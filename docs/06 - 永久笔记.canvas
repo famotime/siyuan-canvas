@@ -1,0 +1,24 @@
+{
+	"nodes":[
+		{"type":"group","id":"7f042ac9475cdb19","x":-402,"y":-351,"width":1828,"height":1321,"color":"2","label":"文章输出"},
+		{"type":"group","id":"31f63a74a6a84ced","x":-402,"y":-1398,"width":1828,"height":989,"color":"5","label":"概念笔记"},
+		{"type":"file","file":"template/📑概念笔记模板.md","id":"c78ac5cffc90a121","x":-382,"y":-1145,"width":400,"height":400},
+		{"type":"file","file":"canvas/media/Pasted image 20230125162712.png","id":"1d4a1681ac5cf680","x":-341,"y":590,"width":400,"height":339},
+		{"type":"text","text":"### 文章拼装区的使用要点\n- **格式处理**\n\t- 选中内容，右键Regex Pipeline: Quote&Tag#Del正则格式化，删除多余的^（上标引用）及标签\n\n- **文件导出**\n\t- *Word*，输入命令：Pandoc Plugin: Export as Word Document (docx)\n\t- *PDF*，输入命令：导出为PDF","id":"d737ab4e0277b350","x":105,"y":590,"width":363,"height":339},
+		{"type":"file","file":"canvas/media/Pasted image 20230125165604.png","id":"3cca26fcf34a814f","x":515,"y":605,"width":880,"height":309},
+		{"type":"file","file":"pages/Prj002_example/知识流动系统.md","id":"cd1ae86f31a0b63a","x":142,"y":-1145,"width":400,"height":400},
+		{"type":"file","file":"assets/booknote/知识流动.pdf","id":"99c31f28fa30463b","x":751,"y":-1342,"width":655,"height":394},
+		{"type":"link","url":"https://player.bilibili.com/player.html?aid=469469361&bvid=BV1T541197BG&cid=728778666&page=1","id":"9ae065bd2cd1d5b4","x":750,"y":-874,"width":656,"height":440},
+		{"type":"file","file":"canvas/media/Pasted image 20230125161522.png","id":"236a55f41dc6da6f","x":-382,"y":-305,"width":1337,"height":752},
+		{"type":"file","file":"canvas/media/Pasted image 20230125161548.png","id":"da36628ae84596bd","x":1103,"y":-305,"width":303,"height":752}
+	],
+	"edges":[
+		{"id":"bf90b0c6bba86b65","fromNode":"236a55f41dc6da6f","fromSide":"right","toNode":"da36628ae84596bd","toSide":"left","label":"Memos卡片区"},
+		{"id":"a2cae6d36615057f","fromNode":"236a55f41dc6da6f","fromSide":"bottom","toNode":"1d4a1681ac5cf680","toSide":"top","label":"检索区，按住Ctrl键打开悬浮窗口"},
+		{"id":"8fe886982d02b29d","fromNode":"236a55f41dc6da6f","fromSide":"bottom","toNode":"d737ab4e0277b350","toSide":"top"},
+		{"id":"6f522a3e453a55a5","fromNode":"236a55f41dc6da6f","fromSide":"bottom","toNode":"3cca26fcf34a814f","toSide":"top","label":"版本控制：Ctrl+q"},
+		{"id":"869080ec2f1d415c","fromNode":"c78ac5cffc90a121","fromSide":"right","toNode":"cd1ae86f31a0b63a","toSide":"left","label":"内容来源"},
+		{"id":"aec76cf416f91eb0","fromNode":"cd1ae86f31a0b63a","fromSide":"right","toNode":"9ae065bd2cd1d5b4","toSide":"left","label":"B站视频"},
+		{"id":"e0c5411c3fb6cc9d","fromNode":"cd1ae86f31a0b63a","fromSide":"right","toNode":"99c31f28fa30463b","toSide":"left","label":"课件"}
+	]
+}
