@@ -99,6 +99,15 @@ export function removeCanvasNode(document: CanvasDocument, nodeId: string): Canv
   }
 }
 
+export function removeCanvasNodes(document: CanvasDocument, nodeIds: string[]): CanvasDocument {
+  const removedIds = new Set(nodeIds)
+  return {
+    ...document,
+    nodes: document.nodes.filter((node) => !removedIds.has(node.id)),
+    edges: document.edges.filter((edge) => !removedIds.has(edge.fromNode) && !removedIds.has(edge.toNode)),
+  }
+}
+
 export function removeCanvasEdge(document: CanvasDocument, edgeId: string): CanvasDocument {
   return {
     ...document,
@@ -121,6 +130,29 @@ export function setCanvasNodeGeometry(
       return {
         ...node,
         ...geometry,
+      }
+    }),
+  }
+}
+
+export function translateCanvasNodes(
+  document: CanvasDocument,
+  nodeIds: string[],
+  deltaX: number,
+  deltaY: number,
+): CanvasDocument {
+  const movedIds = new Set(nodeIds)
+  return {
+    ...document,
+    nodes: document.nodes.map((node) => {
+      if (!movedIds.has(node.id)) {
+        return node
+      }
+
+      return {
+        ...node,
+        x: node.x + deltaX,
+        y: node.y + deltaY,
       }
     }),
   }

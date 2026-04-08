@@ -32,6 +32,12 @@
         >
           Export
         </button>
+        <button
+          class="toolbar__button"
+          @click="editor.openSettings"
+        >
+          Settings
+        </button>
       </div>
       <div class="toolbar__group">
         <button
@@ -139,10 +145,10 @@
             class="canvas-node"
             :class="[
               `canvas-node--${node.type}`,
-              { 'canvas-node--selected': editor.state.selectedNodeId === node.id },
+              { 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id) },
             ]"
             :style="editor.getNodeStyle(node)"
-            @click.stop="editor.selectNode(node.id)"
+            @click.stop="editor.selectNode(node.id, $event)"
             @dblclick.stop="editor.activateNode(node)"
           >
             <header
@@ -159,11 +165,25 @@
                 </div>
               </template>
               <template v-else-if="node.type === 'file'">
-                <div class="canvas-node__title">
-                  {{ editor.getFileName(node.file) }}
-                </div>
-                <div class="canvas-node__meta">
-                  {{ node.file }}
+                <div class="file-card">
+                  <span class="file-card__badge">
+                    {{ editor.getFileNodePreview(node).badge }}
+                  </span>
+                  <img
+                    v-if="editor.getFileNodePreview(node).imageSrc"
+                    :src="editor.getFileNodePreview(node).imageSrc"
+                    alt=""
+                    class="file-card__image"
+                  >
+                  <div class="canvas-node__title">
+                    {{ editor.getFileNodePreview(node).headline }}
+                  </div>
+                  <div class="canvas-node__meta">
+                    {{ editor.getFileNodePreview(node).detail }}
+                  </div>
+                  <div class="file-card__helper">
+                    {{ editor.getFileNodePreview(node).helper }}
+                  </div>
                 </div>
               </template>
               <template v-else-if="node.type === 'link'">
@@ -194,6 +214,27 @@
           <p>{{ editor.state.filePath || "Unsaved workspace path" }}</p>
           <p>{{ editor.state.isDirty ? "Pending save" : "In sync" }}</p>
           <div
+            v-if="editor.state.conflict"
+            class="conflict-panel"
+          >
+            <strong>External change detected</strong>
+            <span>The file changed on disk after it was loaded.</span>
+            <div class="conflict-panel__actions">
+              <button
+                class="toolbar__button"
+                @click="editor.loadConflictVersion"
+              >
+                Load disk version
+              </button>
+              <button
+                class="toolbar__button toolbar__button--primary"
+                @click="editor.overwriteConflictVersion"
+              >
+                Overwrite disk version
+              </button>
+            </div>
+          </div>
+          <div
             v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
             class="issues"
           >
@@ -207,8 +248,43 @@
           </div>
         </section>
 
+        <section class="inspector__section">
+          <h2>Recent</h2>
+          <div
+            v-if="editor.recentFiles.length"
+            class="recent-list"
+          >
+            <button
+              v-for="recent in editor.recentFiles"
+              :key="recent.path"
+              class="recent-list__item"
+              @click="editor.openRecentPath(recent.path)"
+            >
+              <strong>{{ recent.title }}</strong>
+              <span>{{ recent.path }}</span>
+            </button>
+          </div>
+          <p v-else>
+            No recent workspace files yet.
+          </p>
+        </section>
+
         <section
-          v-if="editor.selectedNode"
+          v-if="editor.selectedNodeCount > 1"
+          class="inspector__section"
+        >
+          <h2>Selection</h2>
+          <p>{{ editor.selectedNodeCount }} nodes selected.</p>
+          <button
+            class="toolbar__button"
+            @click="editor.deleteSelection"
+          >
+            Delete selected nodes
+          </button>
+        </section>
+
+        <section
+          v-if="editor.selectedNode && editor.selectedNodeCount === 1"
           class="inspector__section"
         >
           <h2>Node</h2>
@@ -282,7 +358,7 @@
         </section>
 
         <section
-          v-if="editor.selectedNode"
+          v-if="editor.selectedNode && editor.selectedNodeCount === 1"
           class="inspector__section"
         >
           <h2>Create Edge</h2>
@@ -599,6 +675,36 @@ async function handleImport(event: Event) {
   word-break: break-all;
 }
 
+.file-card {
+  display: grid;
+  gap: 8px;
+}
+
+.file-card__badge {
+  justify-self: start;
+  border-radius: 999px;
+  background: rgba(22, 54, 31, 0.12);
+  color: #274332;
+  padding: 4px 8px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.file-card__image {
+  width: 100%;
+  max-height: 132px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 33, 22, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.file-card__helper {
+  font-size: 12px;
+  color: #506355;
+}
+
 .canvas-node__resize {
   position: absolute;
   right: 10px;
@@ -665,6 +771,45 @@ async function handleImport(event: Event) {
   display: grid;
   gap: 8px;
   font-size: 12px;
+}
+
+.conflict-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(184, 79, 42, 0.1);
+  color: #6f2f18;
+}
+
+.conflict-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recent-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recent-list__item {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  border: 1px solid rgba(17, 33, 22, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.recent-list__item span {
+  font-size: 12px;
+  color: #6d796f;
+  word-break: break-all;
 }
 
 .issues strong {

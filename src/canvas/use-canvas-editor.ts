@@ -6,27 +6,47 @@ import type {
   CanvasSide,
 } from "@/canvas/types"
 import type { CanvasTabBootstrap } from "@/main"
+import type {
+  CanvasPluginSettings,
+  CanvasRecentFile,
+} from "@/canvas/plugin-data"
+import type { ResolvedCanvasFileNode } from "@/canvas/file-node-resolution"
 
-import { showMessage } from "siyuan"
+import {
+  openTab,
+  showMessage,
+} from "siyuan"
 import {
   computed,
+  onBeforeUnmount,
   onMounted,
   reactive,
   ref,
   watch,
 } from "vue"
 import {
+  findSiyuanAssetByPath,
+  findSiyuanDocumentByPath,
+} from "@/api"
+import {
   createCanvasEdge,
   createCanvasNode,
   createEmptyCanvasDocument,
   removeCanvasEdge,
   removeCanvasNode,
+  removeCanvasNodes,
   setCanvasNodeGeometry,
   upsertCanvasEdge,
   upsertCanvasNode,
 } from "@/canvas/document"
 import { createCanvasEditorBindings } from "@/canvas/editor-bindings"
 import { CanvasEditorState } from "@/canvas/editor-state"
+import { createCanvasFileNodePreview } from "@/canvas/file-node-preview"
+import {
+  createFallbackCanvasFileNode,
+  resolveCanvasFileNode,
+} from "@/canvas/file-node-resolution"
+import { createDefaultCanvasPluginSettings } from "@/canvas/plugin-data"
 import { CanvasFileService } from "@/canvas/file-service"
 import {
   parseCanvasDocument,
@@ -35,6 +55,10 @@ import {
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
 
 interface CanvasPlugin extends Plugin {
+  getCanvasSettings?: () => CanvasPluginSettings
+  getRecentCanvasFiles?: () => CanvasRecentFile[]
+  rememberRecentCanvas?: (path: string, title?: string) => Promise<void>
+  openCanvasSettings?: () => void
   openCanvasTab?: (bootstrap?: CanvasTabBootstrap) => Promise<void>
 }
 
@@ -62,7 +86,9 @@ export function useCanvasEditor(
     y: 0,
   })
   const fileInputRef = ref<HTMLInputElement>()
+  const fileNodeMeta = ref<Record<string, ResolvedCanvasFileNode>>({})
   const stageRef = ref<HTMLElement>()
+  const recentFiles = ref<CanvasRecentFile[]>([])
   const suggestedFilename = ref(bootstrap.title || "Untitled.canvas")
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
@@ -81,13 +107,23 @@ export function useCanvasEditor(
   const selectedNode = computed(
     () => state.document.nodes.find((node) => node.id === state.selectedNodeId) || null,
   )
+  const selectedNodeCount = computed(() => state.selectedNodeIds.length)
   const selectedEdge = computed(
     () => state.document.edges.find((edge) => edge.id === state.selectedEdgeId) || null,
   )
   const edgeTargets = computed(() =>
     state.document.nodes.filter((node) => node.id !== state.selectedNodeId),
   )
-  const canDelete = computed(() => Boolean(selectedNode.value || selectedEdge.value))
+  const canDelete = computed(() => Boolean(state.selectedNodeIds.length || selectedEdge.value))
+  let fileNodeResolveVersion = 0
+
+  function getPluginSettings(): CanvasPluginSettings {
+    return (plugin as CanvasPlugin).getCanvasSettings?.() ?? createDefaultCanvasPluginSettings()
+  }
+
+  function refreshRecentFiles() {
+    recentFiles.value = (plugin as CanvasPlugin).getRecentCanvasFiles?.() ?? []
+  }
 
   watch(
     () => [state.filePath, state.isDirty, suggestedFilename.value],
@@ -106,10 +142,18 @@ export function useCanvasEditor(
     return path.split("/").pop() || path
   }
 
+  function getResolvedFileNode(node: CanvasNode): ResolvedCanvasFileNode {
+    if (node.type !== "file") {
+      throw new Error("Resolved file-node metadata requested for a non-file node.")
+    }
+
+    return fileNodeMeta.value[node.id] || createFallbackCanvasFileNode(node.file)
+  }
+
   function getNodeTitle(node: CanvasNode): string {
     switch (node.type) {
       case "file":
-        return getFileName(node.file)
+        return getResolvedFileNode(node).title
       case "group":
         return node.label || "Group"
       case "link":
@@ -119,6 +163,30 @@ export function useCanvasEditor(
       default:
         return node.type
     }
+  }
+
+  function getFileNodeDescription(node: CanvasNode): string {
+    if (node.type !== "file") {
+      return ""
+    }
+
+    return getResolvedFileNode(node).description
+  }
+
+  function getFileNodeKind(node: CanvasNode): string {
+    if (node.type !== "file") {
+      return ""
+    }
+
+    return getResolvedFileNode(node).kind
+  }
+
+  function getFileNodePreview(node: CanvasNode) {
+    if (node.type !== "file") {
+      throw new Error("File-node preview requested for a non-file node.")
+    }
+
+    return createCanvasFileNodePreview(getResolvedFileNode(node))
   }
 
   function getNodeStyle(node: CanvasNode) {
@@ -226,11 +294,37 @@ export function useCanvasEditor(
     }
 
     const normalized = trimmed.endsWith(".canvas") ? trimmed : `${trimmed}.canvas`
-    return normalized.startsWith("/") ? normalized : `/data/storage/siyuan-canvas/${normalized}`
+    const baseDirectory = getPluginSettings().defaultCanvasDirectory
+    return normalized.startsWith("/") ? normalized : `${baseDirectory}/${normalized}`
   }
 
-  function selectNode(nodeId: string) {
-    state.selectNode(nodeId)
+  async function rememberRecentPath(path: string) {
+    await (plugin as CanvasPlugin).rememberRecentCanvas?.(path, getFileName(path))
+    refreshRecentFiles()
+  }
+
+  async function refreshFileNodeMetadata() {
+    const version = ++fileNodeResolveVersion
+    const fileNodes = state.document.nodes.filter((node): node is Extract<CanvasNode, { type: "file" }> => node.type === "file")
+    const nextEntries = await Promise.all(fileNodes.map(async (node) => {
+      const resolved = await resolveCanvasFileNode(node.file, {
+        resolveAssetByPath: findSiyuanAssetByPath,
+        resolveDocumentByPath: findSiyuanDocumentByPath,
+      })
+      return [node.id, resolved] as const
+    }))
+
+    if (version !== fileNodeResolveVersion) {
+      return
+    }
+
+    fileNodeMeta.value = Object.fromEntries(nextEntries)
+  }
+
+  function selectNode(nodeId: string, event?: MouseEvent) {
+    state.selectNode(nodeId, {
+      additive: Boolean(event?.ctrlKey || event?.metaKey || event?.shiftKey),
+    })
   }
 
   function selectEdge(edgeId: string) {
@@ -252,8 +346,12 @@ export function useCanvasEditor(
   }
 
   function deleteSelection() {
-    if (selectedNode.value) {
-      commitDocument(removeCanvasNode(state.document, selectedNode.value.id))
+    if (state.selectedNodeIds.length > 0) {
+      commitDocument(
+        state.selectedNodeIds.length === 1
+          ? removeCanvasNode(state.document, state.selectedNodeIds[0]!)
+          : removeCanvasNodes(state.document, state.selectedNodeIds),
+      )
       state.selectNode()
       return
     }
@@ -266,6 +364,9 @@ export function useCanvasEditor(
 
   function updateNode(node: CanvasNode) {
     commitDocument(upsertCanvasNode(state.document, node))
+    if (node.type === "file") {
+      void refreshFileNodeMetadata()
+    }
   }
 
   function updateNodeField(field: string, value: string) {
@@ -347,7 +448,10 @@ export function useCanvasEditor(
 
   async function openPath() {
     // eslint-disable-next-line no-alert
-    const input = window.prompt("Workspace path", state.filePath || "/data/storage/siyuan-canvas/untitled.canvas")
+    const input = window.prompt(
+      "Workspace path",
+      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/untitled.canvas`,
+    )
     const path = ensureCanvasPath(input || "")
     if (!path) {
       return
@@ -356,6 +460,7 @@ export function useCanvasEditor(
     try {
       await state.open(path)
       suggestedFilename.value = getFileName(path)
+      await rememberRecentPath(path)
       resetViewport()
     } catch (error) {
       showMessage(error instanceof Error ? error.message : "Unable to open canvas file.", 4000, "error")
@@ -387,7 +492,7 @@ export function useCanvasEditor(
     // eslint-disable-next-line no-alert
     const input = window.prompt(
       "Workspace save path",
-      state.filePath || `/data/storage/siyuan-canvas/${suggestedFilename.value || "untitled.canvas"}`,
+      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/${suggestedFilename.value || "untitled.canvas"}`,
     )
     const path = ensureCanvasPath(input || "")
     if (!path) {
@@ -395,12 +500,59 @@ export function useCanvasEditor(
     }
 
     try {
-      await state.save(path)
+      await state.save(path, {
+        detectExternalChanges: getPluginSettings().detectExternalChanges,
+      })
       suggestedFilename.value = getFileName(path)
+      await rememberRecentPath(path)
       showMessage("Canvas saved to workspace.", 2500, "info")
     } catch (error) {
+      if (state.conflict) {
+        showMessage("Canvas file changed on disk. Review the conflict panel before saving again.", 5000, "error")
+        return
+      }
+
       showMessage(error instanceof Error ? error.message : "Unable to save canvas.", 4000, "error")
     }
+  }
+
+  async function openRecentPath(path: string) {
+    try {
+      await state.open(path)
+      suggestedFilename.value = getFileName(path)
+      await rememberRecentPath(path)
+      resetViewport()
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "Unable to open recent canvas file.", 4000, "error")
+    }
+  }
+
+  async function overwriteConflictVersion() {
+    if (!state.filePath) {
+      return
+    }
+
+    try {
+      await state.save(state.filePath, {
+        detectExternalChanges: getPluginSettings().detectExternalChanges,
+        force: true,
+      })
+      await rememberRecentPath(state.filePath)
+      showMessage("Canvas saved by overwriting the disk version.", 2500, "info")
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "Unable to overwrite the disk version.", 4000, "error")
+    }
+  }
+
+  function loadConflictVersion() {
+    const conflictPath = state.conflict?.path || state.filePath
+    state.loadConflictVersion()
+    suggestedFilename.value = getFileName(conflictPath)
+    showMessage("Loaded the newer canvas version from disk.", 2500, "info")
+  }
+
+  function openSettings() {
+    ;(plugin as CanvasPlugin).openCanvasSettings?.()
   }
 
   function exportCanvas() {
@@ -421,13 +573,43 @@ export function useCanvasEditor(
       return
     }
 
-    if (node.type === "file" && node.file.endsWith(".canvas")) {
-      const path = ensureCanvasPath(node.file)
-      void (plugin as CanvasPlugin).openCanvasTab?.({ path })
+    if (node.type === "file") {
+      const resolved = getResolvedFileNode(node)
+      if (resolved.kind === "canvas") {
+        const path = ensureCanvasPath(node.file)
+        void (plugin as CanvasPlugin).openCanvasTab?.({ path })
+        return
+      }
+
+      if (resolved.kind === "document" && resolved.document) {
+        void openTab({
+          app: plugin.app,
+          doc: {
+            id: resolved.document.id,
+          },
+          keepCursor: true,
+          openNewTab: true,
+        })
+        return
+      }
+
+      if (resolved.kind === "asset" && resolved.asset) {
+        void openTab({
+          app: plugin.app,
+          asset: {
+            path: resolved.asset.openPath,
+          },
+          keepCursor: true,
+          openNewTab: true,
+        })
+        return
+      }
+
+      showMessage(resolved.description || node.file, 2500, "info")
       return
     }
 
-    showMessage(node.type === "file" ? node.file : getNodeTitle(node), 2500, "info")
+    showMessage(getNodeTitle(node), 2500, "info")
   }
 
   function startPointerGesture(event: PointerEvent, onMove: (dx: number, dy: number) => void) {
@@ -460,13 +642,36 @@ export function useCanvasEditor(
   }
 
   function startDrag(node: CanvasNode, event: PointerEvent) {
-    const initialX = node.x
-    const initialY = node.y
+    const selectedNodeIds = state.selectedNodeIds.includes(node.id)
+      ? state.selectedNodeIds
+      : [node.id]
+    const initialPositions = new Map(
+      state.document.nodes
+        .filter((candidate) => selectedNodeIds.includes(candidate.id))
+        .map((candidate) => [candidate.id, {
+          x: candidate.x,
+          y: candidate.y,
+        }]),
+    )
+    if (!state.selectedNodeIds.includes(node.id)) {
+      state.selectNode(node.id)
+    }
     startPointerGesture(event, (dx, dy) => {
-      commitDocument(setCanvasNodeGeometry(state.document, node.id, {
-        x: Math.round(initialX + dx / viewport.scale),
-        y: Math.round(initialY + dy / viewport.scale),
-      }))
+      const deltaX = Math.round(dx / viewport.scale)
+      const deltaY = Math.round(dy / viewport.scale)
+      const movedDocument = state.document.nodes.reduce((document, candidate) => {
+        const initial = initialPositions.get(candidate.id)
+        if (!initial) {
+          return document
+        }
+
+        return setCanvasNodeGeometry(document, candidate.id, {
+          x: initial.x + deltaX,
+          y: initial.y + deltaY,
+        })
+      }, state.document)
+
+      commitDocument(movedDocument)
     })
   }
 
@@ -479,6 +684,46 @@ export function useCanvasEditor(
         height: Math.max(node.type === "group" ? 120 : 100, Math.round(initialHeight + dy / viewport.scale)),
       }))
     })
+  }
+
+  function isEditingTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+      return false
+    }
+
+    return Boolean(target.closest("input, textarea, select, [contenteditable='true']"))
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (isEditingTarget(event.target)) {
+      return
+    }
+
+    const key = event.key.toLowerCase()
+    const isAccelerator = event.ctrlKey || event.metaKey
+
+    if ((event.key === "Delete" || event.key === "Backspace") && canDelete.value) {
+      event.preventDefault()
+      deleteSelection()
+      return
+    }
+
+    if (event.key === "Escape") {
+      state.selectNode()
+      state.selectEdge()
+      return
+    }
+
+    if (isAccelerator && key === "a") {
+      event.preventDefault()
+      state.selectAllNodes()
+      return
+    }
+
+    if (isAccelerator && key === "s") {
+      event.preventDefault()
+      void save()
+    }
   }
 
   onMounted(async () => {
@@ -495,6 +740,7 @@ export function useCanvasEditor(
       try {
         await state.open(bootstrap.path)
         suggestedFilename.value = getFileName(bootstrap.path)
+        await rememberRecentPath(bootstrap.path)
       } catch (error) {
         showMessage(error instanceof Error ? error.message : "Unable to open canvas file.", 4000, "error")
       }
@@ -502,8 +748,25 @@ export function useCanvasEditor(
       newCanvas()
     }
 
+    refreshRecentFiles()
+    await refreshFileNodeMetadata()
     resetViewport()
+    window.addEventListener("keydown", handleKeydown)
   })
+
+  onBeforeUnmount(() => {
+    window.removeEventListener("keydown", handleKeydown)
+  })
+
+  watch(
+    () => state.document.nodes
+      .filter((node) => node.type === "file")
+      .map((node) => `${node.id}:${node.file}`),
+    () => {
+      void refreshFileNodeMetadata()
+    },
+    { deep: false },
+  )
 
   return createCanvasEditorBindings(
     {
@@ -516,6 +779,9 @@ export function useCanvasEditor(
       getEdgeLabelPosition,
       getEdgePath,
       getFileName,
+      getFileNodeDescription,
+      getFileNodeKind,
+      getFileNodePreview,
       getNodeStyle,
       getNodeTitle,
       importCanvas,
@@ -531,6 +797,7 @@ export function useCanvasEditor(
       selectNode,
       selectedEdge,
       selectedNode,
+      selectedNodeCount,
       sides: SIDES,
       stageRef,
       startDrag,
@@ -550,6 +817,11 @@ export function useCanvasEditor(
       createEdgeFromSelection,
       deleteSelection,
       activateNode,
+      loadConflictVersion,
+      openRecentPath,
+      openSettings,
+      overwriteConflictVersion,
+      recentFiles,
     },
     ["fileInputRef", "stageRef"],
   )

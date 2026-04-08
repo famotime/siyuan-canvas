@@ -5,7 +5,10 @@ import {
   vi,
 } from "vitest"
 
-import { CanvasFileService } from "@/canvas/file-service"
+import {
+  CanvasExternalChangeError,
+  CanvasFileService,
+} from "@/canvas/file-service"
 
 describe("canvas file service", () => {
   it("loads and parses a canvas document from a gateway", async () => {
@@ -71,5 +74,61 @@ describe("canvas file service", () => {
       ],
       edges: [],
     })
+  })
+
+  it("detects external file changes before saving", async () => {
+    const gateway = {
+      readText: vi.fn(async () =>
+        JSON.stringify({
+          nodes: [
+            {
+              id: "n1",
+              type: "text",
+              text: "changed on disk",
+              x: 0,
+              y: 0,
+              width: 320,
+              height: 180,
+            },
+          ],
+          edges: [],
+        })),
+      writeText: vi.fn(async () => undefined),
+    }
+
+    const service = new CanvasFileService(gateway)
+
+    await expect(service.save("/data/storage/canvas/example.canvas", {
+      nodes: [
+        {
+          id: "n1",
+          type: "text",
+          text: "edited in memory",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+      ],
+      edges: [],
+    }, {
+      baseRaw: `${JSON.stringify({
+        nodes: [
+          {
+            id: "n1",
+            type: "text",
+            text: "original",
+            x: 0,
+            y: 0,
+            width: 320,
+            height: 180,
+          },
+        ],
+        edges: [],
+      }, null, "\t")}\n`,
+      detectExternalChanges: true,
+    })).rejects.toBeInstanceOf(CanvasExternalChangeError)
+
+    expect(gateway.writeText).not.toHaveBeenCalled()
   })
 })

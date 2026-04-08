@@ -7,7 +7,9 @@ import {
 import {
   createEmptyCanvasDocument,
   removeCanvasNode,
+  removeCanvasNodes,
   setCanvasNodeGeometry,
+  translateCanvasNodes,
   upsertCanvasEdge,
   upsertCanvasNode,
 } from "@/canvas/document"
@@ -78,5 +80,101 @@ describe("canvas document operations", () => {
       label: "scope",
       color: "2",
     })
+  })
+
+  it("removing multiple nodes removes their related edges", () => {
+    const document = {
+      nodes: [
+        {
+          id: "n1",
+          type: "text",
+          text: "one",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+        {
+          id: "n2",
+          type: "text",
+          text: "two",
+          x: 400,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+        {
+          id: "n3",
+          type: "text",
+          text: "three",
+          x: 800,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+      ],
+      edges: [
+        {
+          id: "e1",
+          fromNode: "n1",
+          fromSide: "right",
+          toNode: "n2",
+          toSide: "left",
+        },
+        {
+          id: "e2",
+          fromNode: "n2",
+          fromSide: "right",
+          toNode: "n3",
+          toSide: "left",
+        },
+      ],
+    }
+
+    const next = removeCanvasNodes(document, ["n1", "n2"])
+
+    expect(next.nodes.map((node) => node.id)).toEqual(["n3"])
+    expect(next.edges).toEqual([])
+  })
+
+  it("translates a group of selected nodes together", () => {
+    const document = {
+      nodes: [
+        {
+          id: "n1",
+          type: "text",
+          text: "one",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+        {
+          id: "n2",
+          type: "text",
+          text: "two",
+          x: 400,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+      ],
+      edges: [],
+    }
+
+    const next = translateCanvasNodes(document, ["n1", "n2"], 30, -15)
+
+    expect(next.nodes).toMatchObject([
+      {
+        id: "n1",
+        x: 30,
+        y: -15,
+      },
+      {
+        id: "n2",
+        x: 430,
+        y: -15,
+      },
+    ])
   })
 })

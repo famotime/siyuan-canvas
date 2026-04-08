@@ -8,10 +8,61 @@
 
 import { fetchSyncPost, IWebSocketData } from "siyuan";
 
+export interface ISiyuanResolvedDocument {
+  hpath: string;
+  id: string;
+  path: string;
+  title: string;
+}
+
+export interface ISiyuanResolvedAsset {
+  name: string;
+  openPath: string;
+  path: string;
+  title?: string;
+}
+
 async function request(url: string, data: any) {
   let response: IWebSocketData = await fetchSyncPost(url, data);
   let res = response.code === 0 ? response.data : null;
   return res;
+}
+
+function escapeSqlString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function getFileName(path: string): string {
+  const parts = path.split("/");
+  return parts[parts.length - 1] || path;
+}
+
+function uniqueValues(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function createDocumentPathCandidates(path: string): { hpaths: string[]; storagePaths: string[] } {
+  const trimmed = path.trim();
+  const withoutMarkdownExtension = trimmed.replace(/\.(markdown|md)$/i, "");
+  return {
+    hpaths: uniqueValues([
+      trimmed.startsWith("/") ? trimmed : `/${trimmed}`,
+      withoutMarkdownExtension.startsWith("/") ? withoutMarkdownExtension : `/${withoutMarkdownExtension}`,
+    ]),
+    storagePaths: uniqueValues([
+      trimmed,
+      trimmed.startsWith("/") ? trimmed : `/${trimmed}`,
+    ].filter((candidate) => candidate.endsWith(".sy"))),
+  };
+}
+
+function createAssetPathCandidates(path: string): string[] {
+  const trimmed = path.trim().replace(/\\/g, "/");
+  return uniqueValues([
+    trimmed,
+    trimmed.replace(/^\/data\//, ""),
+    trimmed.replace(/^\//, ""),
+  ]);
 }
 
 // **************************************** Noteboook ****************************************
@@ -145,6 +196,71 @@ export async function getIDsByHPath(
   };
   let url = "/api/filetree/getIDsByHPath";
   return request(url, data);
+}
+
+export async function findSiyuanDocumentByPath(path: string): Promise<ISiyuanResolvedDocument | null> {
+  const candidates = createDocumentPathCandidates(path);
+
+  for (const storagePath of candidates.storagePaths) {
+    const rows = await sql(
+      `SELECT id, path, hpath, content
+       FROM blocks
+       WHERE type = 'd' AND path = '${escapeSqlString(storagePath)}'
+       LIMIT 1`,
+    );
+    const row = rows[0];
+    if (row) {
+      return {
+        hpath: row.hpath,
+        id: row.id,
+        path: row.path,
+        title: row.content || getFileName(row.path),
+      };
+    }
+  }
+
+  for (const hpath of candidates.hpaths) {
+    const rows = await sql(
+      `SELECT id, path, hpath, content
+       FROM blocks
+       WHERE type = 'd' AND hpath = '${escapeSqlString(hpath)}'
+       LIMIT 1`,
+    );
+    const row = rows[0];
+    if (row) {
+      return {
+        hpath: row.hpath,
+        id: row.id,
+        path: row.path,
+        title: row.content || getFileName(row.path),
+      };
+    }
+  }
+
+  return null;
+}
+
+export async function findSiyuanAssetByPath(path: string): Promise<ISiyuanResolvedAsset | null> {
+  for (const candidate of createAssetPathCandidates(path)) {
+    const rows = await sql(
+      `SELECT path, name, title
+       FROM assets
+       WHERE path = '${escapeSqlString(candidate)}'
+       LIMIT 1`,
+    );
+    const row = rows[0];
+    if (row) {
+      const assetPath = row.path as string;
+      return {
+        name: row.name || getFileName(assetPath),
+        openPath: assetPath.startsWith("/data/") ? assetPath : `/data/${assetPath.replace(/^\//, "")}`,
+        path: assetPath,
+        title: row.title || undefined,
+      };
+    }
+  }
+
+  return null;
 }
 
 // **************************************** Asset Files ****************************************

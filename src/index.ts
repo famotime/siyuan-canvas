@@ -1,13 +1,23 @@
 import type { Custom } from "siyuan"
+import type {
+  CanvasPluginSettings,
+  CanvasRecentFile,
+} from "@/canvas/plugin-data"
 
 import type { CanvasTabBootstrap } from "@/main"
 import {
   getFrontend,
   openTab,
   Plugin,
+  Setting,
   showMessage,
 } from "siyuan"
 import PluginInfoString from "@/../plugin.json"
+import {
+  createDefaultCanvasPluginData,
+  normalizeCanvasPluginData,
+  rememberRecentCanvasFile,
+} from "@/canvas/plugin-data"
 import {
   bindPlugin,
 
@@ -19,6 +29,7 @@ import "@/index.scss"
 
 const pluginInfo = PluginInfoString as { name: string, version: string }
 const TAB_TYPE = "-canvas-editor"
+const STORAGE_KEY = "canvas-plugin-data"
 
 export default class SiyuanCanvasPlugin extends Plugin {
   public isBrowser = false
@@ -28,8 +39,10 @@ export default class SiyuanCanvasPlugin extends Plugin {
   public isMobile = false
   public platform: SyFrontendTypes
   public readonly version = pluginInfo.version
+  private canvasData = createDefaultCanvasPluginData()
 
   async onload() {
+    this.canvasData = normalizeCanvasPluginData(await this.loadData(STORAGE_KEY))
     const frontend = getFrontend()
     this.platform = frontend as SyFrontendTypes
     this.isMobile = frontend === "mobile" || frontend === "browser-mobile"
@@ -78,10 +91,22 @@ export default class SiyuanCanvasPlugin extends Plugin {
       },
     })
 
+    this.addCommand({
+      langKey: "openCanvasSettings",
+      langText: "Open Canvas Settings",
+      callback: () => {
+        this.openCanvasSettings()
+      },
+    })
+
     showMessage("SiYuan Canvas loaded", 2500, "info")
   }
 
   onunload() {}
+
+  override openSetting(): void {
+    this.openCanvasSettings()
+  }
 
   public async openCanvasTab(bootstrap: CanvasTabBootstrap = {}): Promise<void> {
     const title = bootstrap.title || bootstrap.path?.split("/").pop() || "Untitled.canvas"
@@ -96,6 +121,101 @@ export default class SiyuanCanvasPlugin extends Plugin {
       keepCursor: true,
       openNewTab: true,
     })
+  }
+
+  public getCanvasSettings(): CanvasPluginSettings {
+    return {
+      ...this.canvasData.settings,
+    }
+  }
+
+  public getRecentCanvasFiles(): CanvasRecentFile[] {
+    return this.canvasData.recentFiles.map((item) => ({ ...item }))
+  }
+
+  public async rememberRecentCanvas(path: string, title?: string): Promise<void> {
+    if (!path) {
+      return
+    }
+
+    this.canvasData = rememberRecentCanvasFile(this.canvasData, {
+      openedAt: new Date().toISOString(),
+      path,
+      title: title || path.split("/").pop() || path,
+    })
+    await this.persistCanvasData()
+  }
+
+  public async updateCanvasSettings(settings: Partial<CanvasPluginSettings>): Promise<void> {
+    this.canvasData = normalizeCanvasPluginData({
+      ...this.canvasData,
+      settings: {
+        ...this.canvasData.settings,
+        ...settings,
+      },
+    })
+    await this.persistCanvasData()
+  }
+
+  public openCanvasSettings(): void {
+    const draft = this.getCanvasSettings()
+    const setting = new Setting({
+      width: "560px",
+    })
+    const saveDraft = async () => {
+      await this.updateCanvasSettings(draft)
+    }
+
+    setting.addItem({
+      title: "Default canvas directory",
+      description: "Relative save/open paths will be resolved under this directory.",
+      createActionElement: () => {
+        const input = document.createElement("input")
+        input.className = "b3-text-field fn__flex-center"
+        input.value = draft.defaultCanvasDirectory
+        input.addEventListener("change", () => {
+          draft.defaultCanvasDirectory = input.value.trim() || "/data/storage/siyuan-canvas"
+          void saveDraft()
+        })
+        return input
+      },
+    })
+    setting.addItem({
+      title: "Recent canvas file limit",
+      description: "Controls how many recent canvas paths are shown in the editor.",
+      createActionElement: () => {
+        const input = document.createElement("input")
+        input.className = "b3-text-field fn__flex-center"
+        input.type = "number"
+        input.min = "1"
+        input.max = "20"
+        input.value = draft.recentFilesLimit.toString()
+        input.addEventListener("change", () => {
+          const nextValue = Number.parseInt(input.value, 10)
+          draft.recentFilesLimit = Number.isNaN(nextValue) ? 8 : Math.min(20, Math.max(1, nextValue))
+          input.value = draft.recentFilesLimit.toString()
+          void saveDraft()
+        })
+        return input
+      },
+    })
+    setting.addItem({
+      title: "Detect external file changes",
+      description: "Warn before saving if the underlying canvas file changed on disk.",
+      createActionElement: () => {
+        const input = document.createElement("input")
+        input.type = "checkbox"
+        input.checked = draft.detectExternalChanges
+        input.addEventListener("change", () => {
+          draft.detectExternalChanges = input.checked
+          void saveDraft()
+        })
+        return input
+      },
+    })
+
+    this.setting = setting
+    setting.open(this.name)
   }
 
   private registerCanvasTab(): void {
@@ -113,5 +233,9 @@ export default class SiyuanCanvasPlugin extends Plugin {
         unmountCanvasApp(this.element as HTMLElement)
       },
     })
+  }
+
+  private async persistCanvasData(): Promise<void> {
+    await this.saveData(STORAGE_KEY, this.canvasData)
   }
 }
