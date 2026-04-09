@@ -169,15 +169,19 @@
             :style="editor.getNodeStyle(node)"
             @pointerdown.stop="editor.handleNodePointerDown(node, $event)"
             @click.stop="editor.selectNode(node.id, $event)"
-            @dblclick.stop="editor.activateNode(node)"
+            @dblclick.stop="handleNodeDoubleClick(node)"
           >
-            <header class="canvas-node__header">
-              <span>{{ editor.getNodeTitle(node) }}</span>
-              <span class="canvas-node__kind">{{ node.type }}</span>
-            </header>
             <div class="canvas-node__body">
               <template v-if="node.type === 'text'">
+                <textarea
+                  v-if="editingNodeId === node.id"
+                  :ref="setEditingTextareaRef"
+                  v-model="editingMarkdown"
+                  class="canvas-node__editor"
+                  @blur="commitTextNodeEditing"
+                />
                 <div
+                  v-else
                   class="canvas-node__content markdown-preview"
                   v-html="editor.getRenderedMarkdown(node.text)"
                 />
@@ -496,6 +500,11 @@ import type { Plugin } from "siyuan"
 
 import type { CanvasTabBootstrap } from "@/main"
 import { useCanvasEditor } from "@/canvas/use-canvas-editor"
+import {
+  nextTick,
+  ref,
+} from "vue"
+import type { CanvasNode } from "@/canvas/types"
 
 const props = defineProps<{
   bootstrap: CanvasTabBootstrap
@@ -504,11 +513,43 @@ const props = defineProps<{
 }>()
 
 const editor = useCanvasEditor(props.plugin, props.bootstrap, props.setTitle)
+const editingMarkdown = ref("")
+const editingNodeId = ref("")
+const editingTextareaRef = ref<HTMLTextAreaElement>()
 const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef
 
 function valueFromEvent(event: Event): string {
   return (event.target as HTMLInputElement).value
+}
+
+function setEditingTextareaRef(value: Element | null) {
+  editingTextareaRef.value = value instanceof HTMLTextAreaElement ? value : undefined
+}
+
+function handleNodeDoubleClick(node: CanvasNode) {
+  if (node.type !== "text") {
+    editor.activateNode(node)
+    return
+  }
+
+  editor.selectNode(node.id)
+  editingNodeId.value = node.id
+  editingMarkdown.value = node.text
+  void nextTick(() => {
+    editingTextareaRef.value?.focus()
+    editingTextareaRef.value?.setSelectionRange(editingMarkdown.value.length, editingMarkdown.value.length)
+  })
+}
+
+function commitTextNodeEditing() {
+  if (!editingNodeId.value) {
+    return
+  }
+
+  editor.updateTextNodeContent(editingNodeId.value, editingMarkdown.value)
+  editingNodeId.value = ""
+  editingMarkdown.value = ""
 }
 
 async function handleImport(event: Event) {
@@ -689,27 +730,9 @@ async function handleImport(event: Event) {
   box-shadow: 0 0 0 2px rgba(184, 79, 42, 0.45), 0 24px 40px rgba(22, 36, 25, 0.14);
 }
 
-.canvas-node__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #4c5f53;
-  background: rgba(255, 255, 255, 0.82);
-  cursor: inherit;
-}
-
-.canvas-node__kind {
-  opacity: 0.65;
-}
-
 .canvas-node__body {
   flex: 1;
-  padding: 14px 12px 18px;
+  padding: 16px 14px 20px;
   overflow: auto;
 }
 
@@ -721,6 +744,20 @@ async function handleImport(event: Event) {
 .canvas-node__content {
   white-space: pre-wrap;
   line-height: 1.6;
+}
+
+.canvas-node__editor {
+  width: 100%;
+  min-height: 100%;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: #25362c;
+  font: inherit;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  box-sizing: border-box;
 }
 
 .markdown-preview {

@@ -373,6 +373,18 @@ export function useCanvasEditor(
     }
   }
 
+  function updateTextNodeContent(nodeId: string, text: string) {
+    const node = state.document.nodes.find((candidate) => candidate.id === nodeId)
+    if (!node || node.type !== "text") {
+      return
+    }
+
+    updateNode({
+      ...node,
+      text,
+    })
+  }
+
   function updateNodeField(field: string, value: string) {
     if (!selectedNode.value) {
       return
@@ -864,6 +876,7 @@ export function useCanvasEditor(
       state,
       suggestedFilename,
       triggerImport,
+      updateTextNodeContent,
       updateEdgeField,
       updateEdgeSide,
       updateNodeField,
