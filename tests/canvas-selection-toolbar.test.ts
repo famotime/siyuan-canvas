@@ -1,14 +1,16 @@
 /* @vitest-environment jsdom */
 
 import {
-  readFile,
-  unlink,
-  writeFile,
-} from "node:fs/promises"
-import { join } from "node:path"
+  readFileSync,
+} from "node:fs"
+import { createRequire } from "node:module"
+import {
+  dirname,
+  extname,
+  resolve,
+} from "node:path"
 
 import {
-  afterAll,
   beforeAll,
   describe,
   expect,
@@ -22,61 +24,130 @@ import {
   nextTick,
 } from "vue"
 import {
+  transpileModule,
+  ModuleKind,
+  ScriptTarget,
+} from "typescript"
+import type { ModuleExports } from "vitest"
+import {
   centerViewportOnBounds,
   resolveDragNodeIds,
   resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
 
-vi.mock("@/api", () => ({
+const apiMock = {
   findSiyuanAssetByPath: vi.fn(async () => null),
   findSiyuanDocumentByPath: vi.fn(async () => null),
-}))
+}
+const siyuanMock = {
+  openTab: vi.fn(),
+  showMessage: vi.fn(),
+}
 
 let useCanvasEditor: typeof import("@/canvas/use-canvas-editor").useCanvasEditor
-let originalSiyuanPackage = ""
-let originalSiyuanIndex: string | null = null
+const nodeRequire = createRequire(import.meta.url)
+const moduleCache = new Map<string, ModuleExports>()
 
-beforeAll(async () => {
-  const siyuanDirectory = join(process.cwd(), "node_modules", "siyuan")
-  const packagePath = join(siyuanDirectory, "package.json")
-  const indexPath = join(siyuanDirectory, "index.js")
+function resolveLocalModulePathSync(specifier: string, importer?: string): string {
+  const basePath = specifier.startsWith("@/")
+    ? resolve(process.cwd(), "src", specifier.slice(2))
+    : resolve(importer ? dirname(importer) : process.cwd(), specifier)
 
-  originalSiyuanPackage = await readFile(packagePath, "utf8")
+  const candidates = [
+    basePath,
+    `${basePath}.ts`,
+    `${basePath}.js`,
+    `${basePath}.json`,
+    resolve(basePath, "index.ts"),
+    resolve(basePath, "index.js"),
+  ]
 
-  try {
-    originalSiyuanIndex = await readFile(indexPath, "utf8")
-  } catch {
-    originalSiyuanIndex = null
+  for (const candidate of candidates) {
+    try {
+      readFileSync(candidate)
+      return candidate
+    } catch {
+      continue
+    }
   }
 
-  const parsedPackage = JSON.parse(originalSiyuanPackage)
-  parsedPackage.main = "index.js"
-  await writeFile(packagePath, `${JSON.stringify(parsedPackage, null, 2)}\n`, "utf8")
-  await writeFile(indexPath, [
-    "export function fetchSyncPost() {",
-    "  return Promise.resolve({ code: 0, data: null, msg: '' })",
-    "}",
-    "export function openTab() {}",
-    "export function showMessage() {}",
-    "",
-  ].join("\n"), "utf8")
+  throw new Error(`Unable to resolve local module: ${specifier}`)
+}
 
-  ;({ useCanvasEditor } = await import("@/canvas/use-canvas-editor"))
-})
-
-afterAll(async () => {
-  const siyuanDirectory = join(process.cwd(), "node_modules", "siyuan")
-  const packagePath = join(siyuanDirectory, "package.json")
-  const indexPath = join(siyuanDirectory, "index.js")
-
-  await writeFile(packagePath, originalSiyuanPackage, "utf8")
-
-  if (originalSiyuanIndex === null) {
-    await unlink(indexPath)
-    return
+function loadModuleExports(path: string): ModuleExports {
+  const normalizedPath = resolve(path)
+  const cached = moduleCache.get(normalizedPath)
+  if (cached) {
+    return cached
   }
 
-  await writeFile(indexPath, originalSiyuanIndex, "utf8")
+  if (extname(normalizedPath) === ".json") {
+    const jsonText = readFileSync(normalizedPath, "utf8")
+    const parsed = JSON.parse(jsonText) as ModuleExports
+    moduleCache.set(normalizedPath, parsed)
+    return parsed
+  }
+
+  const source = readFileSync(normalizedPath, "utf8")
+  const transpiled = transpileModule(source, {
+    compilerOptions: {
+      esModuleInterop: true,
+      module: ModuleKind.CommonJS,
+      target: ScriptTarget.ES2020,
+    },
+    fileName: normalizedPath,
+  })
+  const module = { exports: {} as ModuleExports }
+  moduleCache.set(normalizedPath, module.exports)
+
+  const localRequire = (specifier: string) => {
+    if (specifier === "siyuan") {
+      return siyuanMock
+    }
+
+    if (specifier === "@/api") {
+      return apiMock
+    }
+
+    if (specifier.startsWith("@/") || specifier.startsWith(".")) {
+      const resolvedPath = resolveLocalModulePathSync(specifier, normalizedPath)
+      return loadModuleExports(resolvedPath)
+    }
+
+    return nodeRequire(specifier)
+  }
+
+  const wrapped = new Function(
+    "require",
+    "module",
+    "exports",
+    "__dirname",
+    "__filename",
+    `${transpiled.outputText}
+return module.exports;`,
+  ) as (
+    require: (specifier: string) => ModuleExports,
+    module: { exports: ModuleExports },
+    exports: ModuleExports,
+    __dirname: string,
+    __filename: string,
+  ) => ModuleExports
+
+  const exports = wrapped(
+    localRequire,
+    module,
+    module.exports,
+    dirname(normalizedPath),
+    normalizedPath,
+  )
+
+  moduleCache.set(normalizedPath, exports)
+  return exports
+}
+
+beforeAll(() => {
+  const loaded = loadModuleExports(resolve(process.cwd(), "src", "canvas", "use-canvas-editor.ts"))
+  useCanvasEditor = loaded.useCanvasEditor as typeof useCanvasEditor
 })
 
 describe("selection toolbar helpers", () => {
