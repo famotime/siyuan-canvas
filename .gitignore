@@ -9,4 +9,3 @@ build
 tmp
 .env
 /tmp/
-package.zip
