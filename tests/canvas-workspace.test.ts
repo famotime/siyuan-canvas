@@ -161,4 +161,34 @@ describe("CanvasWorkspace", () => {
     expect(currentEditor.updateTextNodeContent).toHaveBeenCalledWith(node.id, "## 已修改")
     expect(wrapper.find(".canvas-node__editor").exists()).toBe(false)
   })
+
+  it("renders edges with a color-matched arrow marker that stays attached to the line", () => {
+    currentEditor = createEditorMock()
+    currentEditor.state.document.edges = [
+      {
+        fromNode: "text-1",
+        fromSide: "right",
+        id: "edge-1",
+        label: "",
+        toNode: "text-2",
+        toSide: "left",
+      },
+    ]
+    currentEditor.getEdgePath = vi.fn(() => "M 0 0 L 100 0")
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const marker = wrapper.find("#canvas-edge-arrow")
+
+    expect(marker.exists()).toBe(true)
+    expect(marker.attributes("viewBox")).toBe("0 0 14 14")
+    expect(marker.find("path").attributes("fill")).toBe("context-stroke")
+    expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow)")
+  })
 })

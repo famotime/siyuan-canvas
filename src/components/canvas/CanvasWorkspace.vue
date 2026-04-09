@@ -136,6 +136,23 @@
             :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
             :width="editor.board.width"
           >
+            <defs>
+              <marker
+                id="canvas-edge-arrow"
+                markerHeight="14"
+                markerUnits="userSpaceOnUse"
+                markerWidth="14"
+                orient="auto"
+                refX="11"
+                refY="7"
+                viewBox="0 0 14 14"
+              >
+                <path
+                  d="M 1.5 1.5 L 12 7 L 1.5 12.5 L 4.75 7 z"
+                  fill="context-stroke"
+                />
+              </marker>
+            </defs>
             <g
               v-for="edge in editor.state.document.edges"
               :key="edge.id"
@@ -144,6 +161,7 @@
                 class="stage__edge"
                 :class="{ 'stage__edge--selected': editor.state.selectedEdgeId === edge.id }"
                 :d="editor.getEdgePath(edge)"
+                marker-end="url(#canvas-edge-arrow)"
                 @click.stop="editor.selectEdge(edge.id)"
               />
               <text
@@ -694,6 +712,8 @@ async function handleImport(event: Event) {
   fill: none;
   stroke: rgba(44, 62, 48, 0.6);
   stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   pointer-events: stroke;
 }
 
