@@ -217,6 +217,23 @@ describe("selection toolbar helpers", () => {
       "inside",
     ])
   })
+
+  it("includes selected groups' enclosed nodes even when another selected node starts the drag", () => {
+    const document = {
+      nodes: [
+        { id: "group-1", type: "group", label: "Group", x: 0, y: 0, width: 300, height: 220 },
+        { id: "inside", type: "text", text: "inside", x: 20, y: 20, width: 120, height: 80 },
+        { id: "outside", type: "text", text: "outside", x: 420, y: 20, width: 120, height: 80 },
+      ],
+      edges: [],
+    }
+
+    expect(resolveDragNodeIds(document, "outside", ["group-1", "outside"])).toEqual([
+      "group-1",
+      "outside",
+      "inside",
+    ])
+  })
 })
 
 describe("useCanvasEditor selection toolbar integration", () => {
