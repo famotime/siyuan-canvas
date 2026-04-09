@@ -249,6 +249,7 @@
 
         <div
           v-if="editor.selectionToolbar.visible"
+          :ref="setSelectionToolbarRef"
           class="selection-toolbar"
           :class="`selection-toolbar--${editor.selectionToolbar.placement}`"
           :style="{
@@ -625,8 +626,11 @@ import type { Plugin } from "siyuan"
 import type { CanvasTabBootstrap } from "@/main"
 import { useCanvasEditor } from "@/canvas/use-canvas-editor"
 import {
+  onBeforeUnmount,
+  onMounted,
   nextTick,
   ref,
+  watch,
 } from "vue"
 import type { CanvasNode } from "@/canvas/types"
 
@@ -642,6 +646,8 @@ const editingNodeId = ref("")
 const editingTextareaRef = ref<HTMLTextAreaElement>()
 const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef
+const selectionToolbarRef = ref<HTMLElement>()
+let selectionToolbarResizeObserver: ResizeObserver | null = null
 const selectionColorStyles: Record<string, { background: string, border: string, swatch: string }> = {
   "1": {
     background: "rgba(79, 124, 255, 0.18)",
@@ -683,6 +689,12 @@ function setEditingTextareaRef(value: Element | null) {
   editingTextareaRef.value = value instanceof HTMLTextAreaElement ? value : undefined
 }
 
+function setSelectionToolbarRef(value: Element | null) {
+  selectionToolbarRef.value = value instanceof HTMLElement ? value : undefined
+  observeSelectionToolbar()
+  syncSelectionToolbarSize()
+}
+
 function getSelectionColorStyle(color: string) {
   const colorStyle = selectionColorStyles[color]
 
@@ -709,6 +721,44 @@ function handleToolbarEdit() {
   }
 
   handleNodeDoubleClick(editor.selectedNode)
+}
+
+function syncSelectionToolbarSize() {
+  if (!selectionToolbarRef.value) {
+    return
+  }
+
+  const { height, width } = selectionToolbarRef.value.getBoundingClientRect()
+  editor.setSelectionToolbarSize({
+    height: Math.round(height),
+    width: Math.round(width),
+  })
+}
+
+function observeSelectionToolbar() {
+  selectionToolbarResizeObserver?.disconnect()
+  selectionToolbarResizeObserver = null
+
+  if (!selectionToolbarRef.value || typeof ResizeObserver === "undefined") {
+    return
+  }
+
+  selectionToolbarResizeObserver = new ResizeObserver(() => {
+    syncSelectionToolbarSize()
+  })
+  selectionToolbarResizeObserver.observe(selectionToolbarRef.value)
+}
+
+function handleWindowPointerDown(event: PointerEvent) {
+  if (editor.selectionToolbarPopover === "closed") {
+    return
+  }
+
+  if (event.target instanceof HTMLElement && event.target.closest(".selection-toolbar")) {
+    return
+  }
+
+  editor.closeSelectionPopover()
 }
 
 function handleNodeDoubleClick(node: CanvasNode) {
@@ -746,6 +796,23 @@ async function handleImport(event: Event) {
   await editor.importCanvas(file)
   input.value = ""
 }
+
+onMounted(() => {
+  window.addEventListener("pointerdown", handleWindowPointerDown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener("pointerdown", handleWindowPointerDown)
+  selectionToolbarResizeObserver?.disconnect()
+})
+
+watch(
+  () => `${editor.selectionToolbar.visible}|${editor.selectedNodeCount}`,
+  async () => {
+    await nextTick()
+    syncSelectionToolbarSize()
+  },
+)
 </script>
 
 <style scoped lang="scss">

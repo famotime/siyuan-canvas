@@ -55,6 +55,7 @@ function createEditorMock(node = createTextNode()) {
     },
     canDelete: false,
     centerSelectionInViewport: vi.fn(),
+    closeSelectionPopover: vi.fn(),
     createGroupFromSelection: vi.fn(),
     createEdgeFromSelection: vi.fn(),
     deleteSelection: vi.fn(),
@@ -113,6 +114,7 @@ function createEditorMock(node = createTextNode()) {
     },
     selectionToolbarPopover: "closed",
     selectNode: vi.fn(),
+    setSelectionToolbarSize: vi.fn(),
     sides: ["top", "right", "bottom", "left"],
     stageRef: ref<HTMLElement>(),
     startPan: vi.fn(),
@@ -366,5 +368,30 @@ describe("CanvasWorkspace", () => {
 
     expect(card.style.borderColor).toBe("rgb(38, 166, 154)")
     expect(card.style.backgroundColor).toBe("rgba(38, 166, 154, 0.18)")
+  })
+
+  it("closes the open selection popover when clicking outside the toolbar", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.selectionToolbarPopover = "color"
+    currentEditor.state.selectedNodeIds = ["text-1"]
+
+    mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+
+    expect(currentEditor.closeSelectionPopover).toHaveBeenCalledTimes(1)
   })
 })

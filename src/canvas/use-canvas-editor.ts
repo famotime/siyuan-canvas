@@ -82,7 +82,7 @@ interface CanvasPlugin extends Plugin {
 }
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
-const SELECTION_TOOLBAR_SIZE = {
+const DEFAULT_SELECTION_TOOLBAR_SIZE = {
   height: 48,
   width: 220,
 }
@@ -121,6 +121,10 @@ export function useCanvasEditor(
   const recentFiles = ref<CanvasRecentFile[]>([])
   const suggestedFilename = ref(bootstrap.title || "Untitled.canvas")
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
+  const selectionToolbarSize = reactive({
+    height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
+    width: DEFAULT_SELECTION_TOOLBAR_SIZE.width,
+  })
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
   const newEdgeTargetId = ref("")
@@ -178,7 +182,7 @@ export function useCanvasEditor(
           height: stage.clientHeight,
           width: stage.clientWidth,
         },
-        SELECTION_TOOLBAR_SIZE,
+        selectionToolbarSize,
       ),
       visible: state.selectedNodeIds.length > 0,
     }
@@ -359,6 +363,16 @@ export function useCanvasEditor(
 
   function closeSelectionPopover() {
     selectionToolbarPopover.value = "closed"
+  }
+
+  function setSelectionToolbarSize(size: { height: number, width: number }) {
+    if (size.width > 0) {
+      selectionToolbarSize.width = size.width
+    }
+
+    if (size.height > 0) {
+      selectionToolbarSize.height = size.height
+    }
   }
 
   function ensureCanvasPath(input: string): string {
@@ -922,7 +936,11 @@ export function useCanvasEditor(
     }
 
     if (event.key === "Escape") {
-      closeSelectionPopover()
+      if (selectionToolbarPopover.value !== "closed") {
+        closeSelectionPopover()
+        return
+      }
+
       state.selectNode()
       state.selectEdge()
       return
@@ -996,6 +1014,7 @@ export function useCanvasEditor(
       board,
       canDelete,
       centerSelectionInViewport,
+      closeSelectionPopover,
       createGroupFromSelection,
       displayNodes,
       edgeTargets,
@@ -1056,6 +1075,7 @@ export function useCanvasEditor(
       selectionLayoutActions,
       selectionToolbar,
       selectionToolbarPopover,
+      setSelectionToolbarSize,
       toggleInspector,
       toggleSelectionPopover,
     },

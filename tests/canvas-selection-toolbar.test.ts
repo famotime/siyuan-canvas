@@ -278,6 +278,7 @@ describe("useCanvasEditor selection toolbar integration", () => {
     await nextTick()
 
     expect(editor.selectionToolbarPopover).toBe("closed")
+    expect(editor.state.selectedNodeIds).toEqual(["n1"])
 
     wrapper.unmount()
   })
@@ -332,6 +333,59 @@ describe("useCanvasEditor selection toolbar integration", () => {
     await nextTick()
 
     expect(editor.selectionToolbarPopover).toBe("closed")
+
+    wrapper.unmount()
+  })
+
+  it("recomputes toolbar placement when the measured toolbar width changes", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = {
+      app: {},
+    }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          {
+            id: "n1",
+            type: "text",
+            text: "one",
+            x: 100,
+            y: 120,
+            width: 180,
+            height: 90,
+          },
+        ],
+        edges: [],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const stage = document.createElement("div")
+    Object.defineProperty(stage, "clientWidth", { configurable: true, value: 900 })
+    Object.defineProperty(stage, "clientHeight", { configurable: true, value: 700 })
+    editor.stageRef.value = stage
+    editor.viewport.x = -2800
+    editor.viewport.y = -2100
+    editor.selectNode("n1")
+    await nextTick()
+
+    expect(editor.selectionToolbar.visible).toBe(true)
+    const initialX = editor.selectionToolbar.x
+
+    editor.setSelectionToolbarSize({ height: 48, width: 320 })
+    await nextTick()
+
+    expect(editor.selectionToolbar.x).toBe(initialX - 50)
 
     wrapper.unmount()
   })
