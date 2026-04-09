@@ -29,6 +29,11 @@ import {
   findSiyuanDocumentByPath,
 } from "@/api"
 import {
+  createCanvasBoardMetrics,
+  toBoardX,
+  toBoardY,
+} from "@/canvas/board"
+import {
   createCanvasEdge,
   createCanvasNode,
   createEmptyCanvasDocument,
@@ -46,6 +51,7 @@ import {
   createFallbackCanvasFileNode,
   resolveCanvasFileNode,
 } from "@/canvas/file-node-resolution"
+import { renderMarkdownPreview } from "@/canvas/markdown-preview"
 import { createDefaultCanvasPluginSettings } from "@/canvas/plugin-data"
 import { CanvasFileService } from "@/canvas/file-service"
 import {
@@ -53,6 +59,7 @@ import {
   validateCanvasDocument,
 } from "@/canvas/format"
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
+import { scaleViewportAtPoint } from "@/canvas/viewport"
 
 interface CanvasPlugin extends Plugin {
   getCanvasSettings?: () => CanvasPluginSettings
@@ -69,15 +76,6 @@ export function useCanvasEditor(
   bootstrap: CanvasTabBootstrap,
   setTitle: (title: string) => void,
 ) {
-  const board = {
-    height: 4200,
-    width: 5600,
-  }
-  const boardOrigin = {
-    x: board.width / 2,
-    y: board.height / 2,
-  }
-
   const fileService = new CanvasFileService(new SiyuanCanvasTextGateway())
   const state = reactive(new CanvasEditorState(fileService))
   const viewport = reactive({
@@ -94,6 +92,7 @@ export function useCanvasEditor(
   const newEdgeLabel = ref("")
   const newEdgeTargetId = ref("")
   const newEdgeToSide = ref<CanvasSide>("left")
+  const inspectorExpanded = ref(true)
 
   const displayNodes = computed(() =>
     [...state.document.nodes].sort((left, right) => {
@@ -114,6 +113,7 @@ export function useCanvasEditor(
   const edgeTargets = computed(() =>
     state.document.nodes.filter((node) => node.id !== state.selectedNodeId),
   )
+  const board = computed(() => createCanvasBoardMetrics(state.document.nodes))
   const canDelete = computed(() => Boolean(state.selectedNodeIds.length || selectedEdge.value))
   let fileNodeResolveVersion = 0
 
@@ -192,15 +192,15 @@ export function useCanvasEditor(
   function getNodeStyle(node: CanvasNode) {
     return {
       height: `${node.height}px`,
-      left: `${boardOrigin.x + node.x}px`,
-      top: `${boardOrigin.y + node.y}px`,
+      left: `${toBoardX(board.value, node.x)}px`,
+      top: `${toBoardY(board.value, node.y)}px`,
       width: `${node.width}px`,
     }
   }
 
   function getAnchor(node: CanvasNode, side: CanvasSide) {
-    const x = boardOrigin.x + node.x
-    const y = boardOrigin.y + node.y
+    const x = toBoardX(board.value, node.x)
+    const y = toBoardY(board.value, node.y)
 
     switch (side) {
       case "top":
@@ -275,8 +275,8 @@ export function useCanvasEditor(
     const minY = Math.min(...state.document.nodes.map((node) => node.y))
     const maxX = Math.max(...state.document.nodes.map((node) => node.x + node.width))
     const maxY = Math.max(...state.document.nodes.map((node) => node.y + node.height))
-    const centerX = boardOrigin.x + (minX + maxX) / 2
-    const centerY = boardOrigin.y + (minY + maxY) / 2
+    const centerX = toBoardX(board.value, (minX + maxX) / 2)
+    const centerY = toBoardY(board.value, (minY + maxY) / 2)
     viewport.scale = 1
     viewport.x = stage.clientWidth / 2 - centerX
     viewport.y = stage.clientHeight / 2 - centerY
@@ -331,6 +331,10 @@ export function useCanvasEditor(
     state.selectEdge(edgeId)
   }
 
+  function getRenderedMarkdown(text: string): string {
+    return renderMarkdownPreview(text)
+  }
+
   function newCanvas() {
     state.replaceDocument(createEmptyCanvasDocument(), "")
     suggestedFilename.value = "Untitled.canvas"
@@ -339,8 +343,8 @@ export function useCanvasEditor(
 
   function addNode(type: CanvasNode["type"]) {
     const node = createCanvasNode(type)
-    node.x = Math.round((200 - viewport.x) / viewport.scale - boardOrigin.x)
-    node.y = Math.round((160 - viewport.y) / viewport.scale - boardOrigin.y)
+    node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
+    node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
     commitDocument(upsertCanvasNode(state.document, node))
     state.selectNode(node.id)
   }
@@ -444,6 +448,10 @@ export function useCanvasEditor(
 
   function zoomOut() {
     viewport.scale = clamp(Number((viewport.scale - 0.1).toFixed(2)), 0.3, 2.5)
+  }
+
+  function toggleInspector() {
+    inspectorExpanded.value = !inspectorExpanded.value
   }
 
   async function openPath() {
@@ -629,16 +637,66 @@ export function useCanvasEditor(
   }
 
   function startPan(event: PointerEvent) {
-    if ((event.target as HTMLElement).closest(".canvas-node")) {
+    if (event.button !== 2) {
       return
     }
 
+    event.preventDefault()
     const initialX = viewport.x
     const initialY = viewport.y
     startPointerGesture(event, (dx, dy) => {
       viewport.x = initialX + dx
       viewport.y = initialY + dy
     })
+  }
+
+  function handleWheelZoom(event: WheelEvent) {
+    const stage = stageRef.value
+    if (!stage) {
+      return
+    }
+
+    event.preventDefault()
+    const rect = stage.getBoundingClientRect()
+    const point = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    }
+    const nextScale = clamp(
+      Number((viewport.scale * Math.exp(-event.deltaY * 0.0015)).toFixed(2)),
+      0.3,
+      2.5,
+    )
+    const nextViewport = scaleViewportAtPoint(viewport, point, nextScale)
+
+    viewport.scale = nextViewport.scale
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
+  }
+
+  function isAdditiveSelectionGesture(event: MouseEvent | PointerEvent): boolean {
+    return Boolean(event.ctrlKey || event.metaKey || event.shiftKey)
+  }
+
+  function isNodeGestureTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+      return false
+    }
+
+    return !target.closest(".canvas-node__resize, a, button, input, textarea, select")
+  }
+
+  function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
+    if (event.button === 2) {
+      startPan(event)
+      return
+    }
+
+    if (event.button !== 0 || isAdditiveSelectionGesture(event) || !isNodeGestureTarget(event.target)) {
+      return
+    }
+
+    startDrag(node, event)
   }
 
   function startDrag(node: CanvasNode, event: PointerEvent) {
@@ -813,6 +871,10 @@ export function useCanvasEditor(
       viewport,
       zoomIn,
       zoomOut,
+      getRenderedMarkdown,
+      handleNodePointerDown,
+      handleWheelZoom,
+      inspectorExpanded,
       addNode,
       createEdgeFromSelection,
       deleteSelection,
@@ -822,6 +884,7 @@ export function useCanvasEditor(
       openSettings,
       overwriteConflictVersion,
       recentFiles,
+      toggleInspector,
     },
     ["fileInputRef", "stageRef"],
   )

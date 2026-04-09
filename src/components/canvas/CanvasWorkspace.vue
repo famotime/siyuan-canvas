@@ -101,21 +101,40 @@
       </div>
     </header>
 
-    <div class="workspace">
+    <div
+      class="workspace"
+      :class="{ 'workspace--inspector-collapsed': !editor.inspectorExpanded }"
+    >
+      <button
+        class="workspace__inspector-handle"
+        :class="{ 'workspace__inspector-handle--collapsed': !editor.inspectorExpanded }"
+        type="button"
+        :title="editor.inspectorExpanded ? '收起属性栏' : '展开属性栏'"
+        @click="editor.toggleInspector"
+      >
+        {{ editor.inspectorExpanded ? "›" : "‹" }}
+      </button>
+
       <section
         ref="stageRef"
         class="stage"
         @pointerdown="editor.startPan"
+        @wheel="editor.handleWheelZoom"
+        @contextmenu.prevent
       >
         <div
           class="stage__world"
           :style="{
+            height: `${editor.board.height}px`,
             transform: `translate(${editor.viewport.x}px, ${editor.viewport.y}px) scale(${editor.viewport.scale})`,
+            width: `${editor.board.width}px`,
           }"
         >
           <svg
             class="stage__edges"
+            :height="editor.board.height"
             :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
+            :width="editor.board.width"
           >
             <g
               v-for="edge in editor.state.document.edges"
@@ -148,21 +167,20 @@
               { 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id) },
             ]"
             :style="editor.getNodeStyle(node)"
+            @pointerdown.stop="editor.handleNodePointerDown(node, $event)"
             @click.stop="editor.selectNode(node.id, $event)"
             @dblclick.stop="editor.activateNode(node)"
           >
-            <header
-              class="canvas-node__header"
-              @pointerdown.stop="editor.startDrag(node, $event)"
-            >
+            <header class="canvas-node__header">
               <span>{{ editor.getNodeTitle(node) }}</span>
               <span class="canvas-node__kind">{{ node.type }}</span>
             </header>
             <div class="canvas-node__body">
               <template v-if="node.type === 'text'">
-                <div class="canvas-node__content">
-                  {{ node.text }}
-                </div>
+                <div
+                  class="canvas-node__content markdown-preview"
+                  v-html="editor.getRenderedMarkdown(node.text)"
+                />
               </template>
               <template v-else-if="node.type === 'file'">
                 <div class="file-card">
@@ -208,85 +226,92 @@
         </div>
       </section>
 
-      <aside class="inspector">
-        <section class="inspector__section">
-          <h2>Document</h2>
-          <p>{{ editor.state.filePath || "Unsaved workspace path" }}</p>
-          <p>{{ editor.state.isDirty ? "Pending save" : "In sync" }}</p>
-          <div
-            v-if="editor.state.conflict"
-            class="conflict-panel"
-          >
-            <strong>External change detected</strong>
-            <span>The file changed on disk after it was loaded.</span>
-            <div class="conflict-panel__actions">
-              <button
-                class="toolbar__button"
-                @click="editor.loadConflictVersion"
-              >
-                Load disk version
-              </button>
-              <button
-                class="toolbar__button toolbar__button--primary"
-                @click="editor.overwriteConflictVersion"
-              >
-                Overwrite disk version
-              </button>
-            </div>
-          </div>
-          <div
-            v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
-            class="issues"
-          >
+      <aside
+        class="inspector"
+        :class="{ 'inspector--collapsed': !editor.inspectorExpanded }"
+      >
+        <div
+          v-if="editor.inspectorExpanded"
+          class="inspector__content"
+        >
+          <section class="inspector__section">
+            <h2>Document</h2>
+            <p>{{ editor.state.filePath || "Unsaved workspace path" }}</p>
+            <p>{{ editor.state.isDirty ? "Pending save" : "In sync" }}</p>
             <div
-              v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
-              :key="issue.code + issue.path"
+              v-if="editor.state.conflict"
+              class="conflict-panel"
             >
-              <strong>{{ issue.level.toUpperCase() }}</strong>
-              <span>{{ issue.message }}</span>
+              <strong>External change detected</strong>
+              <span>The file changed on disk after it was loaded.</span>
+              <div class="conflict-panel__actions">
+                <button
+                  class="toolbar__button"
+                  @click="editor.loadConflictVersion"
+                >
+                  Load disk version
+                </button>
+                <button
+                  class="toolbar__button toolbar__button--primary"
+                  @click="editor.overwriteConflictVersion"
+                >
+                  Overwrite disk version
+                </button>
+              </div>
             </div>
-          </div>
-        </section>
-
-        <section class="inspector__section">
-          <h2>Recent</h2>
-          <div
-            v-if="editor.recentFiles.length"
-            class="recent-list"
-          >
-            <button
-              v-for="recent in editor.recentFiles"
-              :key="recent.path"
-              class="recent-list__item"
-              @click="editor.openRecentPath(recent.path)"
+            <div
+              v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
+              class="issues"
             >
-              <strong>{{ recent.title }}</strong>
-              <span>{{ recent.path }}</span>
-            </button>
-          </div>
-          <p v-else>
-            No recent workspace files yet.
-          </p>
-        </section>
+              <div
+                v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
+                :key="issue.code + issue.path"
+              >
+                <strong>{{ issue.level.toUpperCase() }}</strong>
+                <span>{{ issue.message }}</span>
+              </div>
+            </div>
+          </section>
 
-        <section
-          v-if="editor.selectedNodeCount > 1"
-          class="inspector__section"
-        >
-          <h2>Selection</h2>
-          <p>{{ editor.selectedNodeCount }} nodes selected.</p>
-          <button
-            class="toolbar__button"
-            @click="editor.deleteSelection"
+          <section class="inspector__section">
+            <h2>Recent</h2>
+            <div
+              v-if="editor.recentFiles.length"
+              class="recent-list"
+            >
+              <button
+                v-for="recent in editor.recentFiles"
+                :key="recent.path"
+                class="recent-list__item"
+                @click="editor.openRecentPath(recent.path)"
+              >
+                <strong>{{ recent.title }}</strong>
+                <span>{{ recent.path }}</span>
+              </button>
+            </div>
+            <p v-else>
+              No recent workspace files yet.
+            </p>
+          </section>
+
+          <section
+            v-if="editor.selectedNodeCount > 1"
+            class="inspector__section"
           >
-            Delete selected nodes
-          </button>
-        </section>
+            <h2>Selection</h2>
+            <p>{{ editor.selectedNodeCount }} nodes selected.</p>
+            <button
+              class="toolbar__button"
+              @click="editor.deleteSelection"
+            >
+              Delete selected nodes
+            </button>
+          </section>
 
-        <section
-          v-if="editor.selectedNode && editor.selectedNodeCount === 1"
-          class="inspector__section"
-        >
+          <section
+            v-if="editor.selectedNode && editor.selectedNodeCount === 1"
+            class="inspector__section"
+          >
           <h2>Node</h2>
           <label>
             X
@@ -355,12 +380,12 @@
               @input="editor.updateNodeField('label', valueFromEvent($event))"
             />
           </label>
-        </section>
+          </section>
 
-        <section
-          v-if="editor.selectedNode && editor.selectedNodeCount === 1"
-          class="inspector__section"
-        >
+          <section
+            v-if="editor.selectedNode && editor.selectedNodeCount === 1"
+            class="inspector__section"
+          >
           <h2>Create Edge</h2>
           <label>
             Target
@@ -405,12 +430,12 @@
           >
             Create edge
           </button>
-        </section>
+          </section>
 
-        <section
-          v-if="editor.selectedEdge"
-          class="inspector__section"
-        >
+          <section
+            v-if="editor.selectedEdge"
+            class="inspector__section"
+          >
           <h2>Edge</h2>
           <label>
             Label
@@ -451,7 +476,8 @@
           >
             Delete edge
           </button>
-        </section>
+          </section>
+        </div>
       </aside>
     </div>
 
@@ -566,9 +592,36 @@ async function handleImport(event: Event) {
 }
 
 .workspace {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 320px;
   min-height: 0;
+}
+
+.workspace__inspector-handle {
+  position: absolute;
+  top: 50%;
+  right: 304px;
+  z-index: 4;
+  width: 28px;
+  height: 56px;
+  border: 1px solid rgba(22, 28, 20, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #274332;
+  box-shadow: 0 10px 24px rgba(22, 36, 25, 0.14);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.workspace__inspector-handle--collapsed {
+  right: 36px;
+}
+
+.workspace--inspector-collapsed {
+  grid-template-columns: 1fr 52px;
 }
 
 .stage {
@@ -578,19 +631,20 @@ async function handleImport(event: Event) {
     linear-gradient(rgba(17, 33, 22, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(17, 33, 22, 0.08) 1px, transparent 1px);
   background-size: 32px 32px;
+  touch-action: none;
 }
 
 .stage__world {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
   transform-origin: 0 0;
 }
 
 .stage__edges {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  left: 0;
+  top: 0;
   overflow: visible;
   pointer-events: none;
 }
@@ -622,7 +676,8 @@ async function handleImport(event: Event) {
   overflow: hidden;
   box-shadow: 0 24px 40px rgba(22, 36, 25, 0.1);
   background: rgba(255, 252, 246, 0.96);
-  cursor: default;
+  cursor: grab;
+  touch-action: none;
 }
 
 .canvas-node--group {
@@ -645,7 +700,7 @@ async function handleImport(event: Event) {
   text-transform: uppercase;
   color: #4c5f53;
   background: rgba(255, 255, 255, 0.82);
-  cursor: grab;
+  cursor: inherit;
 }
 
 .canvas-node__kind {
@@ -666,6 +721,69 @@ async function handleImport(event: Event) {
 .canvas-node__content {
   white-space: pre-wrap;
   line-height: 1.6;
+}
+
+.markdown-preview {
+  white-space: normal;
+  color: #25362c;
+}
+
+.markdown-preview :deep(*) {
+  margin: 0;
+}
+
+.markdown-preview :deep(h1),
+.markdown-preview :deep(h2),
+.markdown-preview :deep(h3),
+.markdown-preview :deep(h4),
+.markdown-preview :deep(h5),
+.markdown-preview :deep(h6) {
+  margin-bottom: 10px;
+  color: #16361f;
+  line-height: 1.3;
+}
+
+.markdown-preview :deep(p),
+.markdown-preview :deep(blockquote),
+.markdown-preview :deep(pre),
+.markdown-preview :deep(ul),
+.markdown-preview :deep(ol) {
+  margin-bottom: 10px;
+}
+
+.markdown-preview :deep(ul),
+.markdown-preview :deep(ol) {
+  padding-left: 20px;
+}
+
+.markdown-preview :deep(blockquote) {
+  border-left: 3px solid rgba(22, 54, 31, 0.22);
+  padding-left: 10px;
+  color: #506355;
+}
+
+.markdown-preview :deep(code) {
+  border-radius: 6px;
+  background: rgba(22, 54, 31, 0.08);
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.markdown-preview :deep(pre) {
+  overflow: auto;
+  border-radius: 10px;
+  background: rgba(22, 54, 31, 0.08);
+  padding: 10px;
+}
+
+.markdown-preview :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-preview :deep(a) {
+  color: #2c6a4a;
+  text-decoration: underline;
 }
 
 .canvas-node__meta {
@@ -722,6 +840,20 @@ async function handleImport(event: Event) {
   padding: 18px;
   border-left: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(250, 248, 242, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inspector--collapsed {
+  overflow: hidden;
+  padding: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.inspector__content {
+  display: grid;
+  gap: 0;
 }
 
 .inspector__section {

@@ -95,4 +95,55 @@ describe("canvas format", () => {
     expect(result.errors).toHaveLength(1)
     expect(result.errors[0]?.code).toBe("edge.missing-node")
   })
+
+  it("falls back to inferred edge sides when imported edges omit them", () => {
+    const raw = JSON.stringify({
+      nodes: [
+        {
+          id: "left",
+          type: "text",
+          text: "left",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+        {
+          id: "right",
+          type: "text",
+          text: "right",
+          x: 600,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+      ],
+      edges: [
+        {
+          id: "e1",
+          fromNode: "left",
+          toNode: "right",
+        },
+      ],
+    })
+
+    const result = parseCanvasDocument(raw)
+
+    expect(result.errors).toEqual([])
+    expect(result.document?.edges).toEqual([
+      {
+        id: "e1",
+        fromNode: "left",
+        fromSide: "right",
+        toNode: "right",
+        toSide: "left",
+      },
+    ])
+    expect(result.warnings).toMatchObject([
+      {
+        code: "edge.side.defaulted",
+        level: "warning",
+      },
+    ])
+  })
 })

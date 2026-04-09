@@ -19,6 +19,35 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value)
 }
 
+function inferEdgeSides(fromNode: CanvasNode | undefined, toNode: CanvasNode | undefined): {
+  fromSide: CanvasSide
+  toSide: CanvasSide
+} {
+  if (!fromNode || !toNode) {
+    return {
+      fromSide: "right",
+      toSide: "left",
+    }
+  }
+
+  const fromCenterX = fromNode.x + fromNode.width / 2
+  const fromCenterY = fromNode.y + fromNode.height / 2
+  const toCenterX = toNode.x + toNode.width / 2
+  const toCenterY = toNode.y + toNode.height / 2
+  const deltaX = toCenterX - fromCenterX
+  const deltaY = toCenterY - fromCenterY
+
+  if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+    return deltaX >= 0
+      ? { fromSide: "right", toSide: "left" }
+      : { fromSide: "left", toSide: "right" }
+  }
+
+  return deltaY >= 0
+    ? { fromSide: "bottom", toSide: "top" }
+    : { fromSide: "top", toSide: "bottom" }
+}
+
 function asNode(candidate: unknown, index: number, errors: CanvasIssue[]): CanvasNode | null {
   if (!isRecord(candidate)) {
     errors.push({
@@ -105,7 +134,13 @@ function asNode(candidate: unknown, index: number, errors: CanvasIssue[]): Canva
   return candidate as CanvasNode
 }
 
-function asEdge(candidate: unknown, index: number, errors: CanvasIssue[]): CanvasEdge | null {
+function asEdge(
+  candidate: unknown,
+  index: number,
+  errors: CanvasIssue[],
+  warnings: CanvasIssue[],
+  nodes: CanvasNode[],
+): CanvasEdge | null {
   if (!isRecord(candidate)) {
     errors.push({
       code: "edge.invalid",
@@ -128,19 +163,34 @@ function asEdge(candidate: unknown, index: number, errors: CanvasIssue[]): Canva
     }
   }
 
-  for (const key of ["fromSide", "toSide"] as const) {
-    if (!VALID_SIDES.includes(candidate[key] as CanvasSide)) {
-      errors.push({
-        code: `edge.${key}`,
-        level: "error",
-        message: `Edge ${key} must be one of ${VALID_SIDES.join(", ")}.`,
-        path: `edges[${index}].${key}`,
-      })
-      return null
-    }
+  const inferredSides = inferEdgeSides(
+    nodes.find((node) => node.id === candidate.fromNode),
+    nodes.find((node) => node.id === candidate.toNode),
+  )
+  const fromSide = VALID_SIDES.includes(candidate.fromSide as CanvasSide)
+    ? candidate.fromSide as CanvasSide
+    : inferredSides.fromSide
+  const toSide = VALID_SIDES.includes(candidate.toSide as CanvasSide)
+    ? candidate.toSide as CanvasSide
+    : inferredSides.toSide
+
+  if (fromSide !== candidate.fromSide || toSide !== candidate.toSide) {
+    warnings.push({
+      code: "edge.side.defaulted",
+      level: "warning",
+      message: "Imported edge side was missing or invalid, so a fallback anchor was used.",
+      path: `edges[${index}]`,
+    })
   }
 
-  return candidate as CanvasEdge
+  return {
+    ...candidate,
+    fromNode: candidate.fromNode,
+    fromSide,
+    id: candidate.id,
+    toNode: candidate.toNode,
+    toSide,
+  } as CanvasEdge
 }
 
 export function validateCanvasDocument(document: CanvasDocument): {
@@ -261,7 +311,7 @@ export function parseCanvasDocument(raw: string): CanvasParseResult {
 
   const edges = Array.isArray(rawEdges)
     ? rawEdges
-        .map((candidate, index) => asEdge(candidate, index, errors))
+        .map((candidate, index) => asEdge(candidate, index, errors, warnings, nodes))
         .filter((edge): edge is CanvasEdge => edge !== null)
     : []
 
