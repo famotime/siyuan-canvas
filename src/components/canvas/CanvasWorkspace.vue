@@ -184,7 +184,7 @@
               `canvas-node--${node.type}`,
               { 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id) },
             ]"
-            :style="editor.getNodeStyle(node)"
+            :style="getCanvasNodeStyle(node)"
             @pointerdown.stop="editor.handleNodePointerDown(node, $event)"
             @click.stop="editor.selectNode(node.id, $event)"
             @dblclick.stop="handleNodeDoubleClick(node)"
@@ -642,13 +642,37 @@ const editingNodeId = ref("")
 const editingTextareaRef = ref<HTMLTextAreaElement>()
 const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef
-const selectionColorStyles: Record<string, string> = {
-  "1": "#4f7cff",
-  "2": "#26a69a",
-  "3": "#f4b400",
-  "4": "#f97316",
-  "5": "#ef4444",
-  "6": "#8b5cf6",
+const selectionColorStyles: Record<string, { background: string, border: string, swatch: string }> = {
+  "1": {
+    background: "rgba(79, 124, 255, 0.18)",
+    border: "#4f7cff",
+    swatch: "#4f7cff",
+  },
+  "2": {
+    background: "rgba(38, 166, 154, 0.18)",
+    border: "#26a69a",
+    swatch: "#26a69a",
+  },
+  "3": {
+    background: "rgba(244, 180, 0, 0.18)",
+    border: "#f4b400",
+    swatch: "#f4b400",
+  },
+  "4": {
+    background: "rgba(249, 115, 22, 0.18)",
+    border: "#f97316",
+    swatch: "#f97316",
+  },
+  "5": {
+    background: "rgba(239, 68, 68, 0.18)",
+    border: "#ef4444",
+    swatch: "#ef4444",
+  },
+  "6": {
+    background: "rgba(139, 92, 246, 0.18)",
+    border: "#8b5cf6",
+    swatch: "#8b5cf6",
+  },
 }
 
 function valueFromEvent(event: Event): string {
@@ -660,8 +684,22 @@ function setEditingTextareaRef(value: Element | null) {
 }
 
 function getSelectionColorStyle(color: string) {
+  const colorStyle = selectionColorStyles[color]
+
   return {
-    backgroundColor: selectionColorStyles[color] || "#64748b",
+    backgroundColor: colorStyle?.swatch || "#64748b",
+  }
+}
+
+function getCanvasNodeStyle(node: CanvasNode) {
+  const colorStyle = "color" in node && node.color ? selectionColorStyles[node.color] : undefined
+
+  return {
+    ...editor.getNodeStyle(node),
+    ...(colorStyle ? {
+      backgroundColor: colorStyle.background,
+      borderColor: colorStyle.border,
+    } : {}),
   }
 }
 

@@ -30,6 +30,19 @@ function createTextNode(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function createLinkNode(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "link-1",
+    type: "link",
+    url: "https://example.com",
+    x: 0,
+    y: 0,
+    width: 320,
+    height: 180,
+    ...overrides,
+  }
+}
+
 function createEditorMock(node = createTextNode()) {
   return {
     addNode: vi.fn(),
@@ -310,5 +323,48 @@ describe("CanvasWorkspace", () => {
     await textarea.trigger("blur")
 
     expect(currentEditor.updateTextNodeContent).toHaveBeenCalledWith(node.id, "## Toolbar edit")
+  })
+
+  it("reuses the existing activate flow when the floating toolbar edits a non-text node", async () => {
+    const node = createLinkNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='selection-toolbar-edit']").trigger("click")
+
+    expect(currentEditor.activateNode).toHaveBeenCalledWith(node)
+    expect(wrapper.find(".canvas-node__editor").exists()).toBe(false)
+  })
+
+  it("renders a visible card color from node.color using the shared selection color mapping", () => {
+    const node = createTextNode({ color: "2" })
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const card = wrapper.find(".canvas-node").element as HTMLElement
+
+    expect(card.style.borderColor).toBe("rgb(38, 166, 154)")
+    expect(card.style.backgroundColor).toBe("rgba(38, 166, 154, 0.18)")
   })
 })
