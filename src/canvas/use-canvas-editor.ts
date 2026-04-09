@@ -1,3 +1,4 @@
+import type { Plugin } from "siyuan"
 import type {
   CanvasBounds,
   CanvasDocument,
@@ -6,12 +7,17 @@ import type {
   CanvasNode,
   CanvasSide,
 } from "@/canvas/types"
+import type { CanvasTabBootstrap } from "@/main"
 import type {
   CanvasPluginSettings,
   CanvasRecentFile,
 } from "@/canvas/plugin-data"
 import type { ResolvedCanvasFileNode } from "@/canvas/file-node-resolution"
 
+import {
+  openTab,
+  showMessage,
+} from "siyuan"
 import {
   computed,
   onBeforeUnmount,
@@ -20,6 +26,10 @@ import {
   ref,
   watch,
 } from "vue"
+import {
+  findSiyuanAssetByPath,
+  findSiyuanDocumentByPath,
+} from "@/api"
 import {
   createCanvasBoardMetrics,
   toBoardX,
@@ -62,13 +72,7 @@ import {
   resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
 
-interface CanvasTabBootstrap {
-  path?: string
-  raw?: string
-  title?: string
-}
-
-interface CanvasPlugin {
+interface CanvasPlugin extends Plugin {
   app: unknown
   getCanvasSettings?: () => CanvasPluginSettings
   getRecentCanvasFiles?: () => CanvasRecentFile[]
@@ -98,43 +102,6 @@ const SELECTION_LAYOUT_ACTIONS: Array<{ action: CanvasNodeLayoutAction, label: s
   { action: "stretch-horizontal", label: "水平拉伸" },
   { action: "stretch-vertical", label: "垂直拉伸" },
 ]
-let siyuanRuntimePromise: Promise<{
-  openTab?: (options: Record<string, unknown>) => unknown
-  showMessage?: (message: string, timeout?: number, type?: string) => unknown
-}> | null = null
-let canvasApiPromise: Promise<{
-  findSiyuanAssetByPath?: (path: string) => Promise<unknown>
-  findSiyuanDocumentByPath?: (path: string) => Promise<unknown>
-}> | null = null
-
-function getSiyuanRuntime() {
-  if (!siyuanRuntimePromise) {
-    const moduleId = ["si", "yuan"].join("")
-    siyuanRuntimePromise = import(/* @vite-ignore */ moduleId).catch(() => ({}))
-  }
-
-  return siyuanRuntimePromise
-}
-
-function getCanvasApiRuntime() {
-  if (!canvasApiPromise) {
-    canvasApiPromise = import("@/api").catch(() => ({}))
-  }
-
-  return canvasApiPromise
-}
-
-function showSiyuanMessage(message: string, timeout?: number, type?: string) {
-  void getSiyuanRuntime().then((runtime) => {
-    runtime.showMessage?.(message, timeout, type)
-  })
-}
-
-function openSiyuanTab(options: Record<string, unknown>) {
-  void getSiyuanRuntime().then((runtime) => {
-    runtime.openTab?.(options)
-  })
-}
 
 export function useCanvasEditor(
   plugin: CanvasPlugin,
@@ -413,16 +380,10 @@ export function useCanvasEditor(
   async function refreshFileNodeMetadata() {
     const version = ++fileNodeResolveVersion
     const fileNodes = state.document.nodes.filter((node): node is Extract<CanvasNode, { type: "file" }> => node.type === "file")
-    if (fileNodes.length === 0) {
-      fileNodeMeta.value = {}
-      return
-    }
-
-    const apiRuntime = await getCanvasApiRuntime()
     const nextEntries = await Promise.all(fileNodes.map(async (node) => {
       const resolved = await resolveCanvasFileNode(node.file, {
-        resolveAssetByPath: apiRuntime.findSiyuanAssetByPath,
-        resolveDocumentByPath: apiRuntime.findSiyuanDocumentByPath,
+        resolveAssetByPath: findSiyuanAssetByPath,
+        resolveDocumentByPath: findSiyuanDocumentByPath,
       })
       return [node.id, resolved] as const
     }))
@@ -624,7 +585,7 @@ export function useCanvasEditor(
 
   function createEdgeFromSelection() {
     if (!selectedNode.value || !newEdgeTargetId.value) {
-      showSiyuanMessage("Select a target node first.", 2500, "error")
+      showMessage("Select a target node first.", 2500, "error")
       return
     }
 
@@ -667,7 +628,7 @@ export function useCanvasEditor(
       await rememberRecentPath(path)
       resetViewport()
     } catch (error) {
-      showSiyuanMessage(error instanceof Error ? error.message : "Unable to open canvas file.", 4000, "error")
+      showMessage(error instanceof Error ? error.message : "Unable to open canvas file.", 4000, "error")
     }
   }
 
@@ -679,7 +640,7 @@ export function useCanvasEditor(
     const raw = await file.text()
     const parsed = parseCanvasDocument(raw)
     if (!parsed.document) {
-      showSiyuanMessage(parsed.errors[0]?.message || "Invalid canvas file.", 4000, "error")
+      showMessage(parsed.errors[0]?.message || "Invalid canvas file.", 4000, "error")
       return
     }
 
@@ -709,14 +670,14 @@ export function useCanvasEditor(
       })
       suggestedFilename.value = getFileName(path)
       await rememberRecentPath(path)
-      showSiyuanMessage("Canvas saved to workspace.", 2500, "info")
+      showMessage("Canvas saved to workspace.", 2500, "info")
     } catch (error) {
       if (state.conflict) {
-        showSiyuanMessage("Canvas file changed on disk. Review the conflict panel before saving again.", 5000, "error")
+        showMessage("Canvas file changed on disk. Review the conflict panel before saving again.", 5000, "error")
         return
       }
 
-      showSiyuanMessage(error instanceof Error ? error.message : "Unable to save canvas.", 4000, "error")
+      showMessage(error instanceof Error ? error.message : "Unable to save canvas.", 4000, "error")
     }
   }
 
@@ -727,7 +688,7 @@ export function useCanvasEditor(
       await rememberRecentPath(path)
       resetViewport()
     } catch (error) {
-      showSiyuanMessage(error instanceof Error ? error.message : "Unable to open recent canvas file.", 4000, "error")
+      showMessage(error instanceof Error ? error.message : "Unable to open recent canvas file.", 4000, "error")
     }
   }
 
@@ -742,9 +703,9 @@ export function useCanvasEditor(
         force: true,
       })
       await rememberRecentPath(state.filePath)
-      showSiyuanMessage("Canvas saved by overwriting the disk version.", 2500, "info")
+      showMessage("Canvas saved by overwriting the disk version.", 2500, "info")
     } catch (error) {
-      showSiyuanMessage(error instanceof Error ? error.message : "Unable to overwrite the disk version.", 4000, "error")
+      showMessage(error instanceof Error ? error.message : "Unable to overwrite the disk version.", 4000, "error")
     }
   }
 
@@ -752,7 +713,7 @@ export function useCanvasEditor(
     const conflictPath = state.conflict?.path || state.filePath
     state.loadConflictVersion()
     suggestedFilename.value = getFileName(conflictPath)
-    showSiyuanMessage("Loaded the newer canvas version from disk.", 2500, "info")
+    showMessage("Loaded the newer canvas version from disk.", 2500, "info")
   }
 
   function openSettings() {
@@ -786,7 +747,7 @@ export function useCanvasEditor(
       }
 
       if (resolved.kind === "document" && resolved.document) {
-        openSiyuanTab({
+        void openTab({
           app: plugin.app,
           doc: {
             id: resolved.document.id,
@@ -798,7 +759,7 @@ export function useCanvasEditor(
       }
 
       if (resolved.kind === "asset" && resolved.asset) {
-        openSiyuanTab({
+        void openTab({
           app: plugin.app,
           asset: {
             path: resolved.asset.openPath,
@@ -809,11 +770,11 @@ export function useCanvasEditor(
         return
       }
 
-      showSiyuanMessage(resolved.description || node.file, 2500, "info")
+      showMessage(resolved.description || node.file, 2500, "info")
       return
     }
 
-    showSiyuanMessage(getNodeTitle(node), 2500, "info")
+    showMessage(getNodeTitle(node), 2500, "info")
   }
 
   function startPointerGesture(event: PointerEvent, onMove: (dx: number, dy: number) => void) {
@@ -995,7 +956,7 @@ export function useCanvasEditor(
         suggestedFilename.value = getFileName(bootstrap.path)
         await rememberRecentPath(bootstrap.path)
       } catch (error) {
-        showSiyuanMessage(error instanceof Error ? error.message : "Unable to open canvas file.", 4000, "error")
+        showMessage(error instanceof Error ? error.message : "Unable to open canvas file.", 4000, "error")
       }
     } else {
       newCanvas()

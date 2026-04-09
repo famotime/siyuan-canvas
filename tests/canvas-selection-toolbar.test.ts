@@ -1,6 +1,15 @@
 /* @vitest-environment jsdom */
 
 import {
+  readFile,
+  unlink,
+  writeFile,
+} from "node:fs/promises"
+import { join } from "node:path"
+
+import {
+  afterAll,
+  beforeAll,
   describe,
   expect,
   it,
@@ -12,7 +21,6 @@ import {
   h,
   nextTick,
 } from "vue"
-import { useCanvasEditor } from "@/canvas/use-canvas-editor"
 import {
   centerViewportOnBounds,
   resolveDragNodeIds,
@@ -23,6 +31,53 @@ vi.mock("@/api", () => ({
   findSiyuanAssetByPath: vi.fn(async () => null),
   findSiyuanDocumentByPath: vi.fn(async () => null),
 }))
+
+let useCanvasEditor: typeof import("@/canvas/use-canvas-editor").useCanvasEditor
+let originalSiyuanPackage = ""
+let originalSiyuanIndex: string | null = null
+
+beforeAll(async () => {
+  const siyuanDirectory = join(process.cwd(), "node_modules", "siyuan")
+  const packagePath = join(siyuanDirectory, "package.json")
+  const indexPath = join(siyuanDirectory, "index.js")
+
+  originalSiyuanPackage = await readFile(packagePath, "utf8")
+
+  try {
+    originalSiyuanIndex = await readFile(indexPath, "utf8")
+  } catch {
+    originalSiyuanIndex = null
+  }
+
+  const parsedPackage = JSON.parse(originalSiyuanPackage)
+  parsedPackage.main = "index.js"
+  await writeFile(packagePath, `${JSON.stringify(parsedPackage, null, 2)}\n`, "utf8")
+  await writeFile(indexPath, [
+    "export function fetchSyncPost() {",
+    "  return Promise.resolve({ code: 0, data: null, msg: '' })",
+    "}",
+    "export function openTab() {}",
+    "export function showMessage() {}",
+    "",
+  ].join("\n"), "utf8")
+
+  ;({ useCanvasEditor } = await import("@/canvas/use-canvas-editor"))
+})
+
+afterAll(async () => {
+  const siyuanDirectory = join(process.cwd(), "node_modules", "siyuan")
+  const packagePath = join(siyuanDirectory, "package.json")
+  const indexPath = join(siyuanDirectory, "index.js")
+
+  await writeFile(packagePath, originalSiyuanPackage, "utf8")
+
+  if (originalSiyuanIndex === null) {
+    await unlink(indexPath)
+    return
+  }
+
+  await writeFile(indexPath, originalSiyuanIndex, "utf8")
+})
 
 describe("selection toolbar helpers", () => {
   it("preserves viewport scale while centering bounds in the stage", () => {
