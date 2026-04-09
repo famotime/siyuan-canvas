@@ -77,10 +77,16 @@ export function resolveDragNodeIds(
   selectedNodeIds: string[],
 ): string[] {
   const draggedNode = document.nodes.find((node) => node.id === draggedNodeId)
+  const isDraggedNodeSelected = selectedNodeIds.includes(draggedNodeId)
 
   if (draggedNode?.type === "group") {
-    return [draggedNodeId, ...findCanvasNodesInGroup(document, draggedNodeId)]
+    const containedNodeIds = findCanvasNodesInGroup(document, draggedNodeId)
+    if (!isDraggedNodeSelected) {
+      return [draggedNodeId, ...containedNodeIds]
+    }
+
+    return [...new Set([...selectedNodeIds, ...containedNodeIds])]
   }
 
-  return selectedNodeIds.includes(draggedNodeId) ? selectedNodeIds : [draggedNodeId]
+  return isDraggedNodeSelected ? selectedNodeIds : [draggedNodeId]
 }

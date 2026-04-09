@@ -200,6 +200,23 @@ describe("selection toolbar helpers", () => {
 
     expect(resolveDragNodeIds(document, "group-1", ["group-1"])).toEqual(["group-1", "n1"])
   })
+
+  it("preserves the rest of a mixed selection when dragging a selected group", () => {
+    const document = {
+      nodes: [
+        { id: "group-1", type: "group", label: "Group", x: 0, y: 0, width: 300, height: 220 },
+        { id: "inside", type: "text", text: "inside", x: 20, y: 20, width: 120, height: 80 },
+        { id: "outside", type: "text", text: "outside", x: 420, y: 20, width: 120, height: 80 },
+      ],
+      edges: [],
+    }
+
+    expect(resolveDragNodeIds(document, "group-1", ["group-1", "outside"])).toEqual([
+      "group-1",
+      "outside",
+      "inside",
+    ])
+  })
 })
 
 describe("useCanvasEditor selection toolbar integration", () => {
@@ -241,6 +258,60 @@ describe("useCanvasEditor selection toolbar integration", () => {
     expect(editor.selectionToolbarPopover).toBe("color")
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+    await nextTick()
+
+    expect(editor.selectionToolbarPopover).toBe("closed")
+
+    wrapper.unmount()
+  })
+
+  it("closes the open selection popover when the selection changes", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = {
+      app: {},
+    }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          {
+            id: "n1",
+            type: "text",
+            text: "one",
+            x: 100,
+            y: 120,
+            width: 180,
+            height: 90,
+          },
+          {
+            id: "n2",
+            type: "text",
+            text: "two",
+            x: 400,
+            y: 120,
+            width: 180,
+            height: 90,
+          },
+        ],
+        edges: [],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    editor.selectNode("n1")
+    editor.toggleSelectionPopover("layout")
+    expect(editor.selectionToolbarPopover).toBe("layout")
+
+    editor.selectNode("n2")
     await nextTick()
 
     expect(editor.selectionToolbarPopover).toBe("closed")
