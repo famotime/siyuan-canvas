@@ -5,14 +5,15 @@ import {
 } from "vitest"
 
 import {
-  applyColorToSelectedNodes,
-  computeSelectionBounds,
-  createGroupNodeAroundSelection,
-  findNodesFullyEnclosedByGroup,
+  applyCanvasNodeLayout,
+  createCanvasGroupForNodes,
   createEmptyCanvasDocument,
+  findCanvasNodesInGroup,
+  getCanvasSelectionBounds,
   removeCanvasNode,
   removeCanvasNodes,
   setCanvasNodeGeometry,
+  setCanvasNodesColor,
   translateCanvasNodes,
   upsertCanvasEdge,
   upsertCanvasNode,
@@ -207,7 +208,7 @@ describe("canvas document operations", () => {
       edges: [],
     }
 
-    const bounds = computeSelectionBounds(document, ["n1", "n2"])
+    const bounds = getCanvasSelectionBounds(document, ["n1", "n2"])
 
     expect(bounds).toEqual({
       x: 10,
@@ -244,7 +245,7 @@ describe("canvas document operations", () => {
       edges: [],
     }
 
-    const next = applyColorToSelectedNodes(document, ["n1"], "5")
+    const next = setCanvasNodesColor(document, ["n1"], "5")
 
     expect(next.nodes).toMatchObject([
       {
@@ -283,9 +284,9 @@ describe("canvas document operations", () => {
       edges: [],
     }
 
-    const next = createGroupNodeAroundSelection(document, ["c1", "c2"])
+    const { document: grouped, groupId } = createCanvasGroupForNodes(document, ["c1", "c2"])
 
-    const group = next.nodes.find((node) => node.type === "group")
+    const group = grouped.nodes.find((node) => node.id === groupId)
 
     expect(group).toMatchObject({
       label: "Group",
@@ -339,8 +340,216 @@ describe("canvas document operations", () => {
       edges: [],
     }
 
-    const enclosed = findNodesFullyEnclosedByGroup(document, "g1")
+    const enclosedIds = findCanvasNodesInGroup(document, "g1")
 
-    expect(enclosed.map((node) => node.id)).toEqual(["inside", "border"])
+    expect(enclosedIds).toEqual(["inside", "border"])
+  })
+})
+
+describe("canvas node layout actions", () => {
+  const mapNodesById = <T extends { id: string }>(nodes: T[]) =>
+    nodes.reduce<Record<string, T>>((accumulator, node) => {
+      accumulator[node.id] = node
+      return accumulator
+    }, {})
+
+  it("returns the original document when selection is empty", () => {
+    const document = {
+      nodes: [
+        { id: "n1", type: "text", text: "one", x: 10, y: 20, width: 100, height: 40 },
+      ],
+      edges: [],
+    }
+
+    const next = applyCanvasNodeLayout(document, [], "left-align")
+
+    expect(next).toBe(document)
+  })
+
+  it("aligns selected nodes to left, right, top, and bottom edges only", () => {
+    const document = {
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 40, y: 60, width: 100, height: 80 },
+        { id: "b", type: "text", text: "B", x: 220, y: 120, width: 80, height: 40 },
+        { id: "c", type: "text", text: "C", x: 500, y: 500, width: 40, height: 40 },
+      ],
+      edges: [{ id: "e1", fromNode: "a", fromSide: "right", toNode: "c", toSide: "left" }],
+    }
+
+    const left = applyCanvasNodeLayout(document, ["a", "b"], "left-align")
+    const leftById = mapNodesById(left.nodes)
+    expect(leftById.a).toMatchObject({ x: 40 })
+    expect(leftById.b).toMatchObject({ x: 40 })
+    expect(leftById.c).toMatchObject({ x: 500, y: 500, width: 40, height: 40 })
+    expect(left.edges).toEqual(document.edges)
+
+    const right = applyCanvasNodeLayout(document, ["a", "b"], "right-align")
+    const rightById = mapNodesById(right.nodes)
+    expect(rightById.a).toMatchObject({ x: 200 })
+    expect(rightById.b).toMatchObject({ x: 220 })
+
+    const top = applyCanvasNodeLayout(document, ["a", "b"], "top-align")
+    const topById = mapNodesById(top.nodes)
+    expect(topById.a).toMatchObject({ y: 60 })
+    expect(topById.b).toMatchObject({ y: 60 })
+
+    const bottom = applyCanvasNodeLayout(document, ["a", "b"], "bottom-align")
+    const bottomById = mapNodesById(bottom.nodes)
+    expect(bottomById.a).toMatchObject({ y: 80 })
+    expect(bottomById.b).toMatchObject({ y: 120 })
+  })
+
+  it("aligns selected node centers to horizontal and vertical center lines", () => {
+    const document = {
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 40, y: 60, width: 100, height: 80 },
+        { id: "b", type: "text", text: "B", x: 220, y: 120, width: 80, height: 40 },
+      ],
+      edges: [],
+    }
+
+    const centeredHorizontally = applyCanvasNodeLayout(document, ["a", "b"], "center-horizontal")
+    const horizontalById = mapNodesById(centeredHorizontally.nodes)
+    expect(horizontalById.a).toMatchObject({ x: 120 })
+    expect(horizontalById.b).toMatchObject({ x: 130 })
+
+    const centeredVertically = applyCanvasNodeLayout(document, ["a", "b"], "center-vertical")
+    const verticalById = mapNodesById(centeredVertically.nodes)
+    expect(verticalById.a).toMatchObject({ y: 70 })
+    expect(verticalById.b).toMatchObject({ y: 90 })
+  })
+
+  it("distributes nodes horizontally by center points while keeping first and last anchors", () => {
+    const document = {
+      nodes: [
+        { id: "n1", type: "text", text: "one", x: 0, y: 0, width: 60, height: 40 },
+        { id: "n2", type: "text", text: "two", x: 120, y: 40, width: 100, height: 40 },
+        { id: "n3", type: "text", text: "three", x: 280, y: 80, width: 40, height: 40 },
+        { id: "n4", type: "text", text: "four", x: 500, y: 120, width: 120, height: 40 },
+      ],
+      edges: [],
+    }
+
+    const distributed = applyCanvasNodeLayout(document, ["n1", "n2", "n3", "n4"], "distribute-horizontal")
+    const distributedById = mapNodesById(distributed.nodes)
+    expect(distributedById.n1).toMatchObject({ x: 0 })
+    expect(distributedById.n2.x).toBeCloseTo(156.6666666667)
+    expect(distributedById.n3.x).toBeCloseTo(363.3333333333)
+    expect(distributedById.n4).toMatchObject({ x: 500 })
+  })
+
+  it("distributes nodes vertically by center points while keeping first and last anchors", () => {
+    const document = {
+      nodes: [
+        { id: "n1", type: "text", text: "one", x: 0, y: 0, width: 60, height: 40 },
+        { id: "n2", type: "text", text: "two", x: 40, y: 80, width: 60, height: 60 },
+        { id: "n3", type: "text", text: "three", x: 80, y: 120, width: 60, height: 20 },
+        { id: "n4", type: "text", text: "four", x: 120, y: 300, width: 60, height: 40 },
+      ],
+      edges: [],
+    }
+
+    const distributed = applyCanvasNodeLayout(document, ["n1", "n2", "n3", "n4"], "distribute-vertical")
+    const distributedById = mapNodesById(distributed.nodes)
+    expect(distributedById.n1).toMatchObject({ y: 0 })
+    expect(distributedById.n2).toMatchObject({ y: 90 })
+    expect(distributedById.n3).toMatchObject({ y: 210 })
+    expect(distributedById.n4).toMatchObject({ y: 300 })
+  })
+
+  it("arranges selected nodes as a row with 32px gaps in left-to-right then top-to-bottom order", () => {
+    const document = {
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 200, y: 200, width: 80, height: 40 },
+        { id: "b", type: "text", text: "B", x: 20, y: 150, width: 60, height: 50 },
+        { id: "c", type: "text", text: "C", x: 20, y: 20, width: 100, height: 30 },
+        { id: "d", type: "text", text: "D", x: 120, y: 80, width: 70, height: 60 },
+        { id: "u", type: "text", text: "U", x: 600, y: 600, width: 40, height: 40 },
+      ],
+      edges: [],
+    }
+
+    const arranged = applyCanvasNodeLayout(document, ["a", "b", "c", "d"], "arrange-row")
+    const arrangedById = mapNodesById(arranged.nodes)
+    expect(arrangedById.c).toMatchObject({ x: 20, y: 20 })
+    expect(arrangedById.b).toMatchObject({ x: 152, y: 20 })
+    expect(arrangedById.d).toMatchObject({ x: 244, y: 20 })
+    expect(arrangedById.a).toMatchObject({ x: 346, y: 20 })
+    expect(arrangedById.u).toMatchObject({ x: 600, y: 600 })
+  })
+
+  it("arranges selected nodes as a column with 24px gaps in top-to-bottom then left-to-right order", () => {
+    const document = {
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 200, y: 200, width: 80, height: 40 },
+        { id: "b", type: "text", text: "B", x: 20, y: 80, width: 60, height: 50 },
+        { id: "c", type: "text", text: "C", x: 120, y: 80, width: 100, height: 30 },
+        { id: "d", type: "text", text: "D", x: 50, y: 20, width: 70, height: 60 },
+      ],
+      edges: [],
+    }
+
+    const arranged = applyCanvasNodeLayout(document, ["a", "b", "c", "d"], "arrange-column")
+    const arrangedById = mapNodesById(arranged.nodes)
+    expect(arrangedById.d).toMatchObject({ x: 20, y: 20 })
+    expect(arrangedById.b).toMatchObject({ x: 20, y: 104 })
+    expect(arrangedById.c).toMatchObject({ x: 20, y: 178 })
+    expect(arrangedById.a).toMatchObject({ x: 20, y: 232 })
+  })
+
+  it("arranges selected nodes in a grid using a column count derived from selection aspect ratio", () => {
+    const document = {
+      nodes: [
+        { id: "n1", type: "text", text: "one", x: 10, y: 10, width: 50, height: 30 },
+        { id: "n2", type: "text", text: "two", x: 90, y: 80, width: 70, height: 40 },
+        { id: "n3", type: "text", text: "three", x: 40, y: 180, width: 60, height: 50 },
+        { id: "n4", type: "text", text: "four", x: 120, y: 260, width: 80, height: 30 },
+        { id: "n5", type: "text", text: "five", x: 30, y: 340, width: 55, height: 45 },
+        { id: "n6", type: "text", text: "six", x: 100, y: 420, width: 65, height: 35 },
+      ],
+      edges: [],
+    }
+
+    const arranged = applyCanvasNodeLayout(document, ["n1", "n2", "n3", "n4", "n5", "n6"], "arrange-grid")
+    const arrangedById = mapNodesById(arranged.nodes)
+    expect(arrangedById.n1).toMatchObject({ x: 10, y: 10 })
+    expect(arrangedById.n2).toMatchObject({ x: 94, y: 10 })
+    expect(arrangedById.n3).toMatchObject({ x: 10, y: 74 })
+    expect(arrangedById.n4).toMatchObject({ x: 94, y: 74 })
+    expect(arrangedById.n5).toMatchObject({ x: 10, y: 148 })
+    expect(arrangedById.n6).toMatchObject({ x: 94, y: 148 })
+  })
+
+  it("stretches selected nodes horizontally to selection bounds", () => {
+    const document = {
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 20, y: 0, width: 100, height: 80 },
+        { id: "b", type: "text", text: "B", x: 180, y: 60, width: 50, height: 40 },
+        { id: "c", type: "text", text: "C", x: 500, y: 20, width: 40, height: 40 },
+      ],
+      edges: [{ id: "e1", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" }],
+    }
+
+    const stretched = applyCanvasNodeLayout(document, ["a", "b"], "stretch-horizontal")
+    const stretchedById = mapNodesById(stretched.nodes)
+    expect(stretchedById.a).toMatchObject({ x: 20, width: 210 })
+    expect(stretchedById.b).toMatchObject({ x: 20, width: 210 })
+    expect(stretchedById.c).toMatchObject({ x: 500, width: 40 })
+    expect(stretched.edges).toEqual(document.edges)
+  })
+
+  it("stretches selected nodes vertically to selection bounds", () => {
+    const document = {
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 20, y: 40, width: 100, height: 80 },
+        { id: "b", type: "text", text: "B", x: 180, y: 150, width: 50, height: 40 },
+      ],
+      edges: [],
+    }
+
+    const stretched = applyCanvasNodeLayout(document, ["a", "b"], "stretch-vertical")
+    const stretchedById = mapNodesById(stretched.nodes)
+    expect(stretchedById.a).toMatchObject({ y: 40, height: 150 })
+    expect(stretchedById.b).toMatchObject({ y: 40, height: 150 })
   })
 })

@@ -1,7 +1,9 @@
 import type { Plugin } from "siyuan"
 import type {
+  CanvasBounds,
   CanvasDocument,
   CanvasEdge,
+  CanvasNodeLayoutAction,
   CanvasNode,
   CanvasSide,
 } from "@/canvas/types"
@@ -34,9 +36,13 @@ import {
   toBoardY,
 } from "@/canvas/board"
 import {
+  applyCanvasNodeLayout,
+  createCanvasGroupForNodes,
   createCanvasEdge,
   createCanvasNode,
   createEmptyCanvasDocument,
+  getCanvasSelectionBounds,
+  setCanvasNodesColor,
   removeCanvasEdge,
   removeCanvasNode,
   removeCanvasNodes,
@@ -60,8 +66,14 @@ import {
 } from "@/canvas/format"
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
 import { scaleViewportAtPoint } from "@/canvas/viewport"
+import {
+  centerViewportOnBounds,
+  resolveDragNodeIds,
+  resolveSelectionToolbarPosition,
+} from "@/canvas/selection-toolbar"
 
 interface CanvasPlugin extends Plugin {
+  app: unknown
   getCanvasSettings?: () => CanvasPluginSettings
   getRecentCanvasFiles?: () => CanvasRecentFile[]
   rememberRecentCanvas?: (path: string, title?: string) => Promise<void>
@@ -70,9 +82,29 @@ interface CanvasPlugin extends Plugin {
 }
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
+const DEFAULT_SELECTION_TOOLBAR_SIZE = {
+  height: 48,
+  width: 220,
+}
+const SELECTION_COLORS = ["1", "2", "3", "4", "5", "6"] as const
+const SELECTION_LAYOUT_ACTIONS: Array<{ action: CanvasNodeLayoutAction, label: string }> = [
+  { action: "left-align", label: "左对齐" },
+  { action: "center-horizontal", label: "水平居中" },
+  { action: "right-align", label: "右对齐" },
+  { action: "top-align", label: "顶部对齐" },
+  { action: "center-vertical", label: "垂直居中" },
+  { action: "bottom-align", label: "底部对齐" },
+  { action: "arrange-row", label: "排列成行" },
+  { action: "arrange-column", label: "排列成列" },
+  { action: "arrange-grid", label: "排列成网格" },
+  { action: "distribute-horizontal", label: "水平分布" },
+  { action: "distribute-vertical", label: "垂直分布" },
+  { action: "stretch-horizontal", label: "水平拉伸" },
+  { action: "stretch-vertical", label: "垂直拉伸" },
+]
 
 export function useCanvasEditor(
-  plugin: Plugin,
+  plugin: CanvasPlugin,
   bootstrap: CanvasTabBootstrap,
   setTitle: (title: string) => void,
 ) {
@@ -88,6 +120,11 @@ export function useCanvasEditor(
   const stageRef = ref<HTMLElement>()
   const recentFiles = ref<CanvasRecentFile[]>([])
   const suggestedFilename = ref(bootstrap.title || "Untitled.canvas")
+  const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
+  const selectionToolbarSize = reactive({
+    height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
+    width: DEFAULT_SELECTION_TOOLBAR_SIZE.width,
+  })
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
   const newEdgeTargetId = ref("")
@@ -110,11 +147,48 @@ export function useCanvasEditor(
   const selectedEdge = computed(
     () => state.document.edges.find((edge) => edge.id === state.selectedEdgeId) || null,
   )
+  const selectionBounds = computed<CanvasBounds | null>(() =>
+    getCanvasSelectionBounds(state.document, state.selectedNodeIds),
+  )
   const edgeTargets = computed(() =>
     state.document.nodes.filter((node) => node.id !== state.selectedNodeId),
   )
   const board = computed(() => createCanvasBoardMetrics(state.document.nodes))
   const canDelete = computed(() => Boolean(state.selectedNodeIds.length || selectedEdge.value))
+  const selectionToolbar = computed(() => {
+    const stage = stageRef.value
+    const bounds = selectionBounds.value
+
+    if (!stage || !bounds || selectedEdge.value) {
+      return {
+        placement: "top" as const,
+        visible: false,
+        x: 0,
+        y: 0,
+      }
+    }
+
+    const selectionRect = {
+      height: bounds.height * viewport.scale,
+      width: bounds.width * viewport.scale,
+      x: toBoardX(board.value, bounds.x) * viewport.scale + viewport.x,
+      y: toBoardY(board.value, bounds.y) * viewport.scale + viewport.y,
+    }
+
+    return {
+      ...resolveSelectionToolbarPosition(
+        selectionRect,
+        {
+          height: stage.clientHeight,
+          width: stage.clientWidth,
+        },
+        selectionToolbarSize,
+      ),
+      visible: state.selectedNodeIds.length > 0,
+    }
+  })
+  const selectionColors = computed(() => [...SELECTION_COLORS])
+  const selectionLayoutActions = computed(() => [...SELECTION_LAYOUT_ACTIONS])
   let fileNodeResolveVersion = 0
 
   function getPluginSettings(): CanvasPluginSettings {
@@ -287,6 +361,20 @@ export function useCanvasEditor(
     state.issues = validateCanvasDocument(nextDocument)
   }
 
+  function closeSelectionPopover() {
+    selectionToolbarPopover.value = "closed"
+  }
+
+  function setSelectionToolbarSize(size: { height: number, width: number }) {
+    if (size.width > 0) {
+      selectionToolbarSize.width = size.width
+    }
+
+    if (size.height > 0) {
+      selectionToolbarSize.height = size.height
+    }
+  }
+
   function ensureCanvasPath(input: string): string {
     const trimmed = input.trim()
     if (!trimmed) {
@@ -357,13 +445,84 @@ export function useCanvasEditor(
           : removeCanvasNodes(state.document, state.selectedNodeIds),
       )
       state.selectNode()
+      closeSelectionPopover()
       return
     }
 
     if (selectedEdge.value) {
       commitDocument(removeCanvasEdge(state.document, selectedEdge.value.id))
       state.selectEdge()
+      closeSelectionPopover()
     }
+  }
+
+  function centerSelectionInViewport() {
+    const stage = stageRef.value
+    const bounds = selectionBounds.value
+
+    if (!stage || !bounds) {
+      return
+    }
+
+    const nextViewport = centerViewportOnBounds(
+      viewport,
+      {
+        height: stage.clientHeight,
+        width: stage.clientWidth,
+      },
+      bounds,
+      {
+        left: board.value.left,
+        top: board.value.top,
+      },
+    )
+
+    viewport.scale = nextViewport.scale
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
+    closeSelectionPopover()
+  }
+
+  function applySelectionColor(color: string) {
+    if (!state.selectedNodeIds.length) {
+      return
+    }
+
+    commitDocument(setCanvasNodesColor(state.document, state.selectedNodeIds, color))
+    closeSelectionPopover()
+  }
+
+  function createGroupFromSelection() {
+    if (!state.selectedNodeIds.length) {
+      return
+    }
+
+    const {
+      document: nextDocument,
+      groupId,
+    } = createCanvasGroupForNodes(state.document, state.selectedNodeIds)
+
+    commitDocument(nextDocument)
+    state.selectNode(groupId)
+    closeSelectionPopover()
+  }
+
+  function applySelectionLayout(action: CanvasNodeLayoutAction) {
+    if (!state.selectedNodeIds.length) {
+      return
+    }
+
+    commitDocument(applyCanvasNodeLayout(state.document, state.selectedNodeIds, action))
+    closeSelectionPopover()
+  }
+
+  function toggleSelectionPopover(popover: "color" | "layout") {
+    if (!state.selectedNodeIds.length) {
+      closeSelectionPopover()
+      return
+    }
+
+    selectionToolbarPopover.value = selectionToolbarPopover.value === popover ? "closed" : popover
   }
 
   function updateNode(node: CanvasNode) {
@@ -712,9 +871,7 @@ export function useCanvasEditor(
   }
 
   function startDrag(node: CanvasNode, event: PointerEvent) {
-    const selectedNodeIds = state.selectedNodeIds.includes(node.id)
-      ? state.selectedNodeIds
-      : [node.id]
+    const selectedNodeIds = resolveDragNodeIds(state.document, node.id, state.selectedNodeIds)
     const initialPositions = new Map(
       state.document.nodes
         .filter((candidate) => selectedNodeIds.includes(candidate.id))
@@ -779,6 +936,11 @@ export function useCanvasEditor(
     }
 
     if (event.key === "Escape") {
+      if (selectionToolbarPopover.value !== "closed") {
+        closeSelectionPopover()
+        return
+      }
+
       state.selectNode()
       state.selectEdge()
       return
@@ -838,10 +1000,22 @@ export function useCanvasEditor(
     { deep: false },
   )
 
+  watch(
+    () => `${state.selectedEdgeId}|${state.selectedNodeIds.join(",")}`,
+    () => {
+      closeSelectionPopover()
+    },
+  )
+
   return createCanvasEditorBindings(
     {
+      applySelectionColor,
+      applySelectionLayout,
       board,
       canDelete,
+      centerSelectionInViewport,
+      closeSelectionPopover,
+      createGroupFromSelection,
       displayNodes,
       edgeTargets,
       exportCanvas,
@@ -897,7 +1071,13 @@ export function useCanvasEditor(
       openSettings,
       overwriteConflictVersion,
       recentFiles,
+      selectionColors,
+      selectionLayoutActions,
+      selectionToolbar,
+      selectionToolbarPopover,
+      setSelectionToolbarSize,
       toggleInspector,
+      toggleSelectionPopover,
     },
     ["fileInputRef", "stageRef"],
   )

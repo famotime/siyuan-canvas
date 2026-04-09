@@ -81,9 +81,24 @@ export interface CanvasGeometryPatch {
   y?: number
 }
 
-export interface CanvasSelectionBounds {
+export interface CanvasBounds {
   x: number
   y: number
   width: number
   height: number
 }
+
+export type CanvasNodeLayoutAction =
+  | "left-align"
+  | "center-horizontal"
+  | "right-align"
+  | "top-align"
+  | "center-vertical"
+  | "bottom-align"
+  | "arrange-row"
+  | "arrange-column"
+  | "arrange-grid"
+  | "distribute-horizontal"
+  | "distribute-vertical"
+  | "stretch-horizontal"
+  | "stretch-vertical"

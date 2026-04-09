@@ -8,6 +8,7 @@ import {
   defineConfig,
   loadEnv,
 } from "vite"
+import { configDefaults } from "vitest/config"
 import { viteStaticCopy } from "vite-plugin-static-copy"
 import zipPack from "vite-plugin-zip-pack"
 
@@ -48,6 +49,15 @@ export default defineConfig(({
       alias: {
         "@": resolve(__dirname, "src"),
       },
+    },
+
+    test: {
+      exclude: [
+        ...configDefaults.exclude,
+        "**/.worktrees/**",
+        "**/dist/**",
+        "**/dev/**",
+      ],
     },
 
     plugins: [
