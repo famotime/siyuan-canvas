@@ -34,11 +34,15 @@ function createEditorMock(node = createTextNode()) {
   return {
     addNode: vi.fn(),
     activateNode: vi.fn(),
+    applySelectionColor: vi.fn(),
+    applySelectionLayout: vi.fn(),
     board: {
       height: 800,
       width: 1200,
     },
     canDelete: false,
+    centerSelectionInViewport: vi.fn(),
+    createGroupFromSelection: vi.fn(),
     createEdgeFromSelection: vi.fn(),
     deleteSelection: vi.fn(),
     displayNodes: [node],
@@ -81,8 +85,20 @@ function createEditorMock(node = createTextNode()) {
     save: vi.fn(),
     selectEdge: vi.fn(),
     selectedEdge: null,
-    selectedNode: null,
-    selectedNodeCount: 0,
+    selectedNode: node,
+    selectedNodeCount: 1,
+    selectionColors: ["1", "2", "3"],
+    selectionLayoutActions: [
+      { action: "left-align", label: "Left align" },
+      { action: "arrange-row", label: "Arrange row" },
+    ],
+    selectionToolbar: {
+      placement: "top",
+      visible: false,
+      x: 0,
+      y: 0,
+    },
+    selectionToolbarPopover: "closed",
     selectNode: vi.fn(),
     sides: ["top", "right", "bottom", "left"],
     stageRef: ref<HTMLElement>(),
@@ -105,6 +121,7 @@ function createEditorMock(node = createTextNode()) {
     },
     suggestedFilename: "Untitled.canvas",
     toggleInspector: vi.fn(),
+    toggleSelectionPopover: vi.fn(),
     triggerImport: vi.fn(),
     updateEdgeField: vi.fn(),
     updateEdgeSide: vi.fn(),
@@ -190,5 +207,108 @@ describe("CanvasWorkspace", () => {
     expect(marker.attributes("viewBox")).toBe("0 0 14 14")
     expect(marker.find("path").attributes("fill")).toBe("context-stroke")
     expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow)")
+  })
+
+  it("renders a single-selection floating toolbar with edit and no create-group action", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const toolbar = wrapper.find("[data-testid='selection-toolbar']")
+
+    expect(toolbar.exists()).toBe(true)
+    expect(toolbar.attributes("style")).toContain("left: 144px;")
+    expect(toolbar.attributes("style")).toContain("top: 88px;")
+    expect(wrapper.find("[data-testid='selection-toolbar-edit']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-toolbar-create-group']").exists()).toBe(false)
+
+    await wrapper.find("[data-testid='selection-toolbar-color']").trigger("click")
+
+    expect(currentEditor.toggleSelectionPopover).toHaveBeenCalledWith("color")
+  })
+
+  it("renders a multi-selection floating toolbar with create-group and align menu", async () => {
+    const firstNode = createTextNode()
+    const secondNode = createTextNode({
+      id: "text-2",
+      text: "second node",
+      x: 380,
+    })
+    currentEditor = createEditorMock(firstNode)
+    currentEditor.displayNodes = [firstNode, secondNode]
+    currentEditor.state.document.nodes = [firstNode, secondNode]
+    currentEditor.selectedNode = firstNode
+    currentEditor.selectedNodeCount = 2
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 220,
+      y: 116,
+    }
+    currentEditor.selectionToolbarPopover = "layout"
+    currentEditor.state.selectedNodeIds = [firstNode.id, secondNode.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='selection-toolbar-create-group']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-toolbar-edit']").exists()).toBe(false)
+    expect(wrapper.find("[data-testid='selection-toolbar-align']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-layout-menu']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-layout-action-left-align']").exists()).toBe(true)
+
+    await wrapper.find("[data-testid='selection-layout-action-left-align']").trigger("click")
+
+    expect(currentEditor.applySelectionLayout).toHaveBeenCalledWith("left-align")
+  })
+
+  it("lets the floating toolbar edit button enter inline markdown editing", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='selection-toolbar-edit']").trigger("click")
+
+    const textarea = wrapper.find(".canvas-node__editor")
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe(node.text)
+
+    await textarea.setValue("## Toolbar edit")
+    await textarea.trigger("blur")
+
+    expect(currentEditor.updateTextNodeContent).toHaveBeenCalledWith(node.id, "## Toolbar edit")
   })
 })

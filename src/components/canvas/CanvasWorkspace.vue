@@ -246,6 +246,112 @@
             />
           </article>
         </div>
+
+        <div
+          v-if="editor.selectionToolbar.visible"
+          class="selection-toolbar"
+          :class="`selection-toolbar--${editor.selectionToolbar.placement}`"
+          :style="{
+            left: `${editor.selectionToolbar.x}px`,
+            top: `${editor.selectionToolbar.y}px`,
+          }"
+          data-testid="selection-toolbar"
+          @click.stop
+          @pointerdown.stop
+        >
+          <button
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-delete"
+            type="button"
+            @click.stop="editor.deleteSelection"
+          >
+            Delete
+          </button>
+          <div class="selection-toolbar__menu">
+            <button
+              class="selection-toolbar__button"
+              :class="{ 'selection-toolbar__button--active': editor.selectionToolbarPopover === 'color' }"
+              data-testid="selection-toolbar-color"
+              type="button"
+              @click.stop="editor.toggleSelectionPopover('color')"
+            >
+              Color
+            </button>
+            <div
+              v-if="editor.selectionToolbarPopover === 'color'"
+              class="selection-toolbar__popover selection-toolbar__popover--colors"
+              data-testid="selection-color-palette"
+              @click.stop
+              @pointerdown.stop
+            >
+              <button
+                v-for="color in editor.selectionColors"
+                :key="color"
+                class="selection-toolbar__swatch"
+                :data-testid="`selection-color-${color}`"
+                :style="getSelectionColorStyle(color)"
+                type="button"
+                @click.stop="editor.applySelectionColor(color)"
+              />
+            </div>
+          </div>
+          <button
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-center"
+            type="button"
+            @click.stop="editor.centerSelectionInViewport"
+          >
+            Center
+          </button>
+          <button
+            v-if="editor.selectedNodeCount === 1 && editor.selectedNode"
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-edit"
+            type="button"
+            @click.stop="handleToolbarEdit"
+          >
+            Edit
+          </button>
+          <template v-else-if="editor.selectedNodeCount > 1">
+            <button
+              class="selection-toolbar__button"
+              data-testid="selection-toolbar-create-group"
+              type="button"
+              @click.stop="editor.createGroupFromSelection"
+            >
+              Group
+            </button>
+            <div class="selection-toolbar__menu">
+              <button
+                class="selection-toolbar__button"
+                :class="{ 'selection-toolbar__button--active': editor.selectionToolbarPopover === 'layout' }"
+                data-testid="selection-toolbar-align"
+                type="button"
+                @click.stop="editor.toggleSelectionPopover('layout')"
+              >
+                Align
+              </button>
+              <div
+                v-if="editor.selectionToolbarPopover === 'layout'"
+                class="selection-toolbar__popover selection-toolbar__popover--layout"
+                data-testid="selection-layout-menu"
+                @click.stop
+                @pointerdown.stop
+              >
+                <button
+                  v-for="layoutAction in editor.selectionLayoutActions"
+                  :key="layoutAction.action"
+                  class="selection-toolbar__menu-button"
+                  :data-testid="`selection-layout-action-${layoutAction.action}`"
+                  type="button"
+                  @click.stop="editor.applySelectionLayout(layoutAction.action)"
+                >
+                  {{ layoutAction.label }}
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
       </section>
 
       <aside
@@ -536,6 +642,14 @@ const editingNodeId = ref("")
 const editingTextareaRef = ref<HTMLTextAreaElement>()
 const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef
+const selectionColorStyles: Record<string, string> = {
+  "1": "#4f7cff",
+  "2": "#26a69a",
+  "3": "#f4b400",
+  "4": "#f97316",
+  "5": "#ef4444",
+  "6": "#8b5cf6",
+}
 
 function valueFromEvent(event: Event): string {
   return (event.target as HTMLInputElement).value
@@ -543,6 +657,20 @@ function valueFromEvent(event: Event): string {
 
 function setEditingTextareaRef(value: Element | null) {
   editingTextareaRef.value = value instanceof HTMLTextAreaElement ? value : undefined
+}
+
+function getSelectionColorStyle(color: string) {
+  return {
+    backgroundColor: selectionColorStyles[color] || "#64748b",
+  }
+}
+
+function handleToolbarEdit() {
+  if (!editor.selectedNode || editor.selectedNodeCount !== 1) {
+    return
+  }
+
+  handleNodeDoubleClick(editor.selectedNode)
 }
 
 function handleNodeDoubleClick(node: CanvasNode) {
@@ -691,6 +819,92 @@ async function handleImport(event: Event) {
     linear-gradient(90deg, rgba(17, 33, 22, 0.08) 1px, transparent 1px);
   background-size: 32px 32px;
   touch-action: none;
+}
+
+.selection-toolbar {
+  --selection-toolbar-bg: rgba(15, 20, 20, 0.94);
+  --selection-toolbar-border: rgba(255, 255, 255, 0.08);
+  --selection-toolbar-shadow: 0 16px 40px rgba(5, 10, 10, 0.28);
+  position: absolute;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--selection-toolbar-border);
+  border-radius: 16px;
+  background: var(--selection-toolbar-bg);
+  box-shadow: var(--selection-toolbar-shadow);
+  backdrop-filter: blur(14px);
+}
+
+.selection-toolbar--bottom {
+  transform: translateY(8px);
+}
+
+.selection-toolbar__button {
+  min-width: 0;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f7f5;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.selection-toolbar__button--active,
+.selection-toolbar__button:hover,
+.selection-toolbar__menu-button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.selection-toolbar__menu {
+  position: relative;
+}
+
+.selection-toolbar__popover {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 10px);
+  display: grid;
+  gap: 8px;
+  min-width: 160px;
+  padding: 10px;
+  border: 1px solid var(--selection-toolbar-border);
+  border-radius: 14px;
+  background: rgba(12, 16, 16, 0.98);
+  box-shadow: var(--selection-toolbar-shadow);
+}
+
+.selection-toolbar__popover--colors {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 132px;
+}
+
+.selection-toolbar__popover--layout {
+  min-width: 180px;
+}
+
+.selection-toolbar__swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.selection-toolbar__menu-button {
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #f4f7f5;
+  padding: 8px 10px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
 }
 
 .stage__world {
