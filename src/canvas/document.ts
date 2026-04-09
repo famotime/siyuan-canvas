@@ -1,7 +1,9 @@
 import type {
+  CanvasBounds,
   CanvasDocument,
   CanvasEdge,
   CanvasGeometryPatch,
+  CanvasGroupNode,
   CanvasNode,
   CanvasNodeType,
 } from "@/canvas/types"
@@ -149,11 +151,131 @@ export function translateCanvasNodes(
         return node
       }
 
-      return {
-        ...node,
-        x: node.x + deltaX,
-        y: node.y + deltaY,
-      }
-    }),
+    return {
+      ...node,
+      x: node.x + deltaX,
+      y: node.y + deltaY,
+    }
+  }),
+}
+}
+
+export function getCanvasSelectionBounds(
+  document: CanvasDocument,
+  nodeIds: string[],
+): CanvasBounds | null {
+  const selectedIds = new Set(nodeIds)
+  const selectedNodes = document.nodes.filter((node) => selectedIds.has(node.id))
+
+  if (!selectedNodes.length) {
+    return null
   }
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  for (const node of selectedNodes) {
+    minX = Math.min(minX, node.x)
+    minY = Math.min(minY, node.y)
+    maxX = Math.max(maxX, node.x + node.width)
+    maxY = Math.max(maxY, node.y + node.height)
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  }
+}
+
+export function setCanvasNodesColor(
+  document: CanvasDocument,
+  selectedNodeIds: string[],
+  color: string,
+): CanvasDocument {
+  if (!selectedNodeIds.length) {
+    return document
+  }
+
+  const selectedIds = new Set(selectedNodeIds)
+
+  return {
+    ...document,
+    nodes: document.nodes.map((node) => (selectedIds.has(node.id) ? { ...node, color } : node)),
+  }
+}
+
+export function createCanvasGroupForNodes(
+  document: CanvasDocument,
+  selectedNodeIds: string[],
+  padding = 24,
+): { document: CanvasDocument; groupId: string } {
+  if (!selectedNodeIds.length) {
+    throw new Error("Cannot create a group without selected nodes.")
+  }
+
+  const bounds = getCanvasSelectionBounds(document, selectedNodeIds)
+
+  if (!bounds) {
+    throw new Error("Selected nodes are missing from the document.")
+  }
+
+  const normalizedPadding = Math.max(0, padding)
+  const group = createCanvasNode("group") as CanvasGroupNode
+
+  const positionedGroup: CanvasGroupNode = {
+    ...group,
+    x: bounds.x - normalizedPadding,
+    y: bounds.y - normalizedPadding,
+    width: bounds.width + normalizedPadding * 2,
+    height: bounds.height + normalizedPadding * 2,
+  }
+
+  const nextDocument = {
+    ...document,
+    nodes: [...document.nodes, positionedGroup],
+  }
+
+  return {
+    document: nextDocument,
+    groupId: positionedGroup.id,
+  }
+}
+
+export function findCanvasNodesInGroup(document: CanvasDocument, groupId: string): string[] {
+  const group = document.nodes.find(
+    (node): node is CanvasGroupNode => node.id === groupId && node.type === "group",
+  )
+
+  if (!group) {
+    return []
+  }
+
+  const groupLeft = group.x
+  const groupTop = group.y
+  const groupRight = group.x + group.width
+  const groupBottom = group.y + group.height
+
+  return document.nodes
+    .filter((node) => {
+      if (node.id === group.id) {
+        return false
+      }
+
+      const nodeLeft = node.x
+      const nodeTop = node.y
+      const nodeRight = node.x + node.width
+      const nodeBottom = node.y + node.height
+
+      return (
+        nodeLeft >= groupLeft &&
+        nodeTop >= groupTop &&
+        nodeRight <= groupRight &&
+        nodeBottom <= groupBottom
+      )
+    })
+    .map((node) => node.id)
 }

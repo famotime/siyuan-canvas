@@ -80,3 +80,10 @@ export interface CanvasGeometryPatch {
   x?: number
   y?: number
 }
+
+export interface CanvasBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}

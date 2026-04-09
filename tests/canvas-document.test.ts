@@ -5,10 +5,14 @@ import {
 } from "vitest"
 
 import {
+  createCanvasGroupForNodes,
   createEmptyCanvasDocument,
+  findCanvasNodesInGroup,
+  getCanvasSelectionBounds,
   removeCanvasNode,
   removeCanvasNodes,
   setCanvasNodeGeometry,
+  setCanvasNodesColor,
   translateCanvasNodes,
   upsertCanvasEdge,
   upsertCanvasNode,
@@ -176,5 +180,167 @@ describe("canvas document operations", () => {
         y: -15,
       },
     ])
+  })
+
+  it("computes combined bounds for selected nodes", () => {
+    const document = {
+      nodes: [
+        {
+          id: "n1",
+          type: "text",
+          text: "one",
+          x: 10,
+          y: 20,
+          width: 100,
+          height: 50,
+        },
+        {
+          id: "n2",
+          type: "text",
+          text: "two",
+          x: 50,
+          y: 90,
+          width: 180,
+          height: 120,
+        },
+      ],
+      edges: [],
+    }
+
+    const bounds = getCanvasSelectionBounds(document, ["n1", "n2"])
+
+    expect(bounds).toEqual({
+      x: 10,
+      y: 20,
+      width: 220,
+      height: 190,
+    })
+  })
+
+  it("applies one color to selected nodes only", () => {
+    const document = {
+      nodes: [
+        {
+          id: "n1",
+          type: "text",
+          text: "one",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 180,
+          color: "1",
+        },
+        {
+          id: "n2",
+          type: "text",
+          text: "two",
+          x: 0,
+          y: 200,
+          width: 320,
+          height: 180,
+          color: "2",
+        },
+      ],
+      edges: [],
+    }
+
+    const next = setCanvasNodesColor(document, ["n1"], "5")
+
+    expect(next.nodes).toMatchObject([
+      {
+        id: "n1",
+        color: "5",
+      },
+      {
+        id: "n2",
+        color: "2",
+      },
+    ])
+  })
+
+  it("creates a group node around selected nodes with padding", () => {
+    const document = {
+      nodes: [
+        {
+          id: "c1",
+          type: "text",
+          text: "child",
+          x: 100,
+          y: 200,
+          width: 80,
+          height: 40,
+        },
+        {
+          id: "c2",
+          type: "text",
+          text: "child",
+          x: 220,
+          y: 260,
+          width: 50,
+          height: 50,
+        },
+      ],
+      edges: [],
+    }
+
+    const { document: grouped, groupId } = createCanvasGroupForNodes(document, ["c1", "c2"])
+
+    const group = grouped.nodes.find((node) => node.id === groupId)
+
+    expect(group).toMatchObject({
+      label: "Group",
+      x: 76,
+      y: 176,
+      width: 218,
+      height: 158,
+    })
+  })
+
+  it("finds nodes fully enclosed by a group", () => {
+    const document = {
+      nodes: [
+        {
+          id: "g1",
+          type: "group",
+          label: "scope",
+          x: 0,
+          y: 0,
+          width: 300,
+          height: 200,
+        },
+        {
+          id: "inside",
+          type: "text",
+          text: "inside",
+          x: 10,
+          y: 10,
+          width: 50,
+          height: 50,
+        },
+        {
+          id: "border",
+          type: "text",
+          text: "border",
+          x: 250,
+          y: 150,
+          width: 50,
+          height: 50,
+        },
+        {
+          id: "partial",
+          type: "text",
+          text: "partial",
+          x: 280,
+          y: 10,
+          width: 30,
+          height: 30,
+        },
+      ],
+      edges: [],
+    }
+
+    const enclosedIds = findCanvasNodesInGroup(document, "g1")
+
+    expect(enclosedIds).toEqual(["inside", "border"])
   })
 })
