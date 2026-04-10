@@ -250,6 +250,13 @@ describe("CanvasWorkspace", () => {
     expect(toolbar.attributes("style")).toContain("top: 88px;")
     expect(wrapper.find("[data-testid='selection-toolbar-edit']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-toolbar-create-group']").exists()).toBe(false)
+    expect(wrapper.find("[data-testid='selection-toolbar-delete']").attributes("title")).toBe("删除")
+    expect(wrapper.find("[data-testid='selection-toolbar-delete']").attributes("aria-label")).toBe("删除")
+    expect(wrapper.find("[data-testid='selection-toolbar-delete'] .selection-toolbar__icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-toolbar-delete']").text()).toBe("")
+    expect(wrapper.find("[data-testid='selection-toolbar-color']").attributes("title")).toBe("颜色")
+    expect(wrapper.find("[data-testid='selection-toolbar-center']").attributes("title")).toBe("聚焦")
+    expect(wrapper.find("[data-testid='selection-toolbar-edit']").attributes("title")).toBe("编辑")
 
     await wrapper.find("[data-testid='selection-toolbar-color']").trigger("click")
 
@@ -288,8 +295,12 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='selection-toolbar-create-group']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-toolbar-edit']").exists()).toBe(false)
     expect(wrapper.find("[data-testid='selection-toolbar-align']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-toolbar-create-group']").attributes("title")).toBe("创建分组")
+    expect(wrapper.find("[data-testid='selection-toolbar-align']").attributes("title")).toBe("对齐")
     expect(wrapper.find("[data-testid='selection-layout-menu']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-layout-action-left-align']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-layout-action-left-align']").attributes("title")).toBe("Left align")
+    expect(wrapper.find("[data-testid='selection-layout-action-left-align'] .selection-toolbar__menu-icon").exists()).toBe(true)
 
     await wrapper.find("[data-testid='selection-layout-action-left-align']").trigger("click")
 
