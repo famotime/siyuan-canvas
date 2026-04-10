@@ -1,5 +1,9 @@
 <template>
-  <div class="canvas-shell">
+  <div
+    ref="canvasShellRef"
+    class="canvas-shell"
+    data-testid="canvas-shell"
+  >
     <header class="toolbar">
       <div class="toolbar__group">
         <button
@@ -176,6 +180,12 @@
                 {{ edge.label }}
               </text>
             </g>
+            <path
+              v-if="editor.connectionDraft.visible"
+              class="stage__edge stage__edge--draft"
+              :d="editor.getConnectionDraftPath()"
+              marker-end="url(#canvas-edge-arrow)"
+            />
           </svg>
 
           <article
@@ -243,8 +253,31 @@
               </template>
             </div>
             <button
-              class="canvas-node__resize"
-              @pointerdown.stop="editor.startResize(node, $event)"
+              v-for="side in editor.sides"
+              :key="`anchor-${node.id}-${side}`"
+              class="canvas-node__anchor"
+              :class="[
+                `canvas-node__anchor--${side}`,
+                { 'canvas-node__anchor--active': editor.isConnectionTarget(node.id, side) },
+              ]"
+              :data-testid="`node-anchor-${side}`"
+              type="button"
+              @pointerdown.stop.prevent="editor.startConnectionDrag(node, side, $event)"
+            />
+            <button
+              v-for="side in editor.sides"
+              :key="`resize-${node.id}-${side}`"
+              class="canvas-node__resize-handle"
+              :class="`canvas-node__resize-handle--${side}`"
+              :data-testid="`node-resize-${side}`"
+              type="button"
+              @pointerdown.stop.prevent="editor.startResize(node, side, $event)"
+            />
+            <button
+              class="canvas-node__resize-corner"
+              data-testid="node-resize-corner"
+              type="button"
+              @pointerdown.stop.prevent="editor.startCornerResize(node, $event)"
             />
           </article>
         </div>
@@ -265,7 +298,11 @@
           v-if="editor.selectionToolbar.visible"
           :ref="setSelectionToolbarRef"
           class="selection-toolbar"
-          :class="`selection-toolbar--${editor.selectionToolbar.placement}`"
+          :class="[
+            `selection-toolbar--${editor.selectionToolbar.placement}`,
+            `selection-toolbar--${selectionToolbarThemeMode}`,
+          ]"
+          :data-theme-mode="selectionToolbarThemeMode"
           :style="{
             left: `${editor.selectionToolbar.x}px`,
             top: `${editor.selectionToolbar.y}px`,
@@ -706,9 +743,12 @@ const editor = useCanvasEditor(props.plugin, props.bootstrap, props.setTitle)
 const editingMarkdown = ref("")
 const editingNodeId = ref("")
 const editingTextareaRef = ref<HTMLTextAreaElement>()
+const canvasShellRef = ref<HTMLElement>()
 const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef
 const selectionToolbarRef = ref<HTMLElement>()
+const selectionToolbarThemeMode = ref<"dark" | "light">("light")
+let canvasThemeObserver: MutationObserver | null = null
 let selectionToolbarResizeObserver: ResizeObserver | null = null
 type SelectionToolbarIconName =
   | "delete"
@@ -1013,6 +1053,10 @@ function setEditingTextareaRef(value: Element | null) {
   editingTextareaRef.value = value instanceof HTMLTextAreaElement ? value : undefined
 }
 
+function syncSelectionToolbarThemeMode() {
+  selectionToolbarThemeMode.value = canvasShellRef.value?.dataset.themeMode === "dark" ? "dark" : "light"
+}
+
 function setSelectionToolbarRef(value: Element | null) {
   selectionToolbarRef.value = value instanceof HTMLElement ? value : undefined
   observeSelectionToolbar()
@@ -1122,10 +1166,22 @@ async function handleImport(event: Event) {
 }
 
 onMounted(() => {
+  syncSelectionToolbarThemeMode()
   window.addEventListener("pointerdown", handleWindowPointerDown)
+
+  if (canvasShellRef.value && typeof MutationObserver !== "undefined") {
+    canvasThemeObserver = new MutationObserver(() => {
+      syncSelectionToolbarThemeMode()
+    })
+    canvasThemeObserver.observe(canvasShellRef.value, {
+      attributeFilter: ["data-theme-mode"],
+      attributes: true,
+    })
+  }
 })
 
 onBeforeUnmount(() => {
+  canvasThemeObserver?.disconnect()
   window.removeEventListener("pointerdown", handleWindowPointerDown)
   selectionToolbarResizeObserver?.disconnect()
 })
@@ -1141,14 +1197,72 @@ watch(
 
 <style scoped lang="scss">
 .canvas-shell {
+  --canvas-bg: var(--b3-theme-background);
+  --canvas-surface: var(--b3-theme-surface);
+  --canvas-surface-elevated: var(--b3-theme-surface);
+  --canvas-surface-overlay: rgba(255, 255, 255, 0.82);
+  --canvas-border: rgba(0, 0, 0, 0.1);
+  --canvas-border-strong: rgba(0, 0, 0, 0.16);
+  --canvas-text: var(--b3-theme-on-surface);
+  --canvas-text-muted: var(--b3-theme-on-surface-light);
+  --canvas-accent: var(--b3-theme-primary);
+  --canvas-accent-contrast: var(--b3-theme-on-primary);
+  --canvas-accent-soft: rgba(53, 103, 214, 0.14);
+  --canvas-success: #2f7d4e;
+  --canvas-danger: #c04f2a;
+  --canvas-grid: rgba(15, 23, 42, 0.08);
+  --canvas-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
+  --canvas-shadow-strong: 0 18px 42px rgba(15, 23, 42, 0.18);
+  --canvas-floating-bg: rgba(255, 255, 255, 0.94);
+  --canvas-floating-border: rgba(0, 0, 0, 0.08);
+  --canvas-floating-button-bg: rgba(15, 23, 42, 0.06);
+  --canvas-floating-button-bg-hover: rgba(15, 23, 42, 0.12);
+  --canvas-floating-text: var(--canvas-text);
+  --canvas-floating-tooltip-bg: rgba(15, 23, 42, 0.96);
+  --canvas-floating-tooltip-text: #f8fafc;
+  --canvas-selection-border: rgba(53, 103, 214, 0.72);
+  --canvas-selection-fill: rgba(53, 103, 214, 0.14);
+  --canvas-card-bg: var(--canvas-surface);
+  --canvas-group-bg: rgba(53, 103, 214, 0.08);
+  --canvas-code-bg: rgba(15, 23, 42, 0.06);
+  --canvas-inspector-bg: var(--canvas-surface-elevated);
+  --canvas-inspector-section-bg: var(--canvas-surface-overlay);
+  --canvas-anchor-bg: var(--canvas-surface);
+  --canvas-anchor-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  --canvas-resize-handle: rgba(15, 23, 42, 0.18);
+  --canvas-resize-handle-hover: rgba(15, 23, 42, 0.26);
+  --canvas-shell-highlight: rgba(53, 103, 214, 0.08);
   display: grid;
   grid-template-rows: auto 1fr;
   height: 100%;
   min-height: 100%;
-  color: var(--b3-theme-on-surface);
+  color: var(--canvas-text);
   background:
-    radial-gradient(circle at top left, rgba(196, 226, 214, 0.18), transparent 28%),
-    linear-gradient(135deg, rgba(255, 245, 232, 0.95), rgba(242, 247, 243, 0.96));
+    radial-gradient(circle at top left, var(--canvas-shell-highlight), transparent 28%),
+    linear-gradient(135deg, var(--canvas-bg), var(--canvas-surface));
+}
+
+.canvas-shell[data-theme-mode="dark"] {
+  --canvas-surface-overlay: rgba(15, 23, 42, 0.68);
+  --canvas-border: rgba(255, 255, 255, 0.1);
+  --canvas-border-strong: rgba(255, 255, 255, 0.16);
+  --canvas-accent-soft: rgba(92, 155, 255, 0.2);
+  --canvas-grid: rgba(255, 255, 255, 0.08);
+  --canvas-shadow: 0 18px 34px rgba(2, 6, 23, 0.32);
+  --canvas-shadow-strong: 0 18px 42px rgba(2, 6, 23, 0.46);
+  --canvas-floating-bg: rgba(15, 23, 42, 0.92);
+  --canvas-floating-border: rgba(255, 255, 255, 0.1);
+  --canvas-floating-button-bg: rgba(255, 255, 255, 0.08);
+  --canvas-floating-button-bg-hover: rgba(255, 255, 255, 0.14);
+  --canvas-floating-text: #f8fafc;
+  --canvas-selection-border: rgba(92, 155, 255, 0.82);
+  --canvas-selection-fill: rgba(92, 155, 255, 0.18);
+  --canvas-group-bg: rgba(92, 155, 255, 0.12);
+  --canvas-code-bg: rgba(255, 255, 255, 0.08);
+  --canvas-anchor-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  --canvas-resize-handle: rgba(255, 255, 255, 0.18);
+  --canvas-resize-handle-hover: rgba(255, 255, 255, 0.26);
+  --canvas-shell-highlight: rgba(92, 155, 255, 0.08);
 }
 
 .toolbar {
@@ -1157,8 +1271,8 @@ watch(
   gap: 12px;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 251, 245, 0.88);
+  border-bottom: 1px solid var(--canvas-border);
+  background: var(--canvas-surface-overlay);
   backdrop-filter: blur(16px);
 }
 
@@ -1172,17 +1286,26 @@ watch(
   gap: 16px;
   margin-left: auto;
   font-size: 13px;
-  color: var(--b3-theme-on-surface-light);
+  color: var(--canvas-text-muted);
 }
 
 .toolbar__button {
-  border: 1px solid rgba(22, 28, 20, 0.12);
+  border: 1px solid var(--canvas-border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.8);
-  color: var(--b3-theme-on-surface);
+  background: var(--canvas-surface);
+  color: var(--canvas-text);
   padding: 8px 14px;
   font-size: 13px;
   cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.toolbar__button:hover:not(:disabled) {
+  border-color: var(--canvas-border-strong);
+  background: var(--canvas-surface-overlay);
 }
 
 .toolbar__button:disabled {
@@ -1191,8 +1314,9 @@ watch(
 }
 
 .toolbar__button--primary {
-  background: #16361f;
-  color: #f7f3ea;
+  border-color: transparent;
+  background: var(--canvas-accent);
+  color: var(--canvas-accent-contrast);
 }
 
 .toolbar__button--stat {
@@ -1200,11 +1324,11 @@ watch(
 }
 
 .toolbar__dirty {
-  color: #b84f2a;
+  color: var(--canvas-danger);
 }
 
 .toolbar__saved {
-  color: #3f7a58;
+  color: var(--canvas-success);
 }
 
 .workspace {
@@ -1221,11 +1345,11 @@ watch(
   z-index: 4;
   width: 28px;
   height: 56px;
-  border: 1px solid rgba(22, 28, 20, 0.12);
+  border: 1px solid var(--canvas-border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #274332;
-  box-shadow: 0 10px 24px rgba(22, 36, 25, 0.14);
+  background: var(--canvas-surface-overlay);
+  color: var(--canvas-text);
+  box-shadow: var(--canvas-shadow);
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
@@ -1243,9 +1367,10 @@ watch(
 .stage {
   position: relative;
   overflow: hidden;
+  background-color: var(--canvas-bg);
   background-image:
-    linear-gradient(rgba(17, 33, 22, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 33, 22, 0.08) 1px, transparent 1px);
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px);
   background-size: 32px 32px;
   touch-action: none;
 }
@@ -1253,18 +1378,23 @@ watch(
 .stage__selection-box {
   position: absolute;
   z-index: 3;
-  border: 1px solid rgba(184, 79, 42, 0.72);
+  border: 1px solid var(--canvas-selection-border);
   border-radius: 12px;
-  background:
-    linear-gradient(135deg, rgba(184, 79, 42, 0.2), rgba(214, 140, 98, 0.14));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+  background: linear-gradient(135deg, var(--canvas-selection-fill), transparent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
   pointer-events: none;
 }
 
 .selection-toolbar {
-  --selection-toolbar-bg: rgba(15, 20, 20, 0.94);
-  --selection-toolbar-border: rgba(255, 255, 255, 0.08);
-  --selection-toolbar-shadow: 0 16px 40px rgba(5, 10, 10, 0.28);
+  --selection-toolbar-bg: var(--canvas-floating-bg);
+  --selection-toolbar-border: var(--canvas-floating-border);
+  --selection-toolbar-shadow: var(--canvas-shadow-strong);
+  --selection-toolbar-text: var(--canvas-floating-text);
+  --selection-toolbar-button-bg: var(--canvas-floating-button-bg);
+  --selection-toolbar-button-bg-hover: var(--canvas-floating-button-bg-hover);
+  --selection-toolbar-tooltip-bg: var(--canvas-floating-tooltip-bg);
+  --selection-toolbar-tooltip-border: var(--canvas-floating-border);
+  --selection-toolbar-tooltip-text: var(--canvas-floating-tooltip-text);
   position: absolute;
   z-index: 5;
   display: inline-flex;
@@ -1282,6 +1412,30 @@ watch(
   transform: translateY(8px);
 }
 
+.selection-toolbar--light {
+  --selection-toolbar-bg: rgba(255, 255, 255, 0.96);
+  --selection-toolbar-border: rgba(15, 23, 42, 0.1);
+  --selection-toolbar-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+  --selection-toolbar-text: var(--canvas-text);
+  --selection-toolbar-button-bg: rgba(15, 23, 42, 0.06);
+  --selection-toolbar-button-bg-hover: rgba(15, 23, 42, 0.12);
+  --selection-toolbar-tooltip-bg: rgba(255, 255, 255, 0.98);
+  --selection-toolbar-tooltip-border: rgba(15, 23, 42, 0.12);
+  --selection-toolbar-tooltip-text: var(--canvas-text);
+}
+
+.selection-toolbar--dark {
+  --selection-toolbar-bg: rgba(15, 23, 42, 0.94);
+  --selection-toolbar-border: rgba(255, 255, 255, 0.1);
+  --selection-toolbar-shadow: 0 18px 44px rgba(2, 6, 23, 0.48);
+  --selection-toolbar-text: #f8fafc;
+  --selection-toolbar-button-bg: rgba(255, 255, 255, 0.08);
+  --selection-toolbar-button-bg-hover: rgba(255, 255, 255, 0.14);
+  --selection-toolbar-tooltip-bg: rgba(15, 23, 42, 0.98);
+  --selection-toolbar-tooltip-border: rgba(255, 255, 255, 0.12);
+  --selection-toolbar-tooltip-text: #f8fafc;
+}
+
 .selection-toolbar__button {
   position: relative;
   display: inline-flex;
@@ -1292,8 +1446,8 @@ watch(
   min-width: 0;
   border: 0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #f4f7f5;
+  background: var(--selection-toolbar-button-bg);
+  color: var(--selection-toolbar-text);
   padding: 0;
   font-size: 12px;
   font-weight: 600;
@@ -1308,7 +1462,7 @@ watch(
 .selection-toolbar__button--active,
 .selection-toolbar__button:hover,
 .selection-toolbar__menu-button:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--selection-toolbar-button-bg-hover);
 }
 
 .selection-toolbar__button:hover,
@@ -1330,7 +1484,7 @@ watch(
   padding: 10px;
   border: 1px solid var(--selection-toolbar-border);
   border-radius: 14px;
-  background: rgba(12, 16, 16, 0.98);
+  background: var(--selection-toolbar-bg);
   box-shadow: var(--selection-toolbar-shadow);
 }
 
@@ -1346,7 +1500,7 @@ watch(
 .selection-toolbar__swatch {
   width: 28px;
   height: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--selection-toolbar-border);
   border-radius: 999px;
   cursor: pointer;
 }
@@ -1359,7 +1513,7 @@ watch(
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #f4f7f5;
+  color: var(--selection-toolbar-text);
   padding: 8px 10px;
   font-size: 12px;
   text-align: left;
@@ -1374,10 +1528,10 @@ watch(
   bottom: calc(100% + 8px);
   z-index: 2;
   padding: 5px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--selection-toolbar-tooltip-border);
   border-radius: 8px;
-  background: rgba(7, 10, 10, 0.98);
-  color: #f4f7f5;
+  background: var(--selection-toolbar-tooltip-bg);
+  color: var(--selection-toolbar-tooltip-text);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
@@ -1430,7 +1584,7 @@ watch(
 
 .stage__edge {
   fill: none;
-  stroke: rgba(44, 62, 48, 0.6);
+  stroke: var(--canvas-text-muted);
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1438,13 +1592,19 @@ watch(
 }
 
 .stage__edge--selected {
-  stroke: #b84f2a;
+  stroke: var(--canvas-accent);
+}
+
+.stage__edge--draft {
+  stroke: var(--canvas-accent);
+  stroke-dasharray: 8 6;
+  pointer-events: none;
 }
 
 .stage__edge-label {
   font-size: 12px;
   text-anchor: middle;
-  fill: #4f5d52;
+  fill: var(--canvas-text-muted);
   pointer-events: all;
 }
 
@@ -1452,22 +1612,23 @@ watch(
   position: absolute;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(17, 33, 22, 0.1);
+  border: 1px solid var(--canvas-border);
   border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 24px 40px rgba(22, 36, 25, 0.1);
-  background: rgba(255, 252, 246, 0.96);
+  box-shadow: var(--canvas-shadow);
+  background: var(--canvas-card-bg);
+  color: var(--canvas-text);
   cursor: grab;
   touch-action: none;
 }
 
 .canvas-node--group {
-  background: rgba(195, 221, 206, 0.4);
+  background: var(--canvas-group-bg);
   border-style: dashed;
 }
 
 .canvas-node--selected {
-  box-shadow: 0 0 0 2px rgba(184, 79, 42, 0.45), 0 24px 40px rgba(22, 36, 25, 0.14);
+  box-shadow: 0 0 0 2px var(--canvas-selection-border), var(--canvas-shadow-strong);
 }
 
 .canvas-node__body {
@@ -1493,7 +1654,7 @@ watch(
   outline: 0;
   resize: none;
   background: transparent;
-  color: #25362c;
+  color: var(--canvas-text);
   font: inherit;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -1502,7 +1663,7 @@ watch(
 
 .markdown-preview {
   white-space: normal;
-  color: #25362c;
+  color: var(--canvas-text);
 }
 
 .markdown-preview :deep(*) {
@@ -1516,7 +1677,7 @@ watch(
 .markdown-preview :deep(h5),
 .markdown-preview :deep(h6) {
   margin-bottom: 10px;
-  color: #16361f;
+  color: var(--canvas-text);
   line-height: 1.3;
 }
 
@@ -1534,14 +1695,14 @@ watch(
 }
 
 .markdown-preview :deep(blockquote) {
-  border-left: 3px solid rgba(22, 54, 31, 0.22);
+  border-left: 3px solid var(--canvas-border-strong);
   padding-left: 10px;
-  color: #506355;
+  color: var(--canvas-text-muted);
 }
 
 .markdown-preview :deep(code) {
   border-radius: 6px;
-  background: rgba(22, 54, 31, 0.08);
+  background: var(--canvas-code-bg);
   padding: 2px 6px;
   font-size: 12px;
 }
@@ -1549,7 +1710,7 @@ watch(
 .markdown-preview :deep(pre) {
   overflow: auto;
   border-radius: 10px;
-  background: rgba(22, 54, 31, 0.08);
+  background: var(--canvas-code-bg);
   padding: 10px;
 }
 
@@ -1559,14 +1720,14 @@ watch(
 }
 
 .markdown-preview :deep(a) {
-  color: #2c6a4a;
+  color: var(--canvas-accent);
   text-decoration: underline;
 }
 
 .canvas-node__meta {
   margin-top: 8px;
   font-size: 12px;
-  color: #6d796f;
+  color: var(--canvas-text-muted);
   word-break: break-all;
 }
 
@@ -1578,8 +1739,8 @@ watch(
 .file-card__badge {
   justify-self: start;
   border-radius: 999px;
-  background: rgba(22, 54, 31, 0.12);
-  color: #274332;
+  background: var(--canvas-accent-soft);
+  color: var(--canvas-text);
   padding: 4px 8px;
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -1591,16 +1752,127 @@ watch(
   max-height: 132px;
   object-fit: cover;
   border-radius: 12px;
-  border: 1px solid rgba(17, 33, 22, 0.08);
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--canvas-border);
+  background: var(--canvas-surface);
 }
 
 .file-card__helper {
   font-size: 12px;
-  color: #506355;
+  color: var(--canvas-text-muted);
 }
 
-.canvas-node__resize {
+.canvas-node__anchor,
+.canvas-node__resize-handle {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.canvas-node__anchor {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--canvas-anchor-bg);
+  box-shadow: var(--canvas-anchor-shadow);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.78);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+  pointer-events: auto;
+}
+
+.canvas-node:hover .canvas-node__anchor,
+.canvas-node--selected .canvas-node__anchor,
+.canvas-node__anchor--active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.canvas-node__anchor--active {
+  background: var(--canvas-accent-soft);
+  box-shadow: 0 0 0 2px var(--canvas-selection-fill);
+}
+
+.canvas-node__anchor::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 999px;
+  background: var(--canvas-accent);
+}
+
+.canvas-node__anchor--top {
+  top: 0;
+  left: 50%;
+}
+
+.canvas-node__anchor--right {
+  top: 50%;
+  left: 100%;
+}
+
+.canvas-node__anchor--bottom {
+  top: 100%;
+  left: 50%;
+}
+
+.canvas-node__anchor--left {
+  top: 50%;
+  left: 0;
+}
+
+.canvas-node__resize-handle {
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.canvas-node:hover .canvas-node__resize-handle,
+.canvas-node--selected .canvas-node__resize-handle,
+.canvas-node:hover .canvas-node__resize-corner,
+.canvas-node--selected .canvas-node__resize-corner {
+  opacity: 1;
+}
+
+.canvas-node__resize-handle--top,
+.canvas-node__resize-handle--bottom {
+  left: 14px;
+  right: 14px;
+  height: 12px;
+}
+
+.canvas-node__resize-handle--left,
+.canvas-node__resize-handle--right {
+  top: 14px;
+  bottom: 14px;
+  width: 12px;
+}
+
+.canvas-node__resize-handle--top {
+  top: -6px;
+  cursor: ns-resize;
+}
+
+.canvas-node__resize-handle--right {
+  position: absolute;
+  right: -6px;
+  cursor: ew-resize;
+}
+
+.canvas-node__resize-handle--bottom {
+  bottom: -6px;
+  cursor: ns-resize;
+}
+
+.canvas-node__resize-handle--left {
+  left: -6px;
+  cursor: ew-resize;
+}
+
+.canvas-node__resize-corner {
   position: absolute;
   right: 10px;
   bottom: 10px;
@@ -1608,15 +1880,23 @@ watch(
   height: 16px;
   border: 0;
   border-radius: 4px;
-  background: rgba(22, 54, 31, 0.18);
+  background: var(--canvas-resize-handle);
   cursor: nwse-resize;
+  opacity: 0;
+  transition:
+    opacity 0.16s ease,
+    background 0.16s ease;
+}
+
+.canvas-node__resize-corner:hover {
+  background: var(--canvas-resize-handle-hover);
 }
 
 .inspector {
   overflow: auto;
   padding: 18px;
-  border-left: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(250, 248, 242, 0.9);
+  border-left: 1px solid var(--canvas-border);
+  background: var(--canvas-inspector-bg);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1638,9 +1918,9 @@ watch(
   gap: 10px;
   margin-bottom: 18px;
   padding: 14px;
-  border: 1px solid rgba(17, 33, 22, 0.08);
+  border: 1px solid var(--canvas-border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--canvas-inspector-section-bg);
 }
 
 .inspector__section h2 {
@@ -1648,23 +1928,23 @@ watch(
   font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #4c5f53;
+  color: var(--canvas-text-muted);
 }
 
 .inspector__section label {
   display: grid;
   gap: 6px;
   font-size: 12px;
-  color: #4f5d52;
+  color: var(--canvas-text-muted);
 }
 
 .inspector__section input,
 .inspector__section select,
 .inspector__section textarea {
   width: 100%;
-  border: 1px solid rgba(22, 28, 20, 0.12);
+  border: 1px solid var(--canvas-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--canvas-surface);
   padding: 9px 10px;
   font: inherit;
   color: inherit;
@@ -1687,8 +1967,8 @@ watch(
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  background: rgba(184, 79, 42, 0.1);
-  color: #6f2f18;
+  background: var(--canvas-accent-soft);
+  color: var(--canvas-text);
 }
 
 .conflict-panel__actions {
@@ -1706,9 +1986,9 @@ watch(
   display: grid;
   gap: 4px;
   justify-items: start;
-  border: 1px solid rgba(17, 33, 22, 0.08);
+  border: 1px solid var(--canvas-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--canvas-surface);
   padding: 10px;
   text-align: left;
   cursor: pointer;
@@ -1717,7 +1997,7 @@ watch(
 
 .recent-list__item span {
   font-size: 12px;
-  color: #6d796f;
+  color: var(--canvas-text-muted);
   word-break: break-all;
 }
 

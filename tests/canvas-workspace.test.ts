@@ -7,7 +7,10 @@ import {
   vi,
 } from "vitest"
 import { mount } from "@vue/test-utils"
-import { ref } from "vue"
+import {
+  nextTick,
+  ref,
+} from "vue"
 
 import CanvasWorkspace from "@/components/canvas/CanvasWorkspace.vue"
 
@@ -58,11 +61,17 @@ function createEditorMock(node = createTextNode()) {
     closeSelectionPopover: vi.fn(),
     createGroupFromSelection: vi.fn(),
     createEdgeFromSelection: vi.fn(),
+    connectionDraft: {
+      toX: 0,
+      toY: 0,
+      visible: false,
+    },
     deleteSelection: vi.fn(),
     displayNodes: [node],
     edgeTargets: [],
     exportCanvas: vi.fn(),
     fileInputRef: ref<HTMLInputElement>(),
+    getConnectionDraftPath: vi.fn(() => ""),
     getEdgeLabelPosition: vi.fn(() => ({ x: 0, y: 0 })),
     getEdgePath: vi.fn(() => ""),
     getFileNodePreview: vi.fn(() => ({
@@ -82,6 +91,7 @@ function createEditorMock(node = createTextNode()) {
     getRenderedMarkdown: vi.fn((text: string) => `<p>${text}</p>`),
     handleNodePointerDown: vi.fn(),
     handleWheelZoom: vi.fn(),
+    isConnectionTarget: vi.fn(() => false),
     importCanvas: vi.fn(),
     inspectorExpanded: true,
     loadConflictVersion: vi.fn(),
@@ -124,6 +134,8 @@ function createEditorMock(node = createTextNode()) {
     setSelectionToolbarSize: vi.fn(),
     sides: ["top", "right", "bottom", "left"],
     stageRef: ref<HTMLElement>(),
+    startConnectionDrag: vi.fn(),
+    startCornerResize: vi.fn(),
     startPan: vi.fn(),
     startResize: vi.fn(),
     state: {
@@ -161,6 +173,20 @@ function createEditorMock(node = createTextNode()) {
 }
 
 describe("CanvasWorkspace", () => {
+  it("renders a stable canvas root for host theme attributes", () => {
+    currentEditor = createEditorMock()
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='canvas-shell']").exists()).toBe(true)
+  })
+
   it("renders cards without the top metadata header", () => {
     currentEditor = createEditorMock()
 
@@ -231,6 +257,48 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow)")
   })
 
+  it("renders four edge resize handles, one corner resize handle, and four connection anchors for each card", () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.findAll("[data-testid^='node-resize-']")).toHaveLength(5)
+    expect(wrapper.findAll("[data-testid^='node-anchor-']")).toHaveLength(4)
+    expect(wrapper.find("[data-testid='node-resize-corner']").exists()).toBe(true)
+  })
+
+  it("wires edge handles and anchors to the side-aware editor actions", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='node-resize-left']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-resize-right']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-resize-corner']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-anchor-top']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-anchor-bottom']").trigger("pointerdown")
+
+    expect(currentEditor.startResize).toHaveBeenNthCalledWith(1, node, "left", expect.anything())
+    expect(currentEditor.startResize).toHaveBeenNthCalledWith(2, node, "right", expect.anything())
+    expect(currentEditor.startCornerResize).toHaveBeenCalledWith(node, expect.anything())
+    expect(currentEditor.startConnectionDrag).toHaveBeenNthCalledWith(1, node, "top", expect.anything())
+    expect(currentEditor.startConnectionDrag).toHaveBeenNthCalledWith(2, node, "bottom", expect.anything())
+  })
+
   it("renders a single-selection floating toolbar with edit and no create-group action", async () => {
     const node = createTextNode()
     currentEditor = createEditorMock(node)
@@ -268,6 +336,40 @@ describe("CanvasWorkspace", () => {
     await wrapper.find("[data-testid='selection-toolbar-color']").trigger("click")
 
     expect(currentEditor.toggleSelectionPopover).toHaveBeenCalledWith("color")
+  })
+
+  it("updates the floating toolbar theme class when the canvas theme mode changes", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const shell = wrapper.find("[data-testid='canvas-shell']").element as HTMLElement
+    shell.setAttribute("data-theme-mode", "dark")
+    await nextTick()
+    await Promise.resolve()
+
+    expect(wrapper.find("[data-testid='selection-toolbar']").classes()).toContain("selection-toolbar--dark")
+
+    shell.setAttribute("data-theme-mode", "light")
+    await nextTick()
+    await Promise.resolve()
+
+    expect(wrapper.find("[data-testid='selection-toolbar']").classes()).toContain("selection-toolbar--light")
   })
 
   it("renders a multi-selection floating toolbar with create-group and align menu", async () => {

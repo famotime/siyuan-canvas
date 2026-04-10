@@ -489,4 +489,193 @@ describe("useCanvasEditor selection toolbar integration", () => {
 
     wrapper.unmount()
   })
+
+  it("lets cards shrink below thirty percent zoom floor down to ten percent", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = {
+      app: {},
+    }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [],
+        edges: [],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    editor.viewport.scale = 0.2
+    editor.zoomOut()
+
+    expect(editor.viewport.scale).toBe(0.1)
+
+    wrapper.unmount()
+  })
+
+  it("resizes a card from its left edge", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = {
+      app: {},
+    }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          {
+            id: "n1",
+            type: "text",
+            text: "one",
+            x: 100,
+            y: 100,
+            width: 200,
+            height: 120,
+          },
+        ],
+        edges: [],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const node = editor.state.document.nodes[0]!
+    editor.startResize(node, "left", {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    } as any)
+
+    window.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 140,
+      clientY: 100,
+    }))
+    window.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      clientX: 140,
+      clientY: 100,
+    }))
+    await nextTick()
+
+    expect(editor.state.document.nodes[0]).toMatchObject({
+      x: 120,
+      width: 180,
+      y: 100,
+      height: 120,
+    })
+
+    wrapper.unmount()
+  })
+
+  it("creates an edge by dragging from one side midpoint to another", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = {
+      app: {},
+    }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          {
+            id: "n1",
+            type: "text",
+            text: "one",
+            x: 100,
+            y: 100,
+            width: 180,
+            height: 100,
+          },
+          {
+            id: "n2",
+            type: "text",
+            text: "two",
+            x: 420,
+            y: 120,
+            width: 180,
+            height: 100,
+          },
+        ],
+        edges: [],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const stage = document.createElement("section")
+    Object.defineProperty(stage, "clientWidth", { configurable: true, value: 1200 })
+    Object.defineProperty(stage, "clientHeight", { configurable: true, value: 800 })
+    Object.defineProperty(stage, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 800,
+        height: 800,
+        left: 0,
+        right: 1200,
+        top: 0,
+        width: 1200,
+        x: 0,
+        y: 0,
+      }),
+    })
+    editor.stageRef.value = stage
+    editor.viewport.scale = 1
+    editor.viewport.x = editor.board.left
+    editor.viewport.y = editor.board.top
+
+    const sourceNode = editor.state.document.nodes[0]!
+    editor.startConnectionDrag(sourceNode, "right", {
+      button: 0,
+      clientX: 280,
+      clientY: 150,
+      preventDefault: vi.fn(),
+    } as any)
+
+    window.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 430,
+      clientY: 170,
+    }))
+    await nextTick()
+
+    expect(editor.connectionDraft.visible).toBe(true)
+    expect(editor.isConnectionTarget("n2", "left")).toBe(true)
+
+    editor.finishConnectionDrag()
+    await nextTick()
+
+    expect(editor.state.document.edges).toHaveLength(1)
+    expect(editor.state.document.edges[0]).toMatchObject({
+      fromNode: "n1",
+      fromSide: "right",
+      toNode: "n2",
+      toSide: "left",
+    })
+    expect(editor.connectionDraft.visible).toBe(false)
+
+    wrapper.unmount()
+  })
 })

@@ -4,7 +4,11 @@ import {
   it,
 } from "vitest"
 
-import { scaleViewportAtPoint } from "@/canvas/viewport"
+import {
+  MIN_VIEWPORT_SCALE,
+  clampViewportScale,
+  scaleViewportAtPoint,
+} from "@/canvas/viewport"
 
 describe("canvas viewport helpers", () => {
   it("keeps the cursor focus anchored while zooming", () => {
@@ -21,5 +25,11 @@ describe("canvas viewport helpers", () => {
 
     expect(worldXAfter).toBe(worldXBefore)
     expect(worldYAfter).toBe(worldYBefore)
+  })
+
+  it("allows zooming out below thirty percent while still enforcing a floor", () => {
+    expect(MIN_VIEWPORT_SCALE).toBe(0.1)
+    expect(clampViewportScale(0.18)).toBe(0.18)
+    expect(clampViewportScale(0.04)).toBe(0.1)
   })
 })

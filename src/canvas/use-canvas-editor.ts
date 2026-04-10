@@ -64,8 +64,18 @@ import {
   parseCanvasDocument,
   validateCanvasDocument,
 } from "@/canvas/format"
+import {
+  CONNECTION_SNAP_DISTANCE,
+  findNearestCanvasAnchor,
+  getCanvasNodeAnchor,
+  resizeCanvasNodeFromCorner,
+  resizeCanvasNodeFromSide,
+} from "@/canvas/node-interaction"
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
-import { scaleViewportAtPoint } from "@/canvas/viewport"
+import {
+  clampViewportScale,
+  scaleViewportAtPoint,
+} from "@/canvas/viewport"
 import {
   createBoundsFromPoints,
   centerViewportOnBounds,
@@ -133,6 +143,15 @@ export function useCanvasEditor(
     width: 0,
     x: 0,
     y: 0,
+  })
+  const connectionDraft = reactive({
+    fromNodeId: "",
+    fromSide: "right" as CanvasSide,
+    toNodeId: "",
+    toSide: "left" as CanvasSide,
+    toX: 0,
+    toY: 0,
+    visible: false,
   })
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
@@ -217,10 +236,6 @@ export function useCanvasEditor(
     { immediate: true },
   )
 
-  function clamp(value: number, min: number, max: number): number {
-    return Math.min(max, Math.max(min, value))
-  }
-
   function getFileName(path: string): string {
     return path.split("/").pop() || path
   }
@@ -282,36 +297,19 @@ export function useCanvasEditor(
   }
 
   function getAnchor(node: CanvasNode, side: CanvasSide) {
-    const x = toBoardX(board.value, node.x)
-    const y = toBoardY(board.value, node.y)
-
-    switch (side) {
-      case "top":
-        return {
-          x: x + node.width / 2,
-          y,
-        }
-      case "right":
-        return {
-          x: x + node.width,
-          y: y + node.height / 2,
-        }
-      case "bottom":
-        return {
-          x: x + node.width / 2,
-          y: y + node.height,
-        }
-      case "left":
-        return {
-          x,
-          y: y + node.height / 2,
-        }
-      default:
-        return {
-          x,
-          y,
-        }
+    const anchor = getCanvasNodeAnchor(node, side)
+    return {
+      x: toBoardX(board.value, anchor.x),
+      y: toBoardY(board.value, anchor.y),
     }
+  }
+
+  function getCurvePath(
+    from: { x: number, y: number },
+    to: { x: number, y: number },
+  ) {
+    const midX = (from.x + to.x) / 2
+    return `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`
   }
 
   function getEdgePath(edge: CanvasEdge): string {
@@ -323,8 +321,7 @@ export function useCanvasEditor(
 
     const from = getAnchor(fromNode, edge.fromSide)
     const to = getAnchor(toNode, edge.toSide)
-    const midX = (from.x + to.x) / 2
-    return `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`
+    return getCurvePath(from, to)
   }
 
   function getEdgeLabelPosition(edge: CanvasEdge) {
@@ -390,6 +387,16 @@ export function useCanvasEditor(
     selectionBox.y = 0
     selectionBox.width = 0
     selectionBox.height = 0
+  }
+
+  function clearConnectionDraft() {
+    connectionDraft.fromNodeId = ""
+    connectionDraft.fromSide = "right"
+    connectionDraft.toNodeId = ""
+    connectionDraft.toSide = "left"
+    connectionDraft.toX = 0
+    connectionDraft.toY = 0
+    connectionDraft.visible = false
   }
 
   function ensureCanvasPath(input: string): string {
@@ -631,11 +638,11 @@ export function useCanvasEditor(
   }
 
   function zoomIn() {
-    viewport.scale = clamp(Number((viewport.scale + 0.1).toFixed(2)), 0.3, 2.5)
+    viewport.scale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
   }
 
   function zoomOut() {
-    viewport.scale = clamp(Number((viewport.scale - 0.1).toFixed(2)), 0.3, 2.5)
+    viewport.scale = clampViewportScale(Number((viewport.scale - 0.1).toFixed(2)))
   }
 
   function toggleInspector() {
@@ -843,11 +850,7 @@ export function useCanvasEditor(
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     }
-    const nextScale = clamp(
-      Number((viewport.scale * Math.exp(-event.deltaY * 0.0015)).toFixed(2)),
-      0.3,
-      2.5,
-    )
+    const nextScale = clampViewportScale(Number((viewport.scale * Math.exp(-event.deltaY * 0.0015)).toFixed(2)))
     const nextViewport = scaleViewportAtPoint(viewport, point, nextScale)
 
     viewport.scale = nextViewport.scale
@@ -864,7 +867,7 @@ export function useCanvasEditor(
       return false
     }
 
-    return !target.closest(".canvas-node__resize, a, button, input, textarea, select")
+    return !target.closest(".canvas-node__resize-handle, .canvas-node__resize-corner, .canvas-node__anchor, a, button, input, textarea, select")
   }
 
   function isStageGestureTarget(target: EventTarget | null): target is Element {
@@ -1021,14 +1024,139 @@ export function useCanvasEditor(
     })
   }
 
-  function startResize(node: CanvasNode, event: PointerEvent) {
-    const initialWidth = node.width
-    const initialHeight = node.height
+  function getStagePoint(event: PointerEvent) {
+    const stage = stageRef.value
+    if (!stage) {
+      return null
+    }
+
+    if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
+      return null
+    }
+
+    const rect = stage.getBoundingClientRect()
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    }
+  }
+
+  function updateConnectionTarget(event: PointerEvent) {
+    const stagePoint = getStagePoint(event)
+    if (!stagePoint) {
+      return
+    }
+
+    const canvasPoint = {
+      x: toCanvasX(stagePoint.x),
+      y: toCanvasY(stagePoint.y),
+    }
+    const target = findNearestCanvasAnchor(state.document.nodes, canvasPoint, {
+      excludeNodeId: connectionDraft.fromNodeId,
+      maxDistance: CONNECTION_SNAP_DISTANCE,
+    })
+
+    connectionDraft.toNodeId = target?.nodeId || ""
+    connectionDraft.toSide = target?.side || "left"
+    connectionDraft.toX = target?.x ?? canvasPoint.x
+    connectionDraft.toY = target?.y ?? canvasPoint.y
+  }
+
+  function getConnectionDraftPath() {
+    if (!connectionDraft.visible) {
+      return ""
+    }
+
+    const fromNode = state.document.nodes.find((node) => node.id === connectionDraft.fromNodeId)
+    if (!fromNode) {
+      return ""
+    }
+
+    const from = getAnchor(fromNode, connectionDraft.fromSide)
+    const to = {
+      x: toBoardX(board.value, connectionDraft.toX),
+      y: toBoardY(board.value, connectionDraft.toY),
+    }
+
+    return getCurvePath(from, to)
+  }
+
+  function isConnectionTarget(nodeId: string, side: CanvasSide) {
+    return connectionDraft.visible
+      && connectionDraft.toNodeId === nodeId
+      && connectionDraft.toSide === side
+  }
+
+  function finishConnectionDrag() {
+    if (!connectionDraft.fromNodeId || !connectionDraft.toNodeId) {
+      clearConnectionDraft()
+      return
+    }
+
+    const edge = createCanvasEdge(connectionDraft.fromNodeId, connectionDraft.toNodeId)
+    edge.fromSide = connectionDraft.fromSide
+    edge.toSide = connectionDraft.toSide
+    commitDocument(upsertCanvasEdge(state.document, edge))
+    state.selectEdge(edge.id)
+    clearConnectionDraft()
+  }
+
+  function startConnectionDrag(node: CanvasNode, side: CanvasSide, event: PointerEvent) {
+    if (event.button !== 0) {
+      return
+    }
+
+    event.preventDefault?.()
+    const anchor = getCanvasNodeAnchor(node, side)
+    connectionDraft.fromNodeId = node.id
+    connectionDraft.fromSide = side
+    connectionDraft.toNodeId = ""
+    connectionDraft.toSide = "left"
+    connectionDraft.toX = anchor.x
+    connectionDraft.toY = anchor.y
+    connectionDraft.visible = true
+
+    startPointerGesture(
+      event,
+      (_dx, _dy, moveEvent) => {
+        updateConnectionTarget(moveEvent)
+      },
+      {
+        onEnd: (_dx, _dy, upEvent) => {
+          updateConnectionTarget(upEvent)
+          finishConnectionDrag()
+        },
+      },
+    )
+  }
+
+  function startResize(node: CanvasNode, side: CanvasSide, event: PointerEvent) {
+    if (event.button !== 0) {
+      return
+    }
+
+    event.preventDefault?.()
     startPointerGesture(event, (dx, dy) => {
-      commitDocument(setCanvasNodeGeometry(state.document, node.id, {
-        width: Math.max(180, Math.round(initialWidth + dx / viewport.scale)),
-        height: Math.max(node.type === "group" ? 120 : 100, Math.round(initialHeight + dy / viewport.scale)),
-      }))
+      commitDocument(setCanvasNodeGeometry(
+        state.document,
+        node.id,
+        resizeCanvasNodeFromSide(node, side, dx / viewport.scale, dy / viewport.scale),
+      ))
+    })
+  }
+
+  function startCornerResize(node: CanvasNode, event: PointerEvent) {
+    if (event.button !== 0) {
+      return
+    }
+
+    event.preventDefault?.()
+    startPointerGesture(event, (dx, dy) => {
+      commitDocument(setCanvasNodeGeometry(
+        state.document,
+        node.id,
+        resizeCanvasNodeFromCorner(node, dx / viewport.scale, dy / viewport.scale),
+      ))
     })
   }
 
@@ -1137,11 +1265,14 @@ export function useCanvasEditor(
       closeSelectionPopover,
       createGroupFromSelection,
       displayNodes,
+      connectionDraft,
       edgeTargets,
       exportCanvas,
       fileInputRef,
+      finishConnectionDrag,
       getEdgeLabelPosition,
       getEdgePath,
+      getConnectionDraftPath,
       getFileName,
       getFileNodeDescription,
       getFileNodeKind,
@@ -1149,6 +1280,7 @@ export function useCanvasEditor(
       getNodeStyle,
       getNodeTitle,
       importCanvas,
+      isConnectionTarget,
       newCanvas,
       newEdgeFromSide,
       newEdgeLabel,
@@ -1165,6 +1297,8 @@ export function useCanvasEditor(
       selectionBox,
       sides: SIDES,
       stageRef,
+      startConnectionDrag,
+      startCornerResize,
       startDrag,
       startPan,
       startResize,
