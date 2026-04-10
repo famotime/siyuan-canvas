@@ -29,4 +29,37 @@ Paragraph with **bold**, \`code\`, and [link](https://example.com).
     expect(html).not.toContain("<script>")
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; and <strong>safe</strong>")
   })
+
+  it("renders allowed inline font color and span highlight styles", () => {
+    const html = renderMarkdownPreview(`<font color="#e36c09">Orange text</font> and <span style="background: rgba(255, 77, 79, 0.5); color: #ffffff">highlight</span>`)
+
+    expect(html).toContain('<font color="#e36c09">Orange text</font>')
+    expect(html).toContain('<span style="background: rgba(255, 77, 79, 0.5); color: #ffffff">highlight</span>')
+  })
+
+  it("renders allowed inline color html alongside markdown formatting", () => {
+    const html = renderMarkdownPreview(`### Title
+
+<font color="#e36c09">**Bold orange**</font> and <span style="background-color: #222">plain</span>`)
+
+    expect(html).toContain("<h3>Title</h3>")
+    expect(html).toContain('<font color="#e36c09"><strong>Bold orange</strong></font>')
+    expect(html).toContain('<span style="background-color: #222">plain</span>')
+  })
+
+  it("auto-closes allowed inline color tags that run to the end of a line", () => {
+    const html = renderMarkdownPreview(`<font color="#e36c09">Orange text
+
+<span style="background: rgba(255, 77, 79, 0.5)">highlight`)
+
+    expect(html).toContain('<p><font color="#e36c09">Orange text</font></p>')
+    expect(html).toContain('<p><span style="background: rgba(255, 77, 79, 0.5)">highlight</span></p>')
+  })
+
+  it("keeps non-whitelisted inline html escaped", () => {
+    const html = renderMarkdownPreview(`<span style="font-size: 20px" onclick="alert(1)">bad</span>`)
+
+    expect(html).not.toContain("<span")
+    expect(html).toContain("&lt;span style=&quot;font-size: 20px&quot; onclick=&quot;alert(1)&quot;&gt;bad&lt;/span&gt;")
+  })
 })
