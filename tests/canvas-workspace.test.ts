@@ -101,6 +101,13 @@ function createEditorMock(node = createTextNode()) {
     selectedEdge: null,
     selectedNode: node,
     selectedNodeCount: 1,
+    selectionBox: {
+      height: 0,
+      visible: false,
+      width: 0,
+      x: 0,
+      y: 0,
+    },
     selectionColors: ["1", "2", "3"],
     selectionLayoutActions: [
       { action: "left-align", label: "Left align" },
@@ -404,5 +411,22 @@ describe("CanvasWorkspace", () => {
     document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
 
     expect(currentEditor.closeSelectionPopover).toHaveBeenCalledTimes(1)
+  })
+
+  it("removes the extra right-side gutter when the inspector is collapsed", () => {
+    currentEditor = createEditorMock()
+    currentEditor.inspectorExpanded = false
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find(".workspace").attributes("style")).toContain("grid-template-columns: 1fr 0px;")
+    expect(wrapper.find(".workspace__inspector-handle").attributes("style")).toContain("right: 8px;")
   })
 })

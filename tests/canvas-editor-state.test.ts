@@ -250,4 +250,59 @@ describe("canvas editor state", () => {
 
     expect(state.selectedNodeIds).toEqual(["n1", "n2"])
   })
+
+  it("supports replacing and extending selection with multiple node ids", () => {
+    const state = new CanvasEditorState({
+      load: vi.fn(),
+      save: vi.fn(),
+    } as any)
+
+    state.replaceDocument({
+      nodes: [
+        {
+          id: "n1",
+          type: "text",
+          text: "one",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+        {
+          id: "n2",
+          type: "text",
+          text: "two",
+          x: 400,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+        {
+          id: "n3",
+          type: "text",
+          text: "three",
+          x: 800,
+          y: 0,
+          width: 320,
+          height: 180,
+        },
+      ],
+      edges: [],
+    })
+
+    state.selectNodes(["n1", "n2"])
+
+    expect(state.selectedNodeIds).toEqual(["n1", "n2"])
+    expect(state.selectedNodeId).toBe("n2")
+
+    state.selectNodes(["n2", "n3"], { additive: true })
+
+    expect(state.selectedNodeIds).toEqual(["n1", "n2", "n3"])
+    expect(state.selectedNodeId).toBe("n3")
+
+    state.selectNodes(["n1", "missing"])
+
+    expect(state.selectedNodeIds).toEqual(["n1"])
+    expect(state.selectedNodeId).toBe("n1")
+  })
 })

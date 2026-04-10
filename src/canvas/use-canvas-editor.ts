@@ -67,7 +67,9 @@ import {
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
 import { scaleViewportAtPoint } from "@/canvas/viewport"
 import {
+  createBoundsFromPoints,
   centerViewportOnBounds,
+  resolveMarqueeSelectionNodeIds,
   resolveDragNodeIds,
   resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
@@ -124,6 +126,13 @@ export function useCanvasEditor(
   const selectionToolbarSize = reactive({
     height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
     width: DEFAULT_SELECTION_TOOLBAR_SIZE.width,
+  })
+  const selectionBox = reactive({
+    height: 0,
+    visible: false,
+    width: 0,
+    x: 0,
+    y: 0,
   })
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
@@ -373,6 +382,14 @@ export function useCanvasEditor(
     if (size.height > 0) {
       selectionToolbarSize.height = size.height
     }
+  }
+
+  function clearSelectionBox() {
+    selectionBox.visible = false
+    selectionBox.x = 0
+    selectionBox.y = 0
+    selectionBox.width = 0
+    selectionBox.height = 0
   }
 
   function ensureCanvasPath(input: string): string {
@@ -791,34 +808,27 @@ export function useCanvasEditor(
     showMessage(getNodeTitle(node), 2500, "info")
   }
 
-  function startPointerGesture(event: PointerEvent, onMove: (dx: number, dy: number) => void) {
+  function startPointerGesture(
+    event: PointerEvent,
+    onMove: (dx: number, dy: number, moveEvent: PointerEvent) => void,
+    options: {
+      onEnd?: (dx: number, dy: number, upEvent: PointerEvent) => void
+    } = {},
+  ) {
     const startX = event.clientX
     const startY = event.clientY
 
     const handleMove = (moveEvent: PointerEvent) => {
-      onMove(moveEvent.clientX - startX, moveEvent.clientY - startY)
+      onMove(moveEvent.clientX - startX, moveEvent.clientY - startY, moveEvent)
     }
-    const handleUp = () => {
+    const handleUp = (upEvent: PointerEvent) => {
       window.removeEventListener("pointermove", handleMove)
       window.removeEventListener("pointerup", handleUp)
+      options.onEnd?.(upEvent.clientX - startX, upEvent.clientY - startY, upEvent)
     }
 
     window.addEventListener("pointermove", handleMove)
     window.addEventListener("pointerup", handleUp)
-  }
-
-  function startPan(event: PointerEvent) {
-    if (event.button !== 2) {
-      return
-    }
-
-    event.preventDefault()
-    const initialX = viewport.x
-    const initialY = viewport.y
-    startPointerGesture(event, (dx, dy) => {
-      viewport.x = initialX + dx
-      viewport.y = initialY + dy
-    })
   }
 
   function handleWheelZoom(event: WheelEvent) {
@@ -855,6 +865,115 @@ export function useCanvasEditor(
     }
 
     return !target.closest(".canvas-node__resize, a, button, input, textarea, select")
+  }
+
+  function isStageGestureTarget(target: EventTarget | null): target is Element {
+    if (!(target instanceof Element)) {
+      return false
+    }
+
+    return !target.closest(".canvas-node, .selection-toolbar")
+      && !target.closest(".stage__edge, .stage__edge-label")
+      && !target.closest("a, button, input, textarea, select")
+  }
+
+  function toCanvasX(stageX: number): number {
+    return (stageX - viewport.x) / viewport.scale + board.value.left
+  }
+
+  function toCanvasY(stageY: number): number {
+    return (stageY - viewport.y) / viewport.scale + board.value.top
+  }
+
+  function updateSelectionBox(startPoint: { x: number, y: number }, currentPoint: { x: number, y: number }) {
+    const bounds = createBoundsFromPoints(startPoint, currentPoint)
+
+    selectionBox.visible = true
+    selectionBox.x = bounds.x
+    selectionBox.y = bounds.y
+    selectionBox.width = bounds.width
+    selectionBox.height = bounds.height
+  }
+
+  function finalizeSelectionBox(
+    startPoint: { x: number, y: number },
+    endPoint: { x: number, y: number },
+    options: {
+      additive: boolean
+    },
+  ) {
+    const stageBounds = createBoundsFromPoints(startPoint, endPoint)
+
+    clearSelectionBox()
+
+    if (stageBounds.width < 3 && stageBounds.height < 3) {
+      if (!options.additive) {
+        state.selectNodes([])
+      }
+      return
+    }
+
+    const selectedNodeIds = resolveMarqueeSelectionNodeIds(state.document, {
+      height: stageBounds.height / viewport.scale,
+      width: stageBounds.width / viewport.scale,
+      x: toCanvasX(stageBounds.x),
+      y: toCanvasY(stageBounds.y),
+    })
+
+    state.selectNodes(selectedNodeIds, { additive: options.additive })
+  }
+
+  function startPan(event: PointerEvent) {
+    if (event.button === 2) {
+      event.preventDefault()
+      const initialX = viewport.x
+      const initialY = viewport.y
+      startPointerGesture(event, (dx, dy) => {
+        viewport.x = initialX + dx
+        viewport.y = initialY + dy
+      })
+      return
+    }
+
+    if (event.button !== 0 || !isStageGestureTarget(event.target)) {
+      return
+    }
+
+    const stage = stageRef.value
+    if (!stage) {
+      return
+    }
+
+    event.preventDefault()
+    const rect = stage.getBoundingClientRect()
+    const startPoint = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    }
+    const additive = isAdditiveSelectionGesture(event)
+
+    updateSelectionBox(startPoint, startPoint)
+    startPointerGesture(
+      event,
+      (_dx, _dy, moveEvent) => {
+        updateSelectionBox(startPoint, {
+          x: moveEvent.clientX - rect.left,
+          y: moveEvent.clientY - rect.top,
+        })
+      },
+      {
+        onEnd: (_dx, _dy, upEvent) => {
+          finalizeSelectionBox(
+            startPoint,
+            {
+              x: upEvent.clientX - rect.left,
+              y: upEvent.clientY - rect.top,
+            },
+            { additive },
+          )
+        },
+      },
+    )
   }
 
   function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
@@ -1004,6 +1123,7 @@ export function useCanvasEditor(
     () => `${state.selectedEdgeId}|${state.selectedNodeIds.join(",")}`,
     () => {
       closeSelectionPopover()
+      clearSelectionBox()
     },
   )
 
@@ -1042,6 +1162,7 @@ export function useCanvasEditor(
       selectedEdge,
       selectedNode,
       selectedNodeCount,
+      selectionBox,
       sides: SIDES,
       stageRef,
       startDrag,

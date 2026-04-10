@@ -27,6 +27,11 @@ export interface SelectionToolbarPosition {
   y: number
 }
 
+export interface CanvasPoint {
+  x: number
+  y: number
+}
+
 const TOOLBAR_MARGIN = 12
 const TOOLBAR_OFFSET = 8
 
@@ -69,6 +74,34 @@ export function resolveSelectionToolbarPosition(
     x,
     y: selectionRect.y + selectionRect.height + TOOLBAR_OFFSET,
   }
+}
+
+export function createBoundsFromPoints(start: CanvasPoint, end: CanvasPoint): CanvasBounds {
+  const x = Math.min(start.x, end.x)
+  const y = Math.min(start.y, end.y)
+  const width = Math.abs(end.x - start.x)
+  const height = Math.abs(end.y - start.y)
+
+  return {
+    height,
+    width,
+    x,
+    y,
+  }
+}
+
+export function resolveMarqueeSelectionNodeIds(
+  document: CanvasDocument,
+  bounds: CanvasBounds,
+): string[] {
+  return document.nodes
+    .filter((node) =>
+      node.x < bounds.x + bounds.width
+      && node.x + node.width > bounds.x
+      && node.y < bounds.y + bounds.height
+      && node.y + node.height > bounds.y,
+    )
+    .map((node) => node.id)
 }
 
 export function resolveDragNodeIds(

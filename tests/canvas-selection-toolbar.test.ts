@@ -389,4 +389,104 @@ describe("useCanvasEditor selection toolbar integration", () => {
 
     wrapper.unmount()
   })
+
+  it("left-dragging the empty stage selects every card intersecting the marquee", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = {
+      app: {},
+    }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          {
+            id: "n1",
+            type: "text",
+            text: "one",
+            x: 100,
+            y: 100,
+            width: 140,
+            height: 80,
+          },
+          {
+            id: "n2",
+            type: "text",
+            text: "two",
+            x: 280,
+            y: 120,
+            width: 140,
+            height: 80,
+          },
+          {
+            id: "n3",
+            type: "text",
+            text: "three",
+            x: 520,
+            y: 120,
+            width: 140,
+            height: 80,
+          },
+        ],
+        edges: [],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const stage = document.createElement("section")
+    Object.defineProperty(stage, "clientWidth", { configurable: true, value: 1200 })
+    Object.defineProperty(stage, "clientHeight", { configurable: true, value: 800 })
+    Object.defineProperty(stage, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 800,
+        height: 800,
+        left: 0,
+        right: 1200,
+        top: 0,
+        width: 1200,
+        x: 0,
+        y: 0,
+      }),
+    })
+    editor.stageRef.value = stage
+    editor.viewport.scale = 1
+    editor.viewport.x = editor.board.left
+    editor.viewport.y = editor.board.top
+
+    editor.startPan({
+      button: 0,
+      clientX: 80,
+      clientY: 80,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault: vi.fn(),
+      shiftKey: false,
+      target: stage,
+    } as any)
+
+    window.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 430,
+      clientY: 230,
+    }))
+    window.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      clientX: 430,
+      clientY: 230,
+    }))
+    await nextTick()
+
+    expect(editor.state.selectedNodeIds).toEqual(["n1", "n2"])
+
+    wrapper.unmount()
+  })
 })

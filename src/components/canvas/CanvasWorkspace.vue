@@ -104,10 +104,12 @@
     <div
       class="workspace"
       :class="{ 'workspace--inspector-collapsed': !editor.inspectorExpanded }"
+      :style="editor.inspectorExpanded ? undefined : { gridTemplateColumns: '1fr 0px' }"
     >
       <button
         class="workspace__inspector-handle"
         :class="{ 'workspace__inspector-handle--collapsed': !editor.inspectorExpanded }"
+        :style="editor.inspectorExpanded ? undefined : { right: '8px' }"
         type="button"
         :title="editor.inspectorExpanded ? '收起属性栏' : '展开属性栏'"
         @click="editor.toggleInspector"
@@ -246,6 +248,18 @@
             />
           </article>
         </div>
+
+        <div
+          v-if="editor.selectionBox.visible"
+          class="stage__selection-box"
+          :style="{
+            height: `${editor.selectionBox.height}px`,
+            left: `${editor.selectionBox.x}px`,
+            top: `${editor.selectionBox.y}px`,
+            width: `${editor.selectionBox.width}px`,
+          }"
+          data-testid="selection-box"
+        />
 
         <div
           v-if="editor.selectionToolbar.visible"
@@ -1223,7 +1237,7 @@ watch(
 }
 
 .workspace--inspector-collapsed {
-  grid-template-columns: 1fr 52px;
+  grid-template-columns: 1fr 0;
 }
 
 .stage {
@@ -1234,6 +1248,17 @@ watch(
     linear-gradient(90deg, rgba(17, 33, 22, 0.08) 1px, transparent 1px);
   background-size: 32px 32px;
   touch-action: none;
+}
+
+.stage__selection-box {
+  position: absolute;
+  z-index: 3;
+  border: 1px solid rgba(184, 79, 42, 0.72);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(184, 79, 42, 0.2), rgba(214, 140, 98, 0.14));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+  pointer-events: none;
 }
 
 .selection-toolbar {
@@ -1599,8 +1624,8 @@ watch(
 
 .inspector--collapsed {
   overflow: hidden;
+  border-left: 0;
   padding: 0;
-  border-left: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .inspector__content {

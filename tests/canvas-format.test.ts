@@ -18,15 +18,19 @@ describe("canvas format", () => {
       resolve(process.cwd(), "sample_canvas", "学习观 1-6.canvas"),
       "utf8",
     )
+    const sourceDocument = JSON.parse(raw) as {
+      edges: unknown[]
+      nodes: unknown[]
+    }
 
     const result = parseCanvasDocument(raw)
 
     expect(result.errors).toEqual([])
     expect(result.document).not.toBeNull()
-    expect(result.document?.nodes).toHaveLength(11)
-    expect(result.document?.edges).toHaveLength(7)
+    expect(result.document?.nodes).toHaveLength(sourceDocument.nodes.length)
+    expect(result.document?.edges).toHaveLength(sourceDocument.edges.length)
     expect(new Set(result.document?.nodes.map((node) => node.type))).toEqual(
-      new Set(["group", "file", "text", "link"]),
+      new Set(sourceDocument.nodes.map((node) => (node as { type: string }).type)),
     )
   })
 

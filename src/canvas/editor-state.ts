@@ -97,6 +97,34 @@ export class CanvasEditorState {
     }
   }
 
+  selectNodes(nodeIds: string[], options: { additive?: boolean } = {}): void {
+    const validNodeIds = nodeIds.filter((nodeId, index) =>
+      nodeIds.indexOf(nodeId) === index
+      && this.document.nodes.some((node) => node.id === nodeId),
+    )
+
+    if (options.additive) {
+      const mergedNodeIds = [...this.selectedNodeIds]
+
+      for (const nodeId of validNodeIds) {
+        if (!mergedNodeIds.includes(nodeId)) {
+          mergedNodeIds.push(nodeId)
+        }
+      }
+
+      this.selectedNodeIds = mergedNodeIds
+      this.selectedNodeId = validNodeIds[validNodeIds.length - 1]
+        || this.selectedNodeIds[this.selectedNodeIds.length - 1]
+        || ""
+      this.selectedEdgeId = ""
+      return
+    }
+
+    this.selectedNodeIds = validNodeIds
+    this.selectedNodeId = validNodeIds[validNodeIds.length - 1] || ""
+    this.selectedEdgeId = ""
+  }
+
   selectNode(nodeId = "", options: { additive?: boolean } = {}): void {
     if (!nodeId) {
       this.selectedNodeId = ""
