@@ -15,7 +15,7 @@ import {
 describe("canvas format", () => {
   it("parses the sample Obsidian canvas document", () => {
     const raw = readFileSync(
-      resolve(process.cwd(), "docs", "06 - 永久笔记.canvas"),
+      resolve(process.cwd(), "sample_canvas", "学习观 1-6.canvas"),
       "utf8",
     )
 
