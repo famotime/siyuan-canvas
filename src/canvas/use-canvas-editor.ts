@@ -1,4 +1,3 @@
-import type { Plugin } from "siyuan"
 import type {
   CanvasBounds,
   CanvasDocument,
@@ -13,6 +12,7 @@ import type {
   CanvasRecentFile,
 } from "@/canvas/plugin-data"
 import type { ResolvedCanvasFileNode } from "@/canvas/file-node-resolution"
+import type { CanvasPluginBridge } from "@/canvas/use-canvas-editor-shared"
 
 import {
   openTab,
@@ -27,10 +27,6 @@ import {
   watch,
 } from "vue"
 import {
-  findSiyuanAssetByPath,
-  findSiyuanDocumentByPath,
-} from "@/api"
-import {
   createCanvasBoardMetrics,
   toBoardX,
   toBoardY,
@@ -40,23 +36,26 @@ import {
   createCanvasGroupForNodes,
   createCanvasEdge,
   createCanvasNode,
-  createEmptyCanvasDocument,
   getCanvasSelectionBounds,
   setCanvasNodesColor,
   removeCanvasEdge,
   removeCanvasNode,
   removeCanvasNodes,
-  setCanvasNodeGeometry,
   upsertCanvasEdge,
   upsertCanvasNode,
 } from "@/canvas/document"
 import { createCanvasEditorBindings } from "@/canvas/editor-bindings"
 import { CanvasEditorState } from "@/canvas/editor-state"
-import { createCanvasFileNodePreview } from "@/canvas/file-node-preview"
+import { createCanvasEditorFileActions } from "@/canvas/use-canvas-editor-file-actions"
+import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-file-nodes"
 import {
-  createFallbackCanvasFileNode,
-  resolveCanvasFileNode,
-} from "@/canvas/file-node-resolution"
+  createCanvasEditorGestureHandlers,
+  type CanvasEditorConnectionDraftState,
+  type CanvasEditorSelectionBoxState,
+} from "@/canvas/use-canvas-editor-gestures"
+import {
+  getCanvasFileName,
+} from "@/canvas/use-canvas-editor-shared"
 import { renderMarkdownPreview } from "@/canvas/markdown-preview"
 import { createDefaultCanvasPluginSettings } from "@/canvas/plugin-data"
 import { CanvasFileService } from "@/canvas/file-service"
@@ -65,35 +64,13 @@ import {
   validateCanvasDocument,
 } from "@/canvas/format"
 import { createCanvasI18n } from "@/i18n/canvas"
-import {
-  CONNECTION_SNAP_DISTANCE,
-  findNearestCanvasAnchor,
-  getCanvasNodeAnchor,
-  resizeCanvasNodeFromCorner,
-  resizeCanvasNodeFromSide,
-} from "@/canvas/node-interaction"
+import { getCanvasNodeAnchor } from "@/canvas/node-interaction"
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
+import { clampViewportScale } from "@/canvas/viewport"
 import {
-  clampViewportScale,
-  scaleViewportAtPoint,
-} from "@/canvas/viewport"
-import {
-  createBoundsFromPoints,
   centerViewportOnBounds,
-  resolveMarqueeSelectionNodeIds,
-  resolveDragNodeIds,
   resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
-
-interface CanvasPlugin extends Plugin {
-  app: unknown
-  getCanvasSettings?: () => CanvasPluginSettings
-  getRecentCanvasFiles?: () => CanvasRecentFile[]
-  i18n?: Record<string, string>
-  rememberRecentCanvas?: (path: string, title?: string) => Promise<void>
-  openCanvasSettings?: () => void
-  openCanvasTab?: (bootstrap?: CanvasTabBootstrap) => Promise<void>
-}
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
 const DEFAULT_SELECTION_TOOLBAR_SIZE = {
@@ -103,7 +80,7 @@ const DEFAULT_SELECTION_TOOLBAR_SIZE = {
 const SELECTION_COLORS = ["1", "2", "3", "4", "5", "6"] as const
 
 export function useCanvasEditor(
-  plugin: CanvasPlugin,
+  plugin: CanvasPluginBridge,
   bootstrap: CanvasTabBootstrap,
   setTitle: (title: string) => void,
 ) {
@@ -125,14 +102,14 @@ export function useCanvasEditor(
     height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
     width: DEFAULT_SELECTION_TOOLBAR_SIZE.width,
   })
-  const selectionBox = reactive({
+  const selectionBox = reactive<CanvasEditorSelectionBoxState>({
     height: 0,
     visible: false,
     width: 0,
     x: 0,
     y: 0,
   })
-  const connectionDraft = reactive({
+  const connectionDraft = reactive<CanvasEditorConnectionDraftState>({
     fromNodeId: "",
     fromSide: "right" as CanvasSide,
     toNodeId: "",
@@ -219,14 +196,14 @@ export function useCanvasEditor(
     { action: "stretch-horizontal", label: t("layoutStretchHorizontal") },
     { action: "stretch-vertical", label: t("layoutStretchVertical") },
   ])
-  let fileNodeResolveVersion = 0
+  const getFileName = getCanvasFileName
 
   function getPluginSettings(): CanvasPluginSettings {
-    return (plugin as CanvasPlugin).getCanvasSettings?.() ?? createDefaultCanvasPluginSettings()
+    return plugin.getCanvasSettings?.() ?? createDefaultCanvasPluginSettings()
   }
 
   function refreshRecentFiles() {
-    recentFiles.value = (plugin as CanvasPlugin).getRecentCanvasFiles?.() ?? []
+    recentFiles.value = plugin.getRecentCanvasFiles?.() ?? []
   }
 
   watch(
@@ -238,56 +215,18 @@ export function useCanvasEditor(
     { immediate: true },
   )
 
-  function getFileName(path: string): string {
-    return path.split("/").pop() || path
-  }
-
-  function getResolvedFileNode(node: CanvasNode): ResolvedCanvasFileNode {
-    if (node.type !== "file") {
-      throw new Error("Resolved file-node metadata requested for a non-file node.")
-    }
-
-    return fileNodeMeta.value[node.id] || createFallbackCanvasFileNode(node.file)
-  }
-
-  function getNodeTitle(node: CanvasNode): string {
-    switch (node.type) {
-      case "file":
-        return getResolvedFileNode(node).title
-      case "group":
-        return node.label || t("nodeDefaultGroupLabel")
-      case "link":
-        return t("nodeKindExternalLink")
-      case "text":
-        return node.text.split("\n")[0] || t("nodeKindText")
-      default:
-        return node.type
-    }
-  }
-
-  function getFileNodeDescription(node: CanvasNode): string {
-    if (node.type !== "file") {
-      return ""
-    }
-
-    return getResolvedFileNode(node).description
-  }
-
-  function getFileNodeKind(node: CanvasNode): string {
-    if (node.type !== "file") {
-      return ""
-    }
-
-    return getResolvedFileNode(node).kind
-  }
-
-  function getFileNodePreview(node: CanvasNode) {
-    if (node.type !== "file") {
-      throw new Error("File-node preview requested for a non-file node.")
-    }
-
-    return createCanvasFileNodePreview(getResolvedFileNode(node))
-  }
+  const {
+    getFileNodeDescription,
+    getFileNodeKind,
+    getFileNodePreview,
+    getNodeTitle,
+    getResolvedFileNode,
+    refreshFileNodeMetadata,
+  } = createCanvasEditorFileNodeHelpers({
+    fileNodeMeta,
+    state,
+    t,
+  })
 
   function getNodeStyle(node: CanvasNode) {
     return {
@@ -383,57 +322,29 @@ export function useCanvasEditor(
     }
   }
 
-  function clearSelectionBox() {
-    selectionBox.visible = false
-    selectionBox.x = 0
-    selectionBox.y = 0
-    selectionBox.width = 0
-    selectionBox.height = 0
-  }
-
-  function clearConnectionDraft() {
-    connectionDraft.fromNodeId = ""
-    connectionDraft.fromSide = "right"
-    connectionDraft.toNodeId = ""
-    connectionDraft.toSide = "left"
-    connectionDraft.toX = 0
-    connectionDraft.toY = 0
-    connectionDraft.visible = false
-  }
-
-  function ensureCanvasPath(input: string): string {
-    const trimmed = input.trim()
-    if (!trimmed) {
-      return ""
-    }
-
-    const normalized = trimmed.endsWith(".canvas") ? trimmed : `${trimmed}.canvas`
-    const baseDirectory = getPluginSettings().defaultCanvasDirectory
-    return normalized.startsWith("/") ? normalized : `${baseDirectory}/${normalized}`
-  }
-
-  async function rememberRecentPath(path: string) {
-    await (plugin as CanvasPlugin).rememberRecentCanvas?.(path, getFileName(path))
-    refreshRecentFiles()
-  }
-
-  async function refreshFileNodeMetadata() {
-    const version = ++fileNodeResolveVersion
-    const fileNodes = state.document.nodes.filter((node): node is Extract<CanvasNode, { type: "file" }> => node.type === "file")
-    const nextEntries = await Promise.all(fileNodes.map(async (node) => {
-      const resolved = await resolveCanvasFileNode(node.file, {
-        resolveAssetByPath: findSiyuanAssetByPath,
-        resolveDocumentByPath: findSiyuanDocumentByPath,
-      })
-      return [node.id, resolved] as const
-    }))
-
-    if (version !== fileNodeResolveVersion) {
-      return
-    }
-
-    fileNodeMeta.value = Object.fromEntries(nextEntries)
-  }
+  const {
+    ensureCanvasPath,
+    exportCanvas,
+    importCanvas,
+    loadConflictVersion,
+    newCanvas,
+    openPath,
+    openRecentPath,
+    openSettings,
+    overwriteConflictVersion,
+    rememberRecentPath,
+    save,
+    triggerImport,
+  } = createCanvasEditorFileActions({
+    fileInputRef,
+    getPluginSettings,
+    plugin,
+    refreshRecentFiles,
+    resetViewport,
+    state,
+    suggestedFilename,
+    t,
+  })
 
   function selectNode(nodeId: string, event?: MouseEvent) {
     state.selectNode(nodeId, {
@@ -447,12 +358,6 @@ export function useCanvasEditor(
 
   function getRenderedMarkdown(text: string): string {
     return renderMarkdownPreview(text)
-  }
-
-  function newCanvas() {
-    state.replaceDocument(createEmptyCanvasDocument(), "")
-    suggestedFilename.value = t("untitledCanvas")
-    resetViewport()
   }
 
   function addNode(type: CanvasNode["type"]) {
@@ -651,127 +556,6 @@ export function useCanvasEditor(
     inspectorExpanded.value = !inspectorExpanded.value
   }
 
-  async function openPath() {
-    // eslint-disable-next-line no-alert
-    const input = window.prompt(
-      t("promptWorkspacePath"),
-      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/${t("untitledCanvas")}`,
-    )
-    const path = ensureCanvasPath(input || "")
-    if (!path) {
-      return
-    }
-
-    try {
-      await state.open(path)
-      suggestedFilename.value = getFileName(path)
-      await rememberRecentPath(path)
-      resetViewport()
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : t("messageUnableOpenCanvasFile"), 4000, "error")
-    }
-  }
-
-  function triggerImport() {
-    fileInputRef.value?.click()
-  }
-
-  async function importCanvas(file: File) {
-    const raw = await file.text()
-    const parsed = parseCanvasDocument(raw)
-    if (!parsed.document) {
-      showMessage(parsed.errors[0]?.message || t("messageInvalidCanvasFile"), 4000, "error")
-      return
-    }
-
-    suggestedFilename.value = file.name
-    state.replaceDocument(parsed.document, "")
-    state.issues = {
-      errors: parsed.errors,
-      warnings: parsed.warnings,
-    }
-    resetViewport()
-  }
-
-  async function save() {
-    // eslint-disable-next-line no-alert
-    const input = window.prompt(
-      t("promptWorkspaceSavePath"),
-      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/${suggestedFilename.value || t("untitledCanvas")}`,
-    )
-    const path = ensureCanvasPath(input || "")
-    if (!path) {
-      return
-    }
-
-    try {
-      await state.save(path, {
-        detectExternalChanges: getPluginSettings().detectExternalChanges,
-      })
-      suggestedFilename.value = getFileName(path)
-      await rememberRecentPath(path)
-      showMessage(t("messageCanvasSavedToWorkspace"), 2500, "info")
-    } catch (error) {
-      if (state.conflict) {
-        showMessage(t("messageCanvasFileChangedOnDisk"), 5000, "error")
-        return
-      }
-
-      showMessage(error instanceof Error ? error.message : t("messageUnableSaveCanvas"), 4000, "error")
-    }
-  }
-
-  async function openRecentPath(path: string) {
-    try {
-      await state.open(path)
-      suggestedFilename.value = getFileName(path)
-      await rememberRecentPath(path)
-      resetViewport()
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : t("messageUnableOpenRecentCanvasFile"), 4000, "error")
-    }
-  }
-
-  async function overwriteConflictVersion() {
-    if (!state.filePath) {
-      return
-    }
-
-    try {
-      await state.save(state.filePath, {
-        detectExternalChanges: getPluginSettings().detectExternalChanges,
-        force: true,
-      })
-      await rememberRecentPath(state.filePath)
-      showMessage(t("messageCanvasSavedByOverwritingDiskVersion"), 2500, "info")
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : t("messageUnableOverwriteDiskVersion"), 4000, "error")
-    }
-  }
-
-  function loadConflictVersion() {
-    const conflictPath = state.conflict?.path || state.filePath
-    state.loadConflictVersion()
-    suggestedFilename.value = getFileName(conflictPath)
-    showMessage(t("messageLoadedNewerCanvasVersionFromDisk"), 2500, "info")
-  }
-
-  function openSettings() {
-    ;(plugin as CanvasPlugin).openCanvasSettings?.()
-  }
-
-  function exportCanvas() {
-    const blob = new Blob([`${JSON.stringify(state.document, null, "\t")}\n`], {
-      type: "application/json",
-    })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement("a")
-    anchor.href = url
-    anchor.download = suggestedFilename.value || state.filePath.split("/").pop() || "canvas-export.canvas"
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }
-
   function activateNode(node: CanvasNode) {
     if (node.type === "link") {
       window.open(node.url, "_blank", "noopener,noreferrer")
@@ -782,7 +566,7 @@ export function useCanvasEditor(
       const resolved = getResolvedFileNode(node)
       if (resolved.kind === "canvas") {
         const path = ensureCanvasPath(node.file)
-        void (plugin as CanvasPlugin).openCanvasTab?.({ path })
+        void plugin.openCanvasTab?.({ path })
         return
       }
 
@@ -816,351 +600,29 @@ export function useCanvasEditor(
 
     showMessage(getNodeTitle(node), 2500, "info")
   }
-
-  function startPointerGesture(
-    event: PointerEvent,
-    onMove: (dx: number, dy: number, moveEvent: PointerEvent) => void,
-    options: {
-      onEnd?: (dx: number, dy: number, upEvent: PointerEvent) => void
-    } = {},
-  ) {
-    const startX = event.clientX
-    const startY = event.clientY
-
-    const handleMove = (moveEvent: PointerEvent) => {
-      onMove(moveEvent.clientX - startX, moveEvent.clientY - startY, moveEvent)
-    }
-    const handleUp = (upEvent: PointerEvent) => {
-      window.removeEventListener("pointermove", handleMove)
-      window.removeEventListener("pointerup", handleUp)
-      options.onEnd?.(upEvent.clientX - startX, upEvent.clientY - startY, upEvent)
-    }
-
-    window.addEventListener("pointermove", handleMove)
-    window.addEventListener("pointerup", handleUp)
-  }
-
-  function handleWheelZoom(event: WheelEvent) {
-    const stage = stageRef.value
-    if (!stage) {
-      return
-    }
-
-    event.preventDefault()
-    const rect = stage.getBoundingClientRect()
-    const point = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    }
-    const nextScale = clampViewportScale(Number((viewport.scale * Math.exp(-event.deltaY * 0.0015)).toFixed(2)))
-    const nextViewport = scaleViewportAtPoint(viewport, point, nextScale)
-
-    viewport.scale = nextViewport.scale
-    viewport.x = nextViewport.x
-    viewport.y = nextViewport.y
-  }
-
-  function isAdditiveSelectionGesture(event: MouseEvent | PointerEvent): boolean {
-    return Boolean(event.ctrlKey || event.metaKey || event.shiftKey)
-  }
-
-  function isNodeGestureTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) {
-      return false
-    }
-
-    return !target.closest(".canvas-node__resize-handle, .canvas-node__resize-corner, .canvas-node__anchor, a, button, input, textarea, select")
-  }
-
-  function isStageGestureTarget(target: EventTarget | null): target is Element {
-    if (!(target instanceof Element)) {
-      return false
-    }
-
-    return !target.closest(".canvas-node, .selection-toolbar")
-      && !target.closest(".stage__edge, .stage__edge-label")
-      && !target.closest("a, button, input, textarea, select")
-  }
-
-  function toCanvasX(stageX: number): number {
-    return (stageX - viewport.x) / viewport.scale + board.value.left
-  }
-
-  function toCanvasY(stageY: number): number {
-    return (stageY - viewport.y) / viewport.scale + board.value.top
-  }
-
-  function updateSelectionBox(startPoint: { x: number, y: number }, currentPoint: { x: number, y: number }) {
-    const bounds = createBoundsFromPoints(startPoint, currentPoint)
-
-    selectionBox.visible = true
-    selectionBox.x = bounds.x
-    selectionBox.y = bounds.y
-    selectionBox.width = bounds.width
-    selectionBox.height = bounds.height
-  }
-
-  function finalizeSelectionBox(
-    startPoint: { x: number, y: number },
-    endPoint: { x: number, y: number },
-    options: {
-      additive: boolean
-    },
-  ) {
-    const stageBounds = createBoundsFromPoints(startPoint, endPoint)
-
-    clearSelectionBox()
-
-    if (stageBounds.width < 3 && stageBounds.height < 3) {
-      if (!options.additive) {
-        state.selectNodes([])
-      }
-      return
-    }
-
-    const selectedNodeIds = resolveMarqueeSelectionNodeIds(state.document, {
-      height: stageBounds.height / viewport.scale,
-      width: stageBounds.width / viewport.scale,
-      x: toCanvasX(stageBounds.x),
-      y: toCanvasY(stageBounds.y),
-    })
-
-    state.selectNodes(selectedNodeIds, { additive: options.additive })
-  }
-
-  function startPan(event: PointerEvent) {
-    if (event.button === 2) {
-      event.preventDefault()
-      const initialX = viewport.x
-      const initialY = viewport.y
-      startPointerGesture(event, (dx, dy) => {
-        viewport.x = initialX + dx
-        viewport.y = initialY + dy
-      })
-      return
-    }
-
-    if (event.button !== 0 || !isStageGestureTarget(event.target)) {
-      return
-    }
-
-    const stage = stageRef.value
-    if (!stage) {
-      return
-    }
-
-    event.preventDefault()
-    const rect = stage.getBoundingClientRect()
-    const startPoint = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    }
-    const additive = isAdditiveSelectionGesture(event)
-
-    updateSelectionBox(startPoint, startPoint)
-    startPointerGesture(
-      event,
-      (_dx, _dy, moveEvent) => {
-        updateSelectionBox(startPoint, {
-          x: moveEvent.clientX - rect.left,
-          y: moveEvent.clientY - rect.top,
-        })
-      },
-      {
-        onEnd: (_dx, _dy, upEvent) => {
-          finalizeSelectionBox(
-            startPoint,
-            {
-              x: upEvent.clientX - rect.left,
-              y: upEvent.clientY - rect.top,
-            },
-            { additive },
-          )
-        },
-      },
-    )
-  }
-
-  function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
-    if (event.button === 2) {
-      startPan(event)
-      return
-    }
-
-    if (event.button !== 0 || isAdditiveSelectionGesture(event) || !isNodeGestureTarget(event.target)) {
-      return
-    }
-
-    startDrag(node, event)
-  }
-
-  function startDrag(node: CanvasNode, event: PointerEvent) {
-    const selectedNodeIds = resolveDragNodeIds(state.document, node.id, state.selectedNodeIds)
-    const initialPositions = new Map(
-      state.document.nodes
-        .filter((candidate) => selectedNodeIds.includes(candidate.id))
-        .map((candidate) => [candidate.id, {
-          x: candidate.x,
-          y: candidate.y,
-        }]),
-    )
-    if (!state.selectedNodeIds.includes(node.id)) {
-      state.selectNode(node.id)
-    }
-    startPointerGesture(event, (dx, dy) => {
-      const deltaX = Math.round(dx / viewport.scale)
-      const deltaY = Math.round(dy / viewport.scale)
-      const movedDocument = state.document.nodes.reduce((document, candidate) => {
-        const initial = initialPositions.get(candidate.id)
-        if (!initial) {
-          return document
-        }
-
-        return setCanvasNodeGeometry(document, candidate.id, {
-          x: initial.x + deltaX,
-          y: initial.y + deltaY,
-        })
-      }, state.document)
-
-      commitDocument(movedDocument)
-    })
-  }
-
-  function getStagePoint(event: PointerEvent) {
-    const stage = stageRef.value
-    if (!stage) {
-      return null
-    }
-
-    if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
-      return null
-    }
-
-    const rect = stage.getBoundingClientRect()
-    return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    }
-  }
-
-  function updateConnectionTarget(event: PointerEvent) {
-    const stagePoint = getStagePoint(event)
-    if (!stagePoint) {
-      return
-    }
-
-    const canvasPoint = {
-      x: toCanvasX(stagePoint.x),
-      y: toCanvasY(stagePoint.y),
-    }
-    const target = findNearestCanvasAnchor(state.document.nodes, canvasPoint, {
-      excludeNodeId: connectionDraft.fromNodeId,
-      maxDistance: CONNECTION_SNAP_DISTANCE,
-    })
-
-    connectionDraft.toNodeId = target?.nodeId || ""
-    connectionDraft.toSide = target?.side || "left"
-    connectionDraft.toX = target?.x ?? canvasPoint.x
-    connectionDraft.toY = target?.y ?? canvasPoint.y
-  }
-
-  function getConnectionDraftPath() {
-    if (!connectionDraft.visible) {
-      return ""
-    }
-
-    const fromNode = state.document.nodes.find((node) => node.id === connectionDraft.fromNodeId)
-    if (!fromNode) {
-      return ""
-    }
-
-    const from = getAnchor(fromNode, connectionDraft.fromSide)
-    const to = {
-      x: toBoardX(board.value, connectionDraft.toX),
-      y: toBoardY(board.value, connectionDraft.toY),
-    }
-
-    return getCurvePath(from, to)
-  }
-
-  function isConnectionTarget(nodeId: string, side: CanvasSide) {
-    return connectionDraft.visible
-      && connectionDraft.toNodeId === nodeId
-      && connectionDraft.toSide === side
-  }
-
-  function finishConnectionDrag() {
-    if (!connectionDraft.fromNodeId || !connectionDraft.toNodeId) {
-      clearConnectionDraft()
-      return
-    }
-
-    const edge = createCanvasEdge(connectionDraft.fromNodeId, connectionDraft.toNodeId)
-    edge.fromSide = connectionDraft.fromSide
-    edge.toSide = connectionDraft.toSide
-    commitDocument(upsertCanvasEdge(state.document, edge))
-    state.selectEdge(edge.id)
-    clearConnectionDraft()
-  }
-
-  function startConnectionDrag(node: CanvasNode, side: CanvasSide, event: PointerEvent) {
-    if (event.button !== 0) {
-      return
-    }
-
-    event.preventDefault?.()
-    const anchor = getCanvasNodeAnchor(node, side)
-    connectionDraft.fromNodeId = node.id
-    connectionDraft.fromSide = side
-    connectionDraft.toNodeId = ""
-    connectionDraft.toSide = "left"
-    connectionDraft.toX = anchor.x
-    connectionDraft.toY = anchor.y
-    connectionDraft.visible = true
-
-    startPointerGesture(
-      event,
-      (_dx, _dy, moveEvent) => {
-        updateConnectionTarget(moveEvent)
-      },
-      {
-        onEnd: (_dx, _dy, upEvent) => {
-          updateConnectionTarget(upEvent)
-          finishConnectionDrag()
-        },
-      },
-    )
-  }
-
-  function startResize(node: CanvasNode, side: CanvasSide, event: PointerEvent) {
-    if (event.button !== 0) {
-      return
-    }
-
-    event.preventDefault?.()
-    startPointerGesture(event, (dx, dy) => {
-      commitDocument(setCanvasNodeGeometry(
-        state.document,
-        node.id,
-        resizeCanvasNodeFromSide(node, side, dx / viewport.scale, dy / viewport.scale),
-      ))
-    })
-  }
-
-  function startCornerResize(node: CanvasNode, event: PointerEvent) {
-    if (event.button !== 0) {
-      return
-    }
-
-    event.preventDefault?.()
-    startPointerGesture(event, (dx, dy) => {
-      commitDocument(setCanvasNodeGeometry(
-        state.document,
-        node.id,
-        resizeCanvasNodeFromCorner(node, dx / viewport.scale, dy / viewport.scale),
-      ))
-    })
-  }
+  const {
+    clearConnectionDraft,
+    clearSelectionBox,
+    finishConnectionDrag,
+    getConnectionDraftPath,
+    handleNodePointerDown,
+    handleWheelZoom,
+    isConnectionTarget,
+    startConnectionDrag,
+    startCornerResize,
+    startDrag,
+    startPan,
+    startResize,
+  } = createCanvasEditorGestureHandlers({
+    board,
+    commitDocument,
+    connectionDraft,
+    getAnchor,
+    selectionBox,
+    stageRef,
+    state,
+    viewport,
+  })
 
   function isEditingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) {

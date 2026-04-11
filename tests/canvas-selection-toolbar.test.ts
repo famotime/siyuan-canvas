@@ -35,7 +35,7 @@ import {
   resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
 
-const apiMock = {
+const fileNodeLookupMock = {
   findSiyuanAssetByPath: vi.fn(async () => null),
   findSiyuanDocumentByPath: vi.fn(async () => null),
 }
@@ -105,8 +105,12 @@ function loadModuleExports(path: string): ModuleExports {
       return siyuanMock
     }
 
-    if (specifier === "@/api") {
-      return apiMock
+    if (
+      specifier === "@/api"
+      || specifier === "@/canvas/siyuan-file-node-lookups"
+      || specifier === "@/canvas/siyuan-kernel-file-node-lookups"
+    ) {
+      return fileNodeLookupMock
     }
 
     if (specifier.startsWith("@/") || specifier.startsWith(".")) {

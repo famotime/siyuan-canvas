@@ -731,22 +731,20 @@ import type { Plugin } from "siyuan"
 
 import type { CanvasTabBootstrap } from "@/main"
 import { useCanvasEditor } from "@/canvas/use-canvas-editor"
-import { createCanvasI18n } from "@/i18n/canvas"
 import {
-  computed,
-  defineComponent,
-  h,
-  onBeforeUnmount,
-  onMounted,
-  nextTick,
-  ref,
-  watch,
-} from "vue"
-import type {
-  CanvasNode,
-  CanvasNodeLayoutAction,
-} from "@/canvas/types"
-import type { PropType } from "vue"
+  SELECTION_LAYOUT_ICON_NAMES,
+  SelectionToolbarIcon,
+  createSelectionToolbarTooltips,
+} from "@/components/canvas/canvas-selection-toolbar-icon"
+import {
+  CLEAR_SELECTION_COLOR,
+  getCanvasNodeContentStyle as resolveCanvasNodeContentStyle,
+  getCanvasNodeStyle as buildCanvasNodeStyle,
+  getSelectionColorStyle as resolveSelectionColorStyle,
+} from "@/components/canvas/canvas-workspace-display"
+import { useCanvasWorkspaceBehavior } from "@/components/canvas/use-canvas-workspace-behavior"
+import { createCanvasI18n } from "@/i18n/canvas"
+import type { CanvasNode } from "@/canvas/types"
 
 const props = defineProps<{
   bootstrap: CanvasTabBootstrap
@@ -756,333 +754,22 @@ const props = defineProps<{
 
 const t = createCanvasI18n((props.plugin as Plugin & { i18n?: Record<string, string> }).i18n)
 const editor = useCanvasEditor(props.plugin, props.bootstrap, props.setTitle)
-const editingMarkdown = ref("")
-const editingNodeId = ref("")
-const editingTextareaRef = ref<HTMLTextAreaElement>()
-const canvasShellRef = ref<HTMLElement>()
 const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef
-const selectionToolbarRef = ref<HTMLElement>()
-const selectionToolbarThemeMode = ref<"dark" | "light">("light")
-const CLEAR_SELECTION_COLOR = ""
-let canvasThemeObserver: MutationObserver | null = null
-let selectionToolbarResizeObserver: ResizeObserver | null = null
-type SelectionToolbarIconName =
-  | "delete"
-  | "color"
-  | "center"
-  | "edit"
-  | "group"
-  | "align"
-  | "left-align"
-  | "center-horizontal"
-  | "right-align"
-  | "top-align"
-  | "center-vertical"
-  | "bottom-align"
-  | "arrange-row"
-  | "arrange-column"
-  | "arrange-grid"
-  | "distribute-horizontal"
-  | "distribute-vertical"
-  | "stretch-horizontal"
-  | "stretch-vertical"
-
-const SELECTION_TOOLBAR_TOOLTIPS = {
-  align: t("selectionToolbarAlign"),
-  center: t("selectionToolbarCenter"),
-  color: t("selectionToolbarColor"),
-  createGroup: t("selectionToolbarCreateGroup"),
-  delete: t("selectionToolbarDelete"),
-  edit: t("selectionToolbarEdit"),
-} as const
-
-const SELECTION_LAYOUT_ICON_NAMES: Record<CanvasNodeLayoutAction, SelectionToolbarIconName> = {
-  "arrange-column": "arrange-column",
-  "arrange-grid": "arrange-grid",
-  "arrange-row": "arrange-row",
-  "bottom-align": "bottom-align",
-  "center-horizontal": "center-horizontal",
-  "center-vertical": "center-vertical",
-  "distribute-horizontal": "distribute-horizontal",
-  "distribute-vertical": "distribute-vertical",
-  "left-align": "left-align",
-  "right-align": "right-align",
-  "stretch-horizontal": "stretch-horizontal",
-  "stretch-vertical": "stretch-vertical",
-  "top-align": "top-align",
-}
-
-const SELECTION_TOOLBAR_ICONS: Record<SelectionToolbarIconName, { paths: string[], viewBox: string }> = {
-  align: {
-    paths: [
-      "M6 6h12",
-      "M6 12h8",
-      "M6 18h14",
-      "M4 4v16",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "arrange-column": {
-    paths: [
-      "M6 4h12v4H6z",
-      "M6 10h12v4H6z",
-      "M6 16h12v4H6z",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "arrange-grid": {
-    paths: [
-      "M5 5h5v5H5z",
-      "M14 5h5v5h-5z",
-      "M5 14h5v5H5z",
-      "M14 14h5v5h-5z",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "arrange-row": {
-    paths: [
-      "M4 7h4v10H4z",
-      "M10 7h4v10h-4z",
-      "M16 7h4v10h-4z",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "bottom-align": {
-    paths: [
-      "M4 19h16",
-      "M7 8v11",
-      "M12 5v14",
-      "M17 11v8",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  center: {
-    paths: [
-      "M9 4H7a3 3 0 0 0-3 3v2",
-      "M15 4h2a3 3 0 0 1 3 3v2",
-      "M20 15v2a3 3 0 0 1-3 3h-2",
-      "M9 20H7a3 3 0 0 1-3-3v-2",
-      "M12 9v6",
-      "M9 12h6",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "center-horizontal": {
-    paths: [
-      "M12 4v16",
-      "M7 7h10",
-      "M9 12h6",
-      "M6 17h12",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "center-vertical": {
-    paths: [
-      "M4 12h16",
-      "M7 7v10",
-      "M12 9v6",
-      "M17 6v12",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  color: {
-    paths: [
-      "M12 4c4.97 0 9 3.13 9 7 0 2.76-2.04 5.14-5 6.27-.9.34-1.5 1.2-1.5 2.17 0 .85-.69 1.56-1.54 1.56H12C7.03 21 3 17.87 3 14s4.03-10 9-10Z",
-      "M8 11h.01",
-      "M10.5 8.5h.01",
-      "M14 8h.01",
-      "M16 11h.01",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  delete: {
-    paths: [
-      "M4 7h16",
-      "M9 4h6",
-      "M7 7l1 12h8l1-12",
-      "M10 11v5",
-      "M14 11v5",
-      "M9 7V5h6v2",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "distribute-horizontal": {
-    paths: [
-      "M5 6v12",
-      "M19 6v12",
-      "M8 9h2v6H8z",
-      "M14 9h2v6h-2z",
-      "M10 12h4",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "distribute-vertical": {
-    paths: [
-      "M6 5h12",
-      "M6 19h12",
-      "M9 8v2h6V8",
-      "M9 14v2h6v-2",
-      "M12 10v4",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  edit: {
-    paths: [
-      "M4 20h4l10-10-4-4L4 16v4",
-      "M12 6l4 4",
-      "M14 4l4 4",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  group: {
-    paths: [
-      "M4 7h7v7H4z",
-      "M13 7h7v7h-7z",
-      "M8 14h8v3H8z",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "left-align": {
-    paths: [
-      "M4 4v16",
-      "M7 7h11",
-      "M7 12h8",
-      "M7 17h13",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "right-align": {
-    paths: [
-      "M20 4v16",
-      "M6 7h11",
-      "M9 12h8",
-      "M4 17h13",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "stretch-horizontal": {
-    paths: [
-      "M5 6v12",
-      "M19 6v12",
-      "M8 9h8v6H8z",
-      "M7 12h-2",
-      "M19 12h-2",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "stretch-vertical": {
-    paths: [
-      "M6 5h12",
-      "M6 19h12",
-      "M9 8h6v8H9z",
-      "M12 7V5",
-      "M12 19v-2",
-    ],
-    viewBox: "0 0 24 24",
-  },
-  "top-align": {
-    paths: [
-      "M4 5h16",
-      "M7 5v11",
-      "M12 5v14",
-      "M17 5v8",
-    ],
-    viewBox: "0 0 24 24",
-  },
-}
-
-const SelectionToolbarIcon = defineComponent({
-  name: "SelectionToolbarIcon",
-  props: {
-    name: {
-      required: true,
-      type: String as PropType<SelectionToolbarIconName>,
-    },
-    size: {
-      default: 18,
-      type: Number,
-    },
-  },
-  setup(props) {
-    return () => {
-      const icon = SELECTION_TOOLBAR_ICONS[props.name]
-
-      return h(
-        "svg",
-        {
-          "aria-hidden": "true",
-          fill: "none",
-          height: props.size,
-          viewBox: icon.viewBox,
-          width: props.size,
-          xmlns: "http://www.w3.org/2000/svg",
-        },
-        icon.paths.map((path) => h("path", {
-          d: path,
-          stroke: "currentColor",
-          "stroke-linecap": "round",
-          "stroke-linejoin": "round",
-          "stroke-width": "1.7",
-        })),
-      )
-    }
-  },
-})
-const selectionColorStyles: Record<string, { background: string, border: string, swatch: string }> = {
-  "1": {
-    background: "rgba(239, 68, 68, 0.18)",
-    border: "#ef4444",
-    swatch: "#ef4444",
-  },
-  "2": {
-    background: "rgba(249, 115, 22, 0.18)",
-    border: "#f97316",
-    swatch: "#f97316",
-  },
-  "3": {
-    background: "rgba(244, 180, 0, 0.18)",
-    border: "#f4b400",
-    swatch: "#f4b400",
-  },
-  "4": {
-    background: "rgba(34, 197, 94, 0.18)",
-    border: "#22c55e",
-    swatch: "#22c55e",
-  },
-  "5": {
-    background: "rgba(77, 208, 225, 0.18)",
-    border: "#4dd0e1",
-    swatch: "#4dd0e1",
-  },
-  "6": {
-    background: "rgba(139, 92, 246, 0.18)",
-    border: "#8b5cf6",
-    swatch: "#8b5cf6",
-  },
-}
-const clearSelectionColorStyle = {
-  border: "#94a3b8",
-  swatch: "#9ca3af",
-}
-const activeSelectionColor = computed(() => {
-  if (!editor.state.selectedNodeIds.length) {
-    return null
-  }
-
-  const selectedNodeIds = new Set(editor.state.selectedNodeIds)
-  const selectedNodes = editor.state.document.nodes.filter((node) => selectedNodeIds.has(node.id))
-
-  if (!selectedNodes.length) {
-    return null
-  }
-
-  const firstColor = getNodeSelectionColorValue(selectedNodes[0])
-
-  return selectedNodes.every((node) => getNodeSelectionColorValue(node) === firstColor)
-    ? firstColor
-    : null
-})
+const SELECTION_TOOLBAR_TOOLTIPS = createSelectionToolbarTooltips(t)
+const {
+  activeSelectionColor,
+  canvasShellRef,
+  commitTextNodeEditing,
+  editingMarkdown,
+  editingNodeId,
+  handleImport,
+  handleNodeDoubleClick,
+  handleToolbarEdit,
+  selectionToolbarThemeMode,
+  setEditingTextareaRef,
+  setSelectionToolbarRef,
+} = useCanvasWorkspaceBehavior(editor)
 
 function valueFromEvent(event: Event): string {
   return (event.target as HTMLInputElement).value
@@ -1107,178 +794,17 @@ function getSideLabel(side: string): string {
   }
 }
 
-function setEditingTextareaRef(value: Element | null) {
-  editingTextareaRef.value = value instanceof HTMLTextAreaElement ? value : undefined
-}
-
-function syncSelectionToolbarThemeMode() {
-  selectionToolbarThemeMode.value = canvasShellRef.value?.dataset.themeMode === "dark" ? "dark" : "light"
-}
-
-function setSelectionToolbarRef(value: Element | null) {
-  selectionToolbarRef.value = value instanceof HTMLElement ? value : undefined
-  observeSelectionToolbar()
-  syncSelectionToolbarSize()
-}
-
 function getSelectionColorStyle(color: string) {
-  if (!color) {
-    return {
-      backgroundColor: clearSelectionColorStyle.swatch,
-      borderColor: clearSelectionColorStyle.border,
-    }
-  }
-
-  const colorStyle = selectionColorStyles[color]
-
-  return {
-    backgroundColor: colorStyle?.swatch || "#64748b",
-    borderColor: colorStyle?.border || "#64748b",
-  }
+  return resolveSelectionColorStyle(color)
 }
 
 function getCanvasNodeStyle(node: CanvasNode) {
-  const colorStyle = "color" in node && node.color ? selectionColorStyles[node.color] : undefined
-
-  return {
-    ...editor.getNodeStyle(node),
-    ...(colorStyle ? {
-      backgroundColor: colorStyle.background,
-      borderColor: colorStyle.border,
-    } : {}),
-  }
+  return buildCanvasNodeStyle(node, editor.getNodeStyle(node))
 }
 
 function getCanvasNodeContentStyle(node: CanvasNode) {
-  if (node.type !== "group" || !node.color) {
-    return undefined
-  }
-
-  const colorStyle = selectionColorStyles[node.color]
-
-  if (!colorStyle) {
-    return undefined
-  }
-
-  return {
-    color: colorStyle.border,
-  }
+  return resolveCanvasNodeContentStyle(node)
 }
-
-function getNodeSelectionColorValue(node: CanvasNode) {
-  return typeof node.color === "string" && node.color ? node.color : CLEAR_SELECTION_COLOR
-}
-
-function handleToolbarEdit() {
-  if (!editor.selectedNode || editor.selectedNodeCount !== 1) {
-    return
-  }
-
-  handleNodeDoubleClick(editor.selectedNode)
-}
-
-function syncSelectionToolbarSize() {
-  if (!selectionToolbarRef.value) {
-    return
-  }
-
-  const { height, width } = selectionToolbarRef.value.getBoundingClientRect()
-  editor.setSelectionToolbarSize({
-    height: Math.round(height),
-    width: Math.round(width),
-  })
-}
-
-function observeSelectionToolbar() {
-  selectionToolbarResizeObserver?.disconnect()
-  selectionToolbarResizeObserver = null
-
-  if (!selectionToolbarRef.value || typeof ResizeObserver === "undefined") {
-    return
-  }
-
-  selectionToolbarResizeObserver = new ResizeObserver(() => {
-    syncSelectionToolbarSize()
-  })
-  selectionToolbarResizeObserver.observe(selectionToolbarRef.value)
-}
-
-function handleWindowPointerDown(event: PointerEvent) {
-  if (editor.selectionToolbarPopover === "closed") {
-    return
-  }
-
-  if (event.target instanceof HTMLElement && event.target.closest(".selection-toolbar")) {
-    return
-  }
-
-  editor.closeSelectionPopover()
-}
-
-function handleNodeDoubleClick(node: CanvasNode) {
-  if (node.type !== "text") {
-    editor.activateNode(node)
-    return
-  }
-
-  editor.selectNode(node.id)
-  editingNodeId.value = node.id
-  editingMarkdown.value = node.text
-  void nextTick(() => {
-    editingTextareaRef.value?.focus()
-    editingTextareaRef.value?.setSelectionRange(editingMarkdown.value.length, editingMarkdown.value.length)
-  })
-}
-
-function commitTextNodeEditing() {
-  if (!editingNodeId.value) {
-    return
-  }
-
-  editor.updateTextNodeContent(editingNodeId.value, editingMarkdown.value)
-  editingNodeId.value = ""
-  editingMarkdown.value = ""
-}
-
-async function handleImport(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) {
-    return
-  }
-
-  await editor.importCanvas(file)
-  input.value = ""
-}
-
-onMounted(() => {
-  syncSelectionToolbarThemeMode()
-  window.addEventListener("pointerdown", handleWindowPointerDown)
-
-  if (canvasShellRef.value && typeof MutationObserver !== "undefined") {
-    canvasThemeObserver = new MutationObserver(() => {
-      syncSelectionToolbarThemeMode()
-    })
-    canvasThemeObserver.observe(canvasShellRef.value, {
-      attributeFilter: ["data-theme-mode"],
-      attributes: true,
-    })
-  }
-})
-
-onBeforeUnmount(() => {
-  canvasThemeObserver?.disconnect()
-  window.removeEventListener("pointerdown", handleWindowPointerDown)
-  selectionToolbarResizeObserver?.disconnect()
-})
-
-watch(
-  () => `${editor.selectionToolbar.visible}|${editor.selectedNodeCount}`,
-  async () => {
-    await nextTick()
-    syncSelectionToolbarSize()
-  },
-)
 </script>
 
 <style scoped lang="scss">

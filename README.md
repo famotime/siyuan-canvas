@@ -26,13 +26,23 @@ SiYuan Canvas is a SiYuan plugin for importing, editing, and exporting Obsidian 
 
 ```bash
 pnpm install
+pnpm dev
 pnpm test
 pnpm build
 ```
 
 Set `VITE_SIYUAN_WORKSPACE_PATH` in `.env` if you want `pnpm dev` to build directly into a local SiYuan workspace.
 
+## Project structure
+
+- `src/index.ts` keeps the plugin lifecycle thin and delegates runtime detection, tab wiring, and settings UI to focused helpers in `src/canvas/`.
+- `src/canvas/use-canvas-editor.ts` is the editor composition entry, with file actions, file-node metadata, and pointer gestures split into dedicated `use-canvas-editor-*` modules.
+- `src/components/canvas/CanvasWorkspace.vue` remains the main workspace view, while shared toolbar icons, display helpers, and inline-editing behavior live in `src/components/canvas/*.ts`.
+- `src/canvas/siyuan-file-node-lookups.ts` contains pure lookup logic for SiYuan document and asset resolution, with runtime SQL access isolated in `src/canvas/siyuan-kernel-file-node-lookups.ts`.
+- `tests/` mirrors the canvas modules with focused Vitest coverage for editor flows, plugin lifecycle, theme sync, display helpers, parsing, geometry, and persistence.
+
 ## Notes
 
 - The plugin targets the open JSON Canvas format maintained by `obsidianmd/jsoncanvas`.
 - The current implementation prioritizes file-format compatibility and core editing over full visual parity with Obsidian Canvas.
+- A detailed file-by-file map is maintained in `docs/project-structure.md`.
