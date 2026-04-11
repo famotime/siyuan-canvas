@@ -18,6 +18,7 @@ import {
   normalizeCanvasPluginData,
   rememberRecentCanvasFile,
 } from "@/canvas/plugin-data"
+import { createCanvasI18n } from "@/i18n/canvas"
 import {
   bindPlugin,
 
@@ -62,7 +63,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
 
     this.addTopBar({
       icon: "iconGraph",
-      title: "SiYuan Canvas",
+      title: this.t("addTopBarIcon"),
       callback: () => {
         void this.openCanvasTab()
       },
@@ -70,7 +71,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
 
     this.addCommand({
       langKey: "openCanvas",
-      langText: "Open Canvas Workspace",
+      langText: this.t("openCanvas"),
       hotkey: "Ctrl+Alt+C",
       callback: () => {
         void this.openCanvasTab()
@@ -79,10 +80,10 @@ export default class SiyuanCanvasPlugin extends Plugin {
 
     this.addCommand({
       langKey: "openCanvasPath",
-      langText: "Open Canvas by Path",
+      langText: this.t("openCanvasPath"),
       callback: () => {
         // eslint-disable-next-line no-alert
-        const path = window.prompt("Workspace path", "/data/storage/siyuan-canvas/untitled.canvas")
+        const path = window.prompt(this.t("promptWorkspacePath"), "/data/storage/siyuan-canvas/untitled.canvas")
         if (!path) {
           return
         }
@@ -93,13 +94,13 @@ export default class SiyuanCanvasPlugin extends Plugin {
 
     this.addCommand({
       langKey: "openCanvasSettings",
-      langText: "Open Canvas Settings",
+      langText: this.t("openCanvasSettings"),
       callback: () => {
         this.openCanvasSettings()
       },
     })
 
-    showMessage("SiYuan Canvas loaded", 2500, "info")
+    showMessage(this.t("pluginLoaded"), 2500, "info")
   }
 
   onunload() {}
@@ -109,7 +110,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
   }
 
   public async openCanvasTab(bootstrap: CanvasTabBootstrap = {}): Promise<void> {
-    const title = bootstrap.title || bootstrap.path?.split("/").pop() || "Untitled.canvas"
+    const title = bootstrap.title || bootstrap.path?.split("/").pop() || this.t("untitledCanvas")
     await openTab({
       app: this.app,
       custom: {
@@ -167,8 +168,8 @@ export default class SiyuanCanvasPlugin extends Plugin {
     }
 
     setting.addItem({
-      title: "Default canvas directory",
-      description: "Relative save/open paths will be resolved under this directory.",
+      title: this.t("settingsDefaultCanvasDirectoryTitle"),
+      description: this.t("settingsDefaultCanvasDirectoryDescription"),
       createActionElement: () => {
         const input = document.createElement("input")
         input.className = "b3-text-field fn__flex-center"
@@ -181,8 +182,8 @@ export default class SiyuanCanvasPlugin extends Plugin {
       },
     })
     setting.addItem({
-      title: "Recent canvas file limit",
-      description: "Controls how many recent canvas paths are shown in the editor.",
+      title: this.t("settingsRecentCanvasFileLimitTitle"),
+      description: this.t("settingsRecentCanvasFileLimitDescription"),
       createActionElement: () => {
         const input = document.createElement("input")
         input.className = "b3-text-field fn__flex-center"
@@ -200,8 +201,8 @@ export default class SiyuanCanvasPlugin extends Plugin {
       },
     })
     setting.addItem({
-      title: "Detect external file changes",
-      description: "Warn before saving if the underlying canvas file changed on disk.",
+      title: this.t("settingsDetectExternalFileChangesTitle"),
+      description: this.t("settingsDetectExternalFileChangesDescription"),
       createActionElement: () => {
         const input = document.createElement("input")
         input.type = "checkbox"
@@ -237,5 +238,9 @@ export default class SiyuanCanvasPlugin extends Plugin {
 
   private async persistCanvasData(): Promise<void> {
     await this.saveData(STORAGE_KEY, this.canvasData)
+  }
+
+  private t(key: Parameters<ReturnType<typeof createCanvasI18n>>[0]): string {
+    return createCanvasI18n((this as Plugin & { i18n?: Record<string, string> }).i18n)(key)
   }
 }

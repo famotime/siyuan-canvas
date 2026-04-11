@@ -64,6 +64,7 @@ import {
   parseCanvasDocument,
   validateCanvasDocument,
 } from "@/canvas/format"
+import { createCanvasI18n } from "@/i18n/canvas"
 import {
   CONNECTION_SNAP_DISTANCE,
   findNearestCanvasAnchor,
@@ -88,6 +89,7 @@ interface CanvasPlugin extends Plugin {
   app: unknown
   getCanvasSettings?: () => CanvasPluginSettings
   getRecentCanvasFiles?: () => CanvasRecentFile[]
+  i18n?: Record<string, string>
   rememberRecentCanvas?: (path: string, title?: string) => Promise<void>
   openCanvasSettings?: () => void
   openCanvasTab?: (bootstrap?: CanvasTabBootstrap) => Promise<void>
@@ -99,27 +101,13 @@ const DEFAULT_SELECTION_TOOLBAR_SIZE = {
   width: 220,
 }
 const SELECTION_COLORS = ["1", "2", "3", "4", "5", "6"] as const
-const SELECTION_LAYOUT_ACTIONS: Array<{ action: CanvasNodeLayoutAction, label: string }> = [
-  { action: "left-align", label: "左对齐" },
-  { action: "center-horizontal", label: "水平居中" },
-  { action: "right-align", label: "右对齐" },
-  { action: "top-align", label: "顶部对齐" },
-  { action: "center-vertical", label: "垂直居中" },
-  { action: "bottom-align", label: "底部对齐" },
-  { action: "arrange-row", label: "排列成行" },
-  { action: "arrange-column", label: "排列成列" },
-  { action: "arrange-grid", label: "排列成网格" },
-  { action: "distribute-horizontal", label: "水平分布" },
-  { action: "distribute-vertical", label: "垂直分布" },
-  { action: "stretch-horizontal", label: "水平拉伸" },
-  { action: "stretch-vertical", label: "垂直拉伸" },
-]
 
 export function useCanvasEditor(
   plugin: CanvasPlugin,
   bootstrap: CanvasTabBootstrap,
   setTitle: (title: string) => void,
 ) {
+  const t = createCanvasI18n(plugin.i18n)
   const fileService = new CanvasFileService(new SiyuanCanvasTextGateway())
   const state = reactive(new CanvasEditorState(fileService))
   const viewport = reactive({
@@ -131,7 +119,7 @@ export function useCanvasEditor(
   const fileNodeMeta = ref<Record<string, ResolvedCanvasFileNode>>({})
   const stageRef = ref<HTMLElement>()
   const recentFiles = ref<CanvasRecentFile[]>([])
-  const suggestedFilename = ref(bootstrap.title || "Untitled.canvas")
+  const suggestedFilename = ref(bootstrap.title || t("untitledCanvas"))
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
   const selectionToolbarSize = reactive({
     height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
@@ -216,7 +204,21 @@ export function useCanvasEditor(
     }
   })
   const selectionColors = computed(() => [...SELECTION_COLORS])
-  const selectionLayoutActions = computed(() => [...SELECTION_LAYOUT_ACTIONS])
+  const selectionLayoutActions = computed<Array<{ action: CanvasNodeLayoutAction, label: string }>>(() => [
+    { action: "left-align", label: t("layoutLeftAlign") },
+    { action: "center-horizontal", label: t("layoutCenterHorizontal") },
+    { action: "right-align", label: t("layoutRightAlign") },
+    { action: "top-align", label: t("layoutTopAlign") },
+    { action: "center-vertical", label: t("layoutCenterVertical") },
+    { action: "bottom-align", label: t("layoutBottomAlign") },
+    { action: "arrange-row", label: t("layoutArrangeRow") },
+    { action: "arrange-column", label: t("layoutArrangeColumn") },
+    { action: "arrange-grid", label: t("layoutArrangeGrid") },
+    { action: "distribute-horizontal", label: t("layoutDistributeHorizontal") },
+    { action: "distribute-vertical", label: t("layoutDistributeVertical") },
+    { action: "stretch-horizontal", label: t("layoutStretchHorizontal") },
+    { action: "stretch-vertical", label: t("layoutStretchVertical") },
+  ])
   let fileNodeResolveVersion = 0
 
   function getPluginSettings(): CanvasPluginSettings {
@@ -230,7 +232,7 @@ export function useCanvasEditor(
   watch(
     () => [state.filePath, state.isDirty, suggestedFilename.value],
     () => {
-      const title = state.filePath.split("/").pop() || suggestedFilename.value || "Untitled.canvas"
+      const title = state.filePath.split("/").pop() || suggestedFilename.value || t("untitledCanvas")
       setTitle(`${state.isDirty ? "● " : ""}${title}`)
     },
     { immediate: true },
@@ -253,11 +255,11 @@ export function useCanvasEditor(
       case "file":
         return getResolvedFileNode(node).title
       case "group":
-        return node.label || "Group"
+        return node.label || t("nodeDefaultGroupLabel")
       case "link":
-        return "External link"
+        return t("nodeKindExternalLink")
       case "text":
-        return node.text.split("\n")[0] || "Text"
+        return node.text.split("\n")[0] || t("nodeKindText")
       default:
         return node.type
     }
@@ -449,7 +451,7 @@ export function useCanvasEditor(
 
   function newCanvas() {
     state.replaceDocument(createEmptyCanvasDocument(), "")
-    suggestedFilename.value = "Untitled.canvas"
+    suggestedFilename.value = t("untitledCanvas")
     resetViewport()
   }
 
@@ -623,7 +625,7 @@ export function useCanvasEditor(
 
   function createEdgeFromSelection() {
     if (!selectedNode.value || !newEdgeTargetId.value) {
-      showMessage("Select a target node first.", 2500, "error")
+      showMessage(t("messageSelectTargetNodeFirst"), 2500, "error")
       return
     }
 
@@ -652,8 +654,8 @@ export function useCanvasEditor(
   async function openPath() {
     // eslint-disable-next-line no-alert
     const input = window.prompt(
-      "Workspace path",
-      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/untitled.canvas`,
+      t("promptWorkspacePath"),
+      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/${t("untitledCanvas")}`,
     )
     const path = ensureCanvasPath(input || "")
     if (!path) {
@@ -666,7 +668,7 @@ export function useCanvasEditor(
       await rememberRecentPath(path)
       resetViewport()
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : "Unable to open canvas file.", 4000, "error")
+      showMessage(error instanceof Error ? error.message : t("messageUnableOpenCanvasFile"), 4000, "error")
     }
   }
 
@@ -678,7 +680,7 @@ export function useCanvasEditor(
     const raw = await file.text()
     const parsed = parseCanvasDocument(raw)
     if (!parsed.document) {
-      showMessage(parsed.errors[0]?.message || "Invalid canvas file.", 4000, "error")
+      showMessage(parsed.errors[0]?.message || t("messageInvalidCanvasFile"), 4000, "error")
       return
     }
 
@@ -694,8 +696,8 @@ export function useCanvasEditor(
   async function save() {
     // eslint-disable-next-line no-alert
     const input = window.prompt(
-      "Workspace save path",
-      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/${suggestedFilename.value || "untitled.canvas"}`,
+      t("promptWorkspaceSavePath"),
+      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/${suggestedFilename.value || t("untitledCanvas")}`,
     )
     const path = ensureCanvasPath(input || "")
     if (!path) {
@@ -708,14 +710,14 @@ export function useCanvasEditor(
       })
       suggestedFilename.value = getFileName(path)
       await rememberRecentPath(path)
-      showMessage("Canvas saved to workspace.", 2500, "info")
+      showMessage(t("messageCanvasSavedToWorkspace"), 2500, "info")
     } catch (error) {
       if (state.conflict) {
-        showMessage("Canvas file changed on disk. Review the conflict panel before saving again.", 5000, "error")
+        showMessage(t("messageCanvasFileChangedOnDisk"), 5000, "error")
         return
       }
 
-      showMessage(error instanceof Error ? error.message : "Unable to save canvas.", 4000, "error")
+      showMessage(error instanceof Error ? error.message : t("messageUnableSaveCanvas"), 4000, "error")
     }
   }
 
@@ -726,7 +728,7 @@ export function useCanvasEditor(
       await rememberRecentPath(path)
       resetViewport()
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : "Unable to open recent canvas file.", 4000, "error")
+      showMessage(error instanceof Error ? error.message : t("messageUnableOpenRecentCanvasFile"), 4000, "error")
     }
   }
 
@@ -741,9 +743,9 @@ export function useCanvasEditor(
         force: true,
       })
       await rememberRecentPath(state.filePath)
-      showMessage("Canvas saved by overwriting the disk version.", 2500, "info")
+      showMessage(t("messageCanvasSavedByOverwritingDiskVersion"), 2500, "info")
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : "Unable to overwrite the disk version.", 4000, "error")
+      showMessage(error instanceof Error ? error.message : t("messageUnableOverwriteDiskVersion"), 4000, "error")
     }
   }
 
@@ -751,7 +753,7 @@ export function useCanvasEditor(
     const conflictPath = state.conflict?.path || state.filePath
     state.loadConflictVersion()
     suggestedFilename.value = getFileName(conflictPath)
-    showMessage("Loaded the newer canvas version from disk.", 2500, "info")
+    showMessage(t("messageLoadedNewerCanvasVersionFromDisk"), 2500, "info")
   }
 
   function openSettings() {
@@ -1221,7 +1223,7 @@ export function useCanvasEditor(
         suggestedFilename.value = getFileName(bootstrap.path)
         await rememberRecentPath(bootstrap.path)
       } catch (error) {
-        showMessage(error instanceof Error ? error.message : "Unable to open canvas file.", 4000, "error")
+        showMessage(error instanceof Error ? error.message : t("messageUnableOpenCanvasFile"), 4000, "error")
       }
     } else {
       newCanvas()

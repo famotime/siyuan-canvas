@@ -10,37 +10,37 @@
           class="toolbar__button toolbar__button--primary"
           @click="editor.newCanvas"
         >
-          New
+          {{ t("toolbarNew") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.openPath"
         >
-          Open Path
+          {{ t("toolbarOpenPath") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.triggerImport"
         >
-          Import
+          {{ t("toolbarImport") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.save"
         >
-          Save
+          {{ t("toolbarSave") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.exportCanvas"
         >
-          Export
+          {{ t("toolbarExport") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.openSettings"
         >
-          Settings
+          {{ t("toolbarSettings") }}
         </button>
       </div>
       <div class="toolbar__group">
@@ -48,32 +48,32 @@
           class="toolbar__button"
           @click="editor.addNode('text')"
         >
-          Text
+          {{ t("toolbarText") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.addNode('file')"
         >
-          File
+          {{ t("toolbarFile") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.addNode('link')"
         >
-          Link
+          {{ t("toolbarLink") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.addNode('group')"
         >
-          Group
+          {{ t("toolbarGroup") }}
         </button>
         <button
           class="toolbar__button"
           :disabled="!editor.canDelete"
           @click="editor.deleteSelection"
         >
-          Delete
+          {{ t("toolbarDelete") }}
         </button>
       </div>
       <div class="toolbar__group">
@@ -97,10 +97,10 @@
         </button>
       </div>
       <div class="toolbar__meta">
-        <span>{{ editor.state.filePath || editor.suggestedFilename || "Unsaved.canvas" }}</span>
-        <span>{{ editor.state.document.nodes.length }} nodes / {{ editor.state.document.edges.length }} edges</span>
+        <span>{{ editor.state.filePath || editor.suggestedFilename || t("untitledCanvas") }}</span>
+        <span>{{ t("toolbarGraphStats", { nodes: editor.state.document.nodes.length, edges: editor.state.document.edges.length }) }}</span>
         <span :class="editor.state.isDirty ? 'toolbar__dirty' : 'toolbar__saved'">
-          {{ editor.state.isDirty ? "Unsaved changes" : "Saved" }}
+          {{ editor.state.isDirty ? t("toolbarUnsavedChanges") : t("toolbarSaved") }}
         </span>
       </div>
     </header>
@@ -115,7 +115,7 @@
         :class="{ 'workspace__inspector-handle--collapsed': !editor.inspectorExpanded }"
         :style="editor.inspectorExpanded ? undefined : { right: '8px' }"
         type="button"
-        :title="editor.inspectorExpanded ? '收起属性栏' : '展开属性栏'"
+        :title="editor.inspectorExpanded ? t('inspectorCollapseSidebar') : t('inspectorExpandSidebar')"
         @click="editor.toggleInspector"
       >
         {{ editor.inspectorExpanded ? "›" : "‹" }}
@@ -243,12 +243,15 @@
                   {{ node.url }}
                 </div>
                 <div class="canvas-node__meta">
-                  Double click to open
+                  {{ t("nodeLinkHelper") }}
                 </div>
               </template>
               <template v-else>
-                <div class="canvas-node__content">
-                  {{ node.label || "Group" }}
+                <div
+                  class="canvas-node__content"
+                  :style="getCanvasNodeContentStyle(node)"
+                >
+                  {{ node.label || t("nodeDefaultGroupLabel") }}
                 </div>
               </template>
             </div>
@@ -349,9 +352,19 @@
               @pointerdown.stop
             >
               <button
+                class="selection-toolbar__swatch selection-toolbar__swatch--clear"
+                :class="{ 'selection-toolbar__swatch--active': activeSelectionColor === CLEAR_SELECTION_COLOR }"
+                data-testid="selection-color-clear"
+                :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
+                :title="t('selectionToolbarClearColor')"
+                type="button"
+                @click.stop="editor.applySelectionColor(CLEAR_SELECTION_COLOR)"
+              />
+              <button
                 v-for="color in editor.selectionColors"
                 :key="color"
                 class="selection-toolbar__swatch"
+                :class="{ 'selection-toolbar__swatch--active': activeSelectionColor === color }"
                 :data-testid="`selection-color-${color}`"
                 :style="getSelectionColorStyle(color)"
                 type="button"
@@ -457,27 +470,27 @@
           class="inspector__content"
         >
           <section class="inspector__section">
-            <h2>Document</h2>
-            <p>{{ editor.state.filePath || "Unsaved workspace path" }}</p>
-            <p>{{ editor.state.isDirty ? "Pending save" : "In sync" }}</p>
+            <h2>{{ t("inspectorDocument") }}</h2>
+            <p>{{ editor.state.filePath || t("inspectorUnsavedWorkspacePath") }}</p>
+            <p>{{ editor.state.isDirty ? t("inspectorPendingSave") : t("inspectorInSync") }}</p>
             <div
               v-if="editor.state.conflict"
               class="conflict-panel"
             >
-              <strong>External change detected</strong>
-              <span>The file changed on disk after it was loaded.</span>
+              <strong>{{ t("inspectorExternalChangeDetected") }}</strong>
+              <span>{{ t("inspectorExternalChangeDescription") }}</span>
               <div class="conflict-panel__actions">
                 <button
                   class="toolbar__button"
                   @click="editor.loadConflictVersion"
                 >
-                  Load disk version
+                  {{ t("inspectorLoadDiskVersion") }}
                 </button>
                 <button
                   class="toolbar__button toolbar__button--primary"
                   @click="editor.overwriteConflictVersion"
                 >
-                  Overwrite disk version
+                  {{ t("inspectorOverwriteDiskVersion") }}
                 </button>
               </div>
             </div>
@@ -489,14 +502,14 @@
                 v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
                 :key="issue.code + issue.path"
               >
-                <strong>{{ issue.level.toUpperCase() }}</strong>
+                <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
                 <span>{{ issue.message }}</span>
               </div>
             </div>
           </section>
 
           <section class="inspector__section">
-            <h2>Recent</h2>
+            <h2>{{ t("inspectorRecent") }}</h2>
             <div
               v-if="editor.recentFiles.length"
               class="recent-list"
@@ -512,7 +525,7 @@
               </button>
             </div>
             <p v-else>
-              No recent workspace files yet.
+              {{ t("inspectorNoRecentWorkspaceFiles") }}
             </p>
           </section>
 
@@ -520,13 +533,13 @@
             v-if="editor.selectedNodeCount > 1"
             class="inspector__section"
           >
-            <h2>Selection</h2>
-            <p>{{ editor.selectedNodeCount }} nodes selected.</p>
+            <h2>{{ t("inspectorSelection") }}</h2>
+            <p>{{ t("selectionCount", { count: editor.selectedNodeCount }) }}</p>
             <button
               class="toolbar__button"
               @click="editor.deleteSelection"
             >
-              Delete selected nodes
+              {{ t("inspectorDeleteSelectedNodes") }}
             </button>
           </section>
 
@@ -534,9 +547,9 @@
             v-if="editor.selectedNode && editor.selectedNodeCount === 1"
             class="inspector__section"
           >
-          <h2>Node</h2>
+          <h2>{{ t("inspectorNode") }}</h2>
           <label>
-            X
+            {{ t("fieldX") }}
             <input
               :value="editor.selectedNode.x"
               type="number"
@@ -544,7 +557,7 @@
             />
           </label>
           <label>
-            Y
+            {{ t("fieldY") }}
             <input
               :value="editor.selectedNode.y"
               type="number"
@@ -552,7 +565,7 @@
             />
           </label>
           <label>
-            Width
+            {{ t("fieldWidth") }}
             <input
               :value="editor.selectedNode.width"
               type="number"
@@ -560,7 +573,7 @@
             />
           </label>
           <label>
-            Height
+            {{ t("fieldHeight") }}
             <input
               :value="editor.selectedNode.height"
               type="number"
@@ -568,35 +581,35 @@
             />
           </label>
           <label v-if="'color' in editor.selectedNode">
-            Color
+            {{ t("fieldColor") }}
             <input
               :value="editor.selectedNode.color || ''"
               @input="editor.updateNodeField('color', valueFromEvent($event))"
             />
           </label>
           <label v-if="editor.selectedNode.type === 'text'">
-            Text
+            {{ t("fieldText") }}
             <textarea
               :value="editor.selectedNode.text"
               @input="editor.updateNodeField('text', valueFromEvent($event))"
             />
           </label>
           <label v-if="editor.selectedNode.type === 'file'">
-            File path
+            {{ t("fieldFilePath") }}
             <input
               :value="editor.selectedNode.file"
               @input="editor.updateNodeField('file', valueFromEvent($event))"
             />
           </label>
           <label v-if="editor.selectedNode.type === 'link'">
-            URL
+            {{ t("fieldUrl") }}
             <input
               :value="editor.selectedNode.url"
               @input="editor.updateNodeField('url', valueFromEvent($event))"
             />
           </label>
           <label v-if="editor.selectedNode.type === 'group'">
-            Label
+            {{ t("fieldLabel") }}
             <input
               :value="editor.selectedNode.label || ''"
               @input="editor.updateNodeField('label', valueFromEvent($event))"
@@ -608,11 +621,11 @@
             v-if="editor.selectedNode && editor.selectedNodeCount === 1"
             class="inspector__section"
           >
-          <h2>Create Edge</h2>
+          <h2>{{ t("inspectorCreateEdge") }}</h2>
           <label>
-            Target
+            {{ t("fieldTarget") }}
             <select v-model="editor.newEdgeTargetId">
-              <option value="">Select target node</option>
+              <option value="">{{ t("fieldSelectTargetNode") }}</option>
               <option
                 v-for="node in editor.edgeTargets"
                 :key="node.id"
@@ -623,34 +636,34 @@
             </select>
           </label>
           <label>
-            Label
+            {{ t("fieldEdgeLabel") }}
             <input v-model="editor.newEdgeLabel" />
           </label>
           <label>
-            From side
+            {{ t("fieldFromSide") }}
             <select v-model="editor.newEdgeFromSide">
               <option
                 v-for="side in editor.sides"
                 :key="side"
                 :value="side"
-              >{{ side }}</option>
+              >{{ getSideLabel(side) }}</option>
             </select>
           </label>
           <label>
-            To side
+            {{ t("fieldToSide") }}
             <select v-model="editor.newEdgeToSide">
               <option
                 v-for="side in editor.sides"
                 :key="side"
                 :value="side"
-              >{{ side }}</option>
+              >{{ getSideLabel(side) }}</option>
             </select>
           </label>
           <button
             class="toolbar__button toolbar__button--primary"
             @click="editor.createEdgeFromSelection"
           >
-            Create edge
+            {{ t("inspectorCreateEdgeAction") }}
           </button>
           </section>
 
@@ -658,16 +671,16 @@
             v-if="editor.selectedEdge"
             class="inspector__section"
           >
-          <h2>Edge</h2>
+          <h2>{{ t("inspectorEdge") }}</h2>
           <label>
-            Label
+            {{ t("fieldEdgeLabel") }}
             <input
               :value="editor.selectedEdge.label || ''"
               @input="editor.updateEdgeField('label', valueFromEvent($event))"
             />
           </label>
           <label>
-            From side
+            {{ t("fieldFromSide") }}
             <select
               :value="editor.selectedEdge.fromSide"
               @change="editor.updateEdgeSide('fromSide', valueFromEvent($event))"
@@ -676,11 +689,11 @@
                 v-for="side in editor.sides"
                 :key="side"
                 :value="side"
-              >{{ side }}</option>
+              >{{ getSideLabel(side) }}</option>
             </select>
           </label>
           <label>
-            To side
+            {{ t("fieldToSide") }}
             <select
               :value="editor.selectedEdge.toSide"
               @change="editor.updateEdgeSide('toSide', valueFromEvent($event))"
@@ -689,14 +702,14 @@
                 v-for="side in editor.sides"
                 :key="side"
                 :value="side"
-              >{{ side }}</option>
+              >{{ getSideLabel(side) }}</option>
             </select>
           </label>
           <button
             class="toolbar__button"
             @click="editor.deleteSelection"
           >
-            Delete edge
+            {{ t("inspectorDeleteEdge") }}
           </button>
           </section>
         </div>
@@ -718,7 +731,9 @@ import type { Plugin } from "siyuan"
 
 import type { CanvasTabBootstrap } from "@/main"
 import { useCanvasEditor } from "@/canvas/use-canvas-editor"
+import { createCanvasI18n } from "@/i18n/canvas"
 import {
+  computed,
   defineComponent,
   h,
   onBeforeUnmount,
@@ -739,6 +754,7 @@ const props = defineProps<{
   setTitle: (title: string) => void
 }>()
 
+const t = createCanvasI18n((props.plugin as Plugin & { i18n?: Record<string, string> }).i18n)
 const editor = useCanvasEditor(props.plugin, props.bootstrap, props.setTitle)
 const editingMarkdown = ref("")
 const editingNodeId = ref("")
@@ -748,6 +764,7 @@ const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef
 const selectionToolbarRef = ref<HTMLElement>()
 const selectionToolbarThemeMode = ref<"dark" | "light">("light")
+const CLEAR_SELECTION_COLOR = ""
 let canvasThemeObserver: MutationObserver | null = null
 let selectionToolbarResizeObserver: ResizeObserver | null = null
 type SelectionToolbarIconName =
@@ -772,12 +789,12 @@ type SelectionToolbarIconName =
   | "stretch-vertical"
 
 const SELECTION_TOOLBAR_TOOLTIPS = {
-  align: "对齐",
-  center: "聚焦",
-  color: "颜色",
-  createGroup: "创建分组",
-  delete: "删除",
-  edit: "编辑",
+  align: t("selectionToolbarAlign"),
+  center: t("selectionToolbarCenter"),
+  color: t("selectionToolbarColor"),
+  createGroup: t("selectionToolbarCreateGroup"),
+  delete: t("selectionToolbarDelete"),
+  edit: t("selectionToolbarEdit"),
 } as const
 
 const SELECTION_LAYOUT_ICON_NAMES: Record<CanvasNodeLayoutAction, SelectionToolbarIconName> = {
@@ -1014,14 +1031,14 @@ const SelectionToolbarIcon = defineComponent({
 })
 const selectionColorStyles: Record<string, { background: string, border: string, swatch: string }> = {
   "1": {
-    background: "rgba(79, 124, 255, 0.18)",
-    border: "#4f7cff",
-    swatch: "#4f7cff",
+    background: "rgba(239, 68, 68, 0.18)",
+    border: "#ef4444",
+    swatch: "#ef4444",
   },
   "2": {
-    background: "rgba(38, 166, 154, 0.18)",
-    border: "#26a69a",
-    swatch: "#26a69a",
+    background: "rgba(249, 115, 22, 0.18)",
+    border: "#f97316",
+    swatch: "#f97316",
   },
   "3": {
     background: "rgba(244, 180, 0, 0.18)",
@@ -1029,14 +1046,14 @@ const selectionColorStyles: Record<string, { background: string, border: string,
     swatch: "#f4b400",
   },
   "4": {
-    background: "rgba(249, 115, 22, 0.18)",
-    border: "#f97316",
-    swatch: "#f97316",
+    background: "rgba(34, 197, 94, 0.18)",
+    border: "#22c55e",
+    swatch: "#22c55e",
   },
   "5": {
-    background: "rgba(239, 68, 68, 0.18)",
-    border: "#ef4444",
-    swatch: "#ef4444",
+    background: "rgba(77, 208, 225, 0.18)",
+    border: "#4dd0e1",
+    swatch: "#4dd0e1",
   },
   "6": {
     background: "rgba(139, 92, 246, 0.18)",
@@ -1044,9 +1061,50 @@ const selectionColorStyles: Record<string, { background: string, border: string,
     swatch: "#8b5cf6",
   },
 }
+const clearSelectionColorStyle = {
+  border: "#94a3b8",
+  swatch: "#9ca3af",
+}
+const activeSelectionColor = computed(() => {
+  if (!editor.state.selectedNodeIds.length) {
+    return null
+  }
+
+  const selectedNodeIds = new Set(editor.state.selectedNodeIds)
+  const selectedNodes = editor.state.document.nodes.filter((node) => selectedNodeIds.has(node.id))
+
+  if (!selectedNodes.length) {
+    return null
+  }
+
+  const firstColor = getNodeSelectionColorValue(selectedNodes[0])
+
+  return selectedNodes.every((node) => getNodeSelectionColorValue(node) === firstColor)
+    ? firstColor
+    : null
+})
 
 function valueFromEvent(event: Event): string {
   return (event.target as HTMLInputElement).value
+}
+
+function getIssueLevelLabel(level: "error" | "warning"): string {
+  return level === "error" ? t("issueError") : t("issueWarning")
+}
+
+function getSideLabel(side: string): string {
+  switch (side) {
+    case "top":
+      return t("sideTop")
+    case "right":
+      return t("sideRight")
+    case "bottom":
+      return t("sideBottom")
+    case "left":
+      return t("sideLeft")
+    default:
+      return side
+  }
 }
 
 function setEditingTextareaRef(value: Element | null) {
@@ -1064,10 +1122,18 @@ function setSelectionToolbarRef(value: Element | null) {
 }
 
 function getSelectionColorStyle(color: string) {
+  if (!color) {
+    return {
+      backgroundColor: clearSelectionColorStyle.swatch,
+      borderColor: clearSelectionColorStyle.border,
+    }
+  }
+
   const colorStyle = selectionColorStyles[color]
 
   return {
     backgroundColor: colorStyle?.swatch || "#64748b",
+    borderColor: colorStyle?.border || "#64748b",
   }
 }
 
@@ -1081,6 +1147,26 @@ function getCanvasNodeStyle(node: CanvasNode) {
       borderColor: colorStyle.border,
     } : {}),
   }
+}
+
+function getCanvasNodeContentStyle(node: CanvasNode) {
+  if (node.type !== "group" || !node.color) {
+    return undefined
+  }
+
+  const colorStyle = selectionColorStyles[node.color]
+
+  if (!colorStyle) {
+    return undefined
+  }
+
+  return {
+    color: colorStyle.border,
+  }
+}
+
+function getNodeSelectionColorValue(node: CanvasNode) {
+  return typeof node.color === "string" && node.color ? node.color : CLEAR_SELECTION_COLOR
 }
 
 function handleToolbarEdit() {
@@ -1503,6 +1589,12 @@ watch(
   border: 1px solid var(--selection-toolbar-border);
   border-radius: 999px;
   cursor: pointer;
+}
+
+.selection-toolbar__swatch--active {
+  box-shadow:
+    0 0 0 2px var(--selection-toolbar-bg),
+    0 0 0 4px var(--selection-toolbar-text);
 }
 
 .selection-toolbar__menu-button {

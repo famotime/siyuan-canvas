@@ -11,6 +11,7 @@ import {
   nextTick,
   ref,
 } from "vue"
+import zhCN from "@/i18n/zh_CN.json"
 
 import CanvasWorkspace from "@/components/canvas/CanvasWorkspace.vue"
 
@@ -42,6 +43,19 @@ function createLinkNode(overrides: Record<string, unknown> = {}) {
     y: 0,
     width: 320,
     height: 180,
+    ...overrides,
+  }
+}
+
+function createGroupNode(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "group-1",
+    type: "group",
+    label: "意义为什么好好说话是一件很困难很复杂的事？",
+    x: 0,
+    y: 0,
+    width: 480,
+    height: 240,
     ...overrides,
   }
 }
@@ -169,6 +183,12 @@ function createEditorMock(node = createTextNode()) {
     },
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
+  }
+}
+
+function createPluginMock() {
+  return {
+    i18n: zhCN,
   }
 }
 
@@ -486,8 +506,58 @@ describe("CanvasWorkspace", () => {
 
     const card = wrapper.find(".canvas-node").element as HTMLElement
 
-    expect(card.style.borderColor).toBe("rgb(38, 166, 154)")
-    expect(card.style.backgroundColor).toBe("rgba(38, 166, 154, 0.18)")
+    expect(card.style.borderColor).toBe("rgb(249, 115, 22)")
+    expect(card.style.backgroundColor).toBe("rgba(249, 115, 22, 0.18)")
+  })
+
+  it("renders a visible group label text color from node.color using the shared selection color mapping", () => {
+    const node = createGroupNode({ color: "1" })
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const label = wrapper.find(".canvas-node__content").element as HTMLElement
+
+    expect(label.style.color).toBe("rgb(239, 68, 68)")
+  })
+
+  it("renders a clear swatch first and marks the current selection color as active", async () => {
+    const node = createTextNode({ color: "1" })
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionColors = ["1", "2", "3", "4", "5", "6"]
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.selectionToolbarPopover = "color"
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const swatches = wrapper.findAll(".selection-toolbar__swatch")
+
+    expect(swatches).toHaveLength(7)
+    expect(swatches[0]?.attributes("data-testid")).toBe("selection-color-clear")
+    expect(wrapper.find("[data-testid='selection-color-clear']").classes()).not.toContain("selection-toolbar__swatch--active")
+    expect(wrapper.find("[data-testid='selection-color-1']").classes()).toContain("selection-toolbar__swatch--active")
+
+    await wrapper.find("[data-testid='selection-color-clear']").trigger("click")
+
+    expect(currentEditor.applySelectionColor).toHaveBeenCalledWith("")
   })
 
   it("closes the open selection popover when clicking outside the toolbar", async () => {
@@ -530,5 +600,43 @@ describe("CanvasWorkspace", () => {
 
     expect(wrapper.find(".workspace").attributes("style")).toContain("grid-template-columns: 1fr 0px;")
     expect(wrapper.find(".workspace__inspector-handle").attributes("style")).toContain("right: 8px;")
+  })
+
+  it("renders toolbar and sidebar labels in Chinese from plugin i18n", () => {
+    currentEditor = createEditorMock()
+    currentEditor.suggestedFilename = ""
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const toolbarText = wrapper.find(".toolbar").text()
+    const inspectorText = wrapper.find(".inspector").text()
+
+    expect(toolbarText).toContain("新建")
+    expect(toolbarText).toContain("打开路径")
+    expect(toolbarText).toContain("导入")
+    expect(toolbarText).toContain("保存")
+    expect(toolbarText).toContain("导出")
+    expect(toolbarText).toContain("设置")
+    expect(toolbarText).toContain("文本")
+    expect(toolbarText).toContain("文件")
+    expect(toolbarText).toContain("链接")
+    expect(toolbarText).toContain("分组")
+    expect(toolbarText).toContain("未命名.canvas")
+    expect(toolbarText).toContain("1 个节点 / 0 条连线")
+    expect(toolbarText).toContain("已保存")
+    expect(wrapper.find(".workspace__inspector-handle").attributes("title")).toBe("收起侧栏")
+    expect(inspectorText).toContain("文档")
+    expect(inspectorText).toContain("未保存的工作区路径")
+    expect(inspectorText).toContain("已同步")
+    expect(inspectorText).toContain("最近打开")
+    expect(inspectorText).toContain("暂无最近打开的工作区文件。")
+    expect(inspectorText).toContain("节点")
+    expect(inspectorText).toContain("创建连线")
   })
 })
