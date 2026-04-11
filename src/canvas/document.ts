@@ -528,7 +528,18 @@ export function setCanvasNodesColor(
 
   return {
     ...document,
-    nodes: document.nodes.map((node) => (selectedIds.has(node.id) ? { ...node, color } : node)),
+    nodes: document.nodes.map((node) => {
+      if (!selectedIds.has(node.id)) {
+        return node
+      }
+
+      if (!color) {
+        const { color: _removedColor, ...nextNode } = node
+        return nextNode as typeof node
+      }
+
+      return { ...node, color }
+    }),
   }
 }
 

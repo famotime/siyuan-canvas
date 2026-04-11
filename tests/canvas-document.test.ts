@@ -259,6 +259,42 @@ describe("canvas document operations", () => {
     ])
   })
 
+  it("removes color from selected nodes when clearing the selection color", () => {
+    const document = {
+      nodes: [
+        {
+          id: "n1",
+          type: "text",
+          text: "one",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 180,
+          color: "1",
+        },
+        {
+          id: "n2",
+          type: "text",
+          text: "two",
+          x: 0,
+          y: 200,
+          width: 320,
+          height: 180,
+          color: "2",
+        },
+      ],
+      edges: [],
+    }
+
+    const next = setCanvasNodesColor(document, ["n1"], "")
+
+    expect("color" in next.nodes[0]).toBe(false)
+    expect(next.nodes[1]).toMatchObject({
+      id: "n2",
+      color: "2",
+    })
+  })
+
   it("creates a group node around selected nodes with padding", () => {
     const document = {
       nodes: [
