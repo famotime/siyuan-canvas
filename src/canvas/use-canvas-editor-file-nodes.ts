@@ -1,21 +1,33 @@
 import type { Ref } from "vue"
 import type { CanvasEditorState } from "@/canvas/editor-state"
-import type { ResolvedCanvasFileNode } from "@/canvas/file-node-resolution"
+import type { ResolvedCanvasFileTarget } from "@/canvas/file-target-resolution"
+import type { CanvasFileTargetPreview } from "@/canvas/file-target-preview"
 import type { CanvasNode } from "@/canvas/types"
 import type { CanvasI18nTranslator } from "@/canvas/use-canvas-editor-shared"
 
 import {
   findSiyuanAssetByPath,
+  findSiyuanDocumentByBlockId,
   findSiyuanDocumentByPath,
+  findSiyuanImageAssetByBlockId,
+  getSiyuanDocumentMarkdown,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
-import { createCanvasFileTargetPreview } from "@/canvas/file-target-preview"
+import { renderMarkdownPreview } from "@/canvas/markdown-preview"
 import {
-  createFallbackCanvasFileNode,
-  resolveCanvasFileNode,
-} from "@/canvas/file-node-resolution"
+  createCanvasFileTargetPreview,
+  loadCanvasTargetPreview,
+} from "@/canvas/file-target-preview"
+import {
+  resolveCanvasFileTarget,
+  type ResolvedCanvasDocumentTarget,
+} from "@/canvas/file-target-resolution"
 
 interface CanvasEditorFileNodeOptions {
-  fileNodeMeta: Ref<Record<string, ResolvedCanvasFileNode>>
+  fileNodeMeta: Ref<Record<string, ResolvedCanvasFileTarget & {
+    detail: string
+    excerptHtml?: string
+    thumbnail?: CanvasFileTargetPreview["thumbnail"]
+  }>>
   state: CanvasEditorState
   t: CanvasI18nTranslator
 }
@@ -29,23 +41,131 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
 
   let fileNodeResolveVersion = 0
 
-  function getResolvedFileNode(node: CanvasNode): ResolvedCanvasFileNode {
+  function createFallbackFileTarget(path: string): ResolvedCanvasFileTarget & { detail: string } {
+    const trimmed = path.trim()
+    const segments = trimmed.replace(/\\/g, "/").split("/")
+    return {
+      detail: trimmed,
+      kind: trimmed.endsWith(".canvas") ? "canvas" : "file",
+      path: trimmed,
+      title: segments[segments.length - 1] || trimmed,
+    }
+  }
+
+  async function readWorkspaceCanvasText(path: string): Promise<string> {
+    const response = await fetch("/api/file/getFile", {
+      body: JSON.stringify({ path }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    })
+
+    if (!response.ok) {
+      throw new Error(`Unable to read canvas file: ${path}`)
+    }
+
+    return response.text()
+  }
+
+  function getResolvedFileNode(node: CanvasNode): ResolvedCanvasFileTarget & {
+    detail: string
+    excerptHtml?: string
+    thumbnail?: CanvasFileTargetPreview["thumbnail"]
+  } {
     if (node.type !== "file") {
       throw new Error("Resolved file-node metadata requested for a non-file node.")
     }
 
-    return fileNodeMeta.value[node.id] || createFallbackCanvasFileNode(node.file)
+    return fileNodeMeta.value[node.id] || createFallbackFileTarget(node.file)
+  }
+
+  async function withDocumentPreview(target: ResolvedCanvasDocumentTarget) {
+    const markdown = await getSiyuanDocumentMarkdown(target.id)
+    return {
+      ...target,
+      detail: target.hpath || target.path,
+      excerptHtml: renderMarkdownPreview(markdown),
+    }
   }
 
   async function refreshFileNodeMetadata() {
     const version = ++fileNodeResolveVersion
     const fileNodes = state.document.nodes.filter((node): node is Extract<CanvasNode, { type: "file" }> => node.type === "file")
     const nextEntries = await Promise.all(fileNodes.map(async (node) => {
-      const resolved = await resolveCanvasFileNode(node.file, {
-        resolveAssetByPath: findSiyuanAssetByPath,
-        resolveDocumentByPath: findSiyuanDocumentByPath,
+      const resolved = await resolveCanvasFileTarget(node.file, {
+        resolveCanvasByPath: async (path) => (
+          path.trim().endsWith(".canvas")
+            ? {
+                kind: "canvas" as const,
+                path,
+                title: path.replace(/\\/g, "/").split("/").at(-1) || path,
+              }
+            : null
+        ),
+        resolveDocumentByBlockId: async (blockId) => {
+          const document = await findSiyuanDocumentByBlockId(blockId)
+          return document
+            ? {
+                ...document,
+                kind: "document" as const,
+              }
+            : null
+        },
+        resolveDocumentByPath: async (path) => {
+          const document = await findSiyuanDocumentByPath(path)
+          return document
+            ? {
+                ...document,
+                kind: "document" as const,
+              }
+            : null
+        },
+        resolveImageByBlockId: async (blockId) => {
+          const image = await findSiyuanImageAssetByBlockId(blockId)
+          return image
+            ? {
+                kind: "image" as const,
+                openPath: image.openPath,
+                path: image.path,
+                title: image.title || image.name,
+              }
+            : null
+        },
+        resolveImageByPath: async (path) => {
+          const image = await findSiyuanAssetByPath(path)
+          return image
+            ? {
+                kind: "image" as const,
+                openPath: image.openPath,
+                path: image.path,
+                title: image.title || image.name,
+              }
+            : null
+        },
       })
-      return [node.id, resolved] as const
+
+      let enriched: ResolvedCanvasFileTarget & { detail: string, excerptHtml?: string } = {
+        ...resolved,
+        detail: resolved.path,
+      }
+
+      if (resolved.kind === "document") {
+        enriched = await withDocumentPreview(resolved)
+      }
+
+      if (resolved.kind === "canvas") {
+        const canvasPreview = await loadCanvasTargetPreview(resolved, {
+          readCanvasText: readWorkspaceCanvasText,
+        })
+        enriched = {
+          ...resolved,
+          detail: resolved.path,
+          thumbnail: canvasPreview.thumbnail,
+        }
+      }
+
+      return [node.id, enriched] as const
     }))
 
     if (version !== fileNodeResolveVersion) {
@@ -71,7 +191,7 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
   }
 
   function getFileNodeDescription(node: CanvasNode): string {
-    return node.type === "file" ? getResolvedFileNode(node).description : ""
+    return node.type === "file" ? getResolvedFileNode(node).detail : ""
   }
 
   function getFileNodeKind(node: CanvasNode): string {

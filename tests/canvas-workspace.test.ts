@@ -472,6 +472,90 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".file-card__document-preview").html()).toContain("Preview")
   })
 
+  it("renders all file picker result kinds in the dialog", () => {
+    currentEditor = createEditorMock()
+    currentEditor.filePickerDialog.visible = true
+    currentEditor.filePickerDialog.groups.documents = [{
+      kind: "document",
+      path: "/data/roadmap.sy",
+      subtitle: "/Projects/Roadmap",
+      title: "Roadmap",
+    }]
+    currentEditor.filePickerDialog.groups.canvases = [{
+      kind: "canvas",
+      path: "/data/storage/siyuan-canvas/road.canvas",
+      subtitle: "/data/storage/siyuan-canvas/road.canvas",
+      title: "road.canvas",
+    }]
+    currentEditor.filePickerDialog.groups.images = [{
+      kind: "image",
+      path: "assets/road.png",
+      subtitle: "assets/road.png",
+      title: "road.png",
+    }]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='file-picker-option-document']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='file-picker-option-canvas']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='file-picker-option-image']").exists()).toBe(true)
+  })
+
+  it("renders a canvas thumbnail preview for nested canvas file cards", () => {
+    currentEditor = createEditorMock({
+      id: "file-canvas-1",
+      file: "/data/storage/siyuan-canvas/road.canvas",
+      type: "file",
+    })
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Canvas",
+      detail: "/data/storage/siyuan-canvas/road.canvas",
+      headline: "road.canvas",
+      helper: "Opens nested canvas",
+      kind: "canvas",
+      thumbnail: {
+        edges: [{
+          fromX: 40,
+          fromY: 50,
+          toX: 180,
+          toY: 140,
+        }],
+        nodes: [
+          {
+            height: 72,
+            width: 120,
+            x: 0,
+            y: 0,
+          },
+          {
+            height: 72,
+            width: 120,
+            x: 140,
+            y: 104,
+          },
+        ],
+      },
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find(".file-card__canvas-preview").exists()).toBe(true)
+    expect(wrapper.findAll(".file-card__thumbnail-node")).toHaveLength(2)
+    expect(wrapper.findAll(".file-card__thumbnail-edge")).toHaveLength(1)
+  })
+
   it("renders the create-edge dialog when requested", () => {
     currentEditor = createEditorMock()
     currentEditor.createEdgeDialog.visible = true

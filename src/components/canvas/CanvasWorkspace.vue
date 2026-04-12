@@ -174,6 +174,33 @@
                   <span class="file-card__badge">
                     {{ editor.getFileNodePreview(node).badge }}
                   </span>
+                  <div
+                    v-if="editor.getFileNodePreview(node).kind === 'canvas' && editor.getFileNodePreview(node).thumbnail"
+                    class="file-card__canvas-preview"
+                  >
+                    <svg
+                      class="file-card__thumbnail"
+                      :viewBox="getCanvasThumbnailViewBox(editor.getFileNodePreview(node).thumbnail)"
+                      preserveAspectRatio="xMidYMid meet"
+                    >
+                      <path
+                        v-for="(edge, edgeIndex) in editor.getFileNodePreview(node).thumbnail?.edges || []"
+                        :key="`thumbnail-edge-${node.id}-${edgeIndex}`"
+                        class="file-card__thumbnail-edge"
+                        :d="`M ${edge.fromX} ${edge.fromY} L ${edge.toX} ${edge.toY}`"
+                      />
+                      <rect
+                        v-for="(thumbnailNode, thumbnailIndex) in editor.getFileNodePreview(node).thumbnail?.nodes || []"
+                        :key="`thumbnail-node-${node.id}-${thumbnailIndex}`"
+                        class="file-card__thumbnail-node"
+                        rx="16"
+                        :height="thumbnailNode.height"
+                        :width="thumbnailNode.width"
+                        :x="thumbnailNode.x"
+                        :y="thumbnailNode.y"
+                      />
+                    </svg>
+                  </div>
                   <img
                     v-if="editor.getFileNodePreview(node).imageSrc"
                     :src="editor.getFileNodePreview(node).imageSrc"
@@ -499,12 +526,14 @@
             </label>
             <div class="canvas-node-picker__options">
               <button
-                v-for="result in editor.filePickerDialog.groups.documents"
-                :key="`file-picker-document-${result.path}`"
+                v-for="result in getFilePickerResults()"
+                :key="`file-picker-${result.kind}-${result.path}`"
                 class="canvas-node-picker__option"
+                :data-testid="`file-picker-option-${result.kind}`"
                 type="button"
                 @click="editor.selectFilePickerResult(result)"
               >
+                <span class="canvas-node-picker__option-kind">{{ getFilePickerKindLabel(result.kind) }}</span>
                 <strong>{{ result.title }}</strong>
                 <span>{{ result.subtitle }}</span>
               </button>
@@ -1239,6 +1268,56 @@ function getCanvasNodeContentStyle(node: CanvasNode) {
   return resolveCanvasNodeContentStyle(node)
 }
 
+function getFilePickerResults() {
+  return [
+    ...editor.filePickerDialog.groups.documents,
+    ...editor.filePickerDialog.groups.canvases,
+    ...editor.filePickerDialog.groups.images,
+  ]
+}
+
+function getFilePickerKindLabel(kind: "canvas" | "document" | "image"): string {
+  switch (kind) {
+    case "canvas":
+      return "Canvas"
+    case "document":
+      return "Document"
+    case "image":
+      return "Image"
+    default:
+      return kind
+  }
+}
+
+function getCanvasThumbnailViewBox(thumbnail?: {
+  edges: Array<{ fromX: number, fromY: number, toX: number, toY: number }>
+  nodes: Array<{ height: number, width: number, x: number, y: number }>
+}) {
+  if (!thumbnail || thumbnail.nodes.length === 0) {
+    return "0 0 100 64"
+  }
+
+  const nodeMinX = Math.min(...thumbnail.nodes.map((node) => node.x))
+  const nodeMinY = Math.min(...thumbnail.nodes.map((node) => node.y))
+  const nodeMaxX = Math.max(...thumbnail.nodes.map((node) => node.x + node.width))
+  const nodeMaxY = Math.max(...thumbnail.nodes.map((node) => node.y + node.height))
+  const edgePoints = thumbnail.edges.flatMap((edge) => [
+    { x: edge.fromX, y: edge.fromY },
+    { x: edge.toX, y: edge.toY },
+  ])
+  const edgeMinX = edgePoints.length > 0 ? Math.min(...edgePoints.map((point) => point.x)) : nodeMinX
+  const edgeMinY = edgePoints.length > 0 ? Math.min(...edgePoints.map((point) => point.y)) : nodeMinY
+  const edgeMaxX = edgePoints.length > 0 ? Math.max(...edgePoints.map((point) => point.x)) : nodeMaxX
+  const edgeMaxY = edgePoints.length > 0 ? Math.max(...edgePoints.map((point) => point.y)) : nodeMaxY
+  const minX = Math.min(nodeMinX, edgeMinX)
+  const minY = Math.min(nodeMinY, edgeMinY)
+  const maxX = Math.max(nodeMaxX, edgeMaxX)
+  const maxY = Math.max(nodeMaxY, edgeMaxY)
+  const padding = 24
+
+  return `${minX - padding} ${minY - padding} ${Math.max(maxX - minX + padding * 2, 1)} ${Math.max(maxY - minY + padding * 2, 1)}`
+}
+
 onMounted(() => {
   window.addEventListener("pointerdown", handleWindowPointerDown)
 })
@@ -1856,12 +1935,47 @@ watch(
 }
 
 .file-card__image {
+  display: block;
   width: 100%;
   max-height: 132px;
   object-fit: cover;
   border-radius: 12px;
   border: 1px solid var(--canvas-border);
   background: var(--canvas-surface);
+}
+
+.file-card__canvas-preview {
+  height: 132px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--canvas-border);
+  background:
+    linear-gradient(180deg, rgba(53, 103, 214, 0.08), rgba(15, 23, 42, 0.02)),
+    var(--canvas-surface);
+}
+
+.file-card__thumbnail {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.file-card__thumbnail-edge {
+  fill: none;
+  stroke: rgba(53, 103, 214, 0.58);
+  stroke-linecap: round;
+  stroke-width: 10px;
+}
+
+.file-card__thumbnail-node {
+  fill: rgba(255, 255, 255, 0.88);
+  stroke: rgba(15, 23, 42, 0.12);
+  stroke-width: 4px;
+}
+
+.file-card__document-preview {
+  max-height: min(46vh, 320px);
+  overflow: hidden;
 }
 
 .file-card__helper {
@@ -2234,6 +2348,8 @@ watch(
 }
 
 .canvas-node-picker__option {
+  display: grid;
+  gap: 4px;
   width: 100%;
   border: 0;
   border-radius: 10px;
@@ -2242,6 +2358,17 @@ watch(
   color: var(--canvas-text);
   text-align: left;
   cursor: pointer;
+}
+
+.canvas-node-picker__option-kind {
+  justify-self: start;
+  border-radius: 999px;
+  background: var(--canvas-accent-soft);
+  color: var(--canvas-text);
+  padding: 2px 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .canvas-node-picker__option:hover {

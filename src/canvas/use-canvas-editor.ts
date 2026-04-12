@@ -12,7 +12,8 @@ import type {
   CanvasPluginSettings,
   CanvasRecentFile,
 } from "@/canvas/plugin-data"
-import type { ResolvedCanvasFileNode } from "@/canvas/file-node-resolution"
+import type { ResolvedCanvasFileTarget } from "@/canvas/file-target-resolution"
+import type { CanvasFileTargetPreview } from "@/canvas/file-target-preview"
 import type { CanvasPluginBridge } from "@/canvas/use-canvas-editor-shared"
 import type { CanvasEditorFileSource } from "@/canvas/use-canvas-editor-shared"
 
@@ -51,7 +52,10 @@ import {
   upsertCanvasNode,
 } from "@/canvas/document"
 import { createCanvasEditorBindings } from "@/canvas/editor-bindings"
-import type { CanvasFilePickerOption } from "@/canvas/file-picker-dialog"
+import {
+  searchCanvasFilePickerTargets,
+  type CanvasFilePickerOption,
+} from "@/canvas/file-picker-dialog"
 import { CanvasEditorState } from "@/canvas/editor-state"
 import { createCanvasEditorFileActions } from "@/canvas/use-canvas-editor-file-actions"
 import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-file-nodes"
@@ -70,6 +74,10 @@ import {
 } from "@/canvas/plugin-data"
 import { CanvasFileService } from "@/canvas/file-service"
 import { writeWorkspaceImageFile } from "@/canvas/workspace-image-files"
+import {
+  findSiyuanDocumentsByQuery,
+  findSiyuanImageAssetsByQuery,
+} from "@/canvas/siyuan-kernel-file-node-lookups"
 import {
   parseCanvasDocument,
   validateCanvasDocument,
@@ -104,7 +112,11 @@ export function useCanvasEditor(
     y: 0,
   })
   const fileInputRef = ref<HTMLInputElement>()
-  const fileNodeMeta = ref<Record<string, ResolvedCanvasFileNode>>({})
+  const fileNodeMeta = ref<Record<string, ResolvedCanvasFileTarget & {
+    detail: string
+    excerptHtml?: string
+    thumbnail?: CanvasFileTargetPreview["thumbnail"]
+  }>>({})
   const fileSource = ref<CanvasEditorFileSource>(bootstrap.path ? "workspace" : "unsaved")
   const stageRef = ref<HTMLElement>()
   const recentFiles = ref<CanvasRecentFile[]>([])
@@ -692,8 +704,57 @@ export function useCanvasEditor(
     }
   }
 
-  function updateFilePickerQuery(value: string) {
+  async function updateFilePickerQuery(value: string) {
     filePickerDialog.query = value
+    const query = value.trim()
+
+    if (!query) {
+      filePickerDialog.groups = {
+        canvases: [],
+        documents: [],
+        images: [],
+      }
+      return
+    }
+
+    filePickerDialog.groups = await searchCanvasFilePickerTargets(query, {
+      searchDocuments: async (keyword) => {
+        const documents = await findSiyuanDocumentsByQuery(keyword)
+        return documents.map((document) => ({
+          kind: "document" as const,
+          path: document.path,
+          subtitle: document.hpath || document.path,
+          title: document.title,
+        }))
+      },
+      searchImages: async (keyword) => {
+        const images = await findSiyuanImageAssetsByQuery(keyword)
+        return images.map((image) => ({
+          kind: "image" as const,
+          path: image.path,
+          subtitle: image.path,
+          title: image.title || image.name,
+        }))
+      },
+      searchWorkspaceCanvasFiles: async (keyword) => {
+        const normalizedQuery = keyword.trim().toLowerCase()
+        return workspaceDocuments.value
+          .filter((document) => {
+            if (!normalizedQuery) {
+              return true
+            }
+
+            return document.title.toLowerCase().includes(normalizedQuery)
+              || document.path.toLowerCase().includes(normalizedQuery)
+          })
+          .map((document) => ({
+            kind: "canvas" as const,
+            path: document.path,
+            subtitle: document.path,
+            title: document.title,
+          }))
+      },
+    })
   }
 
   async function selectFilePickerResult(option: CanvasFilePickerOption) {
@@ -773,11 +834,11 @@ export function useCanvasEditor(
         return
       }
 
-      if (resolved.kind === "document" && resolved.document) {
+      if (resolved.kind === "document") {
         void openTab({
           app: plugin.app,
           doc: {
-            id: resolved.document.id,
+            id: resolved.id,
           },
           keepCursor: true,
           openNewTab: true,
@@ -785,11 +846,11 @@ export function useCanvasEditor(
         return
       }
 
-      if (resolved.kind === "asset" && resolved.asset) {
+      if (resolved.kind === "image") {
         void openTab({
           app: plugin.app,
           asset: {
-            path: resolved.asset.openPath,
+            path: resolved.openPath,
           },
           keepCursor: true,
           openNewTab: true,
@@ -797,7 +858,7 @@ export function useCanvasEditor(
         return
       }
 
-      showMessage(resolved.description || node.file, 2500, "info")
+      showMessage(resolved.detail || node.file, 2500, "info")
       return
     }
 
@@ -947,7 +1008,6 @@ export function useCanvasEditor(
       exportCanvas,
       fileInputRef,
       finishConnectionDrag,
-      filePickerDialog,
       getEdgeLabelPosition,
       getEdgePath,
       getConnectionDraftPath,

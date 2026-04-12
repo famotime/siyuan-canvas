@@ -45,7 +45,12 @@ const showMessage = vi.fn()
 const confirm = vi.fn()
 const fileNodeLookupMock = {
   findSiyuanAssetByPath: vi.fn(async () => null),
+  findSiyuanDocumentByBlockId: vi.fn(async () => null),
   findSiyuanDocumentByPath: vi.fn(async () => null),
+  findSiyuanDocumentsByQuery: vi.fn(async () => []),
+  findSiyuanImageAssetByBlockId: vi.fn(async () => null),
+  findSiyuanImageAssetsByQuery: vi.fn(async () => []),
+  getSiyuanDocumentMarkdown: vi.fn(async () => ""),
 }
 type DialogAction = "cancel" | "confirm"
 
@@ -440,6 +445,20 @@ beforeEach(() => {
   showMessage.mockReset()
   openTab.mockReset()
   fetchMock.mockClear()
+  fileNodeLookupMock.findSiyuanAssetByPath.mockReset()
+  fileNodeLookupMock.findSiyuanAssetByPath.mockResolvedValue(null)
+  fileNodeLookupMock.findSiyuanDocumentByBlockId.mockReset()
+  fileNodeLookupMock.findSiyuanDocumentByBlockId.mockResolvedValue(null)
+  fileNodeLookupMock.findSiyuanDocumentByPath.mockReset()
+  fileNodeLookupMock.findSiyuanDocumentByPath.mockResolvedValue(null)
+  fileNodeLookupMock.findSiyuanDocumentsByQuery.mockReset()
+  fileNodeLookupMock.findSiyuanDocumentsByQuery.mockResolvedValue([])
+  fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockReset()
+  fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue(null)
+  fileNodeLookupMock.findSiyuanImageAssetsByQuery.mockReset()
+  fileNodeLookupMock.findSiyuanImageAssetsByQuery.mockResolvedValue([])
+  fileNodeLookupMock.getSiyuanDocumentMarkdown.mockReset()
+  fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue("")
   vi.stubGlobal("fetch", fetchMock)
   vi.spyOn(window, "prompt").mockImplementation(() => {
     throw new Error("prompt() is not supported.")
@@ -490,6 +509,48 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
+  it("updates file picker result groups from the query", async () => {
+    fileNodeLookupMock.findSiyuanDocumentsByQuery.mockResolvedValueOnce([{
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      title: "Roadmap",
+    }])
+    fileNodeLookupMock.findSiyuanImageAssetsByQuery.mockResolvedValueOnce([{
+      name: "road.png",
+      openPath: "/data/assets/road.png",
+      path: "assets/road.png",
+      title: "road.png",
+    }])
+    workspaceDirectoryEntries.push({ isDir: false, isSymlink: false, name: "road.canvas" })
+
+    const { editor, wrapper } = await mountEditor()
+
+    await editor.updateFilePickerQuery("road")
+    await flushEditor()
+
+    expect(editor.filePickerDialog.groups.documents).toEqual([{
+      kind: "document",
+      path: "/data/roadmap.sy",
+      subtitle: "/Projects/Roadmap",
+      title: "Roadmap",
+    }])
+    expect(editor.filePickerDialog.groups.images).toEqual([{
+      kind: "image",
+      path: "assets/road.png",
+      subtitle: "assets/road.png",
+      title: "road.png",
+    }])
+    expect(editor.filePickerDialog.groups.canvases).toEqual([{
+      kind: "canvas",
+      path: "/data/storage/siyuan-canvas/road.canvas",
+      subtitle: "/data/storage/siyuan-canvas/road.canvas",
+      title: "road.canvas",
+    }])
+
+    wrapper.unmount()
+  })
+
   it("creates a document file node from picker selection and selects it", async () => {
     const { editor, wrapper } = await mountEditor()
 
@@ -511,6 +572,55 @@ describe("useCanvasEditor file lifecycle flows", () => {
     })
     expect(editor.selectedNode?.id).toBe(editor.state.document.nodes[0]?.id)
     expect(editor.filePickerDialog.visible).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it("renders a real markdown preview for a resolved document file node", async () => {
+    fileNodeLookupMock.findSiyuanDocumentByPath.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      title: "Roadmap",
+    })
+    fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue("# Roadmap\n\nPreview body")
+
+    const { editor, wrapper } = await mountEditor()
+
+    await editor.selectFilePickerResult({
+      kind: "document",
+      path: "/data/roadmap.sy",
+      subtitle: "/Projects/Roadmap",
+      title: "Roadmap",
+    })
+    await flushEditor()
+
+    const preview = editor.getFileNodePreview(editor.selectedNode)
+    expect(preview.kind).toBe("document")
+    expect(preview.previewHtml).toContain("<h1>Roadmap</h1>")
+
+    wrapper.unmount()
+  })
+
+  it("resolves a copied image block id into an image preview", async () => {
+    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
+      blockId: "20260412094047-ihhbskn",
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Diagram",
+    })
+
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", "20260412094047-ihhbskn")
+    await flushEditor()
+
+    const preview = editor.getFileNodePreview(editor.selectedNode)
+    expect(preview.kind).toBe("image")
+    expect(preview.imageSrc).toBe("/data/assets/diagram.png")
 
     wrapper.unmount()
   })
