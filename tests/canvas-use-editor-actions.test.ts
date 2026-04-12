@@ -489,6 +489,70 @@ describe("useCanvasEditor file lifecycle flows", () => {
     await flushEditor()
 
     expect(editor.createEdgeDialog.visible).toBe(true)
+    expect(editor.newEdgeSourceId).toBe(editor.state.selectedNodeId)
+
+    wrapper.unmount()
+  })
+
+  it("filters create-edge source and target node options by keyword and excludes self-connections", async () => {
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("text")
+    await flushEditor()
+    const firstNodeId = editor.state.selectedNodeId
+    editor.updateTextNodeContent(firstNodeId, "Alpha source")
+    await flushEditor()
+
+    editor.addNode("text")
+    await flushEditor()
+    const secondNodeId = editor.state.selectedNodeId
+    editor.updateTextNodeContent(secondNodeId, "Beta target")
+    await flushEditor()
+
+    editor.selectNode(firstNodeId)
+    await flushEditor()
+    editor.openCreateEdgeDialog()
+    await flushEditor()
+
+    expect(editor.newEdgeSourceId).toBe(firstNodeId)
+    expect(editor.edgeTargets.map((node: any) => node.id)).toEqual([secondNodeId])
+
+    editor.newEdgeSourceQuery = "beta"
+    await flushEditor()
+
+    expect(editor.edgeSources.map((node: any) => node.id)).toEqual([secondNodeId])
+
+    editor.newEdgeTargetQuery = "beta"
+    await flushEditor()
+
+    expect(editor.edgeTargets.map((node: any) => node.id)).toEqual([secondNodeId])
+
+    editor.newEdgeTargetQuery = "alpha"
+    await flushEditor()
+
+    expect(editor.edgeTargets).toEqual([])
+
+    wrapper.unmount()
+  })
+
+  it("blocks create-edge submission when source and target point to the same node", async () => {
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("text")
+    await flushEditor()
+
+    const nodeId = editor.state.selectedNodeId
+    editor.openCreateEdgeDialog()
+    await flushEditor()
+
+    editor.newEdgeSourceId = nodeId
+    editor.newEdgeTargetId = nodeId
+    editor.submitCreateEdgeDialog()
+    await flushEditor()
+
+    expect(editor.state.document.edges).toEqual([])
+    expect(showMessage).toHaveBeenCalled()
+    expect(editor.createEdgeDialog.visible).toBe(true)
 
     wrapper.unmount()
   })

@@ -91,6 +91,7 @@ function createEditorMock(node = createTextNode()) {
     deleteSelection: vi.fn(),
     displayNodes: [node],
     edgeTargets: [],
+    edgeSources: [node],
     exportCanvas: vi.fn(),
     fileInputRef: ref<HTMLInputElement>(),
     getConnectionDraftPath: vi.fn(() => ""),
@@ -109,7 +110,7 @@ function createEditorMock(node = createTextNode()) {
       top: "0px",
       width: "320px",
     })),
-    getNodeTitle: vi.fn(() => "Text"),
+    getNodeTitle: vi.fn((candidate: any) => candidate.text || candidate.label || candidate.url || candidate.id || "Text"),
     getRenderedMarkdown: vi.fn((text: string) => `<p>${text}</p>`),
     handleNodePointerDown: vi.fn(),
     handleWheelZoom: vi.fn(),
@@ -128,7 +129,10 @@ function createEditorMock(node = createTextNode()) {
     newCanvas: vi.fn(),
     newEdgeFromSide: "right",
     newEdgeLabel: "",
+    newEdgeSourceId: node.id,
+    newEdgeSourceQuery: "",
     newEdgeTargetId: "",
+    newEdgeTargetQuery: "",
     newEdgeToSide: "left",
     openCreateEdgeDialog: vi.fn(),
     openRecentFile: vi.fn(),
@@ -188,6 +192,8 @@ function createEditorMock(node = createTextNode()) {
     },
     suggestedFilename: "Untitled.canvas",
     submitCreateEdgeDialog: vi.fn(),
+    setNewEdgeSourceId: vi.fn(),
+    setNewEdgeTargetId: vi.fn(),
     toggleInspector: vi.fn(),
     toggleInspectorSection: vi.fn(),
     toggleSelectionPopover: vi.fn(),
@@ -404,6 +410,14 @@ describe("CanvasWorkspace", () => {
   it("renders the create-edge dialog when requested", () => {
     currentEditor = createEditorMock()
     currentEditor.createEdgeDialog.visible = true
+    const sourceNode = createTextNode({ id: "source-1", text: "#### 为说而听" })
+    const targetNode = createTextNode({ id: "target-1", text: "关系——情况这么复杂，任务这么困难，我们应该如何应对？" })
+    currentEditor.state.document.nodes = [sourceNode, targetNode]
+    currentEditor.displayNodes = [sourceNode, targetNode]
+    currentEditor.edgeSources = [sourceNode]
+    currentEditor.edgeTargets = [targetNode]
+    currentEditor.newEdgeSourceId = "source-1"
+    currentEditor.newEdgeTargetId = "target-1"
 
     const wrapper = mount(CanvasWorkspace, {
       props: {
@@ -414,6 +428,37 @@ describe("CanvasWorkspace", () => {
     })
 
     expect(wrapper.find("[data-testid='create-edge-dialog']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='create-edge-source-trigger']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='create-edge-target-trigger']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='create-edge-source-query']").exists()).toBe(false)
+    expect(wrapper.find("[data-testid='create-edge-target-query']").exists()).toBe(false)
+    expect(wrapper.find("[data-testid='create-edge-source-trigger']").text()).toContain("#### 为说而听")
+    expect(wrapper.find("[data-testid='create-edge-target-trigger']").text()).toContain("关系——情况这么复杂")
+  })
+
+  it("opens the embedded source search field inside the dropdown panel", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.createEdgeDialog.visible = true
+    const firstSource = createTextNode({ id: "source-1", text: "#### 为说而听" })
+    const secondSource = createTextNode({ id: "source-2", text: "Another node" })
+    currentEditor.state.document.nodes = [firstSource, secondSource]
+    currentEditor.displayNodes = [firstSource, secondSource]
+    currentEditor.edgeSources = [firstSource, secondSource]
+    currentEditor.newEdgeSourceId = "source-1"
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='create-edge-source-trigger']").trigger("click")
+
+    expect(wrapper.find("[data-testid='create-edge-source-query']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='create-edge-source-options']").exists()).toBe(true)
+    expect(wrapper.findAll("[data-testid='create-edge-source-option']")).toHaveLength(2)
   })
 
   it("hides a collapsed inspector section body and wires the section toggle", async () => {

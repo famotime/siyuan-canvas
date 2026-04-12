@@ -138,7 +138,10 @@ export function useCanvasEditor(
   })
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
+  const newEdgeSourceId = ref("")
+  const newEdgeSourceQuery = ref("")
   const newEdgeTargetId = ref("")
+  const newEdgeTargetQuery = ref("")
   const newEdgeToSide = ref<CanvasSide>("left")
   const inspectorExpanded = ref(true)
 
@@ -161,8 +164,17 @@ export function useCanvasEditor(
   const selectionBounds = computed<CanvasBounds | null>(() =>
     getCanvasSelectionBounds(state.document, state.selectedNodeIds),
   )
+  const edgeSourceNode = computed(
+    () => state.document.nodes.find((node) => node.id === newEdgeSourceId.value) || null,
+  )
   const edgeTargets = computed(() =>
-    state.document.nodes.filter((node) => node.id !== state.selectedNodeId),
+    filterEdgeNodeOptions(
+      state.document.nodes.filter((node) => node.id !== newEdgeSourceId.value),
+      newEdgeTargetQuery.value,
+    ),
+  )
+  const edgeSources = computed(() =>
+    filterEdgeNodeOptions(state.document.nodes, newEdgeSourceQuery.value),
   )
   const board = computed(() => createCanvasBoardMetrics(state.document.nodes))
   const canDelete = computed(() => Boolean(state.selectedNodeIds.length || selectedEdge.value))
@@ -218,6 +230,18 @@ export function useCanvasEditor(
 
   function getPluginSettings(): CanvasPluginSettings {
     return plugin.getCanvasSettings?.() ?? createDefaultCanvasPluginSettings()
+  }
+
+  function filterEdgeNodeOptions(nodes: CanvasNode[], query: string) {
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery) {
+      return nodes
+    }
+
+    return nodes.filter((node) => {
+      const title = getNodeTitle(node).toLowerCase()
+      return title.includes(normalizedQuery) || node.id.toLowerCase().includes(normalizedQuery)
+    })
   }
 
   function refreshRecentFiles() {
@@ -357,6 +381,34 @@ export function useCanvasEditor(
 
   function closeSelectionPopover() {
     selectionToolbarPopover.value = "closed"
+  }
+
+  function setNewEdgeSourceId(nodeId: string) {
+    newEdgeSourceId.value = nodeId
+
+    if (newEdgeTargetId.value === nodeId) {
+      newEdgeTargetId.value = ""
+    }
+  }
+
+  function setNewEdgeTargetId(nodeId: string) {
+    newEdgeTargetId.value = nodeId
+  }
+
+  function resetEdgeNodeQueries() {
+    newEdgeSourceQuery.value = ""
+    newEdgeTargetQuery.value = ""
+  }
+
+  function applySelectedNodeAsEdgeSource() {
+    if (state.selectedNodeIds.length === 1 && selectedNode.value) {
+      setNewEdgeSourceId(selectedNode.value.id)
+      resetEdgeNodeQueries()
+      return
+    }
+
+    newEdgeSourceId.value = ""
+    resetEdgeNodeQueries()
   }
 
   function setSelectionToolbarSize(size: { height: number, width: number }) {
@@ -580,12 +632,17 @@ export function useCanvasEditor(
   }
 
   function createEdgeFromSelection() {
-    if (!selectedNode.value || !newEdgeTargetId.value) {
+    if (!newEdgeSourceId.value || !newEdgeTargetId.value) {
       showMessage(t("messageSelectTargetNodeFirst"), 2500, "error")
       return
     }
 
-    const edge = createCanvasEdge(selectedNode.value.id, newEdgeTargetId.value)
+    if (newEdgeSourceId.value === newEdgeTargetId.value) {
+      showMessage(t("messageCannotConnectNodeToSelf"), 2500, "error")
+      return
+    }
+
+    const edge = createCanvasEdge(newEdgeSourceId.value, newEdgeTargetId.value)
     edge.label = newEdgeLabel.value || undefined
     edge.fromSide = newEdgeFromSide.value
     edge.toSide = newEdgeToSide.value
@@ -593,6 +650,7 @@ export function useCanvasEditor(
     state.selectEdge(edge.id)
     newEdgeLabel.value = ""
     newEdgeTargetId.value = ""
+    resetEdgeNodeQueries()
   }
 
   function openCreateEdgeDialog() {
@@ -601,6 +659,7 @@ export function useCanvasEditor(
       return
     }
 
+    applySelectedNodeAsEdgeSource()
     activateCanvasSurface()
     createEdgeDialog.visible = true
   }
@@ -799,6 +858,7 @@ export function useCanvasEditor(
   watch(
     () => `${state.selectedEdgeId}|${state.selectedNodeIds.join(",")}`,
     () => {
+      applySelectedNodeAsEdgeSource()
       closeSelectionPopover()
       clearSelectionBox()
     },
@@ -820,6 +880,7 @@ export function useCanvasEditor(
       displayNodes,
       deactivateCanvasSurface,
       connectionDraft,
+      edgeSources,
       edgeTargets,
       exportCanvas,
       fileInputRef,
@@ -838,7 +899,10 @@ export function useCanvasEditor(
       newCanvas,
       newEdgeFromSide,
       newEdgeLabel,
+      newEdgeSourceId,
+      newEdgeSourceQuery,
       newEdgeTargetId,
+      newEdgeTargetQuery,
       newEdgeToSide,
       openCreateEdgeDialog,
       openPath,
@@ -861,6 +925,8 @@ export function useCanvasEditor(
       state,
       submitCreateEdgeDialog,
       suggestedFilename,
+      setNewEdgeSourceId,
+      setNewEdgeTargetId,
       triggerImport,
       toggleInspectorSection,
       updateTextNodeContent,
