@@ -1,33 +1,107 @@
 import type { Ref } from "vue"
 import type { CanvasEditorState } from "@/canvas/editor-state"
-import type { CanvasPluginSettings } from "@/canvas/plugin-data"
 import type {
+  CanvasPluginSettings,
+  CanvasRecentFile,
+  CanvasRecentFileSource,
+} from "@/canvas/plugin-data"
+import type {
+  CanvasEditorFileSource,
   CanvasI18nTranslator,
   CanvasPluginBridge,
 } from "@/canvas/use-canvas-editor-shared"
 
-import { showMessage } from "siyuan"
+import {
+  showMessage,
+} from "siyuan"
+import { openConfirmDialog } from "@/canvas/confirm-dialog"
 import { createEmptyCanvasDocument } from "@/canvas/document"
-import { parseCanvasDocument } from "@/canvas/format"
+import {
+  parseCanvasDocument,
+  stringifyCanvasDocument,
+} from "@/canvas/format"
+import {
+  getSelectedLocalPath,
+  localPathExists,
+  readLocalFileText,
+  writeLocalFileText,
+} from "@/canvas/local-file-system"
+import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 
 interface CanvasEditorFileActionOptions {
   fileInputRef: Ref<HTMLInputElement | undefined>
+  fileSource: Ref<CanvasEditorFileSource>
   getPluginSettings: () => CanvasPluginSettings
   plugin: CanvasPluginBridge
   refreshRecentFiles: () => void
+  refreshWorkspaceDocuments: () => Promise<void>
   resetViewport: () => void
   state: CanvasEditorState
   suggestedFilename: Ref<string>
   t: CanvasI18nTranslator
 }
 
+interface ResolvedSaveTarget {
+  path: string
+  sourceType: CanvasRecentFileSource
+}
+
+function normalizeWorkspaceCanvasPath(input: string, baseDirectory: string): string {
+  const trimmed = input.trim()
+  if (!trimmed) {
+    return ""
+  }
+
+  const normalized = trimmed.endsWith(".canvas") ? trimmed : `${trimmed}.canvas`
+  return normalized.startsWith("/") ? normalized : `${baseDirectory}/${normalized}`
+}
+
+function normalizeLocalCanvasPath(input: string, currentPath: string): string {
+  const trimmed = input.trim()
+  if (!trimmed) {
+    return ""
+  }
+
+  const normalized = trimmed.endsWith(".canvas") ? trimmed : `${trimmed}.canvas`
+  if (
+    normalized.includes("/")
+    || normalized.includes("\\")
+    || /^[a-z]:/i.test(normalized)
+    || normalized.startsWith("\\\\")
+    || !currentPath
+  ) {
+    return normalized
+  }
+
+  const slashIndex = Math.max(currentPath.lastIndexOf("/"), currentPath.lastIndexOf("\\"))
+  if (slashIndex < 0) {
+    return normalized
+  }
+
+  return `${currentPath.slice(0, slashIndex + 1)}${normalized}`
+}
+
+async function workspacePathExists(path: string): Promise<boolean> {
+  const response = await fetch("/api/file/getFile", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ path }),
+  })
+
+  return response.status === 200
+}
+
 export function createCanvasEditorFileActions(options: CanvasEditorFileActionOptions) {
   const {
     fileInputRef,
+    fileSource,
     getPluginSettings,
     plugin,
     refreshRecentFiles,
+    refreshWorkspaceDocuments,
     resetViewport,
     state,
     suggestedFilename,
@@ -35,46 +109,71 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
   } = options
 
   function ensureCanvasPath(input: string): string {
-    const trimmed = input.trim()
-    if (!trimmed) {
-      return ""
-    }
-
-    const normalized = trimmed.endsWith(".canvas") ? trimmed : `${trimmed}.canvas`
-    const baseDirectory = getPluginSettings().defaultCanvasDirectory
-    return normalized.startsWith("/") ? normalized : `${baseDirectory}/${normalized}`
+    return normalizeWorkspaceCanvasPath(input, getPluginSettings().defaultCanvasDirectory)
   }
 
-  async function rememberRecentPath(path: string) {
-    await plugin.rememberRecentCanvas?.(path, getCanvasFileName(path))
+  async function rememberRecentPath(path: string, sourceType: CanvasRecentFileSource) {
+    await plugin.rememberRecentCanvas?.(path, getCanvasFileName(path), sourceType)
     refreshRecentFiles()
   }
 
   function newCanvas() {
     state.replaceDocument(createEmptyCanvasDocument(), "")
     suggestedFilename.value = t("untitledCanvas")
+    fileSource.value = "unsaved"
     resetViewport()
   }
 
+  async function openWorkspacePath(path: string) {
+    try {
+      await state.open(path)
+      suggestedFilename.value = getCanvasFileName(path)
+      fileSource.value = "workspace"
+      await rememberRecentPath(path, "workspace")
+      resetViewport()
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : t("messageUnableOpenCanvasFile"), 4000, "error")
+    }
+  }
+
+  async function openLocalPath(path: string, fallbackTitle?: string) {
+    try {
+      const raw = await readLocalFileText(path)
+      const parsed = parseCanvasDocument(raw)
+      if (!parsed.document) {
+        showMessage(parsed.errors[0]?.message || t("messageInvalidCanvasFile"), 4000, "error")
+        return
+      }
+
+      suggestedFilename.value = fallbackTitle || getCanvasFileName(path)
+      state.replaceDocument(parsed.document, path, { raw })
+      state.issues = {
+        errors: parsed.errors,
+        warnings: parsed.warnings,
+      }
+      fileSource.value = "local"
+      await rememberRecentPath(path, "local")
+      resetViewport()
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : t("messageUnableOpenLocalCanvasFile"), 4000, "error")
+    }
+  }
+
   async function openPath() {
-    // eslint-disable-next-line no-alert
-    const input = window.prompt(
-      t("promptWorkspacePath"),
-      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/${t("untitledCanvas")}`,
-    )
+    const input = await openTextInputDialog({
+      cancelLabel: t("dialogCancel"),
+      confirmLabel: t("dialogConfirm"),
+      initialValue: state.filePath && fileSource.value === "workspace"
+        ? state.filePath
+        : `${getPluginSettings().defaultCanvasDirectory}/${t("untitledCanvas")}`,
+      title: t("promptWorkspacePath"),
+    })
     const path = ensureCanvasPath(input || "")
     if (!path) {
       return
     }
 
-    try {
-      await state.open(path)
-      suggestedFilename.value = getCanvasFileName(path)
-      await rememberRecentPath(path)
-      resetViewport()
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : t("messageUnableOpenCanvasFile"), 4000, "error")
-    }
+    await openWorkspacePath(path)
   }
 
   function triggerImport() {
@@ -89,52 +188,156 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
       return
     }
 
-    suggestedFilename.value = file.name
-    state.replaceDocument(parsed.document, "")
+    const localPath = getSelectedLocalPath(file)
+    const title = file.name || getCanvasFileName(localPath)
+    suggestedFilename.value = title
+    state.replaceDocument(parsed.document, localPath, { raw })
     state.issues = {
       errors: parsed.errors,
       warnings: parsed.warnings,
     }
+    fileSource.value = localPath ? "local" : "unsaved"
+
+    if (localPath) {
+      await rememberRecentPath(localPath, "local")
+    }
+
     resetViewport()
   }
 
-  async function save() {
-    // eslint-disable-next-line no-alert
-    const input = window.prompt(
-      t("promptWorkspaceSavePath"),
-      state.filePath || `${getPluginSettings().defaultCanvasDirectory}/${suggestedFilename.value || t("untitledCanvas")}`,
-    )
-    const path = ensureCanvasPath(input || "")
+  function getDefaultSaveTarget(): ResolvedSaveTarget {
+    if (fileSource.value === "local" && state.filePath) {
+      return {
+        path: state.filePath,
+        sourceType: "local",
+      }
+    }
+
+    return {
+      path: state.filePath && fileSource.value === "workspace"
+        ? state.filePath
+        : `${getPluginSettings().defaultCanvasDirectory}/${suggestedFilename.value || t("untitledCanvas")}`,
+      sourceType: "workspace",
+    }
+  }
+
+  function normalizeSaveTarget(input: string): ResolvedSaveTarget | null {
+    const defaults = getDefaultSaveTarget()
+    const path = defaults.sourceType === "local"
+      ? normalizeLocalCanvasPath(input, state.filePath)
+      : normalizeWorkspaceCanvasPath(input, getPluginSettings().defaultCanvasDirectory)
+
     if (!path) {
+      return null
+    }
+
+    return {
+      path,
+      sourceType: defaults.sourceType,
+    }
+  }
+
+  async function resolveSaveTarget(): Promise<ResolvedSaveTarget | null> {
+    let candidate = getDefaultSaveTarget().path
+
+    while (true) {
+      const input = await openTextInputDialog({
+        cancelLabel: t("dialogCancel"),
+        confirmLabel: t("dialogSave"),
+        initialValue: candidate,
+        title: t("promptCanvasSavePath"),
+      })
+      const target = normalizeSaveTarget(input || "")
+      if (!target) {
+        return null
+      }
+
+      const isCurrentPath = target.path === state.filePath && target.sourceType === fileSource.value
+      const exists = target.sourceType === "local"
+        ? await localPathExists(target.path)
+        : await workspacePathExists(target.path)
+
+      if (exists && !isCurrentPath) {
+        const overwrite = await openConfirmDialog(
+          t("confirmOverwriteCanvasTitle"),
+          t("confirmOverwriteCanvasDescription", { path: target.path }),
+        )
+        if (!overwrite) {
+          candidate = target.path
+          continue
+        }
+      }
+
+      return target
+    }
+  }
+
+  async function saveLocal(path: string) {
+    const raw = stringifyCanvasDocument(state.document)
+    await writeLocalFileText(path, raw)
+    state.filePath = path
+    state.isDirty = false
+    state.lastSavedRaw = raw
+    state.conflict = null
+    suggestedFilename.value = getCanvasFileName(path)
+    fileSource.value = "local"
+    await rememberRecentPath(path, "local")
+    showMessage(t("messageCanvasSaved"), 2500, "info")
+  }
+
+  async function saveWorkspace(path: string) {
+    await state.save(path, {
+      detectExternalChanges: getPluginSettings().detectExternalChanges,
+    })
+    suggestedFilename.value = getCanvasFileName(path)
+    fileSource.value = "workspace"
+    await rememberRecentPath(path, "workspace")
+    await refreshWorkspaceDocuments()
+    showMessage(t("messageCanvasSaved"), 2500, "info")
+  }
+
+  async function save() {
+    const target = await resolveSaveTarget()
+    if (!target) {
       return
     }
 
     try {
-      await state.save(path, {
-        detectExternalChanges: getPluginSettings().detectExternalChanges,
-      })
-      suggestedFilename.value = getCanvasFileName(path)
-      await rememberRecentPath(path)
-      showMessage(t("messageCanvasSavedToWorkspace"), 2500, "info")
+      if (target.sourceType === "local") {
+        await saveLocal(target.path)
+        return
+      }
+
+      await saveWorkspace(target.path)
     } catch (error) {
       if (state.conflict) {
         showMessage(t("messageCanvasFileChangedOnDisk"), 5000, "error")
         return
       }
 
-      showMessage(error instanceof Error ? error.message : t("messageUnableSaveCanvas"), 4000, "error")
+      showMessage(
+        error instanceof Error
+          ? error.message
+          : target.sourceType === "local"
+            ? t("messageUnableSaveLocalCanvasFile")
+            : t("messageUnableSaveCanvas"),
+        4000,
+        "error",
+      )
     }
   }
 
-  async function openRecentPath(path: string) {
-    try {
-      await state.open(path)
-      suggestedFilename.value = getCanvasFileName(path)
-      await rememberRecentPath(path)
-      resetViewport()
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : t("messageUnableOpenRecentCanvasFile"), 4000, "error")
+  async function openRecentFile(recent: CanvasRecentFile) {
+    if (recent.sourceType === "local") {
+      await openLocalPath(recent.path, recent.title)
+      return
     }
+
+    await openWorkspacePath(recent.path)
+  }
+
+  async function openRecentPath(path: string) {
+    await openWorkspacePath(path)
   }
 
   async function overwriteConflictVersion() {
@@ -147,7 +350,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
         detectExternalChanges: getPluginSettings().detectExternalChanges,
         force: true,
       })
-      await rememberRecentPath(state.filePath)
+      await rememberRecentPath(state.filePath, "workspace")
       showMessage(t("messageCanvasSavedByOverwritingDiskVersion"), 2500, "info")
     } catch (error) {
       showMessage(error instanceof Error ? error.message : t("messageUnableOverwriteDiskVersion"), 4000, "error")
@@ -158,6 +361,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     const conflictPath = state.conflict?.path || state.filePath
     state.loadConflictVersion()
     suggestedFilename.value = getCanvasFileName(conflictPath)
+    fileSource.value = "workspace"
     showMessage(t("messageLoadedNewerCanvasVersionFromDisk"), 2500, "info")
   }
 
@@ -172,7 +376,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url
-    anchor.download = suggestedFilename.value || state.filePath.split("/").pop() || "canvas-export.canvas"
+    anchor.download = suggestedFilename.value || getCanvasFileName(state.filePath) || "canvas-export.canvas"
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -184,8 +388,10 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     loadConflictVersion,
     newCanvas,
     openPath,
+    openRecentFile,
     openRecentPath,
     openSettings,
+    openWorkspacePath,
     overwriteConflictVersion,
     rememberRecentPath,
     save,

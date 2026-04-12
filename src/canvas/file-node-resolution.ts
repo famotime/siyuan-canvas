@@ -27,7 +27,8 @@ export interface ResolvedCanvasFileNode {
 }
 
 function getFileName(path: string): string {
-  return path.split("/").pop() || path
+  const parts = path.split(/[\\/]/)
+  return parts[parts.length - 1] || path
 }
 
 export function createFallbackCanvasFileNode(path: string): ResolvedCanvasFileNode {

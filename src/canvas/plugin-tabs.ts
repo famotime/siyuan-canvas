@@ -7,6 +7,7 @@ import type { CanvasTabBootstrap } from "@/main"
 import {
   openTab,
 } from "siyuan"
+import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 import {
   mountCanvasApp,
   unmountCanvasApp,
@@ -20,7 +21,7 @@ export async function openCanvasEditorTab(
   bootstrap: CanvasTabBootstrap,
   untitledTitle: string,
 ): Promise<void> {
-  const title = bootstrap.title || bootstrap.path?.split("/").pop() || untitledTitle
+  const title = bootstrap.title || (bootstrap.path ? getCanvasFileName(bootstrap.path) : "") || untitledTitle
   await openTab({
     app: plugin.app,
     custom: {
