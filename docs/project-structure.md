@@ -35,6 +35,14 @@
   Normalizes file-node lookup results into canvas-specific `file/document/asset/canvas` metadata.
 - `src/canvas/file-node-preview.ts`
   Converts resolved file-node metadata into preview card labels and image hints.
+- `src/canvas/file-target-resolution.ts`
+  Normalizes file-node input from paths and block IDs into document, canvas, image, or fallback targets.
+- `src/canvas/file-target-preview.ts`
+  Builds rich preview payloads for document excerpts, canvas thumbnails, and image cards.
+- `src/canvas/file-picker-dialog.ts`
+  Groups picker-search results for the bottom-toolbar file action.
+- `src/canvas/workspace-image-files.ts`
+  Derives sibling asset directories and writes pasted workspace image files.
 - `src/canvas/plugin-data.ts`
   Plugin settings and recent-file normalization helpers.
 - `src/canvas/plugin-runtime.ts`
