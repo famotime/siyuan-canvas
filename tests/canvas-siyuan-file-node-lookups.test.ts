@@ -8,6 +8,7 @@ import {
 import {
   createAssetPathCandidates,
   createDocumentPathCandidates,
+  resolveImageAssetByBlockId,
   resolveSiyuanAssetByPath,
   resolveSiyuanDocumentByPath,
 } from "@/canvas/siyuan-file-node-lookups"
@@ -80,6 +81,25 @@ describe("siyuan file node lookups", () => {
     expect(queryRows).toHaveBeenNthCalledWith(1, expect.stringContaining("path = '/data/assets/diagram.png'"))
     expect(queryRows).toHaveBeenNthCalledWith(2, expect.stringContaining("path = 'assets/diagram.png'"))
     expect(result).toEqual({
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Architecture Diagram",
+    })
+  })
+
+  it("resolves image assets by the copied block id", async () => {
+    const queryRows = vi.fn(async () => [{
+      block_id: "20260412094047-ihhbskn",
+      name: "diagram.png",
+      path: "assets/diagram.png",
+      title: "Architecture Diagram",
+    }])
+
+    const result = await resolveImageAssetByBlockId("20260412094047-ihhbskn", queryRows)
+
+    expect(result).toEqual({
+      blockId: "20260412094047-ihhbskn",
       name: "diagram.png",
       openPath: "/data/assets/diagram.png",
       path: "assets/diagram.png",

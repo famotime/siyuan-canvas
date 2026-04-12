@@ -4,6 +4,7 @@ import {
 } from "siyuan"
 
 import {
+  resolveImageAssetByBlockId,
   resolveSiyuanAssetByPath,
   resolveSiyuanDocumentByPath,
   type SiyuanResolvedAsset,
@@ -24,6 +25,10 @@ export async function findSiyuanDocumentByPath(path: string): Promise<SiyuanReso
 
 export async function findSiyuanAssetByPath(path: string): Promise<SiyuanResolvedAsset | null> {
   return resolveSiyuanAssetByPath(path, querySiyuanSql)
+}
+
+export async function findSiyuanImageAssetByBlockId(blockId: string): Promise<SiyuanResolvedAsset | null> {
+  return resolveImageAssetByBlockId(blockId, querySiyuanSql)
 }
 
 export type {

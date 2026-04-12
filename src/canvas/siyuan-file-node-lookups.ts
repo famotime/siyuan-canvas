@@ -6,6 +6,7 @@ export interface SiyuanResolvedDocument {
 }
 
 export interface SiyuanResolvedAsset {
+  blockId?: string
   name: string
   openPath: string
   path: string
@@ -120,4 +121,29 @@ export async function resolveSiyuanAssetByPath(
   }
 
   return null
+}
+
+export async function resolveImageAssetByBlockId(
+  blockId: string,
+  queryRows: QueryRows,
+): Promise<SiyuanResolvedAsset | null> {
+  const rows = await queryRows(
+    `SELECT block_id, path, name, title
+     FROM assets
+     WHERE block_id = '${escapeSqlString(blockId)}'
+     LIMIT 1`,
+  )
+  const row = rows[0]
+  if (!row) {
+    return null
+  }
+
+  const assetPath = row.path as string
+  return {
+    blockId: row.block_id as string,
+    name: row.name || getFileName(assetPath),
+    openPath: assetPath.startsWith("/data/") ? assetPath : `/data/${assetPath.replace(/^\//, "")}`,
+    path: assetPath,
+    title: row.title || undefined,
+  }
 }
