@@ -185,6 +185,11 @@
                   <div class="canvas-node__meta">
                     {{ editor.getFileNodePreview(node).detail }}
                   </div>
+                  <div
+                    v-if="editor.getFileNodePreview(node).kind === 'document' && editor.getFileNodePreview(node).previewHtml"
+                    class="file-card__document-preview markdown-preview"
+                    v-html="editor.getFileNodePreview(node).previewHtml"
+                  />
                   <div class="file-card__helper">
                     {{ editor.getFileNodePreview(node).helper }}
                   </div>
@@ -275,7 +280,7 @@
             :aria-label="t('bottomToolbarFile')"
             :title="t('bottomToolbarFile')"
             type="button"
-            @click.stop="editor.addNode('file')"
+            @click.stop="editor.openFilePickerDialog"
           >
             <SelectionToolbarIcon
               class="bottom-toolbar__icon"
@@ -471,6 +476,39 @@
               </div>
             </div>
           </template>
+        </div>
+
+        <div
+          v-if="editor.filePickerDialog.visible"
+          class="canvas-dialog-backdrop"
+          data-testid="file-picker-dialog"
+          @click.self="editor.closeFilePickerDialog"
+        >
+          <div class="canvas-dialog">
+            <div class="canvas-dialog__header">
+              <h2>{{ t("filePickerDialogTitle") }}</h2>
+            </div>
+            <label class="canvas-dialog__field">
+              <span>{{ t("filePickerSearchLabel") }}</span>
+              <input
+                :value="editor.filePickerDialog.query"
+                class="canvas-dialog__control"
+                @input="editor.updateFilePickerQuery(valueFromEvent($event))"
+              >
+            </label>
+            <div class="canvas-node-picker__options">
+              <button
+                v-for="result in editor.filePickerDialog.groups.documents"
+                :key="`file-picker-document-${result.path}`"
+                class="canvas-node-picker__option"
+                type="button"
+                @click="editor.selectFilePickerResult(result)"
+              >
+                <strong>{{ result.title }}</strong>
+                <span>{{ result.subtitle }}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 

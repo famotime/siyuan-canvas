@@ -688,6 +688,22 @@ export function useCanvasEditor(
     }
   }
 
+  function updateFilePickerQuery(value: string) {
+    filePickerDialog.query = value
+  }
+
+  async function selectFilePickerResult(option: CanvasFilePickerOption) {
+    const node = createCanvasNode("file")
+    node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
+    node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
+    node.file = option.path
+
+    commitDocument(upsertCanvasNode(state.document, node))
+    state.selectNode(node.id)
+    closeFilePickerDialog()
+    await refreshFileNodeMetadata()
+  }
+
   function closeCreateEdgeDialog() {
     createEdgeDialog.visible = false
   }
@@ -910,6 +926,7 @@ export function useCanvasEditor(
       exportCanvas,
       fileInputRef,
       finishConnectionDrag,
+      filePickerDialog,
       getEdgeLabelPosition,
       getEdgePath,
       getConnectionDraftPath,
@@ -936,6 +953,7 @@ export function useCanvasEditor(
       resetViewport,
       save,
       closeFilePickerDialog,
+      selectFilePickerResult,
       selectEdge,
       selectNode,
       selectedEdge,
@@ -956,6 +974,7 @@ export function useCanvasEditor(
       setNewEdgeTargetId,
       triggerImport,
       toggleInspectorSection,
+      updateFilePickerQuery,
       updateTextNodeContent,
       updateEdgeField,
       updateEdgeSide,

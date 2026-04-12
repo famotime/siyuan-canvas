@@ -76,8 +76,18 @@ function createEditorMock(node = createTextNode()) {
     canDelete: false,
     centerSelectionInViewport: vi.fn(),
     closeCreateEdgeDialog: vi.fn(),
+    closeFilePickerDialog: vi.fn(),
     closeSelectionPopover: vi.fn(),
     createEdgeDialog: {
+      visible: false,
+    },
+    filePickerDialog: {
+      groups: {
+        canvases: [],
+        documents: [],
+        images: [],
+      },
+      query: "",
       visible: false,
     },
     createGroupFromSelection: vi.fn(),
@@ -102,6 +112,7 @@ function createEditorMock(node = createTextNode()) {
       detail: "",
       headline: "",
       helper: "",
+      kind: "file",
       imageSrc: "",
     })),
     getNodeStyle: vi.fn(() => ({
@@ -135,6 +146,7 @@ function createEditorMock(node = createTextNode()) {
     newEdgeTargetQuery: "",
     newEdgeToSide: "left",
     openCreateEdgeDialog: vi.fn(),
+    openFilePickerDialog: vi.fn(),
     openRecentFile: vi.fn(),
     openPath: vi.fn(),
     openRecentPath: vi.fn(),
@@ -198,6 +210,7 @@ function createEditorMock(node = createTextNode()) {
     toggleInspectorSection: vi.fn(),
     toggleSelectionPopover: vi.fn(),
     triggerImport: vi.fn(),
+    updateFilePickerQuery: vi.fn(),
     updateEdgeField: vi.fn(),
     updateEdgeSide: vi.fn(),
     updateNodeField: vi.fn(),
@@ -405,6 +418,58 @@ describe("CanvasWorkspace", () => {
     await wrapper.find("[data-testid='bottom-toolbar-connect']").trigger("click")
 
     expect(currentEditor.openCreateEdgeDialog).toHaveBeenCalledTimes(1)
+  })
+
+  it("opens the file picker from the bottom toolbar file button", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.bottomToolbarVisible = true
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='bottom-toolbar-file']").trigger("click")
+
+    expect(currentEditor.openFilePickerDialog).toHaveBeenCalledTimes(1)
+  })
+
+  it("renders the file picker dialog and rich document preview card", () => {
+    currentEditor = createEditorMock({
+      id: "file-1",
+      file: "/data/roadmap.sy",
+      type: "file",
+    })
+    currentEditor.filePickerDialog.visible = true
+    currentEditor.filePickerDialog.groups.documents = [{
+      kind: "document",
+      path: "/data/roadmap.sy",
+      subtitle: "/Projects/Roadmap",
+      title: "Roadmap",
+    }]
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Document",
+      clampMode: "viewport",
+      detail: "/Projects/Roadmap",
+      headline: "Roadmap",
+      helper: "Opens in SiYuan",
+      kind: "document",
+      previewHtml: "<p>Preview</p>",
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='file-picker-dialog']").exists()).toBe(true)
+    expect(wrapper.find(".file-card__document-preview").html()).toContain("Preview")
   })
 
   it("renders the create-edge dialog when requested", () => {

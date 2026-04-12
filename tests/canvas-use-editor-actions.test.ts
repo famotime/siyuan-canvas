@@ -485,6 +485,31 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
+  it("creates a document file node from picker selection and selects it", async () => {
+    const { editor, wrapper } = await mountEditor()
+
+    editor.openFilePickerDialog()
+    await flushEditor()
+
+    await editor.selectFilePickerResult({
+      kind: "document",
+      path: "/data/roadmap.sy",
+      subtitle: "/Projects/Roadmap",
+      title: "Roadmap",
+    })
+    await flushEditor()
+
+    expect(editor.state.document.nodes).toHaveLength(1)
+    expect(editor.state.document.nodes[0]).toMatchObject({
+      file: "/data/roadmap.sy",
+      type: "file",
+    })
+    expect(editor.selectedNode?.id).toBe(editor.state.document.nodes[0]?.id)
+    expect(editor.filePickerDialog.visible).toBe(false)
+
+    wrapper.unmount()
+  })
+
   it("opens the create-edge dialog only when exactly one node is selected", async () => {
     const { editor, wrapper } = await mountEditor()
 

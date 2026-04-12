@@ -99,6 +99,8 @@
   "dialogCancel": "Cancel",
   "dialogSave": "Save",
   "createEdgeDialogTitle": "Create edge",
+  "filePickerDialogTitle": "Select file",
+  "filePickerSearchLabel": "Search documents, canvases, or images",
   "promptWorkspacePath": "Workspace path",
   "promptCanvasSavePath": "Save path",
   "promptWorkspaceSavePath": "Workspace save path",

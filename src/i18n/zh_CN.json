@@ -99,6 +99,8 @@
   "dialogCancel": "取消",
   "dialogSave": "保存",
   "createEdgeDialogTitle": "创建连线",
+  "filePickerDialogTitle": "选择文件",
+  "filePickerSearchLabel": "搜索文档、画布或图片",
   "promptWorkspacePath": "工作区路径",
   "promptCanvasSavePath": "保存路径",
   "promptWorkspaceSavePath": "工作区保存路径",
