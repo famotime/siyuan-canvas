@@ -12,6 +12,7 @@ import {
   resolveSiyuanAssetByPath,
   resolveSiyuanDocumentByPath,
 } from "@/canvas/siyuan-file-node-lookups"
+import { searchCanvasFilePickerTargets } from "@/canvas/file-picker-dialog"
 
 describe("siyuan file node lookups", () => {
   it("creates normalized document path candidates for hpath and storage lookups", () => {
@@ -105,5 +106,32 @@ describe("siyuan file node lookups", () => {
       path: "assets/diagram.png",
       title: "Architecture Diagram",
     })
+  })
+
+  it("searches documents, images, and workspace canvases into grouped picker results", async () => {
+    const result = await searchCanvasFilePickerTargets("road", {
+      searchDocuments: vi.fn(async () => [{
+        kind: "document",
+        path: "/data/roadmap.sy",
+        subtitle: "/Projects/Roadmap",
+        title: "Roadmap",
+      }]),
+      searchImages: vi.fn(async () => [{
+        kind: "image",
+        path: "assets/road.png",
+        subtitle: "assets/road.png",
+        title: "road.png",
+      }]),
+      searchWorkspaceCanvasFiles: vi.fn(async () => [{
+        kind: "canvas",
+        path: "/data/storage/maps/road.canvas",
+        subtitle: "/data/storage/maps/road.canvas",
+        title: "road.canvas",
+      }]),
+    })
+
+    expect(result.documents).toHaveLength(1)
+    expect(result.images).toHaveLength(1)
+    expect(result.canvases).toHaveLength(1)
   })
 })

@@ -473,6 +473,18 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
+  it("opens the file picker from the bottom toolbar instead of inserting a placeholder node", async () => {
+    const { editor, wrapper } = await mountEditor()
+
+    editor.openFilePickerDialog()
+    await flushEditor()
+
+    expect(editor.filePickerDialog.visible).toBe(true)
+    expect(editor.state.document.nodes).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
   it("opens the create-edge dialog only when exactly one node is selected", async () => {
     const { editor, wrapper } = await mountEditor()
 

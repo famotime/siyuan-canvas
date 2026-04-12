@@ -48,6 +48,7 @@ import {
   upsertCanvasNode,
 } from "@/canvas/document"
 import { createCanvasEditorBindings } from "@/canvas/editor-bindings"
+import type { CanvasFilePickerOption } from "@/canvas/file-picker-dialog"
 import { CanvasEditorState } from "@/canvas/editor-state"
 import { createCanvasEditorFileActions } from "@/canvas/use-canvas-editor-file-actions"
 import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-file-nodes"
@@ -108,6 +109,15 @@ export function useCanvasEditor(
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
   const bottomToolbarVisible = ref(false)
   const createEdgeDialog = reactive({
+    visible: false,
+  })
+  const filePickerDialog = reactive({
+    groups: {
+      canvases: [] as CanvasFilePickerOption[],
+      documents: [] as CanvasFilePickerOption[],
+      images: [] as CanvasFilePickerOption[],
+    },
+    query: "",
     visible: false,
   })
   const inspectorSectionState = reactive({
@@ -664,6 +674,20 @@ export function useCanvasEditor(
     createEdgeDialog.visible = true
   }
 
+  function openFilePickerDialog() {
+    filePickerDialog.visible = true
+  }
+
+  function closeFilePickerDialog() {
+    filePickerDialog.visible = false
+    filePickerDialog.query = ""
+    filePickerDialog.groups = {
+      canvases: [],
+      documents: [],
+      images: [],
+    }
+  }
+
   function closeCreateEdgeDialog() {
     createEdgeDialog.visible = false
   }
@@ -877,6 +901,7 @@ export function useCanvasEditor(
       closeSelectionPopover,
       createGroupFromSelection,
       createEdgeDialog,
+      filePickerDialog,
       displayNodes,
       deactivateCanvasSurface,
       connectionDraft,
@@ -905,10 +930,12 @@ export function useCanvasEditor(
       newEdgeTargetQuery,
       newEdgeToSide,
       openCreateEdgeDialog,
+      openFilePickerDialog,
       openPath,
       openRecentFile,
       resetViewport,
       save,
+      closeFilePickerDialog,
       selectEdge,
       selectNode,
       selectedEdge,
