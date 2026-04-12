@@ -77,6 +77,7 @@
         ref="stageRef"
         class="stage"
         @pointerdown="handleStagePointerDown"
+        @paste="handleStagePaste"
         @wheel="editor.handleWheelZoom"
         @contextmenu.prevent
       >
@@ -1122,6 +1123,16 @@ function getIssueLevelLabel(level: "error" | "warning"): string {
 function handleStagePointerDown(event: PointerEvent) {
   editor.activateCanvasSurface()
   editor.startPan(event)
+}
+
+function handleStagePaste(event: ClipboardEvent) {
+  const file = [...(event.clipboardData?.files || [])].find((candidate) => candidate.type.startsWith("image/"))
+  if (!file) {
+    return
+  }
+
+  event.preventDefault()
+  void editor.handleClipboardImagePaste(file)
 }
 
 function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {

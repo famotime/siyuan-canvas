@@ -4,7 +4,10 @@ import {
   it,
 } from "vitest"
 
-import { createCanvasFileTargetPreview } from "@/canvas/file-target-preview"
+import {
+  createCanvasFileTargetPreview,
+  loadCanvasTargetPreview,
+} from "@/canvas/file-target-preview"
 
 describe("createCanvasFileTargetPreview", () => {
   it("creates a document preview with rendered html and clipping metadata", () => {
@@ -48,5 +51,24 @@ describe("createCanvasFileTargetPreview", () => {
 
     expect(preview.kind).toBe("image")
     expect(preview.imageSrc).toBe("/data/assets/photo.png")
+  })
+
+  it("creates a static canvas thumbnail from parsed nodes and edges", async () => {
+    const preview = await loadCanvasTargetPreview({
+      kind: "canvas",
+      path: "/data/storage/maps/roadmap.canvas",
+      title: "roadmap.canvas",
+    }, {
+      readCanvasText: async () => JSON.stringify({
+        edges: [{ fromNode: "a", fromSide: "right", id: "edge-1", toNode: "b", toSide: "left" }],
+        nodes: [
+          { height: 100, id: "a", text: "A", type: "text", width: 120, x: 0, y: 0 },
+          { height: 100, id: "b", text: "B", type: "text", width: 120, x: 240, y: 0 },
+        ],
+      }),
+    })
+
+    expect(preview.thumbnail?.nodes).toHaveLength(2)
+    expect(preview.thumbnail?.edges).toHaveLength(1)
   })
 })

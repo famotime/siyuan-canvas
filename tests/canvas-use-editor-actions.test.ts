@@ -131,6 +131,10 @@ function confirmMock(
 }
 
 const apiMock = {
+  putFile: vi.fn(async (path: string, _isDir: boolean, file: Blob) => {
+    workspaceFiles.set(path, await file.text())
+    return { code: 0 }
+  }),
   readDir: vi.fn(async () => [...workspaceDirectoryEntries]),
 }
 
@@ -428,6 +432,7 @@ beforeEach(() => {
   localFiles.clear()
   workspaceFiles.clear()
   apiMock.readDir.mockClear()
+  apiMock.putFile.mockClear()
   localFsMock.access.mockClear()
   localFsMock.readFile.mockClear()
   localFsMock.writeFile.mockClear()
@@ -934,6 +939,30 @@ describe("useCanvasEditor file lifecycle flows", () => {
       "local",
       "workspace",
     ])
+
+    wrapper.unmount()
+  })
+
+  it("writes a pasted image beside the saved workspace canvas and creates a file node", async () => {
+    const path = "/data/storage/maps/roadmap.canvas"
+    workspaceFiles.set(path, createCanvasRaw("workspace canvas"))
+
+    const { editor, wrapper } = await mountEditor({ path })
+
+    await editor.handleClipboardImagePaste(new File(["png"], "pasted.png", { type: "image/png" }))
+    await flushEditor()
+
+    const pastedNode = editor.state.document.nodes.at(-1)
+    expect(pastedNode).toMatchObject({
+      file: expect.stringContaining("/data/storage/maps/roadmap.assets/"),
+      type: "file",
+    })
+    expect(apiMock.putFile).toHaveBeenCalledWith(
+      expect.stringContaining("/data/storage/maps/roadmap.assets/"),
+      false,
+      expect.any(File),
+    )
+    expect(workspaceFiles.get(pastedNode.file)).toBe("png")
 
     wrapper.unmount()
   })

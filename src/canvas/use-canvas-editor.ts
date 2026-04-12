@@ -28,7 +28,10 @@ import {
   ref,
   watch,
 } from "vue"
-import { readDir } from "@/api"
+import {
+  putFile,
+  readDir,
+} from "@/api"
 import {
   createCanvasBoardMetrics,
   toBoardX,
@@ -66,6 +69,7 @@ import {
   createDefaultCanvasPluginUiState,
 } from "@/canvas/plugin-data"
 import { CanvasFileService } from "@/canvas/file-service"
+import { writeWorkspaceImageFile } from "@/canvas/workspace-image-files"
 import {
   parseCanvasDocument,
   validateCanvasDocument,
@@ -704,6 +708,23 @@ export function useCanvasEditor(
     await refreshFileNodeMetadata()
   }
 
+  async function handleClipboardImagePaste(file: File) {
+    if (fileSource.value !== "workspace" || !state.filePath.endsWith(".canvas")) {
+      showMessage(t("messageUnablePasteImageWithoutWorkspaceCanvas"), 4000, "warning")
+      return
+    }
+
+    const path = await writeWorkspaceImageFile(state.filePath, file, putFile)
+    const node = createCanvasNode("file")
+    node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
+    node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
+    node.file = path
+
+    commitDocument(upsertCanvasNode(state.document, node))
+    state.selectNode(node.id)
+    await refreshFileNodeMetadata()
+  }
+
   function closeCreateEdgeDialog() {
     createEdgeDialog.visible = false
   }
@@ -984,6 +1005,7 @@ export function useCanvasEditor(
       zoomIn,
       zoomOut,
       getRenderedMarkdown,
+      handleClipboardImagePaste,
       handleNodePointerDown,
       handleWheelZoom,
       inspectorExpanded,

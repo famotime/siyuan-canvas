@@ -124,6 +124,7 @@
   "messageUnableOpenLocalCanvasFile": "Unable to open local canvas file.",
   "messageUnableSaveLocalCanvasFile": "Unable to save local canvas file.",
   "messageUnableOpenRecentCanvasFile": "Unable to open recent canvas file.",
+  "messageUnablePasteImageWithoutWorkspaceCanvas": "Save the current canvas to the workspace before pasting images.",
   "messageCanvasSavedByOverwritingDiskVersion": "Canvas saved by overwriting the disk version.",
   "messageUnableOverwriteDiskVersion": "Unable to overwrite the disk version.",
   "messageLoadedNewerCanvasVersionFromDisk": "Loaded the newer canvas version from disk."

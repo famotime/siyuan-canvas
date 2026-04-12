@@ -1,6 +1,8 @@
 import type { ResolvedCanvasFileTarget } from "@/canvas/file-target-resolution"
 import type { ResolvedCanvasFileNode } from "@/canvas/file-node-resolution"
 
+import { parseCanvasDocument } from "@/canvas/format"
+
 export interface CanvasThumbnailNode {
   height: number
   width: number
@@ -100,5 +102,49 @@ export function createCanvasFileTargetPreview(target: PreviewInput): CanvasFileT
         helper: "Unresolved path",
         kind: "file",
       }
+  }
+}
+
+export async function loadCanvasTargetPreview(
+  target: Extract<ResolvedCanvasFileTarget, { kind: "canvas" }>,
+  sources: {
+    readCanvasText: (path: string) => Promise<string>
+  },
+): Promise<CanvasFileTargetPreview> {
+  try {
+    const raw = await sources.readCanvasText(target.path)
+    const parsed = parseCanvasDocument(raw)
+    if (!parsed.document) {
+      return createCanvasFileTargetPreview(target)
+    }
+
+    const nodeById = new Map(parsed.document.nodes.map((node) => [node.id, node]))
+    return createCanvasFileTargetPreview({
+      ...target,
+      thumbnail: {
+        edges: parsed.document.edges.flatMap((edge) => {
+          const fromNode = nodeById.get(edge.fromNode)
+          const toNode = nodeById.get(edge.toNode)
+          if (!fromNode || !toNode) {
+            return []
+          }
+
+          return [{
+            fromX: fromNode.x + fromNode.width / 2,
+            fromY: fromNode.y + fromNode.height / 2,
+            toX: toNode.x + toNode.width / 2,
+            toY: toNode.y + toNode.height / 2,
+          }]
+        }),
+        nodes: parsed.document.nodes.map((node) => ({
+          height: node.height,
+          width: node.width,
+          x: node.x,
+          y: node.y,
+        })),
+      },
+    })
+  } catch {
+    return createCanvasFileTargetPreview(target)
   }
 }
