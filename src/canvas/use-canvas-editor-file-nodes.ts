@@ -8,7 +8,7 @@ import {
   findSiyuanAssetByPath,
   findSiyuanDocumentByPath,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
-import { createCanvasFileNodePreview } from "@/canvas/file-node-preview"
+import { createCanvasFileTargetPreview } from "@/canvas/file-target-preview"
 import {
   createFallbackCanvasFileNode,
   resolveCanvasFileNode,
@@ -83,7 +83,7 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
       throw new Error("File node preview requested for a non-file node.")
     }
 
-    return createCanvasFileNodePreview(getResolvedFileNode(node))
+    return createCanvasFileTargetPreview(getResolvedFileNode(node))
   }
 
   return {
