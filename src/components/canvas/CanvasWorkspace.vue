@@ -4,7 +4,10 @@
     class="canvas-shell"
     data-testid="canvas-shell"
   >
-    <header class="toolbar">
+    <header
+      class="toolbar"
+      @pointerdown.capture="editor.deactivateCanvasSurface"
+    >
       <div class="toolbar__group">
         <button
           class="toolbar__button toolbar__button--primary"
@@ -14,66 +17,15 @@
         </button>
         <button
           class="toolbar__button"
-          @click="editor.openPath"
-        >
-          {{ t("toolbarOpenPath") }}
-        </button>
-        <button
-          class="toolbar__button"
           @click="editor.triggerImport"
         >
-          {{ t("toolbarImport") }}
+          {{ t("toolbarOpen") }}
         </button>
         <button
           class="toolbar__button"
           @click="editor.save"
         >
           {{ t("toolbarSave") }}
-        </button>
-        <button
-          class="toolbar__button"
-          @click="editor.exportCanvas"
-        >
-          {{ t("toolbarExport") }}
-        </button>
-        <button
-          class="toolbar__button"
-          @click="editor.openSettings"
-        >
-          {{ t("toolbarSettings") }}
-        </button>
-      </div>
-      <div class="toolbar__group">
-        <button
-          class="toolbar__button"
-          @click="editor.addNode('text')"
-        >
-          {{ t("toolbarText") }}
-        </button>
-        <button
-          class="toolbar__button"
-          @click="editor.addNode('file')"
-        >
-          {{ t("toolbarFile") }}
-        </button>
-        <button
-          class="toolbar__button"
-          @click="editor.addNode('link')"
-        >
-          {{ t("toolbarLink") }}
-        </button>
-        <button
-          class="toolbar__button"
-          @click="editor.addNode('group')"
-        >
-          {{ t("toolbarGroup") }}
-        </button>
-        <button
-          class="toolbar__button"
-          :disabled="!editor.canDelete"
-          @click="editor.deleteSelection"
-        >
-          {{ t("toolbarDelete") }}
         </button>
       </div>
       <div class="toolbar__group">
@@ -124,7 +76,7 @@
       <section
         ref="stageRef"
         class="stage"
-        @pointerdown="editor.startPan"
+        @pointerdown="handleStagePointerDown"
         @wheel="editor.handleWheelZoom"
         @contextmenu.prevent
       >
@@ -197,8 +149,8 @@
               { 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id) },
             ]"
             :style="getCanvasNodeStyle(node)"
-            @pointerdown.stop="editor.handleNodePointerDown(node, $event)"
-            @click.stop="editor.selectNode(node.id, $event)"
+            @pointerdown.stop="handleNodePointerDown(node, $event)"
+            @click.stop="handleNodeClick(node, $event)"
             @dblclick.stop="handleNodeDoubleClick(node)"
           >
             <div class="canvas-node__body">
@@ -296,6 +248,67 @@
           }"
           data-testid="selection-box"
         />
+
+        <div
+          v-if="editor.bottomToolbarVisible"
+          class="bottom-toolbar"
+          data-testid="bottom-toolbar"
+          @click.stop
+          @pointerdown.stop
+        >
+          <button
+            class="bottom-toolbar__button"
+            data-testid="bottom-toolbar-text"
+            :aria-label="t('bottomToolbarText')"
+            :title="t('bottomToolbarText')"
+            type="button"
+            @click.stop="editor.addNode('text')"
+          >
+            <SelectionToolbarIcon
+              class="bottom-toolbar__icon"
+              name="text"
+            />
+          </button>
+          <button
+            class="bottom-toolbar__button"
+            data-testid="bottom-toolbar-file"
+            :aria-label="t('bottomToolbarFile')"
+            :title="t('bottomToolbarFile')"
+            type="button"
+            @click.stop="editor.addNode('file')"
+          >
+            <SelectionToolbarIcon
+              class="bottom-toolbar__icon"
+              name="file"
+            />
+          </button>
+          <button
+            class="bottom-toolbar__button"
+            data-testid="bottom-toolbar-connect"
+            :aria-label="t('bottomToolbarConnect')"
+            :title="t('bottomToolbarConnect')"
+            type="button"
+            @click.stop="editor.openCreateEdgeDialog"
+          >
+            <SelectionToolbarIcon
+              class="bottom-toolbar__icon"
+              name="connect"
+            />
+          </button>
+          <button
+            class="bottom-toolbar__button"
+            data-testid="bottom-toolbar-group"
+            :aria-label="t('bottomToolbarGroup')"
+            :title="t('bottomToolbarGroup')"
+            type="button"
+            @click.stop="editor.addNode('group')"
+          >
+            <SelectionToolbarIcon
+              class="bottom-toolbar__icon"
+              name="group"
+            />
+          </button>
+        </div>
 
         <div
           v-if="editor.selectionToolbar.visible"
@@ -464,256 +477,404 @@
       <aside
         class="inspector"
         :class="{ 'inspector--collapsed': !editor.inspectorExpanded }"
+        @pointerdown.capture="editor.deactivateCanvasSurface"
       >
         <div
           v-if="editor.inspectorExpanded"
           class="inspector__content"
         >
           <section class="inspector__section">
-            <h2>{{ t("inspectorDocument") }}</h2>
-            <p>{{ editor.state.filePath || t("inspectorUnsavedWorkspacePath") }}</p>
-            <p>{{ editor.state.isDirty ? t("inspectorPendingSave") : t("inspectorInSync") }}</p>
-            <div
-              v-if="editor.state.conflict"
-              class="conflict-panel"
+            <button
+              class="inspector__section-toggle"
+              data-testid="inspector-section-document-toggle"
+              :title="getInspectorSectionToggleTitle('document')"
+              type="button"
+              @click="editor.toggleInspectorSection('document')"
             >
-              <strong>{{ t("inspectorExternalChangeDetected") }}</strong>
-              <span>{{ t("inspectorExternalChangeDescription") }}</span>
-              <div class="conflict-panel__actions">
+              <h2>{{ t("inspectorDocument") }}</h2>
+              <span>{{ getInspectorSectionChevron('document') }}</span>
+            </button>
+            <div
+              v-if="editor.inspectorSectionState.document"
+              data-testid="inspector-section-document-body"
+            >
+              <p>{{ editor.state.filePath || t("inspectorUnsavedWorkspacePath") }}</p>
+              <p>{{ editor.state.isDirty ? t("inspectorPendingSave") : t("inspectorInSync") }}</p>
+              <div
+                v-if="editor.workspaceDocuments.length"
+                class="recent-list"
+              >
                 <button
-                  class="toolbar__button"
-                  @click="editor.loadConflictVersion"
+                  v-for="documentEntry in editor.workspaceDocuments"
+                  :key="documentEntry.path"
+                  class="recent-list__item"
+                  @click="editor.openWorkspacePath(documentEntry.path)"
                 >
-                  {{ t("inspectorLoadDiskVersion") }}
-                </button>
-                <button
-                  class="toolbar__button toolbar__button--primary"
-                  @click="editor.overwriteConflictVersion"
-                >
-                  {{ t("inspectorOverwriteDiskVersion") }}
+                  <strong>{{ documentEntry.title }}</strong>
+                  <span>{{ documentEntry.path }}</span>
                 </button>
               </div>
-            </div>
-            <div
-              v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
-              class="issues"
-            >
+              <p v-else>
+                {{ t("inspectorNoWorkspaceCanvasFiles") }}
+              </p>
               <div
-                v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
-                :key="issue.code + issue.path"
+                v-if="editor.state.conflict"
+                class="conflict-panel"
               >
-                <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
-                <span>{{ issue.message }}</span>
+                <strong>{{ t("inspectorExternalChangeDetected") }}</strong>
+                <span>{{ t("inspectorExternalChangeDescription") }}</span>
+                <div class="conflict-panel__actions">
+                  <button
+                    class="toolbar__button"
+                    @click="editor.loadConflictVersion"
+                  >
+                    {{ t("inspectorLoadDiskVersion") }}
+                  </button>
+                  <button
+                    class="toolbar__button toolbar__button--primary"
+                    @click="editor.overwriteConflictVersion"
+                  >
+                    {{ t("inspectorOverwriteDiskVersion") }}
+                  </button>
+                </div>
+              </div>
+              <div
+                v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
+                class="issues"
+              >
+                <div
+                  v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
+                  :key="issue.code + issue.path"
+                >
+                  <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
+                  <span>{{ issue.message }}</span>
+                </div>
               </div>
             </div>
           </section>
 
           <section class="inspector__section">
-            <h2>{{ t("inspectorRecent") }}</h2>
-            <div
-              v-if="editor.recentFiles.length"
-              class="recent-list"
+            <button
+              class="inspector__section-toggle"
+              :title="getInspectorSectionToggleTitle('recent')"
+              type="button"
+              @click="editor.toggleInspectorSection('recent')"
             >
-              <button
-                v-for="recent in editor.recentFiles"
-                :key="recent.path"
-                class="recent-list__item"
-                @click="editor.openRecentPath(recent.path)"
+              <h2>{{ t("inspectorRecent") }}</h2>
+              <span>{{ getInspectorSectionChevron('recent') }}</span>
+            </button>
+            <div v-if="editor.inspectorSectionState.recent">
+              <div
+                v-if="editor.recentFiles.length"
+                class="recent-list"
               >
-                <strong>{{ recent.title }}</strong>
-                <span>{{ recent.path }}</span>
-              </button>
+                <button
+                  v-for="recent in editor.recentFiles"
+                  :key="recent.path"
+                  class="recent-list__item"
+                  @click="editor.openRecentFile(recent)"
+                >
+                  <strong>{{ recent.title }}</strong>
+                  <span>{{ recent.path }}</span>
+                </button>
+              </div>
+              <p v-else>
+                {{ t("inspectorNoRecentWorkspaceFiles") }}
+              </p>
             </div>
-            <p v-else>
-              {{ t("inspectorNoRecentWorkspaceFiles") }}
-            </p>
           </section>
 
           <section
             v-if="editor.selectedNodeCount > 1"
             class="inspector__section"
           >
-            <h2>{{ t("inspectorSelection") }}</h2>
-            <p>{{ t("selectionCount", { count: editor.selectedNodeCount }) }}</p>
             <button
-              class="toolbar__button"
-              @click="editor.deleteSelection"
+              class="inspector__section-toggle"
+              :title="getInspectorSectionToggleTitle('selection')"
+              type="button"
+              @click="editor.toggleInspectorSection('selection')"
             >
-              {{ t("inspectorDeleteSelectedNodes") }}
+              <h2>{{ t("inspectorSelection") }}</h2>
+              <span>{{ getInspectorSectionChevron('selection') }}</span>
             </button>
-          </section>
-
-          <section
-            v-if="editor.selectedNode && editor.selectedNodeCount === 1"
-            class="inspector__section"
-          >
-          <h2>{{ t("inspectorNode") }}</h2>
-          <label>
-            {{ t("fieldX") }}
-            <input
-              :value="editor.selectedNode.x"
-              type="number"
-              @input="editor.updateNumericNodeField('x', valueFromEvent($event))"
-            />
-          </label>
-          <label>
-            {{ t("fieldY") }}
-            <input
-              :value="editor.selectedNode.y"
-              type="number"
-              @input="editor.updateNumericNodeField('y', valueFromEvent($event))"
-            />
-          </label>
-          <label>
-            {{ t("fieldWidth") }}
-            <input
-              :value="editor.selectedNode.width"
-              type="number"
-              @input="editor.updateNumericNodeField('width', valueFromEvent($event))"
-            />
-          </label>
-          <label>
-            {{ t("fieldHeight") }}
-            <input
-              :value="editor.selectedNode.height"
-              type="number"
-              @input="editor.updateNumericNodeField('height', valueFromEvent($event))"
-            />
-          </label>
-          <label v-if="'color' in editor.selectedNode">
-            {{ t("fieldColor") }}
-            <input
-              :value="editor.selectedNode.color || ''"
-              @input="editor.updateNodeField('color', valueFromEvent($event))"
-            />
-          </label>
-          <label v-if="editor.selectedNode.type === 'text'">
-            {{ t("fieldText") }}
-            <textarea
-              :value="editor.selectedNode.text"
-              @input="editor.updateNodeField('text', valueFromEvent($event))"
-            />
-          </label>
-          <label v-if="editor.selectedNode.type === 'file'">
-            {{ t("fieldFilePath") }}
-            <input
-              :value="editor.selectedNode.file"
-              @input="editor.updateNodeField('file', valueFromEvent($event))"
-            />
-          </label>
-          <label v-if="editor.selectedNode.type === 'link'">
-            {{ t("fieldUrl") }}
-            <input
-              :value="editor.selectedNode.url"
-              @input="editor.updateNodeField('url', valueFromEvent($event))"
-            />
-          </label>
-          <label v-if="editor.selectedNode.type === 'group'">
-            {{ t("fieldLabel") }}
-            <input
-              :value="editor.selectedNode.label || ''"
-              @input="editor.updateNodeField('label', valueFromEvent($event))"
-            />
-          </label>
-          </section>
-
-          <section
-            v-if="editor.selectedNode && editor.selectedNodeCount === 1"
-            class="inspector__section"
-          >
-          <h2>{{ t("inspectorCreateEdge") }}</h2>
-          <label>
-            {{ t("fieldTarget") }}
-            <select v-model="editor.newEdgeTargetId">
-              <option value="">{{ t("fieldSelectTargetNode") }}</option>
-              <option
-                v-for="node in editor.edgeTargets"
-                :key="node.id"
-                :value="node.id"
+            <div v-if="editor.inspectorSectionState.selection">
+              <p>{{ t("selectionCount", { count: editor.selectedNodeCount }) }}</p>
+              <button
+                class="toolbar__button"
+                @click="editor.deleteSelection"
               >
-                {{ editor.getNodeTitle(node) }}
-              </option>
-            </select>
-          </label>
-          <label>
-            {{ t("fieldEdgeLabel") }}
-            <input v-model="editor.newEdgeLabel" />
-          </label>
-          <label>
-            {{ t("fieldFromSide") }}
-            <select v-model="editor.newEdgeFromSide">
-              <option
-                v-for="side in editor.sides"
-                :key="side"
-                :value="side"
-              >{{ getSideLabel(side) }}</option>
-            </select>
-          </label>
-          <label>
-            {{ t("fieldToSide") }}
-            <select v-model="editor.newEdgeToSide">
-              <option
-                v-for="side in editor.sides"
-                :key="side"
-                :value="side"
-              >{{ getSideLabel(side) }}</option>
-            </select>
-          </label>
-          <button
-            class="toolbar__button toolbar__button--primary"
-            @click="editor.createEdgeFromSelection"
+                {{ t("inspectorDeleteSelectedNodes") }}
+              </button>
+            </div>
+          </section>
+
+          <section
+            v-if="editor.selectedNode && editor.selectedNodeCount === 1"
+            class="inspector__section"
           >
-            {{ t("inspectorCreateEdgeAction") }}
-          </button>
+            <button
+              class="inspector__section-toggle"
+              :title="getInspectorSectionToggleTitle('node')"
+              type="button"
+              @click="editor.toggleInspectorSection('node')"
+            >
+              <h2>{{ t("inspectorNode") }}</h2>
+              <span>{{ getInspectorSectionChevron('node') }}</span>
+            </button>
+            <div v-if="editor.inspectorSectionState.node">
+              <label>
+                {{ t("fieldX") }}
+                <input
+                  :value="editor.selectedNode.x"
+                  type="number"
+                  @input="editor.updateNumericNodeField('x', valueFromEvent($event))"
+                />
+              </label>
+              <label>
+                {{ t("fieldY") }}
+                <input
+                  :value="editor.selectedNode.y"
+                  type="number"
+                  @input="editor.updateNumericNodeField('y', valueFromEvent($event))"
+                />
+              </label>
+              <label>
+                {{ t("fieldWidth") }}
+                <input
+                  :value="editor.selectedNode.width"
+                  type="number"
+                  @input="editor.updateNumericNodeField('width', valueFromEvent($event))"
+                />
+              </label>
+              <label>
+                {{ t("fieldHeight") }}
+                <input
+                  :value="editor.selectedNode.height"
+                  type="number"
+                  @input="editor.updateNumericNodeField('height', valueFromEvent($event))"
+                />
+              </label>
+              <label v-if="'color' in editor.selectedNode">
+                {{ t("fieldColor") }}
+                <input
+                  :value="editor.selectedNode.color || ''"
+                  @input="editor.updateNodeField('color', valueFromEvent($event))"
+                />
+              </label>
+              <label v-if="editor.selectedNode.type === 'text'">
+                {{ t("fieldText") }}
+                <textarea
+                  :value="editor.selectedNode.text"
+                  @input="editor.updateNodeField('text', valueFromEvent($event))"
+                />
+              </label>
+              <label v-if="editor.selectedNode.type === 'file'">
+                {{ t("fieldFilePath") }}
+                <input
+                  :value="editor.selectedNode.file"
+                  @input="editor.updateNodeField('file', valueFromEvent($event))"
+                />
+              </label>
+              <label v-if="editor.selectedNode.type === 'link'">
+                {{ t("fieldUrl") }}
+                <input
+                  :value="editor.selectedNode.url"
+                  @input="editor.updateNodeField('url', valueFromEvent($event))"
+                />
+              </label>
+              <label v-if="editor.selectedNode.type === 'group'">
+                {{ t("fieldLabel") }}
+                <input
+                  :value="editor.selectedNode.label || ''"
+                  @input="editor.updateNodeField('label', valueFromEvent($event))"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section
+            v-if="editor.selectedNode && editor.selectedNodeCount === 1"
+            class="inspector__section"
+          >
+            <button
+              class="inspector__section-toggle"
+              :title="getInspectorSectionToggleTitle('createEdge')"
+              type="button"
+              @click="editor.toggleInspectorSection('createEdge')"
+            >
+              <h2>{{ t("inspectorCreateEdge") }}</h2>
+              <span>{{ getInspectorSectionChevron('createEdge') }}</span>
+            </button>
+            <div v-if="editor.inspectorSectionState.createEdge">
+              <label>
+                {{ t("fieldTarget") }}
+                <select v-model="editor.newEdgeTargetId">
+                  <option value="">{{ t("fieldSelectTargetNode") }}</option>
+                  <option
+                    v-for="node in editor.edgeTargets"
+                    :key="node.id"
+                    :value="node.id"
+                  >
+                    {{ editor.getNodeTitle(node) }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                {{ t("fieldEdgeLabel") }}
+                <input v-model="editor.newEdgeLabel" />
+              </label>
+              <label>
+                {{ t("fieldFromSide") }}
+                <select v-model="editor.newEdgeFromSide">
+                  <option
+                    v-for="side in editor.sides"
+                    :key="side"
+                    :value="side"
+                  >{{ getSideLabel(side) }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t("fieldToSide") }}
+                <select v-model="editor.newEdgeToSide">
+                  <option
+                    v-for="side in editor.sides"
+                    :key="side"
+                    :value="side"
+                  >{{ getSideLabel(side) }}</option>
+                </select>
+              </label>
+              <button
+                class="toolbar__button toolbar__button--primary"
+                @click="editor.createEdgeFromSelection"
+              >
+                {{ t("inspectorCreateEdgeAction") }}
+              </button>
+            </div>
           </section>
 
           <section
             v-if="editor.selectedEdge"
             class="inspector__section"
           >
-          <h2>{{ t("inspectorEdge") }}</h2>
-          <label>
-            {{ t("fieldEdgeLabel") }}
-            <input
-              :value="editor.selectedEdge.label || ''"
-              @input="editor.updateEdgeField('label', valueFromEvent($event))"
-            />
-          </label>
-          <label>
-            {{ t("fieldFromSide") }}
-            <select
-              :value="editor.selectedEdge.fromSide"
-              @change="editor.updateEdgeSide('fromSide', valueFromEvent($event))"
+            <button
+              class="inspector__section-toggle"
+              :title="getInspectorSectionToggleTitle('edge')"
+              type="button"
+              @click="editor.toggleInspectorSection('edge')"
             >
-              <option
-                v-for="side in editor.sides"
-                :key="side"
-                :value="side"
-              >{{ getSideLabel(side) }}</option>
-            </select>
-          </label>
-          <label>
-            {{ t("fieldToSide") }}
-            <select
-              :value="editor.selectedEdge.toSide"
-              @change="editor.updateEdgeSide('toSide', valueFromEvent($event))"
-            >
-              <option
-                v-for="side in editor.sides"
-                :key="side"
-                :value="side"
-              >{{ getSideLabel(side) }}</option>
-            </select>
-          </label>
-          <button
-            class="toolbar__button"
-            @click="editor.deleteSelection"
-          >
-            {{ t("inspectorDeleteEdge") }}
-          </button>
+              <h2>{{ t("inspectorEdge") }}</h2>
+              <span>{{ getInspectorSectionChevron('edge') }}</span>
+            </button>
+            <div v-if="editor.inspectorSectionState.edge">
+              <label>
+                {{ t("fieldEdgeLabel") }}
+                <input
+                  :value="editor.selectedEdge.label || ''"
+                  @input="editor.updateEdgeField('label', valueFromEvent($event))"
+                />
+              </label>
+              <label>
+                {{ t("fieldFromSide") }}
+                <select
+                  :value="editor.selectedEdge.fromSide"
+                  @change="editor.updateEdgeSide('fromSide', valueFromEvent($event))"
+                >
+                  <option
+                    v-for="side in editor.sides"
+                    :key="side"
+                    :value="side"
+                  >{{ getSideLabel(side) }}</option>
+                </select>
+              </label>
+              <label>
+                {{ t("fieldToSide") }}
+                <select
+                  :value="editor.selectedEdge.toSide"
+                  @change="editor.updateEdgeSide('toSide', valueFromEvent($event))"
+                >
+                  <option
+                    v-for="side in editor.sides"
+                    :key="side"
+                    :value="side"
+                  >{{ getSideLabel(side) }}</option>
+                </select>
+              </label>
+              <button
+                class="toolbar__button"
+                @click="editor.deleteSelection"
+              >
+                {{ t("inspectorDeleteEdge") }}
+              </button>
+            </div>
           </section>
         </div>
       </aside>
+    </div>
+
+    <div
+      v-if="editor.createEdgeDialog.visible"
+      class="canvas-dialog-backdrop"
+      data-testid="create-edge-dialog"
+      @click.self="editor.closeCreateEdgeDialog"
+    >
+      <div class="canvas-dialog">
+        <div class="canvas-dialog__header">
+          <h2>{{ t("createEdgeDialogTitle") }}</h2>
+        </div>
+        <label>
+          {{ t("fieldTarget") }}
+          <select v-model="editor.newEdgeTargetId">
+            <option value="">{{ t("fieldSelectTargetNode") }}</option>
+            <option
+              v-for="node in editor.edgeTargets"
+              :key="node.id"
+              :value="node.id"
+            >
+              {{ editor.getNodeTitle(node) }}
+            </option>
+          </select>
+        </label>
+        <label>
+          {{ t("fieldEdgeLabel") }}
+          <input v-model="editor.newEdgeLabel" />
+        </label>
+        <label>
+          {{ t("fieldFromSide") }}
+          <select v-model="editor.newEdgeFromSide">
+            <option
+              v-for="side in editor.sides"
+              :key="side"
+              :value="side"
+            >{{ getSideLabel(side) }}</option>
+          </select>
+        </label>
+        <label>
+          {{ t("fieldToSide") }}
+          <select v-model="editor.newEdgeToSide">
+            <option
+              v-for="side in editor.sides"
+              :key="side"
+              :value="side"
+            >{{ getSideLabel(side) }}</option>
+          </select>
+        </label>
+        <div class="canvas-dialog__actions">
+          <button
+            class="toolbar__button"
+            type="button"
+            @click="editor.closeCreateEdgeDialog"
+          >
+            {{ t("dialogCancel") }}
+          </button>
+          <button
+            class="toolbar__button toolbar__button--primary"
+            type="button"
+            @click="editor.submitCreateEdgeDialog"
+          >
+            {{ t("inspectorCreateEdgeAction") }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <input
@@ -777,6 +938,31 @@ function valueFromEvent(event: Event): string {
 
 function getIssueLevelLabel(level: "error" | "warning"): string {
   return level === "error" ? t("issueError") : t("issueWarning")
+}
+
+function handleStagePointerDown(event: PointerEvent) {
+  editor.activateCanvasSurface()
+  editor.startPan(event)
+}
+
+function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
+  editor.activateCanvasSurface()
+  editor.handleNodePointerDown(node, event)
+}
+
+function handleNodeClick(node: CanvasNode, event: MouseEvent) {
+  editor.activateCanvasSurface()
+  editor.selectNode(node.id, event)
+}
+
+function getInspectorSectionChevron(section: keyof typeof editor.inspectorSectionState): string {
+  return editor.inspectorSectionState[section] ? "−" : "+"
+}
+
+function getInspectorSectionToggleTitle(section: keyof typeof editor.inspectorSectionState): string {
+  return editor.inspectorSectionState[section]
+    ? t("inspectorCollapseSection")
+    : t("inspectorExpandSection")
 }
 
 function getSideLabel(side: string): string {
@@ -844,6 +1030,7 @@ function getCanvasNodeContentStyle(node: CanvasNode) {
   --canvas-resize-handle: rgba(15, 23, 42, 0.18);
   --canvas-resize-handle-hover: rgba(15, 23, 42, 0.26);
   --canvas-shell-highlight: rgba(53, 103, 214, 0.08);
+  position: relative;
   display: grid;
   grid-template-rows: auto 1fr;
   height: 100%;
@@ -1018,6 +1205,45 @@ function getCanvasNodeContentStyle(node: CanvasNode) {
   background: var(--selection-toolbar-bg);
   box-shadow: var(--selection-toolbar-shadow);
   backdrop-filter: blur(14px);
+}
+
+.bottom-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  z-index: 4;
+  display: inline-flex;
+  gap: 10px;
+  transform: translateX(-50%);
+  padding: 10px;
+  border: 1px solid var(--canvas-floating-border);
+  border-radius: 999px;
+  background: var(--canvas-floating-bg);
+  box-shadow: var(--canvas-shadow-strong);
+  backdrop-filter: blur(14px);
+}
+
+.bottom-toolbar__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--canvas-floating-button-bg);
+  color: var(--canvas-floating-text);
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.bottom-toolbar__button:hover {
+  background: var(--canvas-floating-button-bg-hover);
+  transform: translateY(-1px);
+}
+
+.bottom-toolbar__icon {
+  display: inline-flex;
 }
 
 .selection-toolbar--bottom {
@@ -1541,6 +1767,20 @@ function getCanvasNodeContentStyle(node: CanvasNode) {
   background: var(--canvas-inspector-section-bg);
 }
 
+.inspector__section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .inspector__section h2 {
   margin: 0;
   font-size: 13px;
@@ -1621,6 +1861,40 @@ function getCanvasNodeContentStyle(node: CanvasNode) {
 
 .issues strong {
   margin-right: 6px;
+}
+
+.canvas-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(4px);
+}
+
+.canvas-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(420px, calc(100% - 32px));
+  padding: 18px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 20px;
+  background: var(--canvas-surface);
+  box-shadow: var(--canvas-shadow-strong);
+}
+
+.canvas-dialog__header h2 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--canvas-text);
+}
+
+.canvas-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .visually-hidden {

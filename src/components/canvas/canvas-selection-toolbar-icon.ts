@@ -12,6 +12,9 @@ export type SelectionToolbarIconName =
   | "color"
   | "center"
   | "edit"
+  | "text"
+  | "file"
+  | "connect"
   | "group"
   | "align"
   | "left-align"
@@ -138,6 +141,16 @@ const SELECTION_TOOLBAR_ICONS: Record<SelectionToolbarIconName, { paths: string[
     ],
     viewBox: "0 0 24 24",
   },
+  connect: {
+    paths: [
+      "M8 8h4",
+      "M12 12h4",
+      "M10 10l4 4",
+      "M6 6a3 3 0 1 0 0 6",
+      "M18 12a3 3 0 1 0 0 6",
+    ],
+    viewBox: "0 0 24 24",
+  },
   delete: {
     paths: [
       "M4 7h16",
@@ -146,6 +159,15 @@ const SELECTION_TOOLBAR_ICONS: Record<SelectionToolbarIconName, { paths: string[
       "M10 11v5",
       "M14 11v5",
       "M9 7V5h6v2",
+    ],
+    viewBox: "0 0 24 24",
+  },
+  file: {
+    paths: [
+      "M7 3h7l5 5v13H7z",
+      "M14 3v5h5",
+      "M10 13h6",
+      "M10 17h4",
     ],
     viewBox: "0 0 24 24",
   },
@@ -220,6 +242,14 @@ const SELECTION_TOOLBAR_ICONS: Record<SelectionToolbarIconName, { paths: string[
       "M9 8h6v8H9z",
       "M12 7V5",
       "M12 19v-2",
+    ],
+    viewBox: "0 0 24 24",
+  },
+  text: {
+    paths: [
+      "M5 6h14",
+      "M12 6v12",
+      "M8 18h8",
     ],
     viewBox: "0 0 24 24",
   },

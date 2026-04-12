@@ -36,16 +36,130 @@ import {
   createDefaultCanvasPluginData,
   type CanvasPluginData,
   rememberRecentCanvasFile,
+  updateCanvasPluginUiState,
 } from "@/canvas/plugin-data"
 import type { ModuleExports } from "vitest"
 
 const openTab = vi.fn()
 const showMessage = vi.fn()
+const confirm = vi.fn()
 const fileNodeLookupMock = {
   findSiyuanAssetByPath: vi.fn(async () => null),
   findSiyuanDocumentByPath: vi.fn(async () => null),
 }
+type DialogAction = "cancel" | "confirm"
+
+interface DialogResponse {
+  action: DialogAction
+  value: string
+}
+
+const dialogResponses: DialogResponse[] = []
+const confirmResponses: boolean[] = []
+const workspaceDirectoryEntries: Array<{ isDir: boolean, isSymlink: boolean, name: string, updated?: number }> = []
+const localFiles = new Map<string, string>()
+
+class DialogMock {
+  public element: HTMLElement
+  public editors = {}
+  public data: unknown
+  private readonly destroyCallback?: (options?: Record<string, unknown>) => void
+  private enterEvent?: () => void
+
+  constructor(options: {
+    content: string
+    destroyCallback?: (options?: Record<string, unknown>) => void
+  }) {
+    this.destroyCallback = options.destroyCallback
+    this.element = document.createElement("div")
+    this.element.innerHTML = options.content
+    document.body.appendChild(this.element)
+
+    const response = dialogResponses.shift()
+    queueMicrotask(() => {
+      const input = this.element.querySelector("input, textarea") as HTMLInputElement | HTMLTextAreaElement | null
+      if (input && response) {
+        input.value = response.value
+        input.dispatchEvent(new Event("input", { bubbles: true }))
+      }
+
+      if (!response || response.action === "cancel") {
+        this.destroy()
+        return
+      }
+
+      const confirmButton = this.element.querySelector("[data-canvas-dialog-confirm]") as HTMLButtonElement | null
+      if (confirmButton) {
+        confirmButton.click()
+        return
+      }
+
+      this.enterEvent?.()
+    })
+  }
+
+  bindInput(_inputElement: HTMLInputElement | HTMLTextAreaElement, enterEvent?: () => void): void {
+    this.enterEvent = enterEvent
+  }
+
+  destroy(options?: Record<string, unknown>): void {
+    this.element.remove()
+    this.destroyCallback?.(options)
+  }
+}
+
+function confirmMock(
+  title: string,
+  text: string,
+  confirmCallback?: (dialog: { destroy: () => void }) => void,
+  cancelCallback?: (dialog: { destroy: () => void }) => void,
+): void {
+  confirm(title, text)
+  const accepted = confirmResponses.shift() ?? false
+  const dialog = {
+    destroy: vi.fn(),
+  }
+
+  queueMicrotask(() => {
+    if (accepted) {
+      confirmCallback?.(dialog)
+      return
+    }
+
+    cancelCallback?.(dialog)
+  })
+}
+
+const apiMock = {
+  readDir: vi.fn(async () => [...workspaceDirectoryEntries]),
+}
+
+const localFsMock = {
+  access: vi.fn(async (path: string) => {
+    if (!localFiles.has(path)) {
+      throw new Error(`ENOENT: ${path}`)
+    }
+  }),
+  readFile: vi.fn(async (path: string, encoding?: string) => {
+    if (encoding !== "utf8") {
+      throw new Error(`Unexpected encoding: ${String(encoding)}`)
+    }
+
+    const value = localFiles.get(path)
+    if (value === undefined) {
+      throw new Error(`ENOENT: ${path}`)
+    }
+
+    return value
+  }),
+  writeFile: vi.fn(async (path: string, value: string) => {
+    localFiles.set(path, value)
+  }),
+}
+
 const siyuanMock = {
+  confirm: confirmMock,
+  Dialog: DialogMock,
   openTab,
   showMessage,
 }
@@ -168,12 +282,19 @@ function loadModuleExports(path: string): ModuleExports {
       return siyuanMock
     }
 
+    if (specifier === "@/api") {
+      return apiMock
+    }
+
     if (
-      specifier === "@/api"
-      || specifier === "@/canvas/siyuan-file-node-lookups"
+      specifier === "@/canvas/siyuan-file-node-lookups"
       || specifier === "@/canvas/siyuan-kernel-file-node-lookups"
     ) {
       return fileNodeLookupMock
+    }
+
+    if (specifier === "node:fs/promises") {
+      return localFsMock
     }
 
     if (specifier.startsWith("@/") || specifier.startsWith(".")) {
@@ -229,6 +350,14 @@ function createCanvasRaw(text: string): string {
   }, null, "\t")}\n`
 }
 
+function queueDialogResponse(value: string, action: DialogAction = "confirm"): void {
+  dialogResponses.push({ action, value })
+}
+
+function queueConfirmResponse(accepted: boolean): void {
+  confirmResponses.push(accepted)
+}
+
 function createPluginMock() {
   let pluginData: CanvasPluginData = createDefaultCanvasPluginData()
 
@@ -237,15 +366,24 @@ function createPluginMock() {
     getCanvasSettings: vi.fn(() => ({
       ...pluginData.settings,
     })),
+    getCanvasUiState: vi.fn(() => ({
+      inspectorSections: {
+        ...pluginData.ui.inspectorSections,
+      },
+    })),
     getRecentCanvasFiles: vi.fn(() => pluginData.recentFiles.map((item) => ({ ...item }))),
     openCanvasSettings: vi.fn(),
     openCanvasTab: vi.fn(),
-    rememberRecentCanvas: vi.fn(async (path: string, title?: string) => {
+    rememberRecentCanvas: vi.fn(async (path: string, title?: string, sourceType?: "local" | "workspace") => {
       pluginData = rememberRecentCanvasFile(pluginData, {
         openedAt: new Date("2026-04-11T09:00:00.000Z").toISOString(),
         path,
+        sourceType,
         title: title || path.split("/").pop() || path,
       })
+    }),
+    updateCanvasUiState: vi.fn(async (ui: Parameters<typeof updateCanvasPluginUiState>[1]) => {
+      pluginData = updateCanvasPluginUiState(pluginData, ui)
     }),
   }
 }
@@ -284,12 +422,23 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  dialogResponses.length = 0
+  confirmResponses.length = 0
+  workspaceDirectoryEntries.length = 0
+  localFiles.clear()
   workspaceFiles.clear()
+  apiMock.readDir.mockClear()
+  localFsMock.access.mockClear()
+  localFsMock.readFile.mockClear()
+  localFsMock.writeFile.mockClear()
+  confirm.mockReset()
   showMessage.mockReset()
   openTab.mockReset()
   fetchMock.mockClear()
   vi.stubGlobal("fetch", fetchMock)
-  vi.spyOn(window, "prompt").mockReturnValue(null)
+  vi.spyOn(window, "prompt").mockImplementation(() => {
+    throw new Error("prompt() is not supported.")
+  })
 
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
@@ -306,16 +455,104 @@ afterEach(() => {
 })
 
 describe("useCanvasEditor file lifecycle flows", () => {
-  it("opens a workspace canvas path, normalizes the extension, and refreshes recent files", async () => {
+  it("shows the bottom toolbar after the stage is activated", async () => {
+    const { editor, wrapper } = await mountEditor()
+
+    expect(editor.bottomToolbarVisible).toBe(false)
+
+    editor.activateCanvasSurface()
+    await flushEditor()
+
+    expect(editor.bottomToolbarVisible).toBe(true)
+
+    editor.deactivateCanvasSurface()
+    await flushEditor()
+
+    expect(editor.bottomToolbarVisible).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it("opens the create-edge dialog only when exactly one node is selected", async () => {
+    const { editor, wrapper } = await mountEditor()
+
+    editor.openCreateEdgeDialog()
+    await flushEditor()
+
+    expect(showMessage).toHaveBeenCalled()
+    expect(editor.createEdgeDialog.visible).toBe(false)
+
+    editor.addNode("text")
+    await flushEditor()
+
+    editor.openCreateEdgeDialog()
+    await flushEditor()
+
+    expect(editor.createEdgeDialog.visible).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it("persists inspector section toggles through the plugin bridge", async () => {
+    const { editor, plugin, wrapper } = await mountEditor()
+
+    await editor.toggleInspectorSection("document")
+    await flushEditor()
+
+    expect(plugin.updateCanvasUiState).toHaveBeenCalledWith({
+      inspectorSections: {
+        document: false,
+      },
+    })
+    expect(editor.inspectorSectionState.document).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it("opens a local canvas file through the file picker and records it in recent files", async () => {
+    const localPath = "C:\\canvas\\opened-local.canvas"
+    localFiles.set(localPath, createCanvasRaw("opened from local disk"))
+
+    const { editor, wrapper } = await mountEditor()
+    const localFile = new File([createCanvasRaw("opened from local disk")], "opened-local.canvas", {
+      type: "application/json",
+    })
+    Object.defineProperty(localFile, "path", {
+      configurable: true,
+      value: localPath,
+    })
+
+    await editor.importCanvas(localFile)
+    await flushEditor()
+
+    expect(editor.state.filePath).toBe(localPath)
+    expect(editor.suggestedFilename).toBe("opened-local.canvas")
+    expect(editor.state.document.nodes[0]).toMatchObject({
+      id: "n1",
+      text: "opened from local disk",
+      type: "text",
+    })
+    expect(editor.recentFiles).toEqual([
+      expect.objectContaining({
+        path: localPath,
+        sourceType: "local",
+        title: "opened-local.canvas",
+      }),
+    ])
+
+    wrapper.unmount()
+  })
+
+  it("opens a workspace canvas path through a dialog when prompt is unavailable", async () => {
     workspaceFiles.set("/data/storage/siyuan-canvas/opened.canvas", createCanvasRaw("opened from workspace"))
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("opened")
+    queueDialogResponse("opened")
 
     const { editor, plugin, wrapper } = await mountEditor()
 
     await editor.openPath()
     await flushEditor()
 
-    expect(promptSpy).toHaveBeenCalledOnce()
+    expect(window.prompt).not.toHaveBeenCalled()
     expect(editor.state.filePath).toBe("/data/storage/siyuan-canvas/opened.canvas")
     expect(editor.state.document.nodes[0]).toMatchObject({
       id: "n1",
@@ -325,6 +562,7 @@ describe("useCanvasEditor file lifecycle flows", () => {
     expect(plugin.rememberRecentCanvas).toHaveBeenCalledWith(
       "/data/storage/siyuan-canvas/opened.canvas",
       "opened.canvas",
+      "workspace",
     )
     expect(editor.recentFiles).toEqual([
       expect.objectContaining({
@@ -337,7 +575,6 @@ describe("useCanvasEditor file lifecycle flows", () => {
   })
 
   it("imports a local canvas file and exports the current document through a download link", async () => {
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(null)
     const clickSpy = vi.fn()
     const originalCreateElement = document.createElement.bind(document)
     const createdAnchors: HTMLAnchorElement[] = []
@@ -360,7 +597,7 @@ describe("useCanvasEditor file lifecycle flows", () => {
     }))
     await flushEditor()
 
-    expect(promptSpy).not.toHaveBeenCalled()
+    expect(window.prompt).not.toHaveBeenCalled()
     expect(editor.suggestedFilename).toBe("imported.canvas")
     expect(editor.state.filePath).toBe("")
     expect(editor.state.document.nodes[0]).toMatchObject({
@@ -382,8 +619,8 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
-  it("saves the current document to the workspace and records the saved path in recent files", async () => {
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("saved-workspace")
+  it("saves the current document through a dialog when prompt is unavailable", async () => {
+    queueDialogResponse("saved-workspace")
     const { editor, plugin, wrapper } = await mountEditor()
 
     editor.addNode("text")
@@ -399,12 +636,12 @@ describe("useCanvasEditor file lifecycle flows", () => {
     const savedPath = "/data/storage/siyuan-canvas/saved-workspace.canvas"
     const savedRaw = workspaceFiles.get(savedPath)
 
-    expect(promptSpy).toHaveBeenCalledOnce()
+    expect(window.prompt).not.toHaveBeenCalled()
     expect(savedRaw).toBeTruthy()
     expect(savedRaw).toContain("\"text\": \"saved to workspace\"")
     expect(editor.state.filePath).toBe(savedPath)
     expect(editor.suggestedFilename).toBe("saved-workspace.canvas")
-    expect(plugin.rememberRecentCanvas).toHaveBeenCalledWith(savedPath, "saved-workspace.canvas")
+    expect(plugin.rememberRecentCanvas).toHaveBeenCalledWith(savedPath, "saved-workspace.canvas", "workspace")
     expect(editor.recentFiles[0]).toEqual(expect.objectContaining({
       path: savedPath,
       title: "saved-workspace.canvas",
@@ -413,11 +650,68 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
+  it("saves a local canvas back to its original file path by default", async () => {
+    const localPath = "C:\\canvas\\save-local.canvas"
+    localFiles.set(localPath, createCanvasRaw("before edit"))
+    queueDialogResponse(localPath)
+
+    const { editor, plugin, wrapper } = await mountEditor()
+    const localFile = new File([createCanvasRaw("before edit")], "save-local.canvas", {
+      type: "application/json",
+    })
+    Object.defineProperty(localFile, "path", {
+      configurable: true,
+      value: localPath,
+    })
+
+    await editor.importCanvas(localFile)
+    await flushEditor()
+
+    editor.updateTextNodeContent("n1", "saved back to local disk")
+    await flushEditor()
+
+    await editor.save()
+    await flushEditor()
+
+    expect(localFsMock.writeFile).toHaveBeenCalledWith(
+      localPath,
+      expect.stringContaining("\"text\": \"saved back to local disk\""),
+    )
+    expect(localFiles.get(localPath)).toContain("\"text\": \"saved back to local disk\"")
+    expect(plugin.rememberRecentCanvas).toHaveBeenCalledWith(localPath, "save-local.canvas", "local")
+
+    wrapper.unmount()
+  })
+
+  it("re-prompts for a new workspace filename after overwrite is declined", async () => {
+    workspaceFiles.set("/data/storage/siyuan-canvas/existing.canvas", createCanvasRaw("already there"))
+    queueDialogResponse("/data/storage/siyuan-canvas/existing.canvas")
+    queueConfirmResponse(false)
+    queueDialogResponse("/data/storage/siyuan-canvas/renamed.canvas")
+
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("text")
+    await flushEditor()
+
+    editor.updateTextNodeContent(editor.state.selectedNodeId, "saved after rename")
+    await flushEditor()
+
+    await editor.save()
+    await flushEditor()
+
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(workspaceFiles.get("/data/storage/siyuan-canvas/existing.canvas")).toContain("\"text\": \"already there\"")
+    expect(workspaceFiles.get("/data/storage/siyuan-canvas/renamed.canvas")).toContain("\"text\": \"saved after rename\"")
+
+    wrapper.unmount()
+  })
+
   it("captures external save conflicts and can overwrite the disk version afterwards", async () => {
     const path = "/data/storage/siyuan-canvas/conflict.canvas"
     workspaceFiles.set(path, createCanvasRaw("original on disk"))
 
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(path)
+    queueDialogResponse(path)
     const { editor, wrapper } = await mountEditor({ path })
 
     editor.updateTextNodeContent("n1", "edited in memory")
@@ -428,7 +722,7 @@ describe("useCanvasEditor file lifecycle flows", () => {
     await editor.save()
     await flushEditor()
 
-    expect(promptSpy).toHaveBeenCalledOnce()
+    expect(window.prompt).not.toHaveBeenCalled()
     expect(editor.state.conflict?.path).toBe(path)
     expect(editor.state.conflict?.document?.nodes[0]).toMatchObject({
       id: "n1",
@@ -452,7 +746,7 @@ describe("useCanvasEditor file lifecycle flows", () => {
     const path = "/data/storage/siyuan-canvas/load-conflict.canvas"
     workspaceFiles.set(path, createCanvasRaw("before conflict"))
 
-    vi.spyOn(window, "prompt").mockReturnValue(path)
+    queueDialogResponse(path)
     const { editor, wrapper } = await mountEditor({ path })
 
     editor.updateTextNodeContent("n1", "local edit")
@@ -480,6 +774,65 @@ describe("useCanvasEditor file lifecycle flows", () => {
       type: "text",
     })
     expect(editor.suggestedFilename).toBe("load-conflict.canvas")
+
+    wrapper.unmount()
+  })
+
+  it("lists workspace canvas documents from the configured workspace directory", async () => {
+    workspaceDirectoryEntries.push(
+      { isDir: false, isSymlink: false, name: "alpha.canvas" },
+      { isDir: false, isSymlink: false, name: "notes.md" },
+      { isDir: false, isSymlink: false, name: "beta.canvas" },
+      { isDir: true, isSymlink: false, name: "nested" },
+    )
+
+    const { editor, wrapper } = await mountEditor()
+
+    expect(apiMock.readDir).toHaveBeenCalledWith("/data/storage/siyuan-canvas")
+    expect(editor.workspaceDocuments).toEqual([
+      {
+        path: "/data/storage/siyuan-canvas/alpha.canvas",
+        title: "alpha.canvas",
+      },
+      {
+        path: "/data/storage/siyuan-canvas/beta.canvas",
+        title: "beta.canvas",
+      },
+    ])
+
+    wrapper.unmount()
+  })
+
+  it("keeps recent files from both workspace and local opens", async () => {
+    workspaceFiles.set("/data/storage/siyuan-canvas/workspace.canvas", createCanvasRaw("workspace version"))
+
+    queueDialogResponse("workspace")
+    const { editor, wrapper } = await mountEditor()
+
+    await editor.openPath()
+    await flushEditor()
+
+    const localPath = "C:\\canvas\\recent-local.canvas"
+    localFiles.set(localPath, createCanvasRaw("local version"))
+    const localFile = new File([createCanvasRaw("local version")], "recent-local.canvas", {
+      type: "application/json",
+    })
+    Object.defineProperty(localFile, "path", {
+      configurable: true,
+      value: localPath,
+    })
+
+    await editor.importCanvas(localFile)
+    await flushEditor()
+
+    expect(editor.recentFiles.map((item: any) => item.path)).toEqual([
+      localPath,
+      "/data/storage/siyuan-canvas/workspace.canvas",
+    ])
+    expect(editor.recentFiles.map((item: any) => item.sourceType)).toEqual([
+      "local",
+      "workspace",
+    ])
 
     wrapper.unmount()
   })

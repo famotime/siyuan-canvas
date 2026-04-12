@@ -8,11 +8,13 @@ import type {
 } from "@/canvas/types"
 import type { CanvasTabBootstrap } from "@/main"
 import type {
+  CanvasPluginUiState,
   CanvasPluginSettings,
   CanvasRecentFile,
 } from "@/canvas/plugin-data"
 import type { ResolvedCanvasFileNode } from "@/canvas/file-node-resolution"
 import type { CanvasPluginBridge } from "@/canvas/use-canvas-editor-shared"
+import type { CanvasEditorFileSource } from "@/canvas/use-canvas-editor-shared"
 
 import {
   openTab,
@@ -26,6 +28,7 @@ import {
   ref,
   watch,
 } from "vue"
+import { readDir } from "@/api"
 import {
   createCanvasBoardMetrics,
   toBoardX,
@@ -57,7 +60,10 @@ import {
   getCanvasFileName,
 } from "@/canvas/use-canvas-editor-shared"
 import { renderMarkdownPreview } from "@/canvas/markdown-preview"
-import { createDefaultCanvasPluginSettings } from "@/canvas/plugin-data"
+import {
+  createDefaultCanvasPluginSettings,
+  createDefaultCanvasPluginUiState,
+} from "@/canvas/plugin-data"
 import { CanvasFileService } from "@/canvas/file-service"
 import {
   parseCanvasDocument,
@@ -94,10 +100,22 @@ export function useCanvasEditor(
   })
   const fileInputRef = ref<HTMLInputElement>()
   const fileNodeMeta = ref<Record<string, ResolvedCanvasFileNode>>({})
+  const fileSource = ref<CanvasEditorFileSource>(bootstrap.path ? "workspace" : "unsaved")
   const stageRef = ref<HTMLElement>()
   const recentFiles = ref<CanvasRecentFile[]>([])
+  const workspaceDocuments = ref<Array<{ path: string, title: string }>>([])
   const suggestedFilename = ref(bootstrap.title || t("untitledCanvas"))
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
+  const bottomToolbarVisible = ref(false)
+  const createEdgeDialog = reactive({
+    visible: false,
+  })
+  const inspectorSectionState = reactive({
+    ...(
+      plugin.getCanvasUiState?.().inspectorSections
+      ?? createDefaultCanvasPluginUiState().inspectorSections
+    ),
+  })
   const selectionToolbarSize = reactive({
     height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
     width: DEFAULT_SELECTION_TOOLBAR_SIZE.width,
@@ -206,10 +224,39 @@ export function useCanvasEditor(
     recentFiles.value = plugin.getRecentCanvasFiles?.() ?? []
   }
 
+  function activateCanvasSurface() {
+    bottomToolbarVisible.value = true
+  }
+
+  function deactivateCanvasSurface() {
+    bottomToolbarVisible.value = false
+  }
+
+  async function refreshWorkspaceDocuments() {
+    const directory = getPluginSettings().defaultCanvasDirectory
+
+    try {
+      const entries = await readDir(directory) as Array<{
+        isDir: boolean
+        name: string
+      }> | null
+
+      workspaceDocuments.value = (Array.isArray(entries) ? entries : [])
+        .filter((entry) => !entry.isDir && entry.name.endsWith(".canvas"))
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .map((entry) => ({
+          path: `${directory}/${entry.name}`,
+          title: entry.name,
+        }))
+    } catch {
+      workspaceDocuments.value = []
+    }
+  }
+
   watch(
     () => [state.filePath, state.isDirty, suggestedFilename.value],
     () => {
-      const title = state.filePath.split("/").pop() || suggestedFilename.value || t("untitledCanvas")
+      const title = getFileName(state.filePath) || suggestedFilename.value || t("untitledCanvas")
       setTitle(`${state.isDirty ? "● " : ""}${title}`)
     },
     { immediate: true },
@@ -329,17 +376,21 @@ export function useCanvasEditor(
     loadConflictVersion,
     newCanvas,
     openPath,
+    openRecentFile,
     openRecentPath,
     openSettings,
+    openWorkspacePath,
     overwriteConflictVersion,
     rememberRecentPath,
     save,
     triggerImport,
   } = createCanvasEditorFileActions({
     fileInputRef,
+    fileSource,
     getPluginSettings,
     plugin,
     refreshRecentFiles,
+    refreshWorkspaceDocuments,
     resetViewport,
     state,
     suggestedFilename,
@@ -544,6 +595,28 @@ export function useCanvasEditor(
     newEdgeTargetId.value = ""
   }
 
+  function openCreateEdgeDialog() {
+    if (state.selectedNodeIds.length !== 1 || !selectedNode.value) {
+      showMessage(t("messageSelectSingleSourceNodeFirst"), 2500, "warning")
+      return
+    }
+
+    activateCanvasSurface()
+    createEdgeDialog.visible = true
+  }
+
+  function closeCreateEdgeDialog() {
+    createEdgeDialog.visible = false
+  }
+
+  function submitCreateEdgeDialog() {
+    const previousSelectedEdgeId = state.selectedEdgeId
+    createEdgeFromSelection()
+    if (state.selectedEdgeId && state.selectedEdgeId !== previousSelectedEdgeId) {
+      closeCreateEdgeDialog()
+    }
+  }
+
   function zoomIn() {
     viewport.scale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
   }
@@ -554,6 +627,16 @@ export function useCanvasEditor(
 
   function toggleInspector() {
     inspectorExpanded.value = !inspectorExpanded.value
+  }
+
+  async function toggleInspectorSection(section: keyof CanvasPluginUiState["inspectorSections"]) {
+    const nextValue = !inspectorSectionState[section]
+    inspectorSectionState[section] = nextValue
+    await plugin.updateCanvasUiState?.({
+      inspectorSections: {
+        [section]: nextValue,
+      },
+    })
   }
 
   function activateNode(node: CanvasNode) {
@@ -683,7 +766,8 @@ export function useCanvasEditor(
       try {
         await state.open(bootstrap.path)
         suggestedFilename.value = getFileName(bootstrap.path)
-        await rememberRecentPath(bootstrap.path)
+        fileSource.value = "workspace"
+        await rememberRecentPath(bootstrap.path, "workspace")
       } catch (error) {
         showMessage(error instanceof Error ? error.message : t("messageUnableOpenCanvasFile"), 4000, "error")
       }
@@ -692,6 +776,7 @@ export function useCanvasEditor(
     }
 
     refreshRecentFiles()
+    await refreshWorkspaceDocuments()
     await refreshFileNodeMetadata()
     resetViewport()
     window.addEventListener("keydown", handleKeydown)
@@ -723,12 +808,17 @@ export function useCanvasEditor(
     {
       applySelectionColor,
       applySelectionLayout,
+      activateCanvasSurface,
       board,
+      bottomToolbarVisible,
       canDelete,
       centerSelectionInViewport,
+      closeCreateEdgeDialog,
       closeSelectionPopover,
       createGroupFromSelection,
+      createEdgeDialog,
       displayNodes,
+      deactivateCanvasSurface,
       connectionDraft,
       edgeTargets,
       exportCanvas,
@@ -750,7 +840,9 @@ export function useCanvasEditor(
       newEdgeLabel,
       newEdgeTargetId,
       newEdgeToSide,
+      openCreateEdgeDialog,
       openPath,
+      openRecentFile,
       resetViewport,
       save,
       selectEdge,
@@ -767,8 +859,10 @@ export function useCanvasEditor(
       startPan,
       startResize,
       state,
+      submitCreateEdgeDialog,
       suggestedFilename,
       triggerImport,
+      toggleInspectorSection,
       updateTextNodeContent,
       updateEdgeField,
       updateEdgeSide,
@@ -781,6 +875,7 @@ export function useCanvasEditor(
       handleNodePointerDown,
       handleWheelZoom,
       inspectorExpanded,
+      inspectorSectionState,
       addNode,
       createEdgeFromSelection,
       deleteSelection,
@@ -788,8 +883,10 @@ export function useCanvasEditor(
       loadConflictVersion,
       openRecentPath,
       openSettings,
+      openWorkspacePath,
       overwriteConflictVersion,
       recentFiles,
+      workspaceDocuments,
       selectionColors,
       selectionLayoutActions,
       selectionToolbar,

@@ -9,6 +9,7 @@ import {
 import { mount } from "@vue/test-utils"
 import {
   nextTick,
+  reactive,
   ref,
 } from "vue"
 import zhCN from "@/i18n/zh_CN.json"
@@ -61,18 +62,24 @@ function createGroupNode(overrides: Record<string, unknown> = {}) {
 }
 
 function createEditorMock(node = createTextNode()) {
-  return {
+  return reactive({
     addNode: vi.fn(),
     activateNode: vi.fn(),
+    activateCanvasSurface: vi.fn(),
     applySelectionColor: vi.fn(),
     applySelectionLayout: vi.fn(),
     board: {
       height: 800,
       width: 1200,
     },
+    bottomToolbarVisible: false,
     canDelete: false,
     centerSelectionInViewport: vi.fn(),
+    closeCreateEdgeDialog: vi.fn(),
     closeSelectionPopover: vi.fn(),
+    createEdgeDialog: {
+      visible: false,
+    },
     createGroupFromSelection: vi.fn(),
     createEdgeFromSelection: vi.fn(),
     connectionDraft: {
@@ -80,6 +87,7 @@ function createEditorMock(node = createTextNode()) {
       toY: 0,
       visible: false,
     },
+    deactivateCanvasSurface: vi.fn(),
     deleteSelection: vi.fn(),
     displayNodes: [node],
     edgeTargets: [],
@@ -108,15 +116,26 @@ function createEditorMock(node = createTextNode()) {
     isConnectionTarget: vi.fn(() => false),
     importCanvas: vi.fn(),
     inspectorExpanded: true,
+    inspectorSectionState: {
+      createEdge: true,
+      document: true,
+      edge: true,
+      node: true,
+      recent: true,
+      selection: true,
+    },
     loadConflictVersion: vi.fn(),
     newCanvas: vi.fn(),
     newEdgeFromSide: "right",
     newEdgeLabel: "",
     newEdgeTargetId: "",
     newEdgeToSide: "left",
+    openCreateEdgeDialog: vi.fn(),
+    openRecentFile: vi.fn(),
     openPath: vi.fn(),
     openRecentPath: vi.fn(),
     openSettings: vi.fn(),
+    openWorkspacePath: vi.fn(),
     overwriteConflictVersion: vi.fn(),
     recentFiles: [],
     resetViewport: vi.fn(),
@@ -168,7 +187,9 @@ function createEditorMock(node = createTextNode()) {
       selectedNodeIds: [],
     },
     suggestedFilename: "Untitled.canvas",
+    submitCreateEdgeDialog: vi.fn(),
     toggleInspector: vi.fn(),
+    toggleInspectorSection: vi.fn(),
     toggleSelectionPopover: vi.fn(),
     triggerImport: vi.fn(),
     updateEdgeField: vi.fn(),
@@ -176,6 +197,7 @@ function createEditorMock(node = createTextNode()) {
     updateNodeField: vi.fn(),
     updateNumericNodeField: vi.fn(),
     updateTextNodeContent: vi.fn(),
+    workspaceDocuments: [],
     viewport: {
       scale: 1,
       x: 0,
@@ -183,7 +205,7 @@ function createEditorMock(node = createTextNode()) {
     },
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
-  }
+  })
 }
 
 function createPluginMock() {
@@ -317,6 +339,100 @@ describe("CanvasWorkspace", () => {
     expect(currentEditor.startCornerResize).toHaveBeenCalledWith(node, expect.anything())
     expect(currentEditor.startConnectionDrag).toHaveBeenNthCalledWith(1, node, "top", expect.anything())
     expect(currentEditor.startConnectionDrag).toHaveBeenNthCalledWith(2, node, "bottom", expect.anything())
+  })
+
+  it("removes retired top toolbar buttons and keeps file controls", () => {
+    currentEditor = createEditorMock()
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const toolbarText = wrapper.find(".toolbar").text()
+
+    expect(toolbarText).toContain("新建")
+    expect(toolbarText).toContain("打开")
+    expect(toolbarText).toContain("保存")
+    expect(toolbarText).not.toContain("导出")
+    expect(toolbarText).not.toContain("设置")
+    expect(toolbarText).not.toContain("文本")
+    expect(toolbarText).not.toContain("文件")
+    expect(toolbarText).not.toContain("链接")
+    expect(toolbarText).not.toContain("分组")
+    expect(toolbarText).not.toContain("删除")
+  })
+
+  it("wires stage interaction to canvas-surface activation and renders the bottom toolbar when active", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.bottomToolbarVisible = true
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find(".stage").trigger("pointerdown")
+
+    expect(currentEditor.activateCanvasSurface).toHaveBeenCalled()
+    expect(wrapper.find("[data-testid='bottom-toolbar']").exists()).toBe(true)
+  })
+
+  it("opens the create-edge dialog from the bottom toolbar", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.bottomToolbarVisible = true
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='bottom-toolbar-connect']").trigger("click")
+
+    expect(currentEditor.openCreateEdgeDialog).toHaveBeenCalledTimes(1)
+  })
+
+  it("renders the create-edge dialog when requested", () => {
+    currentEditor = createEditorMock()
+    currentEditor.createEdgeDialog.visible = true
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='create-edge-dialog']").exists()).toBe(true)
+  })
+
+  it("hides a collapsed inspector section body and wires the section toggle", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.inspectorSectionState.document = false
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='inspector-section-document-body']").exists()).toBe(false)
+
+    await wrapper.find("[data-testid='inspector-section-document-toggle']").trigger("click")
+
+    expect(currentEditor.toggleInspectorSection).toHaveBeenCalledWith("document")
   })
 
   it("renders a single-selection floating toolbar with edit and no create-group action", async () => {
@@ -605,6 +721,7 @@ describe("CanvasWorkspace", () => {
   it("renders toolbar and sidebar labels in Chinese from plugin i18n", () => {
     currentEditor = createEditorMock()
     currentEditor.suggestedFilename = ""
+    currentEditor.bottomToolbarVisible = true
 
     const wrapper = mount(CanvasWorkspace, {
       props: {
@@ -618,22 +735,20 @@ describe("CanvasWorkspace", () => {
     const inspectorText = wrapper.find(".inspector").text()
 
     expect(toolbarText).toContain("新建")
-    expect(toolbarText).toContain("打开路径")
-    expect(toolbarText).toContain("导入")
+    expect(toolbarText).toContain("打开")
     expect(toolbarText).toContain("保存")
-    expect(toolbarText).toContain("导出")
-    expect(toolbarText).toContain("设置")
-    expect(toolbarText).toContain("文本")
-    expect(toolbarText).toContain("文件")
-    expect(toolbarText).toContain("链接")
-    expect(toolbarText).toContain("分组")
     expect(toolbarText).toContain("未命名.canvas")
     expect(toolbarText).toContain("1 个节点 / 0 条连线")
     expect(toolbarText).toContain("已保存")
+    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("title")).toBe("文本")
+    expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("title")).toBe("文件")
+    expect(wrapper.find("[data-testid='bottom-toolbar-connect']").attributes("title")).toBe("创建连线")
+    expect(wrapper.find("[data-testid='bottom-toolbar-group']").attributes("title")).toBe("分组")
     expect(wrapper.find(".workspace__inspector-handle").attributes("title")).toBe("收起侧栏")
     expect(inspectorText).toContain("文档")
     expect(inspectorText).toContain("未保存的工作区路径")
     expect(inspectorText).toContain("已同步")
+    expect(inspectorText).toContain("当前工作区目录下暂无 Canvas 文件。")
     expect(inspectorText).toContain("最近打开")
     expect(inspectorText).toContain("暂无最近打开的工作区文件。")
     expect(inspectorText).toContain("节点")

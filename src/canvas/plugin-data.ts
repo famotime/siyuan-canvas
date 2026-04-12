@@ -1,18 +1,35 @@
+export type CanvasRecentFileSource = "local" | "workspace"
+
 export interface CanvasPluginSettings {
   defaultCanvasDirectory: string
   detectExternalChanges: boolean
   recentFilesLimit: number
 }
 
+export interface CanvasInspectorSectionsState {
+  createEdge: boolean
+  document: boolean
+  edge: boolean
+  node: boolean
+  recent: boolean
+  selection: boolean
+}
+
+export interface CanvasPluginUiState {
+  inspectorSections: CanvasInspectorSectionsState
+}
+
 export interface CanvasRecentFile {
   openedAt: string
   path: string
+  sourceType: CanvasRecentFileSource
   title: string
 }
 
 export interface CanvasPluginData {
   recentFiles: CanvasRecentFile[]
   settings: CanvasPluginSettings
+  ui: CanvasPluginUiState
   version: 1
 }
 
@@ -24,12 +41,39 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
   }
 }
 
+export function createDefaultCanvasPluginUiState(): CanvasPluginUiState {
+  return {
+    inspectorSections: {
+      createEdge: true,
+      document: true,
+      edge: true,
+      node: true,
+      recent: true,
+      selection: true,
+    },
+  }
+}
+
 export function createDefaultCanvasPluginData(): CanvasPluginData {
   return {
     recentFiles: [],
     settings: createDefaultCanvasPluginSettings(),
+    ui: createDefaultCanvasPluginUiState(),
     version: 1,
   }
+}
+
+function getCanvasPathTitle(path: string): string {
+  const normalized = path.split(/[\\/]/)
+  return normalized[normalized.length - 1] || path
+}
+
+function normalizeRecentSourceType(path: string, value: unknown): CanvasRecentFileSource {
+  if (value === "local" || value === "workspace") {
+    return value
+  }
+
+  return path.startsWith("/data/") ? "workspace" : "local"
 }
 
 export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
@@ -41,6 +85,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
   const candidate = value as Partial<CanvasPluginData> & {
     settings?: Partial<CanvasPluginSettings>
     recentFiles?: Partial<CanvasRecentFile>[]
+    ui?: {
+      inspectorSections?: Partial<Record<keyof CanvasInspectorSectionsState, unknown>>
+    }
   }
 
   const recentFiles = Array.isArray(candidate.recentFiles)
@@ -52,7 +99,8 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
             ? item.openedAt
             : new Date(0).toISOString(),
           path: item.path!,
-          title: typeof item.title === "string" && item.title ? item.title : item.path!.split("/").pop() || item.path!,
+          sourceType: normalizeRecentSourceType(item.path!, item.sourceType),
+          title: typeof item.title === "string" && item.title ? item.title : getCanvasPathTitle(item.path!),
         }))
     : defaults.recentFiles
 
@@ -70,9 +118,35 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
       : defaults.settings.recentFilesLimit,
   }
 
+  const defaultInspectorSections = defaults.ui.inspectorSections
+  const candidateInspectorSections = candidate.ui?.inspectorSections
+  const inspectorSections: CanvasInspectorSectionsState = {
+    createEdge: typeof candidateInspectorSections?.createEdge === "boolean"
+      ? candidateInspectorSections.createEdge
+      : defaultInspectorSections.createEdge,
+    document: typeof candidateInspectorSections?.document === "boolean"
+      ? candidateInspectorSections.document
+      : defaultInspectorSections.document,
+    edge: typeof candidateInspectorSections?.edge === "boolean"
+      ? candidateInspectorSections.edge
+      : defaultInspectorSections.edge,
+    node: typeof candidateInspectorSections?.node === "boolean"
+      ? candidateInspectorSections.node
+      : defaultInspectorSections.node,
+    recent: typeof candidateInspectorSections?.recent === "boolean"
+      ? candidateInspectorSections.recent
+      : defaultInspectorSections.recent,
+    selection: typeof candidateInspectorSections?.selection === "boolean"
+      ? candidateInspectorSections.selection
+      : defaultInspectorSections.selection,
+  }
+
   return {
     recentFiles: recentFiles.slice(0, settings.recentFilesLimit),
     settings,
+    ui: {
+      inspectorSections,
+    },
     version: 1,
   }
 }
@@ -91,4 +165,23 @@ export function rememberRecentCanvasFile(
     ...normalized,
     recentFiles,
   }
+}
+
+export function updateCanvasPluginUiState(
+  data: CanvasPluginData,
+  ui: Partial<CanvasPluginUiState>,
+): CanvasPluginData {
+  const normalized = normalizeCanvasPluginData(data)
+
+  return normalizeCanvasPluginData({
+    ...normalized,
+    ui: {
+      ...normalized.ui,
+      ...ui,
+      inspectorSections: {
+        ...normalized.ui.inspectorSections,
+        ...ui.inspectorSections,
+      },
+    },
+  })
 }

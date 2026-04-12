@@ -28,6 +28,63 @@ import type { ModuleExports } from "vitest"
 const openTab = vi.fn()
 const showMessage = vi.fn()
 const getFrontend = vi.fn(() => "desktop")
+type DialogAction = "cancel" | "confirm"
+
+interface DialogResponse {
+  action: DialogAction
+  value: string
+}
+
+const dialogResponses: DialogResponse[] = []
+
+class DialogMock {
+  public element: HTMLElement
+  public editors = {}
+  public data: unknown
+  private readonly destroyCallback?: (options?: Record<string, unknown>) => void
+  private enterEvent?: () => void
+
+  constructor(options: {
+    content: string
+    destroyCallback?: (options?: Record<string, unknown>) => void
+  }) {
+    this.destroyCallback = options.destroyCallback
+    this.element = document.createElement("div")
+    this.element.innerHTML = options.content
+    document.body.appendChild(this.element)
+
+    const response = dialogResponses.shift()
+    queueMicrotask(() => {
+      const input = this.element.querySelector("input, textarea") as HTMLInputElement | HTMLTextAreaElement | null
+      if (input && response) {
+        input.value = response.value
+        input.dispatchEvent(new Event("input", { bubbles: true }))
+      }
+
+      if (!response || response.action === "cancel") {
+        this.destroy()
+        return
+      }
+
+      const confirmButton = this.element.querySelector("[data-canvas-dialog-confirm]") as HTMLButtonElement | null
+      if (confirmButton) {
+        confirmButton.click()
+        return
+      }
+
+      this.enterEvent?.()
+    })
+  }
+
+  bindInput(_inputElement: HTMLInputElement | HTMLTextAreaElement, enterEvent?: () => void): void {
+    this.enterEvent = enterEvent
+  }
+
+  destroy(options?: Record<string, unknown>): void {
+    this.element.remove()
+    this.destroyCallback?.(options)
+  }
+}
 
 class PluginMock {
   public app = {}
@@ -77,6 +134,7 @@ class SettingMock {
 }
 
 const siyuanMock = {
+  Dialog: DialogMock,
   Plugin: PluginMock,
   Setting: SettingMock,
   getFrontend,
@@ -196,13 +254,39 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  dialogResponses.length = 0
   openTab.mockReset()
   showMessage.mockReset()
   getFrontend.mockReset()
   getFrontend.mockReturnValue("desktop")
+  vi.spyOn(window, "prompt").mockImplementation(() => {
+    throw new Error("prompt() is not supported.")
+  })
 })
 
 describe("canvas plugin lifecycle", () => {
+  it("opens a canvas tab from the command palette through a dialog when prompt is unavailable", async () => {
+    dialogResponses.push({ action: "confirm", value: "/data/storage/siyuan-canvas/from-command.canvas" })
+
+    const plugin = new SiyuanCanvasPlugin()
+    await plugin.onload()
+
+    const openByPathCommand = plugin.commands.find(command => command.langKey === "openCanvasPath")
+    expect(openByPathCommand).toBeTruthy()
+
+    await openByPathCommand.callback()
+    await Promise.resolve()
+
+    expect(window.prompt).not.toHaveBeenCalled()
+    expect(openTab).toHaveBeenCalledWith(expect.objectContaining({
+      app: plugin.app,
+      custom: expect.objectContaining({
+        data: { path: "/data/storage/siyuan-canvas/from-command.canvas" },
+        title: "from-command.canvas",
+      }),
+    }))
+  })
+
   it("opens canvas tabs with path-derived and explicit titles", async () => {
     const plugin = new SiyuanCanvasPlugin()
 
@@ -295,6 +379,16 @@ describe("canvas plugin lifecycle", () => {
         detectExternalChanges: false,
         recentFilesLimit: 3,
       },
+      ui: {
+        inspectorSections: {
+          createEdge: false,
+          document: false,
+          edge: true,
+          node: true,
+          recent: true,
+          selection: true,
+        },
+      },
       version: 1,
     })
 
@@ -311,9 +405,41 @@ describe("canvas plugin lifecycle", () => {
         title: "recent.canvas",
       }),
     ])
+    expect(plugin.getCanvasUiState()).toEqual({
+      inspectorSections: {
+        createEdge: false,
+        document: false,
+        edge: true,
+        node: true,
+        recent: true,
+        selection: true,
+      },
+    })
     expect(plugin.addTab).toHaveBeenCalledTimes(1)
     expect(plugin.addTopBar).toHaveBeenCalledTimes(1)
     expect(plugin.addCommand).toHaveBeenCalledTimes(3)
     expect(showMessage).toHaveBeenCalledWith(expect.any(String), 2500, "info")
+  })
+
+  it("updates persisted inspector section UI state", async () => {
+    const plugin = new SiyuanCanvasPlugin()
+
+    await plugin.updateCanvasUiState({
+      inspectorSections: {
+        document: false,
+        recent: false,
+      },
+    })
+
+    expect(plugin.getCanvasUiState()).toEqual({
+      inspectorSections: {
+        createEdge: true,
+        document: false,
+        edge: true,
+        node: true,
+        recent: false,
+        selection: true,
+      },
+    })
   })
 })

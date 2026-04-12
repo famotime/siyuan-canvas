@@ -1,6 +1,8 @@
 import type { Custom } from "siyuan"
 import type {
+  CanvasPluginUiState,
   CanvasPluginSettings,
+  CanvasRecentFileSource,
   CanvasRecentFile,
 } from "@/canvas/plugin-data"
 
@@ -16,15 +18,18 @@ import {
   createDefaultCanvasPluginData,
   normalizeCanvasPluginData,
   rememberRecentCanvasFile,
+  updateCanvasPluginUiState,
 } from "@/canvas/plugin-data"
 import { openCanvasPluginSettingsPanel } from "@/canvas/plugin-settings-panel"
 import { detectCanvasPluginRuntime } from "@/canvas/plugin-runtime"
+import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import {
   CANVAS_EDITOR_TAB_TYPE,
   openCanvasEditorTab,
   registerCanvasEditorTab,
 } from "@/canvas/plugin-tabs"
 import { createCanvasI18n } from "@/i18n/canvas"
+import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 import {
   bindPlugin,
 } from "@/main"
@@ -82,9 +87,13 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addCommand({
       langKey: "openCanvasPath",
       langText: this.t("openCanvasPath"),
-      callback: () => {
-        // eslint-disable-next-line no-alert
-        const path = window.prompt(this.t("promptWorkspacePath"), "/data/storage/siyuan-canvas/untitled.canvas")
+      callback: async () => {
+        const path = await openTextInputDialog({
+          cancelLabel: this.t("dialogCancel"),
+          confirmLabel: this.t("dialogConfirm"),
+          initialValue: "/data/storage/siyuan-canvas/untitled.canvas",
+          title: this.t("promptWorkspacePath"),
+        })
         if (!path) {
           return
         }
@@ -120,11 +129,19 @@ export default class SiyuanCanvasPlugin extends Plugin {
     }
   }
 
+  public getCanvasUiState(): CanvasPluginUiState {
+    return {
+      inspectorSections: {
+        ...this.canvasData.ui.inspectorSections,
+      },
+    }
+  }
+
   public getRecentCanvasFiles(): CanvasRecentFile[] {
     return this.canvasData.recentFiles.map((item) => ({ ...item }))
   }
 
-  public async rememberRecentCanvas(path: string, title?: string): Promise<void> {
+  public async rememberRecentCanvas(path: string, title?: string, sourceType: CanvasRecentFileSource = "workspace"): Promise<void> {
     if (!path) {
       return
     }
@@ -132,7 +149,8 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.canvasData = rememberRecentCanvasFile(this.canvasData, {
       openedAt: new Date().toISOString(),
       path,
-      title: title || path.split("/").pop() || path,
+      sourceType,
+      title: title || getCanvasFileName(path) || path,
     })
     await this.persistCanvasData()
   }
@@ -145,6 +163,11 @@ export default class SiyuanCanvasPlugin extends Plugin {
         ...settings,
       },
     })
+    await this.persistCanvasData()
+  }
+
+  public async updateCanvasUiState(ui: Partial<CanvasPluginUiState>): Promise<void> {
+    this.canvasData = updateCanvasPluginUiState(this.canvasData, ui)
     await this.persistCanvasData()
   }
 

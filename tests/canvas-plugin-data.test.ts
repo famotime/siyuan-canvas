@@ -6,6 +6,7 @@ import {
 
 import {
   createDefaultCanvasPluginData,
+  normalizeCanvasPluginData,
   rememberRecentCanvasFile,
 } from "@/canvas/plugin-data"
 
@@ -17,6 +18,14 @@ describe("canvas plugin data", () => {
     expect(data.settings.detectExternalChanges).toBe(true)
     expect(data.settings.recentFilesLimit).toBe(8)
     expect(data.recentFiles).toEqual([])
+    expect(data.ui.inspectorSections).toEqual({
+      createEdge: true,
+      document: true,
+      edge: true,
+      node: true,
+      recent: true,
+      selection: true,
+    })
   })
 
   it("deduplicates and caps recent canvas files", () => {
@@ -25,11 +34,13 @@ describe("canvas plugin data", () => {
     data = rememberRecentCanvasFile(data, {
       openedAt: "2026-04-08T10:00:00.000Z",
       path: "/data/storage/siyuan-canvas/alpha.canvas",
+      sourceType: "workspace",
       title: "alpha.canvas",
     })
     data = rememberRecentCanvasFile(data, {
       openedAt: "2026-04-08T10:01:00.000Z",
-      path: "/data/storage/siyuan-canvas/beta.canvas",
+      path: "C:\\canvas\\beta.canvas",
+      sourceType: "local",
       title: "beta.canvas",
     })
     data = rememberRecentCanvasFile({
@@ -41,6 +52,7 @@ describe("canvas plugin data", () => {
     }, {
       openedAt: "2026-04-08T10:02:00.000Z",
       path: "/data/storage/siyuan-canvas/alpha.canvas",
+      sourceType: "workspace",
       title: "alpha.canvas",
     })
 
@@ -48,13 +60,38 @@ describe("canvas plugin data", () => {
       {
         openedAt: "2026-04-08T10:02:00.000Z",
         path: "/data/storage/siyuan-canvas/alpha.canvas",
+        sourceType: "workspace",
         title: "alpha.canvas",
       },
       {
         openedAt: "2026-04-08T10:01:00.000Z",
-        path: "/data/storage/siyuan-canvas/beta.canvas",
+        path: "C:\\canvas\\beta.canvas",
+        sourceType: "local",
         title: "beta.canvas",
       },
     ])
+  })
+
+  it("normalizes missing or invalid persisted inspector UI state", () => {
+    const data = normalizeCanvasPluginData({
+      recentFiles: [],
+      settings: {},
+      ui: {
+        inspectorSections: {
+          createEdge: false,
+          document: "bad",
+        },
+      },
+      version: 1,
+    })
+
+    expect(data.ui.inspectorSections).toEqual({
+      createEdge: false,
+      document: true,
+      edge: true,
+      node: true,
+      recent: true,
+      selection: true,
+    })
   })
 })
