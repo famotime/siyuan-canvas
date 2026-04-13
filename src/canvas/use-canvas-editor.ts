@@ -76,6 +76,7 @@ import { CanvasFileService } from "@/canvas/file-service"
 import { writeWorkspaceImageFile } from "@/canvas/workspace-image-files"
 import {
   findSiyuanDocumentsByQuery,
+  findSiyuanImageAssetByBlockId,
   findSiyuanImageAssetsByQuery,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
 import {
@@ -97,6 +98,7 @@ const DEFAULT_SELECTION_TOOLBAR_SIZE = {
   width: 220,
 }
 const SELECTION_COLORS = ["1", "2", "3", "4", "5", "6"] as const
+const SIYUAN_BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
 
 export function useCanvasEditor(
   plugin: CanvasPluginBridge,
@@ -717,6 +719,10 @@ export function useCanvasEditor(
       return
     }
 
+    const imageByBlockId = SIYUAN_BLOCK_ID_PATTERN.test(query)
+      ? await findSiyuanImageAssetByBlockId(query)
+      : null
+
     filePickerDialog.groups = await searchCanvasFilePickerTargets(query, {
       searchDocuments: async (keyword) => {
         const documents = await findSiyuanDocumentsByQuery(keyword)
@@ -728,8 +734,19 @@ export function useCanvasEditor(
         }))
       },
       searchImages: async (keyword) => {
+        if (imageByBlockId) {
+          return [{
+            blockId: imageByBlockId.blockId,
+            kind: "image" as const,
+            path: imageByBlockId.path,
+            subtitle: imageByBlockId.path,
+            title: imageByBlockId.title || imageByBlockId.name,
+          }]
+        }
+
         const images = await findSiyuanImageAssetsByQuery(keyword)
         return images.map((image) => ({
+          blockId: image.blockId,
           kind: "image" as const,
           path: image.path,
           subtitle: image.path,
@@ -761,7 +778,9 @@ export function useCanvasEditor(
     const node = createCanvasNode("file")
     node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
     node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
-    node.file = option.path
+    node.file = option.kind === "image" && option.blockId
+      ? option.blockId
+      : option.path
 
     commitDocument(upsertCanvasNode(state.document, node))
     state.selectNode(node.id)

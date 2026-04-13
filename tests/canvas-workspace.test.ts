@@ -507,6 +507,35 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='file-picker-option-image']").exists()).toBe(true)
   })
 
+  it("keeps mouse wheel events inside the file picker dialog instead of zooming the canvas", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.filePickerDialog.visible = true
+    currentEditor.filePickerDialog.groups.documents = [{
+      kind: "document",
+      path: "/data/roadmap.sy",
+      subtitle: "/Projects/Roadmap",
+      title: "Roadmap",
+    }]
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    wrapper.find("[data-testid='file-picker-dialog'] .canvas-dialog").element.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 120,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleWheelZoom).not.toHaveBeenCalled()
+  })
+
   it("renders a canvas thumbnail preview for nested canvas file cards", () => {
     currentEditor = createEditorMock({
       id: "file-canvas-1",

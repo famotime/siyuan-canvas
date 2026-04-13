@@ -512,7 +512,10 @@
           data-testid="file-picker-dialog"
           @click.self="editor.closeFilePickerDialog"
         >
-          <div class="canvas-dialog">
+          <div
+            class="canvas-dialog"
+            @wheel.stop
+          >
             <div class="canvas-dialog__header">
               <h2>{{ t("filePickerDialogTitle") }}</h2>
             </div>
