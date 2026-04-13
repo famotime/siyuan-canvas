@@ -80,4 +80,19 @@ describe("resolveCanvasFileTarget", () => {
     expect(result.kind).toBe("block")
     expect(result.path).toBe("/data/roadmap.sy")
   })
+
+  it("falls back to a direct image target for workspace image paths", async () => {
+    const result = await resolveCanvasFileTarget("/data/storage/maps/roadmap.assets/pasted.png", {
+      resolveBlockById: vi.fn(async () => null),
+      resolveCanvasByPath: vi.fn(async () => null),
+      resolveDocumentByBlockId: vi.fn(async () => null),
+      resolveDocumentByPath: vi.fn(async () => null),
+      resolveImageByBlockId: vi.fn(async () => null),
+      resolveImageByPath: vi.fn(async () => null),
+    })
+
+    expect(result.kind).toBe("image")
+    expect(result.openPath).toBe("/data/storage/maps/roadmap.assets/pasted.png")
+    expect(result.path).toBe("/data/storage/maps/roadmap.assets/pasted.png")
+  })
 })

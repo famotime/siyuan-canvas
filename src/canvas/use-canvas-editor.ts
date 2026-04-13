@@ -76,6 +76,7 @@ import { CanvasFileService } from "@/canvas/file-service"
 import { writeWorkspaceImageFile } from "@/canvas/workspace-image-files"
 import {
   findSiyuanBlockById,
+  findSiyuanDocumentByBlockId,
   findSiyuanBlocksByQuery,
   findSiyuanDocumentsByQuery,
   findSiyuanImageAssetByBlockId,
@@ -725,6 +726,12 @@ export function useCanvasEditor(
       return
     }
 
+    const exactBlock = SIYUAN_BLOCK_ID_PATTERN.test(query)
+      ? await findSiyuanBlockById(query)
+      : null
+    const exactDocument = SIYUAN_BLOCK_ID_PATTERN.test(query) && !exactBlock
+      ? await findSiyuanDocumentByBlockId(query)
+      : null
     const imageByBlockId = SIYUAN_BLOCK_ID_PATTERN.test(query)
       ? await findSiyuanImageAssetByBlockId(query)
       : null
@@ -732,7 +739,7 @@ export function useCanvasEditor(
     filePickerDialog.groups = await searchCanvasFilePickerTargets(query, {
       searchBlocks: async (keyword) => {
         const blocks = SIYUAN_BLOCK_ID_PATTERN.test(keyword)
-          ? await findSiyuanBlockById(keyword).then((block) => block ? [block] : [])
+          ? (exactBlock ? [exactBlock] : [])
           : await findSiyuanBlocksByQuery(keyword)
         return blocks.map((block) => ({
           blockId: block.id,
@@ -743,7 +750,9 @@ export function useCanvasEditor(
         }))
       },
       searchDocuments: async (keyword) => {
-        const documents = await findSiyuanDocumentsByQuery(keyword)
+        const documents = SIYUAN_BLOCK_ID_PATTERN.test(keyword)
+          ? (exactDocument ? [exactDocument] : [])
+          : await findSiyuanDocumentsByQuery(keyword)
         return documents.map((document) => ({
           kind: "document" as const,
           path: document.path,
@@ -796,7 +805,7 @@ export function useCanvasEditor(
     const node = createCanvasNode("file")
     node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
     node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
-    node.file = option.blockId
+    node.file = option.kind === "block" && option.blockId
       ? option.blockId
       : option.path
 

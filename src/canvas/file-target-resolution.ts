@@ -54,10 +54,28 @@ export interface CanvasFileTargetLookups {
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
 const EMBEDDED_BLOCK_ID_PATTERN = /\{\:\s*[^}]*\bid="(\d{14}-[a-z0-9]{7})"[^}]*\}/i
 const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/i
+const IMAGE_PATH_PATTERN = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i
 
 function getFallbackTitle(path: string): string {
   const segments = path.replace(/\\/g, "/").split("/")
   return segments[segments.length - 1] || path
+}
+
+function toDirectImageOpenPath(path: string): string {
+  const trimmed = path.trim()
+  if (!trimmed || trimmed.startsWith("/")) {
+    return trimmed
+  }
+
+  if (trimmed.startsWith("assets/")) {
+    return `/data/${trimmed}`
+  }
+
+  if (trimmed.startsWith("data/")) {
+    return `/${trimmed}`
+  }
+
+  return trimmed
 }
 
 function extractEmbeddedBlockId(input: string): string | null {
@@ -114,6 +132,15 @@ export async function resolveCanvasFileTarget(
   const image = await lookups.resolveImageByPath(lookupPath)
   if (image) {
     return image
+  }
+
+  if (IMAGE_PATH_PATTERN.test(lookupPath)) {
+    return {
+      kind: "image",
+      openPath: toDirectImageOpenPath(lookupPath),
+      path: lookupPath,
+      title: getFallbackTitle(lookupPath),
+    }
   }
 
   return {

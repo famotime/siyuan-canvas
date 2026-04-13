@@ -601,6 +601,30 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
+  it("finds a document picker result by an exact document id", async () => {
+    fileNodeLookupMock.findSiyuanDocumentByBlockId.mockResolvedValueOnce({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-doc0001",
+      path: "/data/roadmap.sy",
+      title: "Roadmap",
+    })
+
+    const { editor, wrapper } = await mountEditor()
+
+    await editor.updateFilePickerQuery("20260412094047-doc0001")
+    await flushEditor()
+
+    expect(editor.filePickerDialog.groups.documents).toEqual([{
+      kind: "document",
+      path: "/data/roadmap.sy",
+      subtitle: "/Projects/Roadmap",
+      title: "Roadmap",
+    }])
+    expect(editor.filePickerDialog.groups.blocks).toEqual([])
+
+    wrapper.unmount()
+  })
+
   it("finds an image picker result by a copied image block id", async () => {
     fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValueOnce({
       blockId: "20260412094047-ihhbskn",
@@ -651,16 +675,13 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
-  it("creates an image file node from picker selection using the image block id", async () => {
-    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
-      hpath: "/Projects/Roadmap",
-      id: "20260412094047-ihhbskn",
-      path: "/data/roadmap.sy",
-      rootId: "20260412094047-root001",
+  it("creates an image file node from picker selection as an image preview", async () => {
+    fileNodeLookupMock.findSiyuanAssetByPath.mockResolvedValue({
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
       title: "Diagram",
     })
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue(`![Diagram](assets/diagram.png)
-{: id="20260412094047-ihhbskn"}`)
 
     const { editor, wrapper } = await mountEditor()
 
@@ -675,14 +696,14 @@ describe("useCanvasEditor file lifecycle flows", () => {
 
     expect(editor.state.document.nodes).toHaveLength(1)
     expect(editor.state.document.nodes[0]).toMatchObject({
-      file: "20260412094047-ihhbskn",
+      file: "assets/diagram.png",
       type: "file",
     })
 
     const preview = editor.getFileNodePreview(editor.selectedNode)
-    expect(preview.kind).toBe("block")
+    expect(preview.kind).toBe("image")
     expect(preview.imageSrc).toBe("/data/assets/diagram.png")
-    expect(preview.previewHtml).toContain("<img src=\"/data/assets/diagram.png\" alt=\"Diagram\">")
+    expect(preview.previewHtml).toBeUndefined()
 
     wrapper.unmount()
   })
@@ -1252,6 +1273,10 @@ Preview body
       expect.any(File),
     )
     expect(workspaceFiles.get(pastedNode.file)).toBe("png")
+
+    const preview = editor.getFileNodePreview(pastedNode)
+    expect(preview.kind).toBe("image")
+    expect(preview.imageSrc).toContain("/data/storage/maps/roadmap.assets/")
 
     wrapper.unmount()
   })
