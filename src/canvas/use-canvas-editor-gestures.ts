@@ -125,7 +125,6 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return
     }
 
-    event.preventDefault()
     const rect = stage.getBoundingClientRect()
     const point = {
       x: event.clientX - rect.left,

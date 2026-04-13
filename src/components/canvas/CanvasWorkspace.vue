@@ -78,7 +78,7 @@
         class="stage"
         @pointerdown="handleStagePointerDown"
         @paste="handleStagePaste"
-        @wheel="editor.handleWheelZoom"
+        @wheel.passive="editor.handleWheelZoom"
         @contextmenu.prevent
       >
         <div
@@ -514,7 +514,7 @@
         >
           <div
             class="canvas-dialog"
-            @wheel.stop
+            @wheel.passive.stop
           >
             <div class="canvas-dialog__header">
               <h2>{{ t("filePickerDialogTitle") }}</h2>
