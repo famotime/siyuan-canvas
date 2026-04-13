@@ -625,6 +625,31 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
+  it("resolves raw image markdown in the file field into an image preview", async () => {
+    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
+      blockId: "20260412094047-ihhbskn",
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Diagram",
+    })
+
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", `![Diagram](assets/diagram.png)
+{: id="20260412094047-ihhbskn"}`)
+    await flushEditor()
+
+    const preview = editor.getFileNodePreview(editor.selectedNode)
+    expect(preview.kind).toBe("image")
+    expect(preview.imageSrc).toBe("/data/assets/diagram.png")
+    expect(preview.headline).toBe("Diagram")
+
+    wrapper.unmount()
+  })
+
   it("opens the create-edge dialog only when exactly one node is selected", async () => {
     const { editor, wrapper } = await mountEditor()
 

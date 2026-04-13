@@ -18,11 +18,62 @@ type AllowedInlineOpenTag = {
   length: number
 }
 
+const KRAMDOWN_INLINE_ATTRIBUTE_PATTERN = /\s*\{\:\s*[^}]*\}\s*$/i
+const KRAMDOWN_ATTRIBUTE_LINE_PATTERN = /^\s*\{\:\s*[^}]*\}\s*$/i
+
 function restorePlaceholders(value: string, prefix: string, placeholders: string[]): string {
   return placeholders.reduce(
     (current, html, index) => current.replaceAll(`%%${prefix}_${index}%%`, html),
     value,
   )
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return escapeHtml(value)
+}
+
+function normalizeMarkdownImageSource(source: string): string {
+  const trimmed = source.trim()
+  if (!trimmed || /^(?:[a-z]+:)?\/\//i.test(trimmed) || /^(?:data|blob):/i.test(trimmed) || trimmed.startsWith("/")) {
+    return trimmed
+  }
+
+  if (trimmed.startsWith("assets/")) {
+    return `/data/${trimmed}`
+  }
+
+  if (trimmed.startsWith("data/")) {
+    return `/${trimmed}`
+  }
+
+  return trimmed
+}
+
+function stripKramdownAttributes(line: string): string {
+  if (KRAMDOWN_ATTRIBUTE_LINE_PATTERN.test(line)) {
+    return ""
+  }
+
+  return line.replace(KRAMDOWN_INLINE_ATTRIBUTE_PATTERN, "")
+}
+
+function sanitizeMarkdownPreviewSource(markdown: string): string {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
+  const sanitized: string[] = []
+  let inCodeBlock = false
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.startsWith("```")) {
+      inCodeBlock = !inCodeBlock
+      sanitized.push(line)
+      continue
+    }
+
+    sanitized.push(inCodeBlock ? line : stripKramdownAttributes(line))
+  }
+
+  return sanitized.join("\n").trim()
 }
 
 function sanitizeColorValue(value: string): string | null {
@@ -152,6 +203,16 @@ function renderInlineMarkdown(value: string): string {
     codePlaceholders.push(`<code>${escapeHtml(code)}</code>`)
     return placeholder
   })
+  const imagePlaceholders: string[] = []
+  rendered = rendered.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (_match, alt: string, source: string, title?: string) => {
+    const placeholder = `%%IMAGE_${imagePlaceholders.length}%%`
+    const src = escapeHtmlAttribute(normalizeMarkdownImageSource(source))
+    const escapedAlt = escapeHtmlAttribute(alt)
+    const titleAttribute = title ? ` title="${escapeHtmlAttribute(title)}"` : ""
+
+    imagePlaceholders.push(`<img src="${src}" alt="${escapedAlt}"${titleAttribute}>`)
+    return placeholder
+  })
   const { placeholders: htmlPlaceholders, text } = extractAllowedInlineHtml(rendered)
   rendered = escapeHtml(text)
 
@@ -163,6 +224,7 @@ function renderInlineMarkdown(value: string): string {
     .replace(/__([^_]+)__/g, "<strong>$1</strong>")
 
   rendered = restorePlaceholders(rendered, "HTML", htmlPlaceholders)
+  rendered = restorePlaceholders(rendered, "IMAGE", imagePlaceholders)
   return restorePlaceholders(rendered, "CODE", codePlaceholders)
 }
 
@@ -171,7 +233,7 @@ function renderParagraph(lines: string[]): string {
 }
 
 export function renderMarkdownPreview(markdown: string): string {
-  const normalized = markdown.replace(/\r\n?/g, "\n").trim()
+  const normalized = sanitizeMarkdownPreviewSource(markdown)
   if (!normalized) {
     return ""
   }

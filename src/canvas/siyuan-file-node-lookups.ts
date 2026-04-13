@@ -18,6 +18,17 @@ export interface SiyuanResolvedAsset {
 }
 
 type QueryRows = (statement: string) => Promise<any[]>
+type ParsedImageReference = {
+  path: string
+  title?: string
+}
+
+const MARKDOWN_IMAGE_PATTERN = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/i
+const HTML_IMAGE_PATTERN = /<img\b[^>]*\bsrc=(?:"([^"]+)"|'([^']+)')[^>]*>/i
+const HTML_ALT_PATTERN = /\balt=(?:"([^"]*)"|'([^']*)')/i
+const HTML_TITLE_PATTERN = /\btitle=(?:"([^"]*)"|'([^']*)')/i
+const IMAGE_PATH_PATTERN = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i
+const SIYUAN_ASSET_PATH_PATTERN = /^(?:\/?data\/)?assets\//i
 
 function escapeSqlString(value: string): string {
   return value.replace(/'/g, "''")
@@ -30,6 +41,62 @@ function getFileName(path: string): string {
 
 function uniqueValues(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))]
+}
+
+function toOpenAssetPath(path: string): string {
+  return path.startsWith("/data/") ? path : `/data/${path.replace(/^\//, "")}`
+}
+
+function toStoredAssetPath(path: string): string {
+  return path
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/data\//, "")
+    .replace(/^data\//, "")
+}
+
+function createResolvedAsset(
+  assetPath: string,
+  options: {
+    blockId?: string
+    name?: string
+    title?: string
+  } = {},
+): SiyuanResolvedAsset {
+  return {
+    blockId: options.blockId,
+    name: options.name || getFileName(assetPath),
+    openPath: toOpenAssetPath(assetPath),
+    path: assetPath,
+    title: options.title || undefined,
+  }
+}
+
+function extractImageReferenceFromMarkdown(markdown: string): ParsedImageReference | null {
+  const markdownMatch = markdown.match(MARKDOWN_IMAGE_PATTERN)
+  if (markdownMatch) {
+    return {
+      path: markdownMatch[2]!.trim(),
+      title: markdownMatch[3] || markdownMatch[1] || undefined,
+    }
+  }
+
+  const htmlMatch = markdown.match(HTML_IMAGE_PATTERN)
+  if (!htmlMatch) {
+    return null
+  }
+
+  const source = htmlMatch[1] || htmlMatch[2]
+  if (!source) {
+    return null
+  }
+
+  const altMatch = markdown.match(HTML_ALT_PATTERN)
+  const titleMatch = markdown.match(HTML_TITLE_PATTERN)
+  return {
+    path: source.trim(),
+    title: titleMatch?.[1] || titleMatch?.[2] || altMatch?.[1] || altMatch?.[2] || undefined,
+  }
 }
 
 export function createDocumentPathCandidates(path: string): { hpaths: string[], storagePaths: string[] } {
@@ -114,13 +181,10 @@ export async function resolveSiyuanAssetByPath(
     )
     const row = rows[0]
     if (row) {
-      const assetPath = row.path as string
-      return {
-        name: row.name || getFileName(assetPath),
-        openPath: assetPath.startsWith("/data/") ? assetPath : `/data/${assetPath.replace(/^\//, "")}`,
-        path: assetPath,
+      return createResolvedAsset(row.path as string, {
+        name: row.name || undefined,
         title: row.title || undefined,
-      }
+      })
     }
   }
 
@@ -181,18 +245,44 @@ export async function resolveImageAssetByBlockId(
      LIMIT 1`,
   )
   const row = rows[0]
-  if (!row) {
+  if (row) {
+    return createResolvedAsset(row.path as string, {
+      blockId: row.block_id as string,
+      name: row.name || undefined,
+      title: row.title || undefined,
+    })
+  }
+
+  const blockRows = await queryRows(
+    `SELECT markdown, content
+     FROM blocks
+     WHERE id = '${escapeSqlString(blockId)}'
+     LIMIT 1`,
+  )
+  const blockRow = blockRows[0]
+  const imageReference = blockRow ? extractImageReferenceFromMarkdown(String(blockRow.markdown || "")) : null
+  if (!imageReference || !IMAGE_PATH_PATTERN.test(imageReference.path)) {
     return null
   }
 
-  const assetPath = row.path as string
-  return {
-    blockId: row.block_id as string,
-    name: row.name || getFileName(assetPath),
-    openPath: assetPath.startsWith("/data/") ? assetPath : `/data/${assetPath.replace(/^\//, "")}`,
-    path: assetPath,
-    title: row.title || undefined,
+  const resolvedByPath = await resolveSiyuanAssetByPath(imageReference.path, queryRows)
+  if (resolvedByPath) {
+    return {
+      ...resolvedByPath,
+      blockId,
+      title: resolvedByPath.title || imageReference.title || undefined,
+    }
   }
+
+  if (!SIYUAN_ASSET_PATH_PATTERN.test(imageReference.path)) {
+    return null
+  }
+
+  const assetPath = toStoredAssetPath(imageReference.path)
+  return createResolvedAsset(assetPath, {
+    blockId,
+    title: imageReference.title || blockRow?.content || undefined,
+  })
 }
 
 export async function searchSiyuanDocuments(

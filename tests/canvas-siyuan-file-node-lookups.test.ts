@@ -108,6 +108,41 @@ describe("siyuan file node lookups", () => {
     })
   })
 
+  it("falls back to block markdown when assets.block_id does not match the copied image block id", async () => {
+    const queryRows = vi.fn(async (statement: string) => {
+      if (statement.includes("FROM assets") && statement.includes("block_id = '20260412094047-ihhbskn'")) {
+        return []
+      }
+
+      if (statement.includes("SELECT markdown, content") && statement.includes("FROM blocks")) {
+        return [{
+          content: "Diagram",
+          markdown: "![Diagram](assets/diagram.png)\n{: id=\"20260412094047-ihhbskn\"}",
+        }]
+      }
+
+      if (statement.includes("path = 'assets/diagram.png'")) {
+        return [{
+          name: "diagram.png",
+          path: "assets/diagram.png",
+          title: "",
+        }]
+      }
+
+      return []
+    })
+
+    const result = await resolveImageAssetByBlockId("20260412094047-ihhbskn", queryRows)
+
+    expect(result).toEqual({
+      blockId: "20260412094047-ihhbskn",
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Diagram",
+    })
+  })
+
   it("searches documents, images, and workspace canvases into grouped picker results", async () => {
     const result = await searchCanvasFilePickerTargets("road", {
       searchDocuments: vi.fn(async () => [{

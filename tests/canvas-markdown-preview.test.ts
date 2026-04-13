@@ -62,4 +62,18 @@ Paragraph with **bold**, \`code\`, and [link](https://example.com).
     expect(html).not.toContain("<span")
     expect(html).toContain("&lt;span style=&quot;font-size: 20px&quot; onclick=&quot;alert(1)&quot;&gt;bad&lt;/span&gt;")
   })
+
+  it("omits kramdown block attributes and renders markdown images", () => {
+    const html = renderMarkdownPreview(`![架构图](assets/diagram.png)
+{: id="20260412094047-ihhbskn" updated="20260412100000"}
+
+正文
+{: id="20260412094047-abcdefg"}`)
+
+    expect(html).toContain('<img src="/data/assets/diagram.png" alt="架构图">')
+    expect(html).toContain("<p>正文</p>")
+    expect(html).not.toContain("{:")
+    expect(html).not.toContain("20260412094047-ihhbskn")
+    expect(html).not.toContain("updated=")
+  })
 })

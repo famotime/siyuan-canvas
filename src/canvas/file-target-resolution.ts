@@ -41,10 +41,20 @@ export interface CanvasFileTargetLookups {
 }
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
+const EMBEDDED_BLOCK_ID_PATTERN = /\{\:\s*[^}]*\bid="(\d{14}-[a-z0-9]{7})"[^}]*\}/i
+const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/i
 
 function getFallbackTitle(path: string): string {
   const segments = path.replace(/\\/g, "/").split("/")
   return segments[segments.length - 1] || path
+}
+
+function extractEmbeddedBlockId(input: string): string | null {
+  return input.match(EMBEDDED_BLOCK_ID_PATTERN)?.[1] || null
+}
+
+function extractEmbeddedImagePath(input: string): string | null {
+  return input.match(MARKDOWN_IMAGE_PATTERN)?.[1]?.trim() || null
 }
 
 export async function resolveCanvasFileTarget(
@@ -60,29 +70,32 @@ export async function resolveCanvasFileTarget(
     }
   }
 
-  if (BLOCK_ID_PATTERN.test(trimmed)) {
-    const image = await lookups.resolveImageByBlockId(trimmed)
+  const blockId = BLOCK_ID_PATTERN.test(trimmed) ? trimmed : extractEmbeddedBlockId(trimmed)
+  if (blockId) {
+    const image = await lookups.resolveImageByBlockId(blockId)
     if (image) {
       return image
     }
 
-    const document = await lookups.resolveDocumentByBlockId(trimmed)
+    const document = await lookups.resolveDocumentByBlockId(blockId)
     if (document) {
       return document
     }
   }
 
-  const canvas = await lookups.resolveCanvasByPath(trimmed)
+  const lookupPath = extractEmbeddedImagePath(trimmed) || trimmed
+
+  const canvas = await lookups.resolveCanvasByPath(lookupPath)
   if (canvas) {
     return canvas
   }
 
-  const document = await lookups.resolveDocumentByPath(trimmed)
+  const document = await lookups.resolveDocumentByPath(lookupPath)
   if (document) {
     return document
   }
 
-  const image = await lookups.resolveImageByPath(trimmed)
+  const image = await lookups.resolveImageByPath(lookupPath)
   if (image) {
     return image
   }
