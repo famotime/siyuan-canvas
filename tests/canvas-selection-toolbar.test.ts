@@ -31,7 +31,11 @@ import {
 import type { ModuleExports } from "vitest"
 import {
   centerViewportOnBounds,
+  getBezierPointAt,
+  getEdgeCurveControlPoints,
+  getEdgeMidpointPosition,
   resolveDragNodeIds,
+  resolveEdgeToolbarPosition,
   resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
 
@@ -189,6 +193,57 @@ describe("selection toolbar helpers", () => {
       placement: "bottom",
       x: 130,
       y: 176,
+    })
+  })
+
+  it("derives side-aware Bezier control points for vertical and horizontal edge tangents", () => {
+    expect(getEdgeCurveControlPoints(
+      { x: 200, y: 100 },
+      "bottom",
+      { x: 240, y: 340 },
+      "top",
+    )).toEqual({
+      fromControl: { x: 200, y: 184 },
+      toControl: { x: 240, y: 256 },
+    })
+
+    expect(getEdgeCurveControlPoints(
+      { x: 100, y: 220 },
+      "right",
+      { x: 360, y: 260 },
+      "left",
+    )).toEqual({
+      fromControl: { x: 191, y: 220 },
+      toControl: { x: 269, y: 260 },
+    })
+  })
+
+  it("resolves the cubic edge midpoint and edge toolbar placement from a midpoint", () => {
+    const midpoint = getBezierPointAt(
+      { x: 100, y: 220 },
+      { x: 191, y: 220 },
+      { x: 269, y: 260 },
+      { x: 360, y: 260 },
+      0.5,
+    )
+
+    expect(midpoint.x).toBe(230)
+    expect(midpoint.y).toBe(240)
+    expect(getEdgeMidpointPosition(
+      { x: 100, y: 220 },
+      "right",
+      { x: 360, y: 260 },
+      "left",
+    )).toEqual(midpoint)
+
+    expect(resolveEdgeToolbarPosition(
+      midpoint,
+      { width: 900, height: 700 },
+      { width: 240, height: 48 },
+    )).toEqual({
+      placement: "top",
+      x: 110,
+      y: 184,
     })
   })
 
@@ -679,6 +734,492 @@ describe("useCanvasEditor selection toolbar integration", () => {
       toSide: "left",
     })
     expect(editor.connectionDraft.visible).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it("shows an edge toolbar for the selected edge and centers the viewport on that edge", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 420, y: 220, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "bottom", toNode: "n2", toSide: "top" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const stage = document.createElement("section")
+    Object.defineProperty(stage, "clientWidth", { configurable: true, value: 1200 })
+    Object.defineProperty(stage, "clientHeight", { configurable: true, value: 800 })
+    Object.defineProperty(stage, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 800,
+        height: 800,
+        left: 0,
+        right: 1200,
+        top: 0,
+        width: 1200,
+        x: 0,
+        y: 0,
+      }),
+    })
+    editor.stageRef.value = stage
+    editor.viewport.scale = 1
+    editor.viewport.x = editor.board.left
+    editor.viewport.y = editor.board.top
+
+    editor.selectEdge("e1")
+    await nextTick()
+
+    expect(editor.edgeToolbar.visible).toBe(true)
+
+    editor.centerEdgeInViewport()
+
+    expect(editor.viewport.x).toBe(-2550)
+    expect(editor.viewport.y).toBe(-1910)
+
+    wrapper.unmount()
+  })
+
+  it("updates selected edge direction flags and inline label text", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 420, y: 220, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "right", toNode: "n2", toSide: "left" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    editor.selectEdge("e1")
+    editor.updateSelectedEdgeDirection("both")
+    editor.startEdgeLabelEditing()
+    editor.edgeLabelDraft = "edge note"
+    editor.submitEdgeLabelEditing()
+    await nextTick()
+
+    expect(editor.state.document.edges[0]).toMatchObject({
+      endArrow: true,
+      label: "edge note",
+      startArrow: true,
+    })
+    expect(editor.editingEdgeLabelId).toBe("")
+
+    wrapper.unmount()
+  })
+
+  it("reconnects a selected edge endpoint when dragged onto another node anchor", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 420, y: 120, width: 180, height: 100 },
+          { id: "n3", type: "text", text: "three", x: 720, y: 180, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "right", toNode: "n2", toSide: "left" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const stage = document.createElement("section")
+    Object.defineProperty(stage, "clientWidth", { configurable: true, value: 1400 })
+    Object.defineProperty(stage, "clientHeight", { configurable: true, value: 900 })
+    Object.defineProperty(stage, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 900,
+        height: 900,
+        left: 0,
+        right: 1400,
+        top: 0,
+        width: 1400,
+        x: 0,
+        y: 0,
+      }),
+    })
+    editor.stageRef.value = stage
+    editor.viewport.scale = 1
+    editor.viewport.x = editor.board.left
+    editor.viewport.y = editor.board.top
+
+    editor.selectEdge("e1")
+    editor.startEdgeEndpointDrag("to", {
+      button: 0,
+      clientX: 420,
+      clientY: 170,
+      preventDefault: vi.fn(),
+    } as any)
+
+    window.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 720,
+      clientY: 230,
+    }))
+    window.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      clientX: 720,
+      clientY: 230,
+    }))
+    await nextTick()
+
+    expect(editor.state.document.edges[0]).toMatchObject({
+      id: "e1",
+      toNode: "n3",
+      toSide: "left",
+    })
+
+    wrapper.unmount()
+  })
+
+  it("deletes a selected edge when its endpoint is dropped on blank space", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 420, y: 120, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "right", toNode: "n2", toSide: "left" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const stage = document.createElement("section")
+    Object.defineProperty(stage, "clientWidth", { configurable: true, value: 1200 })
+    Object.defineProperty(stage, "clientHeight", { configurable: true, value: 800 })
+    Object.defineProperty(stage, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 800,
+        height: 800,
+        left: 0,
+        right: 1200,
+        top: 0,
+        width: 1200,
+        x: 0,
+        y: 0,
+      }),
+    })
+    editor.stageRef.value = stage
+    editor.viewport.scale = 1
+    editor.viewport.x = editor.board.left
+    editor.viewport.y = editor.board.top
+
+    editor.selectEdge("e1")
+    editor.startEdgeEndpointDrag("to", {
+      button: 0,
+      clientX: 420,
+      clientY: 170,
+      preventDefault: vi.fn(),
+    } as any)
+
+    window.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 940,
+      clientY: 48,
+    }))
+    window.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      clientX: 940,
+      clientY: 48,
+    }))
+    await nextTick()
+
+    expect(editor.state.document.edges).toEqual([])
+    expect(editor.state.selectedEdgeId).toBe("")
+
+    wrapper.unmount()
+  })
+
+  it("selects an edge when the marquee rectangle intersects the line but not any nodes", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 500, y: 100, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "right", toNode: "n2", toSide: "left" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const stage = document.createElement("section")
+    Object.defineProperty(stage, "clientWidth", { configurable: true, value: 1400 })
+    Object.defineProperty(stage, "clientHeight", { configurable: true, value: 900 })
+    Object.defineProperty(stage, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 900,
+        height: 900,
+        left: 0,
+        right: 1400,
+        top: 0,
+        width: 1400,
+        x: 0,
+        y: 0,
+      }),
+    })
+    editor.stageRef.value = stage
+    editor.viewport.scale = 1
+    editor.viewport.x = editor.board.left
+    editor.viewport.y = editor.board.top
+
+    editor.startPan({
+      button: 0,
+      clientX: 290,
+      clientY: 130,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault: vi.fn(),
+      shiftKey: false,
+      target: stage,
+    } as any)
+
+    window.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 490,
+      clientY: 170,
+    }))
+    window.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      clientX: 490,
+      clientY: 170,
+    }))
+    await nextTick()
+
+    expect(editor.state.selectedEdgeId).toBe("e1")
+    expect(editor.state.selectedNodeIds).toEqual([])
+
+    wrapper.unmount()
+  })
+
+  it("persists edge label edits while typing and keeps the text after ending edit mode", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 420, y: 220, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "right", toNode: "n2", toSide: "left", label: "old" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    editor.selectEdge("e1")
+    editor.startEdgeLabelEditing()
+    editor.updateEditingEdgeLabel("draft text")
+
+    expect(editor.state.document.edges[0]).toMatchObject({
+      id: "e1",
+      label: "draft text",
+    })
+
+    editor.cancelEdgeLabelEditing()
+
+    expect(editor.editingEdgeLabelId).toBe("")
+    expect(editor.state.document.edges[0]).toMatchObject({
+      id: "e1",
+      label: "draft text",
+    })
+
+    wrapper.unmount()
+  })
+
+  it("treats a legacy edge without explicit arrow flags as single-direction in the toolbar state", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 420, y: 220, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "right", toNode: "n2", toSide: "left" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    editor.selectEdge("e1")
+
+    expect(editor.selectedEdgeDirectionMode).toBe("single")
+
+    wrapper.unmount()
+  })
+
+  it("tracks a freeform reconnect preview point before the dragged endpoint snaps to an anchor", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 420, y: 120, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "right", toNode: "n2", toSide: "left" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    const stage = document.createElement("section")
+    Object.defineProperty(stage, "clientWidth", { configurable: true, value: 1200 })
+    Object.defineProperty(stage, "clientHeight", { configurable: true, value: 800 })
+    Object.defineProperty(stage, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 800,
+        height: 800,
+        left: 0,
+        right: 1200,
+        top: 0,
+        width: 1200,
+        x: 0,
+        y: 0,
+      }),
+    })
+    editor.stageRef.value = stage
+    editor.viewport.scale = 1
+    editor.viewport.x = editor.board.left
+    editor.viewport.y = editor.board.top
+
+    editor.selectEdge("e1")
+    editor.startEdgeEndpointDrag("to", {
+      button: 0,
+      clientX: 420,
+      clientY: 170,
+      preventDefault: vi.fn(),
+    } as any)
+
+    window.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 340,
+      clientY: 280,
+    }))
+    await nextTick()
+
+    expect(editor.edgeReconnectDraft.visible).toBe(true)
+    expect(editor.edgeReconnectDraft.targetNodeId).toBe("")
+    expect(editor.edgeReconnectDraft.toX).toBe(3140)
+    expect(editor.edgeReconnectDraft.toY).toBe(2380)
+    expect(editor.getEdgeReconnectDraftPath()).toContain("3140 2380")
+
+    window.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      clientX: 340,
+      clientY: 280,
+    }))
+    await nextTick()
 
     wrapper.unmount()
   })

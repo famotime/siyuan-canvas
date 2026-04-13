@@ -12,8 +12,12 @@ import {
   getCanvasSelectionBounds,
   removeCanvasNode,
   removeCanvasNodes,
+  setCanvasEdgeColor,
+  setCanvasEdgeDirection,
+  setCanvasEdgeLabel,
   setCanvasNodeGeometry,
   setCanvasNodesColor,
+  setCanvasEdgeEndpoint,
   translateCanvasNodes,
   upsertCanvasEdge,
   upsertCanvasNode,
@@ -379,6 +383,85 @@ describe("canvas document operations", () => {
     const enclosedIds = findCanvasNodesInGroup(document, "g1")
 
     expect(enclosedIds).toEqual(["inside", "border"])
+  })
+
+  it("updates an edge label without disturbing other edges", () => {
+    const document = {
+      nodes: [],
+      edges: [
+        { id: "e1", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left", label: "old" },
+        { id: "e2", fromNode: "b", fromSide: "right", toNode: "c", toSide: "left" },
+      ],
+    }
+
+    const next = setCanvasEdgeLabel(document, "e1", "new label")
+
+    expect(next.edges).toEqual([
+      { id: "e1", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left", label: "new label" },
+      { id: "e2", fromNode: "b", fromSide: "right", toNode: "c", toSide: "left" },
+    ])
+  })
+
+  it("removes an edge label when the submitted value is empty", () => {
+    const document = {
+      nodes: [],
+      edges: [
+        { id: "e1", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left", label: "old" },
+      ],
+    }
+
+    const next = setCanvasEdgeLabel(document, "e1", "")
+
+    expect("label" in next.edges[0]!).toBe(false)
+  })
+
+  it("updates edge color and direction flags independently", () => {
+    const document = {
+      nodes: [],
+      edges: [
+        { id: "e1", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" },
+      ],
+    }
+
+    const colored = setCanvasEdgeColor(document, "e1", "4")
+    expect(colored.edges[0]).toMatchObject({ color: "4" })
+
+    const bidirectional = setCanvasEdgeDirection(colored, "e1", {
+      endArrow: true,
+      startArrow: true,
+    })
+    expect(bidirectional.edges[0]).toMatchObject({
+      color: "4",
+      endArrow: true,
+      startArrow: true,
+    })
+
+    const plain = setCanvasEdgeDirection(bidirectional, "e1", {
+      endArrow: false,
+      startArrow: false,
+    })
+    expect(plain.edges[0]).toMatchObject({
+      endArrow: false,
+      startArrow: false,
+    })
+  })
+
+  it("updates one endpoint of an existing edge without touching the other endpoint", () => {
+    const document = {
+      nodes: [],
+      edges: [
+        { id: "e1", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" },
+      ],
+    }
+
+    const next = setCanvasEdgeEndpoint(document, "e1", "to", {
+      nodeId: "c",
+      side: "bottom",
+    })
+
+    expect(next.edges).toEqual([
+      { id: "e1", fromNode: "a", fromSide: "right", toNode: "c", toSide: "bottom" },
+    ])
   })
 })
 

@@ -44,10 +44,14 @@ import {
   createCanvasEdge,
   createCanvasNode,
   getCanvasSelectionBounds,
+  setCanvasEdgeColor,
+  setCanvasEdgeDirection,
+  setCanvasEdgeLabel,
   setCanvasNodesColor,
   removeCanvasEdge,
   removeCanvasNode,
   removeCanvasNodes,
+  setCanvasEdgeEndpoint,
   upsertCanvasEdge,
   upsertCanvasNode,
 } from "@/canvas/document"
@@ -62,6 +66,7 @@ import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-fi
 import {
   createCanvasEditorGestureHandlers,
   type CanvasEditorConnectionDraftState,
+  type CanvasEditorEdgeReconnectDraftState,
   type CanvasEditorSelectionBoxState,
 } from "@/canvas/use-canvas-editor-gestures"
 import {
@@ -92,6 +97,9 @@ import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
 import { clampViewportScale } from "@/canvas/viewport"
 import {
   centerViewportOnBounds,
+  createEdgeCurvePath,
+  getEdgeMidpointPosition,
+  resolveEdgeToolbarPosition,
   resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
 
@@ -129,6 +137,7 @@ export function useCanvasEditor(
   const workspaceDocuments = ref<Array<{ path: string, title: string }>>([])
   const suggestedFilename = ref(bootstrap.title || t("untitledCanvas"))
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
+  const edgeToolbarPopover = ref<"closed" | "color" | "direction">("closed")
   const bottomToolbarVisible = ref(false)
   const createEdgeDialog = reactive({
     visible: false,
@@ -169,6 +178,15 @@ export function useCanvasEditor(
     toY: 0,
     visible: false,
   })
+  const edgeReconnectDraft = reactive<CanvasEditorEdgeReconnectDraftState>({
+    edgeId: "",
+    endpoint: "",
+    targetNodeId: "",
+    targetSide: "",
+    toX: 0,
+    toY: 0,
+    visible: false,
+  })
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
   const newEdgeSourceId = ref("")
@@ -177,6 +195,12 @@ export function useCanvasEditor(
   const newEdgeTargetQuery = ref("")
   const newEdgeToSide = ref<CanvasSide>("left")
   const inspectorExpanded = ref(true)
+  const edgeToolbarSize = reactive({
+    height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
+    width: 240,
+  })
+  const editingEdgeLabelId = ref("")
+  const edgeLabelDraft = ref("")
 
   const displayNodes = computed(() =>
     [...state.document.nodes].sort((left, right) => {
@@ -211,6 +235,128 @@ export function useCanvasEditor(
   )
   const board = computed(() => createCanvasBoardMetrics(state.document.nodes))
   const canDelete = computed(() => Boolean(state.selectedNodeIds.length || selectedEdge.value))
+  const selectedEdgeAnchors = computed(() => {
+    if (!selectedEdge.value) {
+      return null
+    }
+
+    const fromNode = state.document.nodes.find((node) => node.id === selectedEdge.value?.fromNode)
+    const toNode = state.document.nodes.find((node) => node.id === selectedEdge.value?.toNode)
+    if (!fromNode || !toNode) {
+      return null
+    }
+
+    return {
+      from: getCanvasNodeAnchor(fromNode, selectedEdge.value.fromSide),
+      to: getCanvasNodeAnchor(toNode, selectedEdge.value.toSide),
+    }
+  })
+  const edgeToolbar = computed(() => {
+    const stage = stageRef.value
+    const anchors = selectedEdgeAnchors.value
+
+    if (!stage || !selectedEdge.value || !anchors || state.selectedNodeIds.length > 0) {
+      return {
+        placement: "top" as const,
+        visible: false,
+        x: 0,
+        y: 0,
+      }
+    }
+
+    const midpoint = getEdgeMidpointPosition(
+      {
+        x: toBoardX(board.value, anchors.from.x),
+        y: toBoardY(board.value, anchors.from.y),
+      },
+      selectedEdge.value.fromSide,
+      {
+        x: toBoardX(board.value, anchors.to.x),
+        y: toBoardY(board.value, anchors.to.y),
+      },
+      selectedEdge.value.toSide,
+    )
+
+    return {
+      ...resolveEdgeToolbarPosition(
+        {
+          x: midpoint.x * viewport.scale + viewport.x,
+          y: midpoint.y * viewport.scale + viewport.y,
+        },
+        {
+          height: stage.clientHeight,
+          width: stage.clientWidth,
+        },
+        edgeToolbarSize,
+      ),
+      visible: true,
+    }
+  })
+  const selectedEdgeHandlePositions = computed(() => {
+    if (!selectedEdge.value || !selectedEdgeAnchors.value) {
+      return null
+    }
+
+    return {
+      from: {
+        x: toBoardX(board.value, selectedEdgeAnchors.value.from.x) * viewport.scale + viewport.x,
+        y: toBoardY(board.value, selectedEdgeAnchors.value.from.y) * viewport.scale + viewport.y,
+      },
+      to: {
+        x: toBoardX(board.value, selectedEdgeAnchors.value.to.x) * viewport.scale + viewport.x,
+        y: toBoardY(board.value, selectedEdgeAnchors.value.to.y) * viewport.scale + viewport.y,
+      },
+    }
+  })
+  const selectedEdgeDirectionMode = computed<"both" | "none" | "single">(() => {
+    if (!selectedEdge.value) {
+      return "single"
+    }
+
+    const startArrow = selectedEdge.value.startArrow ?? false
+    const endArrow = selectedEdge.value.endArrow ?? true
+
+    if (startArrow && endArrow) {
+      return "both"
+    }
+
+    if (!startArrow && !endArrow) {
+      return "none"
+    }
+
+    return "single"
+  })
+  const edgeLabelEditorPosition = computed(() => {
+    const edge = state.document.edges.find((candidate) => candidate.id === editingEdgeLabelId.value)
+    if (!edge) {
+      return null
+    }
+
+    const fromNode = state.document.nodes.find((node) => node.id === edge.fromNode)
+    const toNode = state.document.nodes.find((node) => node.id === edge.toNode)
+    const stage = stageRef.value
+    if (!fromNode || !toNode || !stage) {
+      return null
+    }
+
+    const midpoint = getEdgeMidpointPosition(
+      {
+        x: toBoardX(board.value, getCanvasNodeAnchor(fromNode, edge.fromSide).x),
+        y: toBoardY(board.value, getCanvasNodeAnchor(fromNode, edge.fromSide).y),
+      },
+      edge.fromSide,
+      {
+        x: toBoardX(board.value, getCanvasNodeAnchor(toNode, edge.toSide).x),
+        y: toBoardY(board.value, getCanvasNodeAnchor(toNode, edge.toSide).y),
+      },
+      edge.toSide,
+    )
+
+    return {
+      x: midpoint.x * viewport.scale + viewport.x,
+      y: midpoint.y * viewport.scale + viewport.y,
+    }
+  })
   const selectionToolbar = computed(() => {
     const stage = stageRef.value
     const bounds = selectionBounds.value
@@ -349,14 +495,6 @@ export function useCanvasEditor(
     }
   }
 
-  function getCurvePath(
-    from: { x: number, y: number },
-    to: { x: number, y: number },
-  ) {
-    const midX = (from.x + to.x) / 2
-    return `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`
-  }
-
   function getEdgePath(edge: CanvasEdge): string {
     const fromNode = state.document.nodes.find((node) => node.id === edge.fromNode)
     const toNode = state.document.nodes.find((node) => node.id === edge.toNode)
@@ -366,7 +504,7 @@ export function useCanvasEditor(
 
     const from = getAnchor(fromNode, edge.fromSide)
     const to = getAnchor(toNode, edge.toSide)
-    return getCurvePath(from, to)
+    return createEdgeCurvePath(from, edge.fromSide, to, edge.toSide)
   }
 
   function getEdgeLabelPosition(edge: CanvasEdge) {
@@ -381,10 +519,7 @@ export function useCanvasEditor(
 
     const from = getAnchor(fromNode, edge.fromSide)
     const to = getAnchor(toNode, edge.toSide)
-    return {
-      x: (from.x + to.x) / 2,
-      y: (from.y + to.y) / 2 - 8,
-    }
+    return getEdgeMidpointPosition(from, edge.fromSide, to, edge.toSide)
   }
 
   function resetViewport() {
@@ -414,6 +549,10 @@ export function useCanvasEditor(
 
   function closeSelectionPopover() {
     selectionToolbarPopover.value = "closed"
+  }
+
+  function closeEdgePopover() {
+    edgeToolbarPopover.value = "closed"
   }
 
   function setNewEdgeSourceId(nodeId: string) {
@@ -451,6 +590,16 @@ export function useCanvasEditor(
 
     if (size.height > 0) {
       selectionToolbarSize.height = size.height
+    }
+  }
+
+  function setEdgeToolbarSize(size: { height: number, width: number }) {
+    if (size.width > 0) {
+      edgeToolbarSize.width = size.width
+    }
+
+    if (size.height > 0) {
+      edgeToolbarSize.height = size.height
     }
   }
 
@@ -550,6 +699,40 @@ export function useCanvasEditor(
     closeSelectionPopover()
   }
 
+  function centerEdgeInViewport() {
+    const stage = stageRef.value
+    const anchors = selectedEdgeAnchors.value
+
+    if (!stage || !anchors) {
+      return
+    }
+
+    const edgeBounds = {
+      height: Math.max(1, Math.abs(anchors.to.y - anchors.from.y)),
+      width: Math.max(1, Math.abs(anchors.to.x - anchors.from.x)),
+      x: Math.min(anchors.from.x, anchors.to.x),
+      y: Math.min(anchors.from.y, anchors.to.y),
+    }
+
+    const nextViewport = centerViewportOnBounds(
+      viewport,
+      {
+        height: stage.clientHeight,
+        width: stage.clientWidth,
+      },
+      edgeBounds,
+      {
+        left: board.value.left,
+        top: board.value.top,
+      },
+    )
+
+    viewport.scale = nextViewport.scale
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
+    closeEdgePopover()
+  }
+
   function applySelectionColor(color: string) {
     if (!state.selectedNodeIds.length) {
       return
@@ -557,6 +740,15 @@ export function useCanvasEditor(
 
     commitDocument(setCanvasNodesColor(state.document, state.selectedNodeIds, color))
     closeSelectionPopover()
+  }
+
+  function applyEdgeColor(color: string) {
+    if (!selectedEdge.value) {
+      return
+    }
+
+    commitDocument(setCanvasEdgeColor(state.document, selectedEdge.value.id, color))
+    closeEdgePopover()
   }
 
   function createGroupFromSelection() {
@@ -590,6 +782,64 @@ export function useCanvasEditor(
     }
 
     selectionToolbarPopover.value = selectionToolbarPopover.value === popover ? "closed" : popover
+  }
+
+  function toggleEdgePopover(popover: "color" | "direction") {
+    if (!selectedEdge.value) {
+      closeEdgePopover()
+      return
+    }
+
+    edgeToolbarPopover.value = edgeToolbarPopover.value === popover ? "closed" : popover
+  }
+
+  function updateSelectedEdgeDirection(direction: "both" | "none" | "single") {
+    if (!selectedEdge.value) {
+      return
+    }
+
+    const nextDirection = direction === "both"
+      ? { endArrow: true, startArrow: true }
+      : direction === "none"
+        ? { endArrow: false, startArrow: false }
+        : { endArrow: true, startArrow: false }
+
+    commitDocument(setCanvasEdgeDirection(state.document, selectedEdge.value.id, nextDirection))
+    closeEdgePopover()
+  }
+
+  function startEdgeLabelEditing() {
+    if (!selectedEdge.value) {
+      return
+    }
+
+    editingEdgeLabelId.value = selectedEdge.value.id
+    edgeLabelDraft.value = selectedEdge.value.label || ""
+    closeEdgePopover()
+  }
+
+  function updateEditingEdgeLabel(value: string) {
+    if (!editingEdgeLabelId.value) {
+      return
+    }
+
+    edgeLabelDraft.value = value
+    commitDocument(setCanvasEdgeLabel(state.document, editingEdgeLabelId.value, value))
+  }
+
+  function submitEdgeLabelEditing() {
+    if (!editingEdgeLabelId.value) {
+      return
+    }
+
+    commitDocument(setCanvasEdgeLabel(state.document, editingEdgeLabelId.value, edgeLabelDraft.value))
+    editingEdgeLabelId.value = ""
+    edgeLabelDraft.value = ""
+  }
+
+  function cancelEdgeLabelEditing() {
+    editingEdgeLabelId.value = ""
+    edgeLabelDraft.value = ""
   }
 
   function updateNode(node: CanvasNode) {
@@ -922,12 +1172,15 @@ export function useCanvasEditor(
   }
   const {
     clearConnectionDraft,
+    clearEdgeReconnectDraft,
     clearSelectionBox,
     finishConnectionDrag,
     getConnectionDraftPath,
+    getEdgeReconnectDraftPath,
     handleNodePointerDown,
     handleWheelZoom,
     isConnectionTarget,
+    startEdgeEndpointDrag,
     startConnectionDrag,
     startCornerResize,
     startDrag,
@@ -937,8 +1190,10 @@ export function useCanvasEditor(
     board,
     commitDocument,
     connectionDraft,
+    edgeReconnectDraft,
     getAnchor,
     selectionBox,
+    selectedEdge,
     stageRef,
     state,
     viewport,
@@ -967,6 +1222,16 @@ export function useCanvasEditor(
     }
 
     if (event.key === "Escape") {
+      if (editingEdgeLabelId.value) {
+        cancelEdgeLabelEditing()
+        return
+      }
+
+      if (edgeToolbarPopover.value !== "closed") {
+        closeEdgePopover()
+        return
+      }
+
       if (selectionToolbarPopover.value !== "closed") {
         closeSelectionPopover()
         return
@@ -1038,20 +1303,28 @@ export function useCanvasEditor(
     () => {
       applySelectedNodeAsEdgeSource()
       closeSelectionPopover()
+      closeEdgePopover()
+      cancelEdgeLabelEditing()
       clearSelectionBox()
+      if (!edgeReconnectDraft.visible || edgeReconnectDraft.edgeId !== state.selectedEdgeId) {
+        clearEdgeReconnectDraft()
+      }
     },
   )
 
   return createCanvasEditorBindings(
     {
       applySelectionColor,
+      applyEdgeColor,
       applySelectionLayout,
       activateCanvasSurface,
       board,
       bottomToolbarVisible,
       canDelete,
+      centerEdgeInViewport,
       centerSelectionInViewport,
       closeCreateEdgeDialog,
+      closeEdgePopover,
       closeSelectionPopover,
       createGroupFromSelection,
       createEdgeDialog,
@@ -1059,14 +1332,22 @@ export function useCanvasEditor(
       displayNodes,
       deactivateCanvasSurface,
       connectionDraft,
+      edgeColorOptions: selectionColors,
+      edgeLabelDraft,
+      edgeLabelEditorPosition,
+      edgeReconnectDraft,
       edgeSources,
+      edgeToolbar,
+      edgeToolbarPopover,
       edgeTargets,
+      editingEdgeLabelId,
       exportCanvas,
       fileInputRef,
       finishConnectionDrag,
       getEdgeLabelPosition,
       getEdgePath,
       getConnectionDraftPath,
+      getEdgeReconnectDraftPath,
       getFileName,
       getFileNodeDescription,
       getFileNodeKind,
@@ -1141,9 +1422,19 @@ export function useCanvasEditor(
       selectionLayoutActions,
       selectionToolbar,
       selectionToolbarPopover,
+      selectedEdgeHandlePositions,
       setSelectionToolbarSize,
+      setEdgeToolbarSize,
+      startEdgeEndpointDrag,
+      startEdgeLabelEditing,
+      submitEdgeLabelEditing,
+      cancelEdgeLabelEditing,
+      updateEditingEdgeLabel,
       toggleInspector,
+      toggleEdgePopover,
       toggleSelectionPopover,
+      updateSelectedEdgeDirection,
+      selectedEdgeDirectionMode,
     },
     ["fileInputRef", "stageRef"],
   )

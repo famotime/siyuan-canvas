@@ -75,9 +75,11 @@ function createEditorMock(node = createTextNode()) {
     bottomToolbarVisible: false,
     canDelete: false,
     centerSelectionInViewport: vi.fn(),
+    centerEdgeInViewport: vi.fn(),
     closeCreateEdgeDialog: vi.fn(),
     closeFilePickerDialog: vi.fn(),
     closeSelectionPopover: vi.fn(),
+    closeEdgePopover: vi.fn(),
     createEdgeDialog: {
       visible: false,
     },
@@ -101,11 +103,31 @@ function createEditorMock(node = createTextNode()) {
     deactivateCanvasSurface: vi.fn(),
     deleteSelection: vi.fn(),
     displayNodes: [node],
+    edgeColorOptions: ["1", "2", "3"],
+    edgeLabelDraft: "",
+    edgeLabelEditorPosition: null,
+    edgeReconnectDraft: {
+      edgeId: "",
+      endpoint: "",
+      targetNodeId: "",
+      targetSide: "",
+      toX: 0,
+      toY: 0,
+      visible: false,
+    },
+    edgeToolbar: {
+      placement: "top",
+      visible: false,
+      x: 0,
+      y: 0,
+    },
+    edgeToolbarPopover: "closed",
     edgeTargets: [],
     edgeSources: [node],
     exportCanvas: vi.fn(),
     fileInputRef: ref<HTMLInputElement>(),
     getConnectionDraftPath: vi.fn(() => ""),
+    getEdgeReconnectDraftPath: vi.fn(() => ""),
     getEdgeLabelPosition: vi.fn(() => ({ x: 0, y: 0 })),
     getEdgePath: vi.fn(() => ""),
     getFileNodePreview: vi.fn(() => ({
@@ -157,8 +179,10 @@ function createEditorMock(node = createTextNode()) {
     recentFiles: [],
     resetViewport: vi.fn(),
     save: vi.fn(),
+    selectedEdgeHandlePositions: null,
     selectEdge: vi.fn(),
     selectedEdge: null,
+    selectedEdgeDirectionMode: "single",
     selectedNode: node,
     selectedNodeCount: 1,
     selectionBox: {
@@ -182,8 +206,11 @@ function createEditorMock(node = createTextNode()) {
     selectionToolbarPopover: "closed",
     selectNode: vi.fn(),
     setSelectionToolbarSize: vi.fn(),
+    setEdgeToolbarSize: vi.fn(),
     sides: ["top", "right", "bottom", "left"],
     stageRef: ref<HTMLElement>(),
+    startEdgeEndpointDrag: vi.fn(),
+    startEdgeLabelEditing: vi.fn(),
     startConnectionDrag: vi.fn(),
     startCornerResize: vi.fn(),
     startPan: vi.fn(),
@@ -205,12 +232,18 @@ function createEditorMock(node = createTextNode()) {
     },
     suggestedFilename: "Untitled.canvas",
     submitCreateEdgeDialog: vi.fn(),
+    submitEdgeLabelEditing: vi.fn(),
+    cancelEdgeLabelEditing: vi.fn(),
     setNewEdgeSourceId: vi.fn(),
     setNewEdgeTargetId: vi.fn(),
     toggleInspector: vi.fn(),
     toggleInspectorSection: vi.fn(),
+    toggleEdgePopover: vi.fn(),
     toggleSelectionPopover: vi.fn(),
     triggerImport: vi.fn(),
+    updateEditingEdgeLabel: vi.fn(),
+    updateSelectedEdgeDirection: vi.fn(),
+    applyEdgeColor: vi.fn(),
     updateFilePickerQuery: vi.fn(),
     updateEdgeField: vi.fn(),
     updateEdgeSide: vi.fn(),
@@ -316,7 +349,7 @@ describe("CanvasWorkspace", () => {
     expect(marker.exists()).toBe(true)
     expect(marker.attributes("viewBox")).toBe("0 0 14 14")
     expect(marker.find("path").attributes("fill")).toBe("context-stroke")
-    expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow)")
+    expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow-end)")
   })
 
   it("renders four edge resize handles, one corner resize handle, and four connection anchors for each card", () => {
@@ -990,6 +1023,186 @@ describe("CanvasWorkspace", () => {
     document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
 
     expect(currentEditor.closeSelectionPopover).toHaveBeenCalledTimes(1)
+  })
+
+  it("renders a floating edge toolbar with an icon-triggered direction dropdown", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.state.document.edges = [{
+      color: "2",
+      endArrow: true,
+      fromNode: "text-1",
+      fromSide: "bottom",
+      id: "edge-1",
+      label: "flow",
+      startArrow: false,
+      toNode: "text-2",
+      toSide: "top",
+    }]
+    currentEditor.state.selectedEdgeId = "edge-1"
+    currentEditor.selectedEdge = currentEditor.state.document.edges[0]
+    currentEditor.edgeToolbar = {
+      placement: "top",
+      visible: true,
+      x: 200,
+      y: 120,
+    }
+    currentEditor.edgeToolbarPopover = "direction"
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='edge-toolbar']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-toolbar-delete']").attributes("title")).toBe("删除")
+    expect(wrapper.find("[data-testid='edge-toolbar-color']").attributes("title")).toBe("颜色")
+    expect(wrapper.find("[data-testid='edge-toolbar-center']").attributes("title")).toBe("聚焦")
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-trigger']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-direction-menu']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-toolbar-edit-label']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-single']").classes()).toContain("selection-toolbar__menu-button--active")
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-none']").classes()).not.toContain("selection-toolbar__menu-button--active")
+
+    await wrapper.find("[data-testid='edge-toolbar-direction-trigger']").trigger("click")
+    expect(currentEditor.toggleEdgePopover).toHaveBeenCalledWith("direction")
+
+    await wrapper.find("[data-testid='edge-toolbar-direction-both']").trigger("click")
+
+    expect(currentEditor.updateSelectedEdgeDirection).toHaveBeenCalledWith("both")
+  })
+
+  it("highlights the current edge direction in the dropdown for a legacy single-direction edge", () => {
+    currentEditor = createEditorMock()
+    currentEditor.state.document.edges = [{
+      fromNode: "text-1",
+      fromSide: "right",
+      id: "edge-1",
+      toNode: "text-2",
+      toSide: "left",
+    }]
+    currentEditor.state.selectedEdgeId = "edge-1"
+    currentEditor.selectedEdge = currentEditor.state.document.edges[0]
+    currentEditor.selectedEdgeDirectionMode = "single"
+    currentEditor.edgeToolbar = {
+      placement: "top",
+      visible: true,
+      x: 200,
+      y: 120,
+    }
+    currentEditor.edgeToolbarPopover = "direction"
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-single']").classes()).toContain("selection-toolbar__menu-button--active")
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-none']").classes()).not.toContain("selection-toolbar__menu-button--active")
+  })
+
+  it("renders selected edge endpoint handles and wires them to edge endpoint dragging", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.state.document.edges = [{
+      fromNode: "text-1",
+      fromSide: "right",
+      id: "edge-1",
+      toNode: "text-2",
+      toSide: "left",
+    }]
+    currentEditor.state.selectedEdgeId = "edge-1"
+    currentEditor.selectedEdge = currentEditor.state.document.edges[0]
+    currentEditor.selectedEdgeHandlePositions = {
+      from: { x: 280, y: 140 },
+      to: { x: 420, y: 180 },
+    }
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='edge-endpoint-from']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-endpoint-to']").exists()).toBe(true)
+
+    await wrapper.find("[data-testid='edge-endpoint-to']").trigger("pointerdown")
+
+    expect(currentEditor.startEdgeEndpointDrag).toHaveBeenCalledWith("to", expect.anything())
+  })
+
+  it("renders dual edge markers and persists inline edge label edits on input", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.state.document.edges = [{
+      color: "4",
+      endArrow: true,
+      fromNode: "text-1",
+      fromSide: "bottom",
+      id: "edge-1",
+      label: "old",
+      startArrow: true,
+      toNode: "text-2",
+      toSide: "top",
+    }]
+    currentEditor.state.selectedEdgeId = "edge-1"
+    currentEditor.selectedEdge = currentEditor.state.document.edges[0]
+    currentEditor.edgeLabelDraft = "old"
+    currentEditor.editingEdgeLabelId = "edge-1"
+    currentEditor.edgeLabelEditorPosition = { x: 320, y: 180 }
+    currentEditor.getEdgeLabelPosition = vi.fn(() => ({ x: 320, y: 180 }))
+    currentEditor.getEdgePath = vi.fn(() => "M 100 100 C 140 140, 280 220, 320 260")
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find(".stage__edge").attributes("marker-start")).toBe("url(#canvas-edge-arrow-start)")
+    expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow-end)")
+    expect(wrapper.find("[data-testid='edge-label-editor']").exists()).toBe(true)
+
+    await wrapper.find("[data-testid='edge-label-editor']").setValue("updated")
+
+    expect(currentEditor.updateEditingEdgeLabel).toHaveBeenCalledWith("updated")
+
+    await wrapper.find("[data-testid='edge-label-editor']").trigger("blur")
+
+    expect(currentEditor.submitEdgeLabelEditing).toHaveBeenCalledTimes(1)
+  })
+
+  it("renders a reconnect preview line while dragging an edge endpoint", () => {
+    currentEditor = createEditorMock()
+    currentEditor.edgeReconnectDraft = {
+      edgeId: "edge-1",
+      endpoint: "to",
+      targetNodeId: "",
+      targetSide: "",
+      toX: 340,
+      toY: 280,
+      visible: true,
+    }
+    currentEditor.getEdgeReconnectDraftPath = vi.fn(() => "M 280 140 C 320 140, 340 280, 340 280")
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='edge-reconnect-draft']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-reconnect-draft']").attributes("d")).toContain("340 280")
   })
 
   it("removes the extra right-side gutter when the inspector is collapsed", () => {

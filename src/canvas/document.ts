@@ -67,8 +67,10 @@ export function createCanvasEdge(fromNode: string, toNode: string): CanvasEdge {
     id: createCanvasId("edge-"),
     fromNode,
     fromSide: "right",
+    startArrow: false,
     toNode,
     toSide: "left",
+    endArrow: true,
   }
 }
 
@@ -116,6 +118,94 @@ export function removeCanvasEdge(document: CanvasDocument, edgeId: string): Canv
     ...document,
     edges: document.edges.filter((edge) => edge.id !== edgeId),
   }
+}
+
+function updateCanvasEdgeById(
+  document: CanvasDocument,
+  edgeId: string,
+  updater: (edge: CanvasEdge) => CanvasEdge,
+): CanvasDocument {
+  return {
+    ...document,
+    edges: document.edges.map((edge) => (edge.id === edgeId ? updater(edge) : edge)),
+  }
+}
+
+export function setCanvasEdgeLabel(
+  document: CanvasDocument,
+  edgeId: string,
+  label: string,
+): CanvasDocument {
+  const normalizedLabel = label.trim()
+
+  return updateCanvasEdgeById(document, edgeId, (edge) => {
+    if (!normalizedLabel) {
+      const { label: _removedLabel, ...nextEdge } = edge
+      return nextEdge as CanvasEdge
+    }
+
+    return {
+      ...edge,
+      label: normalizedLabel,
+    }
+  })
+}
+
+export function setCanvasEdgeColor(
+  document: CanvasDocument,
+  edgeId: string,
+  color: string,
+): CanvasDocument {
+  return updateCanvasEdgeById(document, edgeId, (edge) => {
+    if (!color) {
+      const { color: _removedColor, ...nextEdge } = edge
+      return nextEdge as CanvasEdge
+    }
+
+    return {
+      ...edge,
+      color,
+    }
+  })
+}
+
+export function setCanvasEdgeDirection(
+  document: CanvasDocument,
+  edgeId: string,
+  direction: {
+    endArrow: boolean
+    startArrow: boolean
+  },
+): CanvasDocument {
+  return updateCanvasEdgeById(document, edgeId, (edge) => ({
+    ...edge,
+    endArrow: direction.endArrow,
+    startArrow: direction.startArrow,
+  }))
+}
+
+export function setCanvasEdgeEndpoint(
+  document: CanvasDocument,
+  edgeId: string,
+  endpoint: "from" | "to",
+  target: {
+    nodeId: string
+    side: CanvasEdge["fromSide"]
+  },
+): CanvasDocument {
+  return updateCanvasEdgeById(document, edgeId, (edge) => (
+    endpoint === "from"
+      ? {
+          ...edge,
+          fromNode: target.nodeId,
+          fromSide: target.side,
+        }
+      : {
+          ...edge,
+          toNode: target.nodeId,
+          toSide: target.side,
+        }
+  ))
 }
 
 export function setCanvasNodeGeometry(

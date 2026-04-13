@@ -6,6 +6,7 @@ import type { CanvasBoardMetrics } from "@/canvas/board"
 import type { CanvasEditorState } from "@/canvas/editor-state"
 import type {
   CanvasDocument,
+  CanvasEdge,
   CanvasNode,
   CanvasSide,
 } from "@/canvas/types"
@@ -16,6 +17,8 @@ import {
 } from "@/canvas/board"
 import {
   createCanvasEdge,
+  removeCanvasEdge,
+  setCanvasEdgeEndpoint,
   setCanvasNodeGeometry,
   upsertCanvasEdge,
 } from "@/canvas/document"
@@ -28,6 +31,7 @@ import {
 import {
   createBoundsFromPoints,
   resolveDragNodeIds,
+  resolveMarqueeSelectionEdgeIds,
   resolveMarqueeSelectionNodeIds,
 } from "@/canvas/selection-toolbar"
 import {
@@ -53,12 +57,24 @@ export interface CanvasEditorConnectionDraftState {
   visible: boolean
 }
 
+export interface CanvasEditorEdgeReconnectDraftState {
+  edgeId: string
+  endpoint: "" | "from" | "to"
+  targetNodeId: string
+  targetSide: "" | CanvasSide
+  toX: number
+  toY: number
+  visible: boolean
+}
+
 interface CanvasEditorGestureOptions {
   board: ComputedRef<CanvasBoardMetrics>
   commitDocument: (document: CanvasDocument) => void
   connectionDraft: CanvasEditorConnectionDraftState
+  edgeReconnectDraft: CanvasEditorEdgeReconnectDraftState
   getAnchor: (node: CanvasNode, side: CanvasSide) => { x: number, y: number }
   selectionBox: CanvasEditorSelectionBoxState
+  selectedEdge: ComputedRef<CanvasEdge | null>
   stageRef: Ref<HTMLElement | undefined>
   state: CanvasEditorState
   viewport: {
@@ -73,8 +89,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     board,
     commitDocument,
     connectionDraft,
+    edgeReconnectDraft,
     getAnchor,
     selectionBox,
+    selectedEdge,
     stageRef,
     state,
     viewport,
@@ -94,6 +112,16 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     connectionDraft.toX = 0
     connectionDraft.toY = 0
     connectionDraft.visible = false
+  }
+
+  function clearEdgeReconnectDraft() {
+    edgeReconnectDraft.edgeId = ""
+    edgeReconnectDraft.endpoint = ""
+    edgeReconnectDraft.targetNodeId = ""
+    edgeReconnectDraft.targetSide = ""
+    edgeReconnectDraft.toX = 0
+    edgeReconnectDraft.toY = 0
+    edgeReconnectDraft.visible = false
   }
 
   function startPointerGesture(
@@ -203,7 +231,26 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       y: toCanvasY(stageBounds.y),
     })
 
-    state.selectNodes(selectedNodeIds, { additive: options.additive })
+    if (selectedNodeIds.length > 0) {
+      state.selectNodes(selectedNodeIds, { additive: options.additive })
+      return
+    }
+
+    const selectedEdgeIds = resolveMarqueeSelectionEdgeIds(state.document, {
+      height: stageBounds.height / viewport.scale,
+      width: stageBounds.width / viewport.scale,
+      x: toCanvasX(stageBounds.x),
+      y: toCanvasY(stageBounds.y),
+    })
+
+    if (selectedEdgeIds.length > 0) {
+      state.selectEdge(selectedEdgeIds[0])
+      return
+    }
+
+    if (!options.additive) {
+      state.selectNodes([])
+    }
   }
 
   function startPan(event: PointerEvent) {
@@ -363,9 +410,45 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   }
 
   function isConnectionTarget(nodeId: string, side: CanvasSide) {
-    return connectionDraft.visible
+    const isCreationTarget = connectionDraft.visible
       && connectionDraft.toNodeId === nodeId
       && connectionDraft.toSide === side
+    const isReconnectTarget = edgeReconnectDraft.visible
+      && edgeReconnectDraft.targetNodeId === nodeId
+      && edgeReconnectDraft.targetSide === side
+
+    return isCreationTarget || isReconnectTarget
+  }
+
+  function getEdgeReconnectDraftPath() {
+    if (!edgeReconnectDraft.visible || !edgeReconnectDraft.edgeId || !edgeReconnectDraft.endpoint) {
+      return ""
+    }
+
+    const edge = state.document.edges.find((candidate) => candidate.id === edgeReconnectDraft.edgeId)
+    if (!edge) {
+      return ""
+    }
+
+    const fixedNode = state.document.nodes.find((node) =>
+      node.id === (edgeReconnectDraft.endpoint === "from" ? edge.toNode : edge.fromNode),
+    )
+    if (!fixedNode) {
+      return ""
+    }
+
+    const fixedSide = edgeReconnectDraft.endpoint === "from" ? edge.toSide : edge.fromSide
+    const fixedPoint = getAnchor(fixedNode, fixedSide)
+    const movingPoint = {
+      x: edgeReconnectDraft.toX,
+      y: edgeReconnectDraft.toY,
+    }
+
+    if (edgeReconnectDraft.endpoint === "from") {
+      return `M ${movingPoint.x} ${movingPoint.y} C ${(movingPoint.x + fixedPoint.x) / 2} ${movingPoint.y}, ${(movingPoint.x + fixedPoint.x) / 2} ${fixedPoint.y}, ${fixedPoint.x} ${fixedPoint.y}`
+    }
+
+    return `M ${fixedPoint.x} ${fixedPoint.y} C ${(fixedPoint.x + movingPoint.x) / 2} ${fixedPoint.y}, ${(fixedPoint.x + movingPoint.x) / 2} ${movingPoint.y}, ${movingPoint.x} ${movingPoint.y}`
   }
 
   function finishConnectionDrag() {
@@ -411,6 +494,80 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     )
   }
 
+  function updateEdgeReconnectTarget(edge: CanvasEdge, endpoint: "from" | "to", event: PointerEvent) {
+    const stagePoint = getStagePoint(event)
+    if (!stagePoint) {
+      return
+    }
+
+    const canvasPoint = {
+      x: toCanvasX(stagePoint.x),
+      y: toCanvasY(stagePoint.y),
+    }
+    const oppositeNodeId = endpoint === "from" ? edge.toNode : edge.fromNode
+    const target = findNearestCanvasAnchor(state.document.nodes, canvasPoint, {
+      maxDistance: CONNECTION_SNAP_DISTANCE,
+    })
+
+    edgeReconnectDraft.edgeId = edge.id
+    edgeReconnectDraft.endpoint = endpoint
+    edgeReconnectDraft.targetNodeId = target?.nodeId || ""
+    edgeReconnectDraft.targetSide = target?.side || ""
+    edgeReconnectDraft.toX = target ? toBoardX(board.value, target.x) : toBoardX(board.value, canvasPoint.x)
+    edgeReconnectDraft.toY = target ? toBoardY(board.value, target.y) : toBoardY(board.value, canvasPoint.y)
+    edgeReconnectDraft.visible = true
+
+    if (target?.nodeId === oppositeNodeId) {
+      edgeReconnectDraft.targetNodeId = ""
+      edgeReconnectDraft.targetSide = ""
+      edgeReconnectDraft.toX = toBoardX(board.value, canvasPoint.x)
+      edgeReconnectDraft.toY = toBoardY(board.value, canvasPoint.y)
+    }
+  }
+
+  function finishEdgeEndpointDrag(edge: CanvasEdge, endpoint: "from" | "to") {
+    if (!edgeReconnectDraft.targetNodeId || !edgeReconnectDraft.targetSide) {
+      commitDocument(removeCanvasEdge(state.document, edge.id))
+      state.selectEdge()
+      clearEdgeReconnectDraft()
+      return
+    }
+
+    commitDocument(setCanvasEdgeEndpoint(state.document, edge.id, endpoint, {
+      nodeId: edgeReconnectDraft.targetNodeId,
+      side: edgeReconnectDraft.targetSide,
+    }))
+    state.selectEdge(edge.id)
+    clearEdgeReconnectDraft()
+  }
+
+  function startEdgeEndpointDrag(endpoint: "from" | "to", event: PointerEvent) {
+    if (event.button !== 0) {
+      return
+    }
+
+    const edge = selectedEdge.value
+    if (!edge) {
+      return
+    }
+
+    event.preventDefault?.()
+    clearEdgeReconnectDraft()
+
+    startPointerGesture(
+      event,
+      (_dx, _dy, moveEvent) => {
+        updateEdgeReconnectTarget(edge, endpoint, moveEvent)
+      },
+      {
+        onEnd: (_dx, _dy, upEvent) => {
+          updateEdgeReconnectTarget(edge, endpoint, upEvent)
+          finishEdgeEndpointDrag(edge, endpoint)
+        },
+      },
+    )
+  }
+
   function startResize(node: CanvasNode, side: CanvasSide, event: PointerEvent) {
     if (event.button !== 0) {
       return
@@ -443,12 +600,15 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
   return {
     clearConnectionDraft,
+    clearEdgeReconnectDraft,
     clearSelectionBox,
     finishConnectionDrag,
     getConnectionDraftPath,
+    getEdgeReconnectDraftPath,
     handleNodePointerDown,
     handleWheelZoom,
     isConnectionTarget,
+    startEdgeEndpointDrag,
     startConnectionDrag,
     startCornerResize,
     startDrag,

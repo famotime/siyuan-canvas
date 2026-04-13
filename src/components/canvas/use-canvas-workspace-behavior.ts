@@ -12,11 +12,17 @@ import { getNodeSelectionColorValue } from "@/components/canvas/canvas-workspace
 
 interface CanvasWorkspaceEditor {
   activateNode: (node: CanvasNode) => void
+  closeEdgePopover: () => void
   closeSelectionPopover: () => void
+  edgeToolbar: {
+    visible: boolean
+  }
+  edgeToolbarPopover: "closed" | "color" | "direction"
   importCanvas: (file: File) => Promise<void>
   selectNode: (nodeId: string) => void
   selectedNode: CanvasNode | null
   selectedNodeCount: number
+  setEdgeToolbarSize: (size: { height: number, width: number }) => void
   selectionToolbar: {
     visible: boolean
   }
@@ -36,10 +42,12 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   const editingNodeId = ref("")
   const editingTextareaRef = ref<HTMLTextAreaElement>()
   const canvasShellRef = ref<HTMLElement>()
+  const edgeToolbarRef = ref<HTMLElement>()
   const selectionToolbarRef = ref<HTMLElement>()
   const selectionToolbarThemeMode = ref<"dark" | "light">("light")
 
   let canvasThemeObserver: MutationObserver | null = null
+  let edgeToolbarResizeObserver: ResizeObserver | null = null
   let selectionToolbarResizeObserver: ResizeObserver | null = null
 
   const activeSelectionColor = computed(() => {
@@ -95,10 +103,42 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     selectionToolbarResizeObserver.observe(selectionToolbarRef.value)
   }
 
+  function syncEdgeToolbarSize() {
+    if (!edgeToolbarRef.value) {
+      return
+    }
+
+    const { height, width } = edgeToolbarRef.value.getBoundingClientRect()
+    editor.setEdgeToolbarSize({
+      height: Math.round(height),
+      width: Math.round(width),
+    })
+  }
+
+  function observeEdgeToolbar() {
+    edgeToolbarResizeObserver?.disconnect()
+    edgeToolbarResizeObserver = null
+
+    if (!edgeToolbarRef.value || typeof ResizeObserver === "undefined") {
+      return
+    }
+
+    edgeToolbarResizeObserver = new ResizeObserver(() => {
+      syncEdgeToolbarSize()
+    })
+    edgeToolbarResizeObserver.observe(edgeToolbarRef.value)
+  }
+
   function setSelectionToolbarRef(value: Element | null) {
     selectionToolbarRef.value = value instanceof HTMLElement ? value : undefined
     observeSelectionToolbar()
     syncSelectionToolbarSize()
+  }
+
+  function setEdgeToolbarRef(value: Element | null) {
+    edgeToolbarRef.value = value instanceof HTMLElement ? value : undefined
+    observeEdgeToolbar()
+    syncEdgeToolbarSize()
   }
 
   function handleToolbarEdit() {
@@ -110,15 +150,23 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   }
 
   function handleWindowPointerDown(event: PointerEvent) {
-    if (editor.selectionToolbarPopover === "closed") {
+    if (!(event.target instanceof HTMLElement)) {
+      if (editor.selectionToolbarPopover !== "closed") {
+        editor.closeSelectionPopover()
+      }
+      if (editor.edgeToolbarPopover !== "closed") {
+        editor.closeEdgePopover()
+      }
       return
     }
 
-    if (event.target instanceof HTMLElement && event.target.closest(".selection-toolbar")) {
-      return
+    if (editor.selectionToolbarPopover !== "closed" && !event.target.closest(".selection-toolbar")) {
+      editor.closeSelectionPopover()
     }
 
-    editor.closeSelectionPopover()
+    if (editor.edgeToolbarPopover !== "closed" && !event.target.closest(".edge-toolbar")) {
+      editor.closeEdgePopover()
+    }
   }
 
   function handleNodeDoubleClick(node: CanvasNode) {
@@ -175,6 +223,7 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   onBeforeUnmount(() => {
     canvasThemeObserver?.disconnect()
     window.removeEventListener("pointerdown", handleWindowPointerDown)
+    edgeToolbarResizeObserver?.disconnect()
     selectionToolbarResizeObserver?.disconnect()
   })
 
@@ -186,12 +235,21 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     },
   )
 
+  watch(
+    () => editor.edgeToolbar.visible,
+    async () => {
+      await nextTick()
+      syncEdgeToolbarSize()
+    },
+  )
+
   return {
     activeSelectionColor,
     canvasShellRef,
     commitTextNodeEditing,
     editingMarkdown,
     editingNodeId,
+    setEdgeToolbarRef,
     handleImport,
     handleNodeDoubleClick,
     handleToolbarEdit,

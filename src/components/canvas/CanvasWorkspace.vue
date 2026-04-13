@@ -111,6 +111,36 @@
                   fill="context-stroke"
                 />
               </marker>
+              <marker
+                id="canvas-edge-arrow-end"
+                markerHeight="14"
+                markerUnits="userSpaceOnUse"
+                markerWidth="14"
+                orient="auto"
+                refX="11"
+                refY="7"
+                viewBox="0 0 14 14"
+              >
+                <path
+                  d="M 1.5 1.5 L 12 7 L 1.5 12.5 L 4.75 7 z"
+                  fill="context-stroke"
+                />
+              </marker>
+              <marker
+                id="canvas-edge-arrow-start"
+                markerHeight="14"
+                markerUnits="userSpaceOnUse"
+                markerWidth="14"
+                orient="auto-start-reverse"
+                refX="11"
+                refY="7"
+                viewBox="0 0 14 14"
+              >
+                <path
+                  d="M 1.5 1.5 L 12 7 L 1.5 12.5 L 4.75 7 z"
+                  fill="context-stroke"
+                />
+              </marker>
             </defs>
             <g
               v-for="edge in editor.state.document.edges"
@@ -120,7 +150,9 @@
                 class="stage__edge"
                 :class="{ 'stage__edge--selected': editor.state.selectedEdgeId === edge.id }"
                 :d="editor.getEdgePath(edge)"
-                marker-end="url(#canvas-edge-arrow)"
+                :marker-start="resolveEdgeStartMarker(edge.startArrow ?? false)"
+                :marker-end="resolveEdgeEndMarker(edge.endArrow ?? true)"
+                :style="getEdgeStrokeStyle(edge)"
                 @click.stop="editor.selectEdge(edge.id)"
               />
               <text
@@ -128,6 +160,7 @@
                 class="stage__edge-label"
                 :x="editor.getEdgeLabelPosition(edge).x"
                 :y="editor.getEdgeLabelPosition(edge).y"
+                :style="getEdgeLabelStyle(edge)"
                 @click.stop="editor.selectEdge(edge.id)"
               >
                 {{ edge.label }}
@@ -138,6 +171,14 @@
               class="stage__edge stage__edge--draft"
               :d="editor.getConnectionDraftPath()"
               marker-end="url(#canvas-edge-arrow)"
+            />
+            <path
+              v-if="editor.edgeReconnectDraft.visible"
+              class="stage__edge stage__edge--draft"
+              data-testid="edge-reconnect-draft"
+              :d="editor.getEdgeReconnectDraftPath()"
+              :marker-start="editor.edgeReconnectDraft.endpoint === 'from' ? 'url(#canvas-edge-arrow-start)' : undefined"
+              :marker-end="editor.edgeReconnectDraft.endpoint === 'to' ? 'url(#canvas-edge-arrow-end)' : undefined"
             />
           </svg>
 
@@ -282,6 +323,177 @@
           }"
           data-testid="selection-box"
         />
+
+        <button
+          v-if="editor.selectedEdgeHandlePositions"
+          class="edge-endpoint-handle"
+          data-testid="edge-endpoint-from"
+          type="button"
+          :style="{
+            left: `${editor.selectedEdgeHandlePositions.from.x}px`,
+            top: `${editor.selectedEdgeHandlePositions.from.y}px`,
+          }"
+          @pointerdown.stop.prevent="editor.startEdgeEndpointDrag('from', $event)"
+        />
+
+        <button
+          v-if="editor.selectedEdgeHandlePositions"
+          class="edge-endpoint-handle"
+          data-testid="edge-endpoint-to"
+          type="button"
+          :style="{
+            left: `${editor.selectedEdgeHandlePositions.to.x}px`,
+            top: `${editor.selectedEdgeHandlePositions.to.y}px`,
+          }"
+          @pointerdown.stop.prevent="editor.startEdgeEndpointDrag('to', $event)"
+        />
+
+        <div
+          v-if="editor.edgeToolbar.visible"
+          :ref="setEdgeToolbarRef"
+          class="edge-toolbar selection-toolbar"
+          :class="[
+            `selection-toolbar--${editor.edgeToolbar.placement}`,
+            `selection-toolbar--${selectionToolbarThemeMode}`,
+          ]"
+          :style="{
+            left: `${editor.edgeToolbar.x}px`,
+            top: `${editor.edgeToolbar.y}px`,
+          }"
+          data-testid="edge-toolbar"
+          @click.stop
+          @pointerdown.stop
+        >
+          <button
+            class="selection-toolbar__button"
+            data-testid="edge-toolbar-delete"
+            :title="SELECTION_TOOLBAR_TOOLTIPS.delete"
+            type="button"
+            @click.stop="editor.deleteSelection"
+          >
+            <SelectionToolbarIcon class="selection-toolbar__icon" name="delete" />
+          </button>
+          <div class="selection-toolbar__menu">
+            <button
+              class="selection-toolbar__button"
+              :class="{ 'selection-toolbar__button--active': editor.edgeToolbarPopover === 'color' }"
+              data-testid="edge-toolbar-color"
+              :title="SELECTION_TOOLBAR_TOOLTIPS.color"
+              type="button"
+              @click.stop="editor.toggleEdgePopover('color')"
+            >
+              <SelectionToolbarIcon class="selection-toolbar__icon" name="color" />
+            </button>
+            <div
+              v-if="editor.edgeToolbarPopover === 'color'"
+              class="selection-toolbar__popover selection-toolbar__popover--colors"
+              data-testid="edge-color-palette"
+              @click.stop
+              @pointerdown.stop
+            >
+              <button
+                class="selection-toolbar__swatch selection-toolbar__swatch--clear"
+                data-testid="edge-color-clear"
+                :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
+                :title="t('selectionToolbarClearColor')"
+                type="button"
+                @click.stop="editor.applyEdgeColor(CLEAR_SELECTION_COLOR)"
+              />
+              <button
+                v-for="color in editor.edgeColorOptions"
+                :key="`edge-color-${color}`"
+                class="selection-toolbar__swatch"
+                :data-testid="`edge-color-${color}`"
+                :style="getSelectionColorStyle(color)"
+                type="button"
+                @click.stop="editor.applyEdgeColor(color)"
+              />
+            </div>
+          </div>
+          <button
+            class="selection-toolbar__button"
+            data-testid="edge-toolbar-center"
+            :title="SELECTION_TOOLBAR_TOOLTIPS.center"
+            type="button"
+            @click.stop="editor.centerEdgeInViewport"
+          >
+            <SelectionToolbarIcon class="selection-toolbar__icon" name="center" />
+          </button>
+          <div
+            class="selection-toolbar__menu"
+            data-testid="edge-toolbar-direction"
+          >
+            <button
+              class="selection-toolbar__button"
+              :class="{ 'selection-toolbar__button--active': editor.edgeToolbarPopover === 'direction' }"
+              data-testid="edge-toolbar-direction-trigger"
+              type="button"
+              :title="t('edgeToolbarDirection')"
+              @click.stop="editor.toggleEdgePopover('direction')"
+            >
+              <SelectionToolbarIcon class="selection-toolbar__icon" name="connect" />
+            </button>
+            <div
+              v-if="editor.edgeToolbarPopover === 'direction'"
+              class="selection-toolbar__popover selection-toolbar__popover--layout"
+              data-testid="edge-direction-menu"
+              @click.stop
+              @pointerdown.stop
+            >
+              <button
+                class="selection-toolbar__menu-button"
+                :class="{ 'selection-toolbar__menu-button--active': editor.selectedEdgeDirectionMode === 'none' }"
+                data-testid="edge-toolbar-direction-none"
+                type="button"
+                @click.stop="editor.updateSelectedEdgeDirection('none')"
+              >
+                {{ t("edgeDirectionNone") }}
+              </button>
+              <button
+                class="selection-toolbar__menu-button"
+                :class="{ 'selection-toolbar__menu-button--active': editor.selectedEdgeDirectionMode === 'single' }"
+                data-testid="edge-toolbar-direction-single"
+                type="button"
+                @click.stop="editor.updateSelectedEdgeDirection('single')"
+              >
+                {{ t("edgeDirectionSingle") }}
+              </button>
+              <button
+                class="selection-toolbar__menu-button"
+                :class="{ 'selection-toolbar__menu-button--active': editor.selectedEdgeDirectionMode === 'both' }"
+                data-testid="edge-toolbar-direction-both"
+                type="button"
+                @click.stop="editor.updateSelectedEdgeDirection('both')"
+              >
+                {{ t("edgeDirectionBoth") }}
+              </button>
+            </div>
+          </div>
+          <button
+            class="selection-toolbar__button"
+            data-testid="edge-toolbar-edit-label"
+            :title="t('edgeToolbarEditLabel')"
+            type="button"
+            @click.stop="editor.startEdgeLabelEditing"
+          >
+            <SelectionToolbarIcon class="selection-toolbar__icon" name="edit" />
+          </button>
+        </div>
+
+        <input
+          v-if="editor.editingEdgeLabelId && editor.edgeLabelEditorPosition"
+          ref="edgeLabelInputRef"
+          :value="editor.edgeLabelDraft"
+          class="edge-label-editor"
+          data-testid="edge-label-editor"
+          :style="{
+            left: `${editor.edgeLabelEditorPosition.x}px`,
+            top: `${editor.edgeLabelEditorPosition.y}px`,
+          }"
+          @blur="editor.submitEdgeLabelEditing"
+          @input="editor.updateEditingEdgeLabel(valueFromEvent($event))"
+          @keydown="handleEdgeLabelEditorKeydown"
+        >
 
         <div
           v-if="editor.bottomToolbarVisible"
@@ -1108,10 +1320,14 @@ import {
   getCanvasNodeContentStyle as resolveCanvasNodeContentStyle,
   getCanvasNodeStyle as buildCanvasNodeStyle,
   getSelectionColorStyle as resolveSelectionColorStyle,
+  selectionColorStyles,
 } from "@/components/canvas/canvas-workspace-display"
 import { useCanvasWorkspaceBehavior } from "@/components/canvas/use-canvas-workspace-behavior"
 import { createCanvasI18n } from "@/i18n/canvas"
-import type { CanvasNode } from "@/canvas/types"
+import type {
+  CanvasEdge,
+  CanvasNode,
+} from "@/canvas/types"
 
 const props = defineProps<{
   bootstrap: CanvasTabBootstrap
@@ -1134,12 +1350,14 @@ const {
   handleNodeDoubleClick,
   handleToolbarEdit,
   selectionToolbarThemeMode,
+  setEdgeToolbarRef,
   setEditingTextareaRef,
   setSelectionToolbarRef,
 } = useCanvasWorkspaceBehavior(editor)
 type EdgeNodePickerKind = "source" | "target"
 
 const activeEdgeNodePicker = ref<EdgeNodePickerKind | null>(null)
+const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
 const sourceEdgePickerRef = ref<HTMLElement>()
 const sourceEdgeSearchRef = ref<HTMLInputElement>()
@@ -1263,6 +1481,24 @@ function getSideLabel(side: string): string {
 
 function getSelectionColorStyle(color: string) {
   return resolveSelectionColorStyle(color)
+}
+
+function resolveEdgeStartMarker(enabled?: boolean) {
+  return enabled ? "url(#canvas-edge-arrow-start)" : undefined
+}
+
+function resolveEdgeEndMarker(enabled?: boolean) {
+  return enabled ? "url(#canvas-edge-arrow-end)" : undefined
+}
+
+function getEdgeStrokeStyle(edge: CanvasEdge) {
+  const colorStyle = edge.color ? selectionColorStyles[edge.color] : undefined
+  return colorStyle ? { stroke: colorStyle.border } : undefined
+}
+
+function getEdgeLabelStyle(edge: CanvasEdge) {
+  const colorStyle = edge.color ? selectionColorStyles[edge.color] : undefined
+  return colorStyle ? { fill: colorStyle.border } : undefined
 }
 
 function getCanvasNodeStyle(node: CanvasNode) {
@@ -1389,6 +1625,19 @@ function getCanvasThumbnailViewBox(thumbnail?: {
   return `${minX - padding} ${minY - padding} ${Math.max(maxX - minX + padding * 2, 1)} ${Math.max(maxY - minY + padding * 2, 1)}`
 }
 
+function handleEdgeLabelEditorKeydown(event: KeyboardEvent) {
+  if (event.key === "Enter") {
+    event.preventDefault()
+    editor.submitEdgeLabelEditing()
+    return
+  }
+
+  if (event.key === "Escape") {
+    event.preventDefault()
+    editor.cancelEdgeLabelEditing()
+  }
+}
+
 onMounted(() => {
   window.addEventListener("pointerdown", handleWindowPointerDown)
 })
@@ -1403,6 +1652,19 @@ watch(
     if (!visible) {
       activeEdgeNodePicker.value = null
     }
+  },
+)
+
+watch(
+  () => editor.editingEdgeLabelId,
+  async () => {
+    if (!editor.editingEdgeLabelId) {
+      return
+    }
+
+    await nextTick()
+    edgeLabelInputRef.value?.focus()
+    edgeLabelInputRef.value?.select()
   },
 )
 </script>
@@ -1621,6 +1883,17 @@ watch(
   backdrop-filter: blur(14px);
 }
 
+.edge-toolbar {
+  z-index: 5;
+}
+
+.edge-toolbar__direction-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+}
+
 .bottom-toolbar {
   position: absolute;
   left: 50%;
@@ -1778,6 +2051,10 @@ watch(
   cursor: pointer;
 }
 
+.selection-toolbar__menu-button--active {
+  background: var(--selection-toolbar-button-bg-hover);
+}
+
 .selection-toolbar__button::after,
 .selection-toolbar__menu-button::after {
   content: attr(data-tooltip);
@@ -1823,6 +2100,33 @@ watch(
 
 .selection-toolbar__menu-icon {
   opacity: 0.88;
+}
+
+.edge-endpoint-handle {
+  position: absolute;
+  z-index: 4;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--canvas-accent);
+  border-radius: 999px;
+  background: var(--canvas-surface);
+  box-shadow: 0 0 0 4px rgba(53, 103, 214, 0.14);
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+}
+
+.edge-label-editor {
+  position: absolute;
+  z-index: 5;
+  min-width: 120px;
+  max-width: 220px;
+  border: 1px solid var(--canvas-floating-border);
+  border-radius: 10px;
+  background: var(--canvas-floating-bg);
+  color: var(--canvas-text);
+  padding: 6px 10px;
+  box-shadow: var(--canvas-shadow);
+  transform: translate(-50%, -50%);
 }
 
 .stage__world {

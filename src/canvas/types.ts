@@ -55,8 +55,10 @@ export interface CanvasEdge {
   id: string
   fromNode: string
   fromSide: CanvasSide
+  startArrow?: boolean
   toNode: string
   toSide: CanvasSide
+  endArrow?: boolean
   label?: string
   color?: string
   [key: string]: unknown
