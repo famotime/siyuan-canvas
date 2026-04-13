@@ -6,6 +6,15 @@ export interface ResolvedCanvasImageTarget {
   title: string
 }
 
+export interface ResolvedCanvasBlockTarget {
+  hpath: string
+  id: string
+  kind: "block"
+  path: string
+  rootId: string
+  title: string
+}
+
 export interface ResolvedCanvasDocumentTarget {
   hpath: string
   id: string
@@ -27,12 +36,14 @@ export interface ResolvedCanvasFileFallbackTarget {
 }
 
 export type ResolvedCanvasFileTarget =
+  | ResolvedCanvasBlockTarget
   | ResolvedCanvasDocumentTarget
   | ResolvedCanvasNestedTarget
   | ResolvedCanvasImageTarget
   | ResolvedCanvasFileFallbackTarget
 
 export interface CanvasFileTargetLookups {
+  resolveBlockById: (blockId: string) => Promise<ResolvedCanvasBlockTarget | null>
   resolveCanvasByPath: (path: string) => Promise<ResolvedCanvasNestedTarget | null>
   resolveDocumentByBlockId: (blockId: string) => Promise<ResolvedCanvasDocumentTarget | null>
   resolveDocumentByPath: (path: string) => Promise<ResolvedCanvasDocumentTarget | null>
@@ -72,6 +83,11 @@ export async function resolveCanvasFileTarget(
 
   const blockId = BLOCK_ID_PATTERN.test(trimmed) ? trimmed : extractEmbeddedBlockId(trimmed)
   if (blockId) {
+    const block = await lookups.resolveBlockById(blockId)
+    if (block) {
+      return block
+    }
+
     const image = await lookups.resolveImageByBlockId(blockId)
     if (image) {
       return image

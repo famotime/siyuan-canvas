@@ -24,7 +24,7 @@ export interface CanvasFileTargetPreview {
   headline: string
   helper: string
   imageSrc?: string
-  kind: "canvas" | "document" | "file" | "image"
+  kind: "block" | "canvas" | "document" | "file" | "image"
   previewHtml?: string
   thumbnail?: {
     edges: CanvasThumbnailEdge[]
@@ -37,6 +37,7 @@ type PreviewInput = (
   | ResolvedCanvasFileNode
 ) & {
   excerptHtml?: string
+  imageSrc?: string
   thumbnail?: {
     edges: CanvasThumbnailEdge[]
     nodes: CanvasThumbnailNode[]
@@ -52,11 +53,26 @@ function toImageSource(target: PreviewInput): string | undefined {
     return target.asset.openPath
   }
 
+  if ("imageSrc" in target && typeof target.imageSrc === "string") {
+    return target.imageSrc
+  }
+
   return undefined
 }
 
 export function createCanvasFileTargetPreview(target: PreviewInput): CanvasFileTargetPreview {
   switch (target.kind) {
+    case "block":
+      return {
+        badge: "Block",
+        clampMode: "viewport",
+        detail: "hpath" in target ? target.hpath || target.path : target.path,
+        headline: target.title,
+        helper: "Opens block in SiYuan",
+        imageSrc: toImageSource(target),
+        kind: "block",
+        previewHtml: target.excerptHtml || "",
+      }
     case "document":
       return {
         badge: "Document",

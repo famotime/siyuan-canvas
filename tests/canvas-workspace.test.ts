@@ -83,6 +83,7 @@ function createEditorMock(node = createTextNode()) {
     },
     filePickerDialog: {
       groups: {
+        blocks: [],
         canvases: [],
         documents: [],
         images: [],
@@ -481,6 +482,13 @@ describe("CanvasWorkspace", () => {
       subtitle: "/Projects/Roadmap",
       title: "Roadmap",
     }]
+    currentEditor.filePickerDialog.groups.blocks = [{
+      blockId: "20260412094047-block01",
+      kind: "block",
+      path: "20260412094047-block01",
+      subtitle: "/Projects/Roadmap",
+      title: "Road block",
+    }]
     currentEditor.filePickerDialog.groups.canvases = [{
       kind: "canvas",
       path: "/data/storage/siyuan-canvas/road.canvas",
@@ -503,8 +511,36 @@ describe("CanvasWorkspace", () => {
     })
 
     expect(wrapper.find("[data-testid='file-picker-option-document']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='file-picker-option-block']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='file-picker-option-canvas']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='file-picker-option-image']").exists()).toBe(true)
+  })
+
+  it("renders a block preview card with markdown content", () => {
+    currentEditor = createEditorMock({
+      id: "file-block-1",
+      file: "20260412094047-block01",
+      type: "file",
+    })
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Block",
+      clampMode: "viewport",
+      detail: "/Projects/Roadmap",
+      headline: "Road block",
+      helper: "Opens block in SiYuan",
+      kind: "block",
+      previewHtml: "<ul><li>第一项</li></ul>",
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find(".file-card__document-preview").html()).toContain("第一项")
   })
 
   it("keeps mouse wheel events inside the file picker dialog instead of zooming the canvas", async () => {

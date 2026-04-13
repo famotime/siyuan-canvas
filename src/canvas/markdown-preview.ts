@@ -20,6 +20,8 @@ type AllowedInlineOpenTag = {
 
 const KRAMDOWN_INLINE_ATTRIBUTE_PATTERN = /\s*\{\:\s*[^}]*\}\s*$/i
 const KRAMDOWN_ATTRIBUTE_LINE_PATTERN = /^\s*\{\:\s*[^}]*\}\s*$/i
+const KRAMDOWN_LEADING_ATTRIBUTE_PATTERN = /^(\s*)\{\:\s*[^}]*\}\s*/
+const KRAMDOWN_LIST_ITEM_ATTRIBUTE_PATTERN = /^(\s*(?:[-+*]|\d+\.)\s+)\{\:\s*[^}]*\}\s*/
 
 function restorePlaceholders(value: string, prefix: string, placeholders: string[]): string {
   return placeholders.reduce(
@@ -54,7 +56,17 @@ function stripKramdownAttributes(line: string): string {
     return ""
   }
 
-  return line.replace(KRAMDOWN_INLINE_ATTRIBUTE_PATTERN, "")
+  let sanitized = line.replace(KRAMDOWN_INLINE_ATTRIBUTE_PATTERN, "")
+
+  while (KRAMDOWN_LEADING_ATTRIBUTE_PATTERN.test(sanitized)) {
+    sanitized = sanitized.replace(KRAMDOWN_LEADING_ATTRIBUTE_PATTERN, "$1")
+  }
+
+  while (KRAMDOWN_LIST_ITEM_ATTRIBUTE_PATTERN.test(sanitized)) {
+    sanitized = sanitized.replace(KRAMDOWN_LIST_ITEM_ATTRIBUTE_PATTERN, "$1")
+  }
+
+  return sanitized
 }
 
 function sanitizeMarkdownPreviewSource(markdown: string): string {

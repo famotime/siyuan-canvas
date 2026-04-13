@@ -5,13 +5,17 @@ import {
 
 import {
   resolveImageAssetByBlockId,
+  resolveSiyuanBlockById,
   resolveSiyuanAssetByPath,
   resolveSiyuanDocumentByBlockId,
   resolveSiyuanDocumentByPath,
+  searchSiyuanBlocks,
   searchSiyuanDocuments,
   searchSiyuanImageAssets,
+  type SiyuanResolvedBlock,
   type SiyuanResolvedAsset,
   type SiyuanResolvedDocument,
+  type SiyuanSearchBlockResult,
   type SiyuanSearchDocumentResult,
   type SiyuanSearchImageResult,
 } from "@/canvas/siyuan-file-node-lookups"
@@ -32,6 +36,10 @@ export async function findSiyuanDocumentByBlockId(blockId: string): Promise<Siyu
   return resolveSiyuanDocumentByBlockId(blockId, querySiyuanSql)
 }
 
+export async function findSiyuanBlockById(blockId: string): Promise<SiyuanResolvedBlock | null> {
+  return resolveSiyuanBlockById(blockId, querySiyuanSql)
+}
+
 export async function findSiyuanAssetByPath(path: string): Promise<SiyuanResolvedAsset | null> {
   return resolveSiyuanAssetByPath(path, querySiyuanSql)
 }
@@ -44,19 +52,28 @@ export async function findSiyuanDocumentsByQuery(query: string): Promise<SiyuanS
   return searchSiyuanDocuments(query, querySiyuanSql)
 }
 
+export async function findSiyuanBlocksByQuery(query: string): Promise<SiyuanSearchBlockResult[]> {
+  return searchSiyuanBlocks(query, querySiyuanSql)
+}
+
 export async function findSiyuanImageAssetsByQuery(query: string): Promise<SiyuanSearchImageResult[]> {
   return searchSiyuanImageAssets(query, querySiyuanSql)
 }
 
-export async function getSiyuanDocumentMarkdown(documentId: string): Promise<string> {
+export async function getSiyuanBlockMarkdown(blockId: string): Promise<string> {
   const response = await fetchSyncPost("/api/block/getBlockKramdown", {
-    id: documentId,
+    id: blockId,
   }) as IWebSocketData
 
   return response.code === 0 ? String(response.data?.kramdown || "") : ""
 }
 
+export async function getSiyuanDocumentMarkdown(documentId: string): Promise<string> {
+  return getSiyuanBlockMarkdown(documentId)
+}
+
 export type {
+  SiyuanResolvedBlock,
   SiyuanResolvedAsset,
   SiyuanResolvedDocument,
 } from "@/canvas/siyuan-file-node-lookups"

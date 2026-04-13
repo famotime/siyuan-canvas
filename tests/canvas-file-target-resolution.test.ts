@@ -8,8 +8,16 @@ import {
 import { resolveCanvasFileTarget } from "@/canvas/file-target-resolution"
 
 describe("resolveCanvasFileTarget", () => {
-  it("resolves a block id to an image target before falling back to document lookup", async () => {
+  it("resolves a block id to a block target before falling back to document lookup", async () => {
     const result = await resolveCanvasFileTarget("20260412094047-ihhbskn", {
+      resolveBlockById: vi.fn(async () => ({
+        hpath: "/Projects/Roadmap",
+        id: "20260412094047-ihhbskn",
+        kind: "block",
+        path: "/data/roadmap.sy",
+        rootId: "20260408235000-root",
+        title: "Picture block",
+      })),
       resolveCanvasByPath: vi.fn(async () => null),
       resolveDocumentByBlockId: vi.fn(async () => null),
       resolveDocumentByPath: vi.fn(async () => null),
@@ -23,12 +31,13 @@ describe("resolveCanvasFileTarget", () => {
       resolveImageByPath: vi.fn(async () => null),
     })
 
-    expect(result.kind).toBe("image")
-    expect(result.path).toBe("assets/example.png")
+    expect(result.kind).toBe("block")
+    expect(result.path).toBe("/data/roadmap.sy")
   })
 
   it("resolves a .canvas path before document lookup", async () => {
     const result = await resolveCanvasFileTarget("/data/storage/maps/roadmap.canvas", {
+      resolveBlockById: vi.fn(async () => null),
       resolveCanvasByPath: vi.fn(async (path) => ({
         kind: "canvas",
         path,
@@ -47,6 +56,14 @@ describe("resolveCanvasFileTarget", () => {
   it("resolves raw image markdown by the embedded block id before falling back to path parsing", async () => {
     const result = await resolveCanvasFileTarget(`![Diagram](assets/diagram.png)
 {: id="20260412094047-ihhbskn"}`, {
+      resolveBlockById: vi.fn(async () => ({
+        hpath: "/Projects/Roadmap",
+        id: "20260412094047-ihhbskn",
+        kind: "block",
+        path: "/data/roadmap.sy",
+        rootId: "20260408235000-root",
+        title: "Diagram",
+      })),
       resolveCanvasByPath: vi.fn(async () => null),
       resolveDocumentByBlockId: vi.fn(async () => null),
       resolveDocumentByPath: vi.fn(async () => null),
@@ -60,7 +77,7 @@ describe("resolveCanvasFileTarget", () => {
       resolveImageByPath: vi.fn(async () => null),
     })
 
-    expect(result.kind).toBe("image")
-    expect(result.path).toBe("assets/diagram.png")
+    expect(result.kind).toBe("block")
+    expect(result.path).toBe("/data/roadmap.sy")
   })
 })

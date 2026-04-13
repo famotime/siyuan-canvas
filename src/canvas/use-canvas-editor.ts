@@ -75,6 +75,8 @@ import {
 import { CanvasFileService } from "@/canvas/file-service"
 import { writeWorkspaceImageFile } from "@/canvas/workspace-image-files"
 import {
+  findSiyuanBlockById,
+  findSiyuanBlocksByQuery,
   findSiyuanDocumentsByQuery,
   findSiyuanImageAssetByBlockId,
   findSiyuanImageAssetsByQuery,
@@ -117,6 +119,7 @@ export function useCanvasEditor(
   const fileNodeMeta = ref<Record<string, ResolvedCanvasFileTarget & {
     detail: string
     excerptHtml?: string
+    imageSrc?: string
     thumbnail?: CanvasFileTargetPreview["thumbnail"]
   }>>({})
   const fileSource = ref<CanvasEditorFileSource>(bootstrap.path ? "workspace" : "unsaved")
@@ -131,6 +134,7 @@ export function useCanvasEditor(
   })
   const filePickerDialog = reactive({
     groups: {
+      blocks: [] as CanvasFilePickerOption[],
       canvases: [] as CanvasFilePickerOption[],
       documents: [] as CanvasFilePickerOption[],
       images: [] as CanvasFilePickerOption[],
@@ -700,6 +704,7 @@ export function useCanvasEditor(
     filePickerDialog.visible = false
     filePickerDialog.query = ""
     filePickerDialog.groups = {
+      blocks: [],
       canvases: [],
       documents: [],
       images: [],
@@ -712,6 +717,7 @@ export function useCanvasEditor(
 
     if (!query) {
       filePickerDialog.groups = {
+        blocks: [],
         canvases: [],
         documents: [],
         images: [],
@@ -724,6 +730,18 @@ export function useCanvasEditor(
       : null
 
     filePickerDialog.groups = await searchCanvasFilePickerTargets(query, {
+      searchBlocks: async (keyword) => {
+        const blocks = SIYUAN_BLOCK_ID_PATTERN.test(keyword)
+          ? await findSiyuanBlockById(keyword).then((block) => block ? [block] : [])
+          : await findSiyuanBlocksByQuery(keyword)
+        return blocks.map((block) => ({
+          blockId: block.id,
+          kind: "block" as const,
+          path: block.id,
+          subtitle: block.hpath || block.path,
+          title: block.title,
+        }))
+      },
       searchDocuments: async (keyword) => {
         const documents = await findSiyuanDocumentsByQuery(keyword)
         return documents.map((document) => ({
@@ -778,7 +796,7 @@ export function useCanvasEditor(
     const node = createCanvasNode("file")
     node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
     node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
-    node.file = option.kind === "image" && option.blockId
+    node.file = option.blockId
       ? option.blockId
       : option.path
 
@@ -861,6 +879,16 @@ export function useCanvasEditor(
           },
           keepCursor: true,
           openNewTab: true,
+        })
+        return
+      }
+
+      if (resolved.kind === "block") {
+        plugin.eventBus.emit("open-siyuan-url-block", {
+          exist: false,
+          focus: true,
+          id: resolved.id,
+          url: `siyuan://blocks/${resolved.id}`,
         })
         return
       }

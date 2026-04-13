@@ -45,11 +45,14 @@ const showMessage = vi.fn()
 const confirm = vi.fn()
 const fileNodeLookupMock = {
   findSiyuanAssetByPath: vi.fn(async () => null),
+  findSiyuanBlockById: vi.fn(async () => null),
+  findSiyuanBlocksByQuery: vi.fn(async () => []),
   findSiyuanDocumentByBlockId: vi.fn(async () => null),
   findSiyuanDocumentByPath: vi.fn(async () => null),
   findSiyuanDocumentsByQuery: vi.fn(async () => []),
   findSiyuanImageAssetByBlockId: vi.fn(async () => null),
   findSiyuanImageAssetsByQuery: vi.fn(async () => []),
+  getSiyuanBlockMarkdown: vi.fn(async () => ""),
   getSiyuanDocumentMarkdown: vi.fn(async () => ""),
 }
 type DialogAction = "cancel" | "confirm"
@@ -447,6 +450,10 @@ beforeEach(() => {
   fetchMock.mockClear()
   fileNodeLookupMock.findSiyuanAssetByPath.mockReset()
   fileNodeLookupMock.findSiyuanAssetByPath.mockResolvedValue(null)
+  fileNodeLookupMock.findSiyuanBlockById.mockReset()
+  fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue(null)
+  fileNodeLookupMock.findSiyuanBlocksByQuery.mockReset()
+  fileNodeLookupMock.findSiyuanBlocksByQuery.mockResolvedValue([])
   fileNodeLookupMock.findSiyuanDocumentByBlockId.mockReset()
   fileNodeLookupMock.findSiyuanDocumentByBlockId.mockResolvedValue(null)
   fileNodeLookupMock.findSiyuanDocumentByPath.mockReset()
@@ -457,6 +464,8 @@ beforeEach(() => {
   fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue(null)
   fileNodeLookupMock.findSiyuanImageAssetsByQuery.mockReset()
   fileNodeLookupMock.findSiyuanImageAssetsByQuery.mockResolvedValue([])
+  fileNodeLookupMock.getSiyuanBlockMarkdown.mockReset()
+  fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue("")
   fileNodeLookupMock.getSiyuanDocumentMarkdown.mockReset()
   fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue("")
   vi.stubGlobal("fetch", fetchMock)
@@ -510,6 +519,13 @@ describe("useCanvasEditor file lifecycle flows", () => {
   })
 
   it("updates file picker result groups from the query", async () => {
+    fileNodeLookupMock.findSiyuanBlocksByQuery.mockResolvedValueOnce([{
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-block01",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "Road block",
+    }])
     fileNodeLookupMock.findSiyuanDocumentsByQuery.mockResolvedValueOnce([{
       hpath: "/Projects/Roadmap",
       id: "20260412094047-ihhbskn",
@@ -536,6 +552,13 @@ describe("useCanvasEditor file lifecycle flows", () => {
       subtitle: "/Projects/Roadmap",
       title: "Roadmap",
     }])
+    expect(editor.filePickerDialog.groups.blocks).toEqual([{
+      blockId: "20260412094047-block01",
+      kind: "block",
+      path: "20260412094047-block01",
+      subtitle: "/Projects/Roadmap",
+      title: "Road block",
+    }])
     expect(editor.filePickerDialog.groups.images).toEqual([{
       blockId: "20260412094047-imgroad",
       kind: "image",
@@ -548,6 +571,31 @@ describe("useCanvasEditor file lifecycle flows", () => {
       path: "/data/storage/siyuan-canvas/road.canvas",
       subtitle: "/data/storage/siyuan-canvas/road.canvas",
       title: "road.canvas",
+    }])
+
+    wrapper.unmount()
+  })
+
+  it("finds a content block picker result by a copied block id", async () => {
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValueOnce({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "图片说明",
+    })
+
+    const { editor, wrapper } = await mountEditor()
+
+    await editor.updateFilePickerQuery("20260412094047-ihhbskn")
+    await flushEditor()
+
+    expect(editor.filePickerDialog.groups.blocks).toEqual([{
+      blockId: "20260412094047-ihhbskn",
+      kind: "block",
+      path: "20260412094047-ihhbskn",
+      subtitle: "/Projects/Roadmap",
+      title: "图片说明",
     }])
 
     wrapper.unmount()
@@ -604,13 +652,15 @@ describe("useCanvasEditor file lifecycle flows", () => {
   })
 
   it("creates an image file node from picker selection using the image block id", async () => {
-    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
-      blockId: "20260412094047-ihhbskn",
-      name: "diagram.png",
-      openPath: "/data/assets/diagram.png",
-      path: "assets/diagram.png",
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
       title: "Diagram",
     })
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue(`![Diagram](assets/diagram.png)
+{: id="20260412094047-ihhbskn"}`)
 
     const { editor, wrapper } = await mountEditor()
 
@@ -630,8 +680,40 @@ describe("useCanvasEditor file lifecycle flows", () => {
     })
 
     const preview = editor.getFileNodePreview(editor.selectedNode)
-    expect(preview.kind).toBe("image")
+    expect(preview.kind).toBe("block")
     expect(preview.imageSrc).toBe("/data/assets/diagram.png")
+    expect(preview.previewHtml).toContain("<img src=\"/data/assets/diagram.png\" alt=\"Diagram\">")
+
+    wrapper.unmount()
+  })
+
+  it("renders a block preview for a non-document block id and strips internal attrs", async () => {
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "第一项",
+    })
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue(`* {: id="20260412094047-ihhbskn"}第一项
+  {: id="20260412094047-child001"}`)
+
+    const { editor, wrapper } = await mountEditor()
+
+    await editor.selectFilePickerResult({
+      blockId: "20260412094047-ihhbskn",
+      kind: "block",
+      path: "20260412094047-ihhbskn",
+      subtitle: "/Projects/Roadmap",
+      title: "第一项",
+    } as any)
+    await flushEditor()
+
+    const preview = editor.getFileNodePreview(editor.selectedNode)
+    expect(preview.kind).toBe("block")
+    expect(preview.previewHtml).toContain("<ul><li>第一项</li></ul>")
+    expect(preview.previewHtml).not.toContain("{:")
+    expect(preview.previewHtml).not.toContain("20260412094047-child001")
 
     wrapper.unmount()
   })
@@ -665,18 +747,21 @@ Preview body
     expect(preview.previewHtml).toContain("<p>Preview body</p>")
     expect(preview.previewHtml).not.toContain("{:")
     expect(preview.previewHtml).not.toContain("updated=")
+    expect(preview.previewHtml).not.toContain("20260412094047-ihhbskn")
 
     wrapper.unmount()
   })
 
   it("resolves a copied image block id into an image preview", async () => {
-    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
-      blockId: "20260412094047-ihhbskn",
-      name: "diagram.png",
-      openPath: "/data/assets/diagram.png",
-      path: "assets/diagram.png",
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
       title: "Diagram",
     })
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue(`![Diagram](assets/diagram.png)
+{: id="20260412094047-ihhbskn"}`)
 
     const { editor, wrapper } = await mountEditor()
 
@@ -686,20 +771,22 @@ Preview body
     await flushEditor()
 
     const preview = editor.getFileNodePreview(editor.selectedNode)
-    expect(preview.kind).toBe("image")
+    expect(preview.kind).toBe("block")
     expect(preview.imageSrc).toBe("/data/assets/diagram.png")
 
     wrapper.unmount()
   })
 
   it("resolves raw image markdown in the file field into an image preview", async () => {
-    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
-      blockId: "20260412094047-ihhbskn",
-      name: "diagram.png",
-      openPath: "/data/assets/diagram.png",
-      path: "assets/diagram.png",
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
       title: "Diagram",
     })
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue(`![Diagram](assets/diagram.png)
+{: id="20260412094047-ihhbskn"}`)
 
     const { editor, wrapper } = await mountEditor()
 
@@ -710,7 +797,7 @@ Preview body
     await flushEditor()
 
     const preview = editor.getFileNodePreview(editor.selectedNode)
-    expect(preview.kind).toBe("image")
+    expect(preview.kind).toBe("block")
     expect(preview.imageSrc).toBe("/data/assets/diagram.png")
     expect(preview.headline).toBe("Diagram")
 

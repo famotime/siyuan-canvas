@@ -76,4 +76,13 @@ Paragraph with **bold**, \`code\`, and [link](https://example.com).
     expect(html).not.toContain("20260412094047-ihhbskn")
     expect(html).not.toContain("updated=")
   })
+
+  it("omits inline kramdown attributes that precede list item content", () => {
+    const html = renderMarkdownPreview(`* {: id="20260412094047-ihhbskn"}第一项
+* {: id="20260412094047-abcdefg"}第二项`)
+
+    expect(html).toContain("<ul><li>第一项</li><li>第二项</li></ul>")
+    expect(html).not.toContain("{:")
+    expect(html).not.toContain("20260412094047-ihhbskn")
+  })
 })

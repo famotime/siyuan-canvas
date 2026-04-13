@@ -7,9 +7,11 @@ import type { CanvasI18nTranslator } from "@/canvas/use-canvas-editor-shared"
 
 import {
   findSiyuanAssetByPath,
+  findSiyuanBlockById,
   findSiyuanDocumentByBlockId,
   findSiyuanDocumentByPath,
   findSiyuanImageAssetByBlockId,
+  getSiyuanBlockMarkdown,
   getSiyuanDocumentMarkdown,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
 import { renderMarkdownPreview } from "@/canvas/markdown-preview"
@@ -19,6 +21,7 @@ import {
 } from "@/canvas/file-target-preview"
 import {
   resolveCanvasFileTarget,
+  type ResolvedCanvasBlockTarget,
   type ResolvedCanvasDocumentTarget,
 } from "@/canvas/file-target-resolution"
 
@@ -26,6 +29,7 @@ interface CanvasEditorFileNodeOptions {
   fileNodeMeta: Ref<Record<string, ResolvedCanvasFileTarget & {
     detail: string
     excerptHtml?: string
+    imageSrc?: string
     thumbnail?: CanvasFileTargetPreview["thumbnail"]
   }>>
   state: CanvasEditorState
@@ -40,6 +44,10 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
   } = options
 
   let fileNodeResolveVersion = 0
+
+  function extractImageSourceFromPreviewHtml(previewHtml: string): string | undefined {
+    return previewHtml.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1]
+  }
 
   function createFallbackFileTarget(path: string): ResolvedCanvasFileTarget & { detail: string } {
     const trimmed = path.trim()
@@ -71,6 +79,7 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
   function getResolvedFileNode(node: CanvasNode): ResolvedCanvasFileTarget & {
     detail: string
     excerptHtml?: string
+    imageSrc?: string
     thumbnail?: CanvasFileTargetPreview["thumbnail"]
   } {
     if (node.type !== "file") {
@@ -89,11 +98,31 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
     }
   }
 
+  async function withBlockPreview(target: ResolvedCanvasBlockTarget) {
+    const markdown = await getSiyuanBlockMarkdown(target.id)
+    const excerptHtml = renderMarkdownPreview(markdown)
+    return {
+      ...target,
+      detail: target.hpath || target.path,
+      excerptHtml,
+      imageSrc: extractImageSourceFromPreviewHtml(excerptHtml),
+    }
+  }
+
   async function refreshFileNodeMetadata() {
     const version = ++fileNodeResolveVersion
     const fileNodes = state.document.nodes.filter((node): node is Extract<CanvasNode, { type: "file" }> => node.type === "file")
     const nextEntries = await Promise.all(fileNodes.map(async (node) => {
       const resolved = await resolveCanvasFileTarget(node.file, {
+        resolveBlockById: async (blockId) => {
+          const block = await findSiyuanBlockById(blockId)
+          return block
+            ? {
+                ...block,
+                kind: "block" as const,
+              }
+            : null
+        },
         resolveCanvasByPath: async (path) => (
           path.trim().endsWith(".canvas")
             ? {
@@ -145,9 +174,13 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
         },
       })
 
-      let enriched: ResolvedCanvasFileTarget & { detail: string, excerptHtml?: string } = {
+      let enriched: ResolvedCanvasFileTarget & { detail: string, excerptHtml?: string, imageSrc?: string } = {
         ...resolved,
         detail: resolved.path,
+      }
+
+      if (resolved.kind === "block") {
+        enriched = await withBlockPreview(resolved)
       }
 
       if (resolved.kind === "document") {

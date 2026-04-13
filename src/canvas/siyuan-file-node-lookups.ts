@@ -6,6 +6,14 @@ export interface SiyuanResolvedDocument {
 }
 
 export interface SiyuanSearchDocumentResult extends SiyuanResolvedDocument {}
+export interface SiyuanResolvedBlock {
+  hpath: string
+  id: string
+  path: string
+  rootId: string
+  title: string
+}
+export interface SiyuanSearchBlockResult extends SiyuanResolvedBlock {}
 
 export interface SiyuanSearchImageResult extends SiyuanResolvedAsset {}
 
@@ -29,6 +37,7 @@ const HTML_ALT_PATTERN = /\balt=(?:"([^"]*)"|'([^']*)')/i
 const HTML_TITLE_PATTERN = /\btitle=(?:"([^"]*)"|'([^']*)')/i
 const IMAGE_PATH_PATTERN = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i
 const SIYUAN_ASSET_PATH_PATTERN = /^(?:\/?data\/)?assets\//i
+const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
 
 function escapeSqlString(value: string): string {
   return value.replace(/'/g, "''")
@@ -69,6 +78,26 @@ function createResolvedAsset(
     openPath: toOpenAssetPath(assetPath),
     path: assetPath,
     title: options.title || undefined,
+  }
+}
+
+async function resolveRootDocumentRow(rootId: string, queryRows: QueryRows): Promise<any | null> {
+  const rootRows = await queryRows(
+    `SELECT id, path, hpath, content
+     FROM blocks
+     WHERE id = '${escapeSqlString(rootId)}'
+     LIMIT 1`,
+  )
+  return rootRows[0] || null
+}
+
+function createResolvedBlock(row: any, rootRow: any): SiyuanResolvedBlock {
+  return {
+    hpath: rootRow?.hpath || row.hpath || row.path,
+    id: row.id,
+    path: rootRow?.path || row.path,
+    rootId: row.root_id || rootRow?.id || row.id,
+    title: row.content || getFileName(rootRow?.path || row.path),
   }
 }
 
@@ -215,13 +244,7 @@ export async function resolveSiyuanDocumentByBlockId(
     }
   }
 
-  const rootRows = await queryRows(
-    `SELECT id, path, hpath, content
-     FROM blocks
-     WHERE id = '${escapeSqlString(row.root_id)}'
-     LIMIT 1`,
-  )
-  const rootRow = rootRows[0]
+  const rootRow = await resolveRootDocumentRow(String(row.root_id), queryRows)
   if (!rootRow) {
     return null
   }
@@ -232,6 +255,29 @@ export async function resolveSiyuanDocumentByBlockId(
     path: rootRow.path,
     title: rootRow.content || getFileName(rootRow.path),
   }
+}
+
+export async function resolveSiyuanBlockById(
+  blockId: string,
+  queryRows: QueryRows,
+): Promise<SiyuanResolvedBlock | null> {
+  const rows = await queryRows(
+    `SELECT id, root_id, path, hpath, content, type
+     FROM blocks
+     WHERE id = '${escapeSqlString(blockId)}'
+     LIMIT 1`,
+  )
+  const row = rows[0]
+  if (!row || row.type === "d") {
+    return null
+  }
+
+  const rootRow = await resolveRootDocumentRow(String(row.root_id), queryRows)
+  if (!rootRow) {
+    return null
+  }
+
+  return createResolvedBlock(row, rootRow)
 }
 
 export async function resolveImageAssetByBlockId(
@@ -309,6 +355,37 @@ export async function searchSiyuanDocuments(
     path: row.path,
     title: row.content || getFileName(row.path),
   }))
+}
+
+export async function searchSiyuanBlocks(
+  query: string,
+  queryRows: QueryRows,
+): Promise<SiyuanSearchBlockResult[]> {
+  const trimmed = query.trim()
+  if (!trimmed) {
+    return []
+  }
+
+  if (BLOCK_ID_PATTERN.test(trimmed)) {
+    const resolved = await resolveSiyuanBlockById(trimmed, queryRows)
+    return resolved ? [resolved] : []
+  }
+
+  const escaped = escapeSqlString(trimmed)
+  const rows = await queryRows(
+    `SELECT id, root_id, path, hpath, content, type
+     FROM blocks
+     WHERE type != 'd'
+       AND (id LIKE '%${escaped}%' OR content LIKE '%${escaped}%' OR hpath LIKE '%${escaped}%' OR markdown LIKE '%${escaped}%')
+     LIMIT 20`,
+  )
+
+  const resolved = await Promise.all(rows.map(async (row) => {
+    const rootRow = await resolveRootDocumentRow(String(row.root_id), queryRows)
+    return rootRow ? createResolvedBlock(row, rootRow) : null
+  }))
+
+  return resolved.filter((row): row is SiyuanResolvedBlock => row !== null)
 }
 
 export async function searchSiyuanImageAssets(

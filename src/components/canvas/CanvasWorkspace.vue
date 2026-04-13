@@ -214,7 +214,7 @@
                     {{ editor.getFileNodePreview(node).detail }}
                   </div>
                   <div
-                    v-if="editor.getFileNodePreview(node).kind === 'document' && editor.getFileNodePreview(node).previewHtml"
+                    v-if="['block', 'document'].includes(editor.getFileNodePreview(node).kind) && editor.getFileNodePreview(node).previewHtml"
                     class="file-card__document-preview markdown-preview"
                     v-html="editor.getFileNodePreview(node).previewHtml"
                   />
@@ -1273,14 +1273,17 @@ function getCanvasNodeContentStyle(node: CanvasNode) {
 
 function getFilePickerResults() {
   return [
+    ...editor.filePickerDialog.groups.blocks,
     ...editor.filePickerDialog.groups.documents,
     ...editor.filePickerDialog.groups.canvases,
     ...editor.filePickerDialog.groups.images,
   ]
 }
 
-function getFilePickerKindLabel(kind: "canvas" | "document" | "image"): string {
+function getFilePickerKindLabel(kind: "block" | "canvas" | "document" | "image"): string {
   switch (kind) {
+    case "block":
+      return "Block"
     case "canvas":
       return "Canvas"
     case "document":
