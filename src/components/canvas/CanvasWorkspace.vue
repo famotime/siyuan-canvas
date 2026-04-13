@@ -202,10 +202,11 @@
                     </svg>
                   </div>
                   <img
-                    v-if="editor.getFileNodePreview(node).imageSrc"
-                    :src="editor.getFileNodePreview(node).imageSrc"
+                    v-if="getFileCardImageSource(node)"
+                    :src="getFileCardImageSource(node)"
                     alt=""
                     class="file-card__image"
+                    @error="handleFileCardImageError(node)"
                   >
                   <div class="canvas-node__title">
                     {{ editor.getFileNodePreview(node).headline }}
@@ -1139,6 +1140,7 @@ const {
 type EdgeNodePickerKind = "source" | "target"
 
 const activeEdgeNodePicker = ref<EdgeNodePickerKind | null>(null)
+const fileCardImageOverrides = ref<Record<string, string>>({})
 const sourceEdgePickerRef = ref<HTMLElement>()
 const sourceEdgeSearchRef = ref<HTMLInputElement>()
 const targetEdgePickerRef = ref<HTMLElement>()
@@ -1269,6 +1271,69 @@ function getCanvasNodeStyle(node: CanvasNode) {
 
 function getCanvasNodeContentStyle(node: CanvasNode) {
   return resolveCanvasNodeContentStyle(node)
+}
+
+function getFileCardImageCandidates(source: string): string[] {
+  const normalized = source.trim().replace(/\\/g, "/")
+  if (!normalized) {
+    return []
+  }
+
+  const candidates = [normalized]
+
+  if (/^\/data\/assets\//i.test(normalized)) {
+    candidates.push(normalized.replace(/^\/data\/assets\//i, "/assets/"))
+  } else if (/^data\/assets\//i.test(normalized)) {
+    candidates.push(`/${normalized}`)
+    candidates.push(normalized.replace(/^data\/assets\//i, "/assets/"))
+  } else if (/^\/assets\//i.test(normalized)) {
+    candidates.push(normalized.replace(/^\/assets\//i, "/data/assets/"))
+  } else if (/^assets\//i.test(normalized)) {
+    candidates.push(`/data/${normalized}`)
+    candidates.push(`/${normalized}`)
+  }
+
+  return [...new Set(candidates.filter(Boolean))]
+}
+
+function getFileCardImageSource(node: CanvasNode): string | undefined {
+  if (node.type !== "file") {
+    return undefined
+  }
+
+  const preview = editor.getFileNodePreview(node)
+  if (!preview.imageSrc) {
+    return undefined
+  }
+
+  const candidates = getFileCardImageCandidates(preview.imageSrc)
+  const override = fileCardImageOverrides.value[node.id]
+  return override && candidates.includes(override) ? override : candidates[0]
+}
+
+function handleFileCardImageError(node: CanvasNode) {
+  if (node.type !== "file") {
+    return
+  }
+
+  const preview = editor.getFileNodePreview(node)
+  if (!preview.imageSrc) {
+    return
+  }
+
+  const candidates = getFileCardImageCandidates(preview.imageSrc)
+  const currentSource = getFileCardImageSource(node)
+  const currentIndex = currentSource ? candidates.indexOf(currentSource) : -1
+  const nextSource = candidates[currentIndex + 1]
+
+  if (!nextSource || nextSource === currentSource) {
+    return
+  }
+
+  fileCardImageOverrides.value = {
+    ...fileCardImageOverrides.value,
+    [node.id]: nextSource,
+  }
 }
 
 function getFilePickerResults() {

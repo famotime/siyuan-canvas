@@ -621,6 +621,38 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.findAll(".file-card__thumbnail-edge")).toHaveLength(1)
   })
 
+  it("falls back to an alternate asset path when an image file preview fails to load", async () => {
+    currentEditor = createEditorMock({
+      id: "file-image-1",
+      file: "assets/road.png",
+      type: "file",
+    })
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Image",
+      detail: "assets/road.png",
+      headline: "road.png",
+      helper: "Image file",
+      imageSrc: "/data/assets/road.png",
+      kind: "image",
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const image = wrapper.find(".file-card__image")
+    expect(image.exists()).toBe(true)
+    expect(image.attributes("src")).toBe("/data/assets/road.png")
+
+    await image.trigger("error")
+
+    expect(wrapper.find(".file-card__image").attributes("src")).toBe("/assets/road.png")
+  })
+
   it("renders the create-edge dialog when requested", () => {
     currentEditor = createEditorMock()
     currentEditor.createEdgeDialog.visible = true
