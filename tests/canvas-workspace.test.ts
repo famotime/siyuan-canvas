@@ -352,6 +352,42 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow-end)")
   })
 
+  it("provides a hoverable edge hit area above groups so the edge can be selected", async () => {
+    const groupNode = createGroupNode()
+    currentEditor = createEditorMock(groupNode)
+    currentEditor.state.document.edges = [
+      {
+        fromNode: "text-1",
+        fromSide: "right",
+        id: "edge-1",
+        label: "Group edge",
+        toNode: "text-2",
+        toSide: "left",
+      },
+    ]
+    currentEditor.getEdgePath = vi.fn(() => "M 120 120 C 200 120, 280 120, 360 120")
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const hitArea = wrapper.find("[data-testid='edge-hit-area-edge-1']")
+    expect(hitArea.exists()).toBe(true)
+
+    await hitArea.trigger("mouseenter")
+    expect(wrapper.find("[data-testid='edge-overlay-edge-1']").classes()).toContain("stage__edge--hovered")
+
+    await hitArea.trigger("click")
+    expect(currentEditor.selectEdge).toHaveBeenCalledWith("edge-1")
+
+    await hitArea.trigger("mouseleave")
+    expect(wrapper.find("[data-testid='edge-overlay-edge-1']").classes()).not.toContain("stage__edge--hovered")
+  })
+
   it("renders four edge resize handles, one corner resize handle, and four connection anchors for each card", () => {
     const node = createTextNode()
     currentEditor = createEditorMock(node)
@@ -435,6 +471,53 @@ describe("CanvasWorkspace", () => {
 
     expect(currentEditor.activateCanvasSurface).toHaveBeenCalled()
     expect(wrapper.find("[data-testid='bottom-toolbar']").exists()).toBe(true)
+  })
+
+  it("does not zoom the canvas when wheeling inside a selected node", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    wrapper.find(".canvas-node__body").element.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 120,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleWheelZoom).not.toHaveBeenCalled()
+  })
+
+  it("keeps canvas zoom enabled when wheeling over an unselected node", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    wrapper.find(".canvas-node__body").element.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 120,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleWheelZoom).toHaveBeenCalledTimes(1)
   })
 
   it("opens the create-edge dialog from the bottom toolbar", async () => {
@@ -549,7 +632,7 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='file-picker-option-image']").exists()).toBe(true)
   })
 
-  it("renders a block preview card with markdown content", () => {
+  it("renders a block preview card without title or path and exposes the path as a tooltip", () => {
     currentEditor = createEditorMock({
       id: "file-block-1",
       file: "20260412094047-block01",
@@ -573,7 +656,44 @@ describe("CanvasWorkspace", () => {
       },
     })
 
+    const fileCard = wrapper.find(".file-card")
+
+    expect(fileCard.attributes("title")).toBe("/Projects/Roadmap")
     expect(wrapper.find(".file-card__document-preview").html()).toContain("第一项")
+    expect(fileCard.text()).not.toContain("Road block")
+    expect(fileCard.text()).not.toContain("/Projects/Roadmap")
+  })
+
+  it("renders a document preview card with the title and content while moving the path to a tooltip", () => {
+    currentEditor = createEditorMock({
+      id: "file-document-1",
+      file: "/data/spec.sy",
+      type: "file",
+    })
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Document",
+      clampMode: "viewport",
+      detail: "/Projects/Canvas/Spec",
+      headline: "Spec",
+      helper: "Opens in SiYuan",
+      kind: "document",
+      previewHtml: "<p>Document preview</p>",
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const fileCard = wrapper.find(".file-card")
+
+    expect(fileCard.attributes("title")).toBe("/Projects/Canvas/Spec")
+    expect(fileCard.text()).toContain("Spec")
+    expect(fileCard.text()).not.toContain("/Projects/Canvas/Spec")
+    expect(wrapper.find(".file-card__document-preview").html()).toContain("Document preview")
   })
 
   it("keeps mouse wheel events inside the file picker dialog instead of zooming the canvas", async () => {

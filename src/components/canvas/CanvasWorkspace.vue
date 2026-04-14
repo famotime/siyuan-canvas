@@ -194,6 +194,7 @@
             @pointerdown.stop="handleNodePointerDown(node, $event)"
             @click.stop="handleNodeClick(node, $event)"
             @dblclick.stop="handleNodeDoubleClick(node)"
+            @wheel.passive="handleNodeWheel(node, $event)"
           >
             <div class="canvas-node__body">
               <template v-if="node.type === 'text'">
@@ -211,7 +212,10 @@
                 />
               </template>
               <template v-else-if="node.type === 'file'">
-                <div class="file-card">
+                <div
+                  class="file-card"
+                  :title="getFileCardTooltip(node)"
+                >
                   <span class="file-card__badge">
                     {{ editor.getFileNodePreview(node).badge }}
                   </span>
@@ -249,10 +253,16 @@
                     class="file-card__image"
                     @error="handleFileCardImageError(node)"
                   >
-                  <div class="canvas-node__title">
+                  <div
+                    v-if="shouldShowFileCardHeadline(node)"
+                    class="canvas-node__title"
+                  >
                     {{ editor.getFileNodePreview(node).headline }}
                   </div>
-                  <div class="canvas-node__meta">
+                  <div
+                    v-if="shouldShowFileCardDetail(node)"
+                    class="canvas-node__meta"
+                  >
                     {{ editor.getFileNodePreview(node).detail }}
                   </div>
                   <div
@@ -310,6 +320,41 @@
               @pointerdown.stop.prevent="editor.startCornerResize(node, $event)"
             />
           </article>
+
+          <svg
+            class="stage__edges stage__edges--interactive"
+            :height="editor.board.height"
+            :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
+            :width="editor.board.width"
+          >
+            <g
+              v-for="edge in editor.state.document.edges"
+              :key="`interactive-${edge.id}`"
+            >
+              <path
+                class="stage__edge stage__edge--overlay"
+                :class="{
+                  'stage__edge--hovered': hoveredEdgeId === edge.id,
+                  'stage__edge--selected': editor.state.selectedEdgeId === edge.id,
+                  'stage__edge--visible': hoveredEdgeId === edge.id || editor.state.selectedEdgeId === edge.id,
+                }"
+                :d="editor.getEdgePath(edge)"
+                :marker-start="resolveEdgeStartMarker(edge.startArrow ?? false)"
+                :marker-end="resolveEdgeEndMarker(edge.endArrow ?? true)"
+                :style="getEdgeStrokeStyle(edge)"
+                :data-testid="`edge-overlay-${edge.id}`"
+              />
+              <path
+                class="stage__edge stage__edge--hit-area"
+                :d="editor.getEdgePath(edge)"
+                :data-testid="`edge-hit-area-${edge.id}`"
+                @mouseenter="setHoveredEdge(edge.id)"
+                @mouseleave="clearHoveredEdge(edge.id)"
+                @pointerdown.stop
+                @click.stop="handleEdgeClick(edge.id)"
+              />
+            </g>
+          </svg>
         </div>
 
         <div
@@ -1359,6 +1404,7 @@ type EdgeNodePickerKind = "source" | "target"
 const activeEdgeNodePicker = ref<EdgeNodePickerKind | null>(null)
 const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
+const hoveredEdgeId = ref("")
 const sourceEdgePickerRef = ref<HTMLElement>()
 const sourceEdgeSearchRef = ref<HTMLInputElement>()
 const targetEdgePickerRef = ref<HTMLElement>()
@@ -1395,6 +1441,27 @@ function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
 function handleNodeClick(node: CanvasNode, event: MouseEvent) {
   editor.activateCanvasSurface()
   editor.selectNode(node.id, event)
+}
+
+function handleNodeWheel(node: CanvasNode, event: WheelEvent) {
+  if (editor.state.selectedNodeIds.includes(node.id)) {
+    event.stopPropagation()
+  }
+}
+
+function handleEdgeClick(edgeId: string) {
+  editor.activateCanvasSurface()
+  editor.selectEdge(edgeId)
+}
+
+function setHoveredEdge(edgeId: string) {
+  hoveredEdgeId.value = edgeId
+}
+
+function clearHoveredEdge(edgeId: string) {
+  if (hoveredEdgeId.value === edgeId) {
+    hoveredEdgeId.value = ""
+  }
 }
 
 function getEdgeNodeTriggerLabel(kind: EdgeNodePickerKind): string {
@@ -1545,6 +1612,31 @@ function getFileCardImageSource(node: CanvasNode): string | undefined {
   const candidates = getFileCardImageCandidates(preview.imageSrc)
   const override = fileCardImageOverrides.value[node.id]
   return override && candidates.includes(override) ? override : candidates[0]
+}
+
+function shouldShowFileCardHeadline(node: CanvasNode) {
+  if (node.type !== "file") {
+    return false
+  }
+
+  return editor.getFileNodePreview(node).kind !== "block"
+}
+
+function shouldShowFileCardDetail(node: CanvasNode) {
+  if (node.type !== "file") {
+    return false
+  }
+
+  const kind = editor.getFileNodePreview(node).kind
+  return kind !== "block" && kind !== "document"
+}
+
+function getFileCardTooltip(node: CanvasNode): string | undefined {
+  if (node.type !== "file") {
+    return undefined
+  }
+
+  return editor.getFileNodePreview(node).detail || undefined
 }
 
 function handleFileCardImageError(node: CanvasNode) {
@@ -2144,6 +2236,10 @@ watch(
   pointer-events: none;
 }
 
+.stage__edges--interactive {
+  z-index: 2;
+}
+
 .stage__edge {
   fill: none;
   stroke: var(--canvas-text-muted);
@@ -2155,6 +2251,33 @@ watch(
 
 .stage__edge--selected {
   stroke: var(--canvas-accent);
+}
+
+.stage__edge--overlay {
+  opacity: 0;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px rgba(53, 103, 214, 0.2));
+  pointer-events: none;
+  transition:
+    opacity 0.16s ease,
+    stroke-width 0.16s ease,
+    filter 0.16s ease;
+}
+
+.stage__edge--visible {
+  opacity: 1;
+}
+
+.stage__edge--hovered,
+.stage__edge--selected.stage__edge--overlay {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 10px rgba(53, 103, 214, 0.28));
+}
+
+.stage__edge--hit-area {
+  stroke: transparent;
+  stroke-width: 18;
+  pointer-events: stroke;
 }
 
 .stage__edge--draft {
@@ -2172,6 +2295,7 @@ watch(
 
 .canvas-node {
   position: absolute;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--canvas-border);
