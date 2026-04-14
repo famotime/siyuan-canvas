@@ -283,15 +283,24 @@
                   {{ t("nodeLinkHelper") }}
                 </div>
               </template>
-              <template v-else>
-                <div
-                  class="canvas-node__content"
-                  :style="getCanvasNodeContentStyle(node)"
-                >
-                  {{ node.label || t("nodeDefaultGroupLabel") }}
-                </div>
-              </template>
+              <template v-else />
             </div>
+            <template v-if="node.type === 'group'">
+              <textarea
+                v-if="editingNodeId === node.id"
+                :ref="setEditingTextareaRef"
+                v-model="editingMarkdown"
+                class="canvas-node__group-label canvas-node__group-label-editor"
+                @blur="commitTextNodeEditing"
+              />
+              <div
+                v-else
+                class="canvas-node__group-label"
+                :style="getCanvasNodeContentStyle(node)"
+              >
+                {{ node.label || t("nodeDefaultGroupLabel") }}
+              </div>
+            </template>
             <button
               v-for="side in editor.sides"
               :key="`anchor-${node.id}-${side}`"
@@ -2311,6 +2320,7 @@ watch(
 .canvas-node--group {
   background: var(--canvas-group-bg);
   border-style: dashed;
+  overflow: visible;
 }
 
 .canvas-node--selected {
@@ -2331,6 +2341,32 @@ watch(
 .canvas-node__content {
   white-space: pre-wrap;
   line-height: 1.6;
+}
+
+.canvas-node__group-label {
+  position: absolute;
+  left: 14px;
+  bottom: 100%;
+  margin-bottom: 10px;
+  max-width: calc(100% - 28px);
+  border-radius: 12px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  box-shadow: var(--canvas-shadow);
+}
+
+.canvas-node__group-label-editor {
+  min-height: 40px;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: var(--canvas-surface);
+  color: var(--canvas-text);
+  font: inherit;
+  box-sizing: border-box;
 }
 
 .canvas-node__editor {
@@ -2403,6 +2439,13 @@ watch(
 .markdown-preview :deep(pre code) {
   background: transparent;
   padding: 0;
+}
+
+.markdown-preview :deep(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
 }
 
 .markdown-preview :deep(a) {

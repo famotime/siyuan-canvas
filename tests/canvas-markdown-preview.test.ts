@@ -77,6 +77,15 @@ Paragraph with **bold**, \`code\`, and [link](https://example.com).
     expect(html).not.toContain("updated=")
   })
 
+  it("renders sanitized html images from document markdown", () => {
+    const html = renderMarkdownPreview(`<img src="assets/diagram.png" alt="架构图" title="预览图">
+
+正文`)
+
+    expect(html).toContain('<img src="/data/assets/diagram.png" alt="架构图" title="预览图">')
+    expect(html).toContain("<p>正文</p>")
+  })
+
   it("omits inline kramdown attributes that precede list item content", () => {
     const html = renderMarkdownPreview(`* {: id="20260412094047-ihhbskn"}第一项
 * {: id="20260412094047-abcdefg"}第二项`)

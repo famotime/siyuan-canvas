@@ -165,6 +165,7 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
           const image = await findSiyuanAssetByPath(path)
           return image
             ? {
+                blockId: image.blockId,
                 kind: "image" as const,
                 openPath: image.openPath,
                 path: image.path,

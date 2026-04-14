@@ -322,6 +322,30 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".canvas-node__editor").exists()).toBe(false)
   })
 
+  it("lets a group card enter label editing on double click and saves on blur", async () => {
+    const node = createGroupNode()
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find(".canvas-node").trigger("dblclick")
+
+    const textarea = wrapper.find(".canvas-node__group-label-editor")
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe(node.label)
+
+    await textarea.setValue("更新后的分组标题")
+    await textarea.trigger("blur")
+
+    expect(currentEditor.updateTextNodeContent).toHaveBeenCalledWith(node.id, "更新后的分组标题")
+  })
+
   it("renders edges with a color-matched arrow marker that stays attached to the line", () => {
     currentEditor = createEditorMock()
     currentEditor.state.document.edges = [
@@ -1052,6 +1076,33 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".canvas-node__editor").exists()).toBe(false)
   })
 
+  it("opens group label editing from the floating toolbar edit action", async () => {
+    const node = createGroupNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='selection-toolbar-edit']").trigger("click")
+
+    const textarea = wrapper.find(".canvas-node__group-label-editor")
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe(node.label)
+    expect(currentEditor.activateNode).not.toHaveBeenCalled()
+  })
+
   it("renders a visible card color from node.color using the shared selection color mapping", () => {
     const node = createTextNode({ color: "2" })
     currentEditor = createEditorMock(node)
@@ -1070,7 +1121,7 @@ describe("CanvasWorkspace", () => {
     expect(card.style.backgroundColor).toBe("rgba(249, 115, 22, 0.18)")
   })
 
-  it("renders a visible group label text color from node.color using the shared selection color mapping", () => {
+  it("renders a visible group label badge outside the card using the shared selection color mapping", () => {
     const node = createGroupNode({ color: "1" })
     currentEditor = createEditorMock(node)
 
@@ -1082,9 +1133,10 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    const label = wrapper.find(".canvas-node__content").element as HTMLElement
+    const label = wrapper.find(".canvas-node__group-label").element as HTMLElement
 
-    expect(label.style.color).toBe("rgb(239, 68, 68)")
+    expect(label.style.backgroundColor).toBe("rgb(239, 68, 68)")
+    expect(label.style.color).toBe("rgb(255, 255, 255)")
   })
 
   it("renders a clear swatch first and marks the current selection color as active", async () => {

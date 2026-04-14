@@ -170,14 +170,14 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   }
 
   function handleNodeDoubleClick(node: CanvasNode) {
-    if (node.type !== "text") {
+    if (!["group", "text"].includes(node.type)) {
       editor.activateNode(node)
       return
     }
 
     editor.selectNode(node.id)
     editingNodeId.value = node.id
-    editingMarkdown.value = node.text
+    editingMarkdown.value = node.type === "group" ? (node.label || "") : node.text
     void nextTick(() => {
       editingTextareaRef.value?.focus()
       editingTextareaRef.value?.setSelectionRange(editingMarkdown.value.length, editingMarkdown.value.length)

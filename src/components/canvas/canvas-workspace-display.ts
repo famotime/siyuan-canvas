@@ -40,6 +40,37 @@ export const clearSelectionColorStyle = {
   swatch: "#9ca3af",
 }
 
+function getHexChannel(value: string): number {
+  return Number.parseInt(value, 16)
+}
+
+function normalizeHexColor(value: string): string | null {
+  const trimmed = value.trim()
+  if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(trimmed)) {
+    return null
+  }
+
+  if (trimmed.length === 4) {
+    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`
+  }
+
+  return trimmed.toLowerCase()
+}
+
+function getContrastingLabelTextColor(background: string): string {
+  const normalized = normalizeHexColor(background)
+  if (!normalized) {
+    return "#ffffff"
+  }
+
+  const red = getHexChannel(normalized.slice(1, 3))
+  const green = getHexChannel(normalized.slice(3, 5))
+  const blue = getHexChannel(normalized.slice(5, 7))
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000
+
+  return luminance >= 160 ? "#111827" : "#ffffff"
+}
+
 export function getSelectionColorStyle(color: string) {
   if (!color) {
     return {
@@ -83,7 +114,8 @@ export function getCanvasNodeContentStyle(node: CanvasNode) {
   }
 
   return {
-    color: colorStyle.border,
+    backgroundColor: colorStyle.border,
+    color: getContrastingLabelTextColor(colorStyle.border),
   }
 }
 

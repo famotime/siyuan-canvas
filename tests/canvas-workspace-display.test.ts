@@ -66,7 +66,24 @@ describe("canvas workspace display helpers", () => {
         y: 0,
       },
     )).toEqual({
-      color: "#ef4444",
+      backgroundColor: "#ef4444",
+      color: "#ffffff",
+    })
+
+    expect(getCanvasNodeContentStyle(
+      {
+        color: "3",
+        height: 240,
+        id: "group-2",
+        label: "Group",
+        type: "group",
+        width: 480,
+        x: 0,
+        y: 0,
+      },
+    )).toEqual({
+      backgroundColor: "#f4b400",
+      color: "#111827",
     })
 
     expect(getNodeSelectionColorValue(

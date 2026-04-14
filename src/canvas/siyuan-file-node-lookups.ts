@@ -203,7 +203,7 @@ export async function resolveSiyuanAssetByPath(
 ): Promise<SiyuanResolvedAsset | null> {
   for (const candidate of createAssetPathCandidates(path)) {
     const rows = await queryRows(
-      `SELECT path, name, title
+      `SELECT block_id, path, name, title
        FROM assets
        WHERE path = '${escapeSqlString(candidate)}'
        LIMIT 1`,
@@ -211,6 +211,7 @@ export async function resolveSiyuanAssetByPath(
     const row = rows[0]
     if (row) {
       return createResolvedAsset(row.path as string, {
+        blockId: row.block_id || undefined,
         name: row.name || undefined,
         title: row.title || undefined,
       })

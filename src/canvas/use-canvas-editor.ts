@@ -456,6 +456,28 @@ export function useCanvasEditor(
     }
   }
 
+  async function openDocumentAtBlock(blockId: string, documentId?: string) {
+    const targetDocumentId = documentId || (await findSiyuanDocumentByBlockId(blockId))?.id
+
+    if (targetDocumentId) {
+      await openTab({
+        app: plugin.app,
+        doc: {
+          id: targetDocumentId,
+        },
+        keepCursor: true,
+        openNewTab: true,
+      })
+    }
+
+    plugin.eventBus?.emit("open-siyuan-url-block", {
+      exist: false,
+      focus: true,
+      id: blockId,
+      url: `siyuan://blocks/${blockId}`,
+    })
+  }
+
   watch(
     () => [state.filePath, state.isDirty, suggestedFilename.value],
     () => {
@@ -851,14 +873,24 @@ export function useCanvasEditor(
 
   function updateTextNodeContent(nodeId: string, text: string) {
     const node = state.document.nodes.find((candidate) => candidate.id === nodeId)
-    if (!node || node.type !== "text") {
+    if (!node) {
       return
     }
 
-    updateNode({
-      ...node,
-      text,
-    })
+    if (node.type === "text") {
+      updateNode({
+        ...node,
+        text,
+      })
+      return
+    }
+
+    if (node.type === "group") {
+      updateNode({
+        ...node,
+        label: text,
+      })
+    }
   }
 
   function updateNodeField(field: string, value: string) {
@@ -1143,16 +1175,16 @@ export function useCanvasEditor(
       }
 
       if (resolved.kind === "block") {
-        plugin.eventBus.emit("open-siyuan-url-block", {
-          exist: false,
-          focus: true,
-          id: resolved.id,
-          url: `siyuan://blocks/${resolved.id}`,
-        })
+        void openDocumentAtBlock(resolved.id, resolved.rootId)
         return
       }
 
       if (resolved.kind === "image") {
+        if (resolved.blockId) {
+          void openDocumentAtBlock(resolved.blockId)
+          return
+        }
+
         void openTab({
           app: plugin.app,
           asset: {

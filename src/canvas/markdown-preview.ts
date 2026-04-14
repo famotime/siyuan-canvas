@@ -18,6 +18,11 @@ type AllowedInlineOpenTag = {
   length: number
 }
 
+type SanitizedImageTag = {
+  html: string
+  length: number
+}
+
 const KRAMDOWN_INLINE_ATTRIBUTE_PATTERN = /\s*\{\:\s*[^}]*\}\s*$/i
 const KRAMDOWN_ATTRIBUTE_LINE_PATTERN = /^\s*\{\:\s*[^}]*\}\s*$/i
 const KRAMDOWN_LEADING_ATTRIBUTE_PATTERN = /^(\s*)\{\:\s*[^}]*\}\s*/
@@ -32,6 +37,12 @@ function restorePlaceholders(value: string, prefix: string, placeholders: string
 
 function escapeHtmlAttribute(value: string): string {
   return escapeHtml(value)
+}
+
+function extractHtmlAttribute(value: string, attribute: string): string | null {
+  const pattern = new RegExp(`\\b${attribute}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "i")
+  const match = value.match(pattern)
+  return match?.[1] ?? match?.[2] ?? null
 }
 
 function normalizeMarkdownImageSource(source: string): string {
@@ -170,6 +181,30 @@ function parseAllowedInlineOpenTag(value: string): AllowedInlineOpenTag | null {
   return null
 }
 
+function parseAllowedImageTag(value: string): SanitizedImageTag | null {
+  const match = value.match(/^<img\b[^>]*>/i)
+  if (!match) {
+    return null
+  }
+
+  const source = extractHtmlAttribute(match[0], "src")
+  if (!source) {
+    return null
+  }
+
+  const src = normalizeMarkdownImageSource(source)
+  if (!src) {
+    return null
+  }
+
+  const alt = extractHtmlAttribute(match[0], "alt")
+  const title = extractHtmlAttribute(match[0], "title")
+  return {
+    html: `<img src="${escapeHtmlAttribute(src)}" alt="${escapeHtmlAttribute(alt || "")}"${title ? ` title="${escapeHtmlAttribute(title)}"` : ""}>`,
+    length: match[0].length,
+  }
+}
+
 function extractAllowedInlineHtml(value: string): { placeholders: string[], text: string } {
   const placeholders: string[] = []
   let text = ""
@@ -183,6 +218,15 @@ function extractAllowedInlineHtml(value: string): { placeholders: string[], text
     }
 
     text += value.slice(index, openIndex)
+
+    const imageTag = parseAllowedImageTag(value.slice(openIndex))
+    if (imageTag) {
+      const placeholder = `%%HTML_${placeholders.length}%%`
+      placeholders.push(imageTag.html)
+      text += placeholder
+      index = openIndex + imageTag.length
+      continue
+    }
 
     const openTag = parseAllowedInlineOpenTag(value.slice(openIndex))
     if (!openTag) {

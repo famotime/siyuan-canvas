@@ -375,6 +375,9 @@ function createPluginMock() {
 
   return {
     app: {},
+    eventBus: {
+      emit: vi.fn(),
+    },
     getCanvasSettings: vi.fn(() => ({
       ...pluginData.settings,
     })),
@@ -769,6 +772,84 @@ Preview body
     expect(preview.previewHtml).not.toContain("{:")
     expect(preview.previewHtml).not.toContain("updated=")
     expect(preview.previewHtml).not.toContain("20260412094047-ihhbskn")
+
+    wrapper.unmount()
+  })
+
+  it("opens a block node by opening its document and jumping to the block", async () => {
+    const { editor, plugin, wrapper } = await mountEditor()
+
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "第一项",
+    })
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", "20260412094047-ihhbskn")
+    await flushEditor()
+
+    editor.activateNode(editor.selectedNode)
+    await flushEditor()
+
+    expect(openTab).toHaveBeenCalledWith(expect.objectContaining({
+      app: plugin.app,
+      doc: {
+        id: "20260412094047-root001",
+      },
+      keepCursor: true,
+      openNewTab: true,
+    }))
+    expect(plugin.eventBus.emit).toHaveBeenCalledWith("open-siyuan-url-block", expect.objectContaining({
+      focus: true,
+      id: "20260412094047-ihhbskn",
+      url: "siyuan://blocks/20260412094047-ihhbskn",
+    }))
+
+    wrapper.unmount()
+  })
+
+  it("opens an image node by opening its document and jumping to the image block", async () => {
+    fileNodeLookupMock.findSiyuanAssetByPath.mockResolvedValue({
+      blockId: "20260412094047-img001",
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Diagram",
+    })
+    fileNodeLookupMock.findSiyuanDocumentByBlockId.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-root001",
+      path: "/data/roadmap.sy",
+      title: "Roadmap",
+    })
+
+    const { editor, plugin, wrapper } = await mountEditor()
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", "assets/diagram.png")
+    await flushEditor()
+
+    editor.activateNode(editor.selectedNode)
+    await flushEditor()
+
+    expect(openTab).toHaveBeenCalledWith(expect.objectContaining({
+      app: plugin.app,
+      doc: {
+        id: "20260412094047-root001",
+      },
+      keepCursor: true,
+      openNewTab: true,
+    }))
+    expect(plugin.eventBus.emit).toHaveBeenCalledWith("open-siyuan-url-block", expect.objectContaining({
+      focus: true,
+      id: "20260412094047-img001",
+      url: "siyuan://blocks/20260412094047-img001",
+    }))
 
     wrapper.unmount()
   })
