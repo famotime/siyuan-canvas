@@ -30,7 +30,6 @@ import {
   watch,
 } from "vue"
 import {
-  putFile,
   readDir,
 } from "@/api"
 import {
@@ -39,29 +38,14 @@ import {
   toBoardY,
 } from "@/canvas/board"
 import {
-  applyCanvasNodeLayout,
-  createCanvasGroupForNodes,
-  createCanvasEdge,
-  createCanvasNode,
   getCanvasSelectionBounds,
-  setCanvasEdgeColor,
-  setCanvasEdgeDirection,
-  setCanvasEdgeLabel,
-  setCanvasNodesColor,
-  removeCanvasEdge,
-  removeCanvasNode,
-  removeCanvasNodes,
   setCanvasEdgeEndpoint,
   upsertCanvasEdge,
-  upsertCanvasNode,
 } from "@/canvas/document"
 import { createCanvasEditorBindings } from "@/canvas/editor-bindings"
-import {
-  searchCanvasFilePickerTargets,
-  type CanvasFilePickerOption,
-} from "@/canvas/file-picker-dialog"
 import { CanvasEditorState } from "@/canvas/editor-state"
 import { createCanvasEditorFileActions } from "@/canvas/use-canvas-editor-file-actions"
+import { createCanvasEditorFilePickerActions } from "@/canvas/use-canvas-editor-file-picker"
 import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-file-nodes"
 import {
   createCanvasEditorGestureHandlers,
@@ -69,16 +53,18 @@ import {
   type CanvasEditorEdgeReconnectDraftState,
   type CanvasEditorSelectionBoxState,
 } from "@/canvas/use-canvas-editor-gestures"
+import { initializeCanvasEditor, syncCanvasEditorSelectionUi } from "@/canvas/use-canvas-editor-lifecycle"
+import { createCanvasEditorNodeActivationActions } from "@/canvas/use-canvas-editor-node-activation"
+import { createCanvasEditorNodeEdgeActions } from "@/canvas/use-canvas-editor-node-edge-actions"
+import { createCanvasEditorKeyboardHandler } from "@/canvas/use-canvas-editor-shortcuts"
 import {
   getCanvasFileName,
 } from "@/canvas/use-canvas-editor-shared"
-import { renderMarkdownPreview } from "@/canvas/markdown-preview"
 import {
   createDefaultCanvasPluginSettings,
   createDefaultCanvasPluginUiState,
 } from "@/canvas/plugin-data"
 import { CanvasFileService } from "@/canvas/file-service"
-import { writeWorkspaceImageFile } from "@/canvas/workspace-image-files"
 import {
   findSiyuanBlockById,
   findSiyuanDocumentByBlockId,
@@ -88,15 +74,12 @@ import {
   findSiyuanImageAssetsByQuery,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
 import {
-  parseCanvasDocument,
   validateCanvasDocument,
 } from "@/canvas/format"
 import { createCanvasI18n } from "@/i18n/canvas"
 import { getCanvasNodeAnchor } from "@/canvas/node-interaction"
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
-import { clampViewportScale } from "@/canvas/viewport"
 import {
-  centerViewportOnBounds,
   createEdgeCurvePath,
   getEdgeMidpointPosition,
   resolveEdgeToolbarPosition,
@@ -109,7 +92,6 @@ const DEFAULT_SELECTION_TOOLBAR_SIZE = {
   width: 220,
 }
 const SELECTION_COLORS = ["1", "2", "3", "4", "5", "6"] as const
-const SIYUAN_BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
 
 export function useCanvasEditor(
   plugin: CanvasPluginBridge,
@@ -577,34 +559,6 @@ export function useCanvasEditor(
     edgeToolbarPopover.value = "closed"
   }
 
-  function setNewEdgeSourceId(nodeId: string) {
-    newEdgeSourceId.value = nodeId
-
-    if (newEdgeTargetId.value === nodeId) {
-      newEdgeTargetId.value = ""
-    }
-  }
-
-  function setNewEdgeTargetId(nodeId: string) {
-    newEdgeTargetId.value = nodeId
-  }
-
-  function resetEdgeNodeQueries() {
-    newEdgeSourceQuery.value = ""
-    newEdgeTargetQuery.value = ""
-  }
-
-  function applySelectedNodeAsEdgeSource() {
-    if (state.selectedNodeIds.length === 1 && selectedNode.value) {
-      setNewEdgeSourceId(selectedNode.value.id)
-      resetEdgeNodeQueries()
-      return
-    }
-
-    newEdgeSourceId.value = ""
-    resetEdgeNodeQueries()
-  }
-
   function setSelectionToolbarSize(size: { height: number, width: number }) {
     if (size.width > 0) {
       selectionToolbarSize.width = size.width
@@ -652,487 +606,92 @@ export function useCanvasEditor(
     suggestedFilename,
     t,
   })
-
-  function selectNode(nodeId: string, event?: MouseEvent) {
-    state.selectNode(nodeId, {
-      additive: Boolean(event?.ctrlKey || event?.metaKey || event?.shiftKey),
-    })
-  }
-
-  function selectEdge(edgeId: string) {
-    state.selectEdge(edgeId)
-  }
-
-  function getRenderedMarkdown(text: string): string {
-    return renderMarkdownPreview(text)
-  }
-
-  function addNode(type: CanvasNode["type"]) {
-    const node = createCanvasNode(type)
-    node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
-    node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
-    commitDocument(upsertCanvasNode(state.document, node))
-    state.selectNode(node.id)
-  }
-
-  function deleteSelection() {
-    if (state.selectedNodeIds.length > 0) {
-      commitDocument(
-        state.selectedNodeIds.length === 1
-          ? removeCanvasNode(state.document, state.selectedNodeIds[0]!)
-          : removeCanvasNodes(state.document, state.selectedNodeIds),
-      )
-      state.selectNode()
-      closeSelectionPopover()
-      return
-    }
-
-    if (selectedEdge.value) {
-      commitDocument(removeCanvasEdge(state.document, selectedEdge.value.id))
-      state.selectEdge()
-      closeSelectionPopover()
-    }
-  }
-
-  function centerSelectionInViewport() {
-    const stage = stageRef.value
-    const bounds = selectionBounds.value
-
-    if (!stage || !bounds) {
-      return
-    }
-
-    const nextViewport = centerViewportOnBounds(
-      viewport,
-      {
-        height: stage.clientHeight,
-        width: stage.clientWidth,
-      },
-      bounds,
-      {
-        left: board.value.left,
-        top: board.value.top,
-      },
-    )
-
-    viewport.scale = nextViewport.scale
-    viewport.x = nextViewport.x
-    viewport.y = nextViewport.y
-    closeSelectionPopover()
-  }
-
-  function centerEdgeInViewport() {
-    const stage = stageRef.value
-    const anchors = selectedEdgeAnchors.value
-
-    if (!stage || !anchors) {
-      return
-    }
-
-    const edgeBounds = {
-      height: Math.max(1, Math.abs(anchors.to.y - anchors.from.y)),
-      width: Math.max(1, Math.abs(anchors.to.x - anchors.from.x)),
-      x: Math.min(anchors.from.x, anchors.to.x),
-      y: Math.min(anchors.from.y, anchors.to.y),
-    }
-
-    const nextViewport = centerViewportOnBounds(
-      viewport,
-      {
-        height: stage.clientHeight,
-        width: stage.clientWidth,
-      },
-      edgeBounds,
-      {
-        left: board.value.left,
-        top: board.value.top,
-      },
-    )
-
-    viewport.scale = nextViewport.scale
-    viewport.x = nextViewport.x
-    viewport.y = nextViewport.y
-    closeEdgePopover()
-  }
-
-  function applySelectionColor(color: string) {
-    if (!state.selectedNodeIds.length) {
-      return
-    }
-
-    commitDocument(setCanvasNodesColor(state.document, state.selectedNodeIds, color))
-    closeSelectionPopover()
-  }
-
-  function applyEdgeColor(color: string) {
-    if (!selectedEdge.value) {
-      return
-    }
-
-    commitDocument(setCanvasEdgeColor(state.document, selectedEdge.value.id, color))
-    closeEdgePopover()
-  }
-
-  function createGroupFromSelection() {
-    if (!state.selectedNodeIds.length) {
-      return
-    }
-
-    const {
-      document: nextDocument,
-      groupId,
-    } = createCanvasGroupForNodes(state.document, state.selectedNodeIds)
-
-    commitDocument(nextDocument)
-    state.selectNode(groupId)
-    closeSelectionPopover()
-  }
-
-  function applySelectionLayout(action: CanvasNodeLayoutAction) {
-    if (!state.selectedNodeIds.length) {
-      return
-    }
-
-    commitDocument(applyCanvasNodeLayout(state.document, state.selectedNodeIds, action))
-    closeSelectionPopover()
-  }
-
-  function toggleSelectionPopover(popover: "color" | "layout") {
-    if (!state.selectedNodeIds.length) {
-      closeSelectionPopover()
-      return
-    }
-
-    selectionToolbarPopover.value = selectionToolbarPopover.value === popover ? "closed" : popover
-  }
-
-  function toggleEdgePopover(popover: "color" | "direction") {
-    if (!selectedEdge.value) {
-      closeEdgePopover()
-      return
-    }
-
-    edgeToolbarPopover.value = edgeToolbarPopover.value === popover ? "closed" : popover
-  }
-
-  function updateSelectedEdgeDirection(direction: "both" | "none" | "single") {
-    if (!selectedEdge.value) {
-      return
-    }
-
-    const nextDirection = direction === "both"
-      ? { endArrow: true, startArrow: true }
-      : direction === "none"
-        ? { endArrow: false, startArrow: false }
-        : { endArrow: true, startArrow: false }
-
-    commitDocument(setCanvasEdgeDirection(state.document, selectedEdge.value.id, nextDirection))
-    closeEdgePopover()
-  }
-
-  function startEdgeLabelEditing() {
-    if (!selectedEdge.value) {
-      return
-    }
-
-    editingEdgeLabelId.value = selectedEdge.value.id
-    edgeLabelDraft.value = selectedEdge.value.label || ""
-    closeEdgePopover()
-  }
-
-  function updateEditingEdgeLabel(value: string) {
-    if (!editingEdgeLabelId.value) {
-      return
-    }
-
-    edgeLabelDraft.value = value
-    commitDocument(setCanvasEdgeLabel(state.document, editingEdgeLabelId.value, value))
-  }
-
-  function submitEdgeLabelEditing() {
-    if (!editingEdgeLabelId.value) {
-      return
-    }
-
-    commitDocument(setCanvasEdgeLabel(state.document, editingEdgeLabelId.value, edgeLabelDraft.value))
-    editingEdgeLabelId.value = ""
-    edgeLabelDraft.value = ""
-  }
-
-  function cancelEdgeLabelEditing() {
-    editingEdgeLabelId.value = ""
-    edgeLabelDraft.value = ""
-  }
-
-  function updateNode(node: CanvasNode) {
-    commitDocument(upsertCanvasNode(state.document, node))
-    if (node.type === "file") {
-      void refreshFileNodeMetadata()
-    }
-  }
-
-  function updateTextNodeContent(nodeId: string, text: string) {
-    const node = state.document.nodes.find((candidate) => candidate.id === nodeId)
-    if (!node) {
-      return
-    }
-
-    if (node.type === "text") {
-      updateNode({
-        ...node,
-        text,
-      })
-      return
-    }
-
-    if (node.type === "group") {
-      updateNode({
-        ...node,
-        label: text,
-      })
-    }
-  }
-
-  function updateNodeField(field: string, value: string) {
-    if (!selectedNode.value) {
-      return
-    }
-
-    updateNode({
-      ...selectedNode.value,
-      [field]: value,
-    })
-  }
-
-  function updateNumericNodeField(field: "height" | "width" | "x" | "y", value: string) {
-    if (!selectedNode.value) {
-      return
-    }
-
-    const numeric = Number.parseFloat(value)
-    if (Number.isNaN(numeric)) {
-      return
-    }
-
-    updateNode({
-      ...selectedNode.value,
-      [field]: numeric,
-    })
-  }
-
-  function updateEdge(edge: CanvasEdge) {
-    commitDocument(upsertCanvasEdge(state.document, edge))
-  }
-
-  function updateEdgeField(field: "label", value: string) {
-    if (!selectedEdge.value) {
-      return
-    }
-
-    updateEdge({
-      ...selectedEdge.value,
-      [field]: value,
-    })
-  }
-
-  function updateEdgeSide(field: "fromSide" | "toSide", value: string) {
-    if (!selectedEdge.value) {
-      return
-    }
-
-    updateEdge({
-      ...selectedEdge.value,
-      [field]: value as CanvasSide,
-    })
-  }
-
-  function createEdgeFromSelection() {
-    if (!newEdgeSourceId.value || !newEdgeTargetId.value) {
-      showMessage(t("messageSelectTargetNodeFirst"), 2500, "error")
-      return
-    }
-
-    if (newEdgeSourceId.value === newEdgeTargetId.value) {
-      showMessage(t("messageCannotConnectNodeToSelf"), 2500, "error")
-      return
-    }
-
-    const edge = createCanvasEdge(newEdgeSourceId.value, newEdgeTargetId.value)
-    edge.label = newEdgeLabel.value || undefined
-    edge.fromSide = newEdgeFromSide.value
-    edge.toSide = newEdgeToSide.value
-    commitDocument(upsertCanvasEdge(state.document, edge))
-    state.selectEdge(edge.id)
-    newEdgeLabel.value = ""
-    newEdgeTargetId.value = ""
-    resetEdgeNodeQueries()
-  }
-
-  function openCreateEdgeDialog() {
-    if (state.selectedNodeIds.length !== 1 || !selectedNode.value) {
-      showMessage(t("messageSelectSingleSourceNodeFirst"), 2500, "warning")
-      return
-    }
-
-    applySelectedNodeAsEdgeSource()
-    activateCanvasSurface()
-    createEdgeDialog.visible = true
-  }
-
-  function openFilePickerDialog() {
-    filePickerDialog.visible = true
-  }
-
-  function closeFilePickerDialog() {
-    filePickerDialog.visible = false
-    filePickerDialog.query = ""
-    filePickerDialog.groups = {
-      blocks: [],
-      canvases: [],
-      documents: [],
-      images: [],
-    }
-  }
-
-  async function updateFilePickerQuery(value: string) {
-    filePickerDialog.query = value
-    const query = value.trim()
-
-    if (!query) {
-      filePickerDialog.groups = {
-        blocks: [],
-        canvases: [],
-        documents: [],
-        images: [],
-      }
-      return
-    }
-
-    const exactBlock = SIYUAN_BLOCK_ID_PATTERN.test(query)
-      ? await findSiyuanBlockById(query)
-      : null
-    const exactDocument = SIYUAN_BLOCK_ID_PATTERN.test(query) && !exactBlock
-      ? await findSiyuanDocumentByBlockId(query)
-      : null
-    const imageByBlockId = SIYUAN_BLOCK_ID_PATTERN.test(query)
-      ? await findSiyuanImageAssetByBlockId(query)
-      : null
-
-    filePickerDialog.groups = await searchCanvasFilePickerTargets(query, {
-      searchBlocks: async (keyword) => {
-        const blocks = SIYUAN_BLOCK_ID_PATTERN.test(keyword)
-          ? (exactBlock ? [exactBlock] : [])
-          : await findSiyuanBlocksByQuery(keyword)
-        return blocks.map((block) => ({
-          blockId: block.id,
-          kind: "block" as const,
-          path: block.id,
-          subtitle: block.hpath || block.path,
-          title: block.title,
-        }))
-      },
-      searchDocuments: async (keyword) => {
-        const documents = SIYUAN_BLOCK_ID_PATTERN.test(keyword)
-          ? (exactDocument ? [exactDocument] : [])
-          : await findSiyuanDocumentsByQuery(keyword)
-        return documents.map((document) => ({
-          kind: "document" as const,
-          path: document.path,
-          subtitle: document.hpath || document.path,
-          title: document.title,
-        }))
-      },
-      searchImages: async (keyword) => {
-        if (imageByBlockId) {
-          return [{
-            blockId: imageByBlockId.blockId,
-            kind: "image" as const,
-            path: imageByBlockId.path,
-            subtitle: imageByBlockId.path,
-            title: imageByBlockId.title || imageByBlockId.name,
-          }]
-        }
-
-        const images = await findSiyuanImageAssetsByQuery(keyword)
-        return images.map((image) => ({
-          blockId: image.blockId,
-          kind: "image" as const,
-          path: image.path,
-          subtitle: image.path,
-          title: image.title || image.name,
-        }))
-      },
-      searchWorkspaceCanvasFiles: async (keyword) => {
-        const normalizedQuery = keyword.trim().toLowerCase()
-        return workspaceDocuments.value
-          .filter((document) => {
-            if (!normalizedQuery) {
-              return true
-            }
-
-            return document.title.toLowerCase().includes(normalizedQuery)
-              || document.path.toLowerCase().includes(normalizedQuery)
-          })
-          .map((document) => ({
-            kind: "canvas" as const,
-            path: document.path,
-            subtitle: document.path,
-            title: document.title,
-          }))
-      },
-    })
-  }
-
-  async function selectFilePickerResult(option: CanvasFilePickerOption) {
-    const node = createCanvasNode("file")
-    node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
-    node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
-    node.file = option.kind === "block" && option.blockId
-      ? option.blockId
-      : option.path
-
-    commitDocument(upsertCanvasNode(state.document, node))
-    state.selectNode(node.id)
-    closeFilePickerDialog()
-    await refreshFileNodeMetadata()
-  }
-
-  async function handleClipboardImagePaste(file: File) {
-    if (fileSource.value !== "workspace" || !state.filePath.endsWith(".canvas")) {
-      showMessage(t("messageUnablePasteImageWithoutWorkspaceCanvas"), 4000, "warning")
-      return
-    }
-
-    const path = await writeWorkspaceImageFile(state.filePath, file, putFile)
-    const node = createCanvasNode("file")
-    node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
-    node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
-    node.file = path
-
-    commitDocument(upsertCanvasNode(state.document, node))
-    state.selectNode(node.id)
-    await refreshFileNodeMetadata()
-  }
-
-  function closeCreateEdgeDialog() {
-    createEdgeDialog.visible = false
-  }
-
-  function submitCreateEdgeDialog() {
-    const previousSelectedEdgeId = state.selectedEdgeId
-    createEdgeFromSelection()
-    if (state.selectedEdgeId && state.selectedEdgeId !== previousSelectedEdgeId) {
-      closeCreateEdgeDialog()
-    }
-  }
-
-  function zoomIn() {
-    viewport.scale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
-  }
-
-  function zoomOut() {
-    viewport.scale = clampViewportScale(Number((viewport.scale - 0.1).toFixed(2)))
-  }
+  const {
+    addNode,
+    applyEdgeColor,
+    applySelectedNodeAsEdgeSource,
+    applySelectionColor,
+    applySelectionLayout,
+    cancelEdgeLabelEditing,
+    centerEdgeInViewport,
+    centerSelectionInViewport,
+    closeCreateEdgeDialog,
+    createEdgeFromSelection,
+    createGroupFromSelection,
+    deleteSelection,
+    getRenderedMarkdown,
+    openCreateEdgeDialog,
+    selectEdge,
+    selectNode,
+    setNewEdgeSourceId,
+    setNewEdgeTargetId,
+    startEdgeLabelEditing,
+    submitCreateEdgeDialog,
+    submitEdgeLabelEditing,
+    toggleEdgePopover,
+    toggleSelectionPopover,
+    updateEdgeField,
+    updateEdgeSide,
+    updateEditingEdgeLabel,
+    updateNodeField,
+    updateNumericNodeField,
+    updateSelectedEdgeDirection,
+    updateTextNodeContent,
+    zoomIn,
+    zoomOut,
+  } = createCanvasEditorNodeEdgeActions({
+    activateCanvasSurface,
+    board,
+    closeEdgePopover,
+    closeSelectionPopover,
+    commitDocument,
+    createEdgeDialog,
+    edgeLabelDraft,
+    editingEdgeLabelId,
+    edgeToolbarPopover,
+    fileFieldRefresh: refreshFileNodeMetadata,
+    newEdgeFromSide,
+    newEdgeLabel,
+    newEdgeSourceId,
+    newEdgeSourceQuery,
+    newEdgeTargetId,
+    newEdgeTargetQuery,
+    newEdgeToSide,
+    selectedEdge,
+    selectedEdgeAnchors,
+    selectedNode,
+    selectionBounds,
+    selectionToolbarPopover,
+    stageRef,
+    state,
+    t,
+    viewport,
+  })
+
+  const {
+    closeFilePickerDialog,
+    handleClipboardImagePaste,
+    openFilePickerDialog,
+    selectFilePickerResult,
+    updateFilePickerQuery,
+  } = createCanvasEditorFilePickerActions({
+    board,
+    commitDocument,
+    filePickerDialog,
+    fileSource,
+    refreshFileNodeMetadata,
+    resolveBlockById: findSiyuanBlockById,
+    resolveBlocksByQuery: findSiyuanBlocksByQuery,
+    resolveDocumentByBlockId: findSiyuanDocumentByBlockId,
+    resolveDocumentsByQuery: findSiyuanDocumentsByQuery,
+    resolveImageAssetByBlockId: findSiyuanImageAssetByBlockId,
+    resolveImageAssetsByQuery: findSiyuanImageAssetsByQuery,
+    selectNode,
+    state,
+    t,
+    viewport,
+    workspaceDocuments,
+  })
 
   function toggleInspector() {
     inspectorExpanded.value = !inspectorExpanded.value
@@ -1148,60 +707,13 @@ export function useCanvasEditor(
     })
   }
 
-  function activateNode(node: CanvasNode) {
-    if (node.type === "link") {
-      window.open(node.url, "_blank", "noopener,noreferrer")
-      return
-    }
-
-    if (node.type === "file") {
-      const resolved = getResolvedFileNode(node)
-      if (resolved.kind === "canvas") {
-        const path = ensureCanvasPath(node.file)
-        void plugin.openCanvasTab?.({ path })
-        return
-      }
-
-      if (resolved.kind === "document") {
-        void openTab({
-          app: plugin.app,
-          doc: {
-            id: resolved.id,
-          },
-          keepCursor: true,
-          openNewTab: true,
-        })
-        return
-      }
-
-      if (resolved.kind === "block") {
-        void openDocumentAtBlock(resolved.id, resolved.rootId)
-        return
-      }
-
-      if (resolved.kind === "image") {
-        if (resolved.blockId) {
-          void openDocumentAtBlock(resolved.blockId)
-          return
-        }
-
-        void openTab({
-          app: plugin.app,
-          asset: {
-            path: resolved.openPath,
-          },
-          keepCursor: true,
-          openNewTab: true,
-        })
-        return
-      }
-
-      showMessage(resolved.detail || node.file, 2500, "info")
-      return
-    }
-
-    showMessage(getNodeTitle(node), 2500, "info")
-  }
+  const { activateNode } = createCanvasEditorNodeActivationActions({
+    ensureCanvasPath,
+    getNodeTitle,
+    getResolvedFileNode,
+    openDocumentByBlockId: openDocumentAtBlock,
+    plugin,
+  })
   const {
     clearConnectionDraft,
     clearEdgeReconnectDraft,
@@ -1231,88 +743,36 @@ export function useCanvasEditor(
     viewport,
   })
 
-  function isEditingTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) {
-      return false
-    }
-
-    return Boolean(target.closest("input, textarea, select, [contenteditable='true']"))
-  }
-
-  function handleKeydown(event: KeyboardEvent) {
-    if (isEditingTarget(event.target)) {
-      return
-    }
-
-    const key = event.key.toLowerCase()
-    const isAccelerator = event.ctrlKey || event.metaKey
-
-    if ((event.key === "Delete" || event.key === "Backspace") && canDelete.value) {
-      event.preventDefault()
-      deleteSelection()
-      return
-    }
-
-    if (event.key === "Escape") {
-      if (editingEdgeLabelId.value) {
-        cancelEdgeLabelEditing()
-        return
-      }
-
-      if (edgeToolbarPopover.value !== "closed") {
-        closeEdgePopover()
-        return
-      }
-
-      if (selectionToolbarPopover.value !== "closed") {
-        closeSelectionPopover()
-        return
-      }
-
-      state.selectNode()
-      state.selectEdge()
-      return
-    }
-
-    if (isAccelerator && key === "a") {
-      event.preventDefault()
-      state.selectAllNodes()
-      return
-    }
-
-    if (isAccelerator && key === "s") {
-      event.preventDefault()
-      void save()
-    }
-  }
+  const { handleKeydown } = createCanvasEditorKeyboardHandler({
+    canDelete: () => canDelete.value,
+    cancelEdgeLabelEditing,
+    closeEdgePopover,
+    closeSelectionPopover,
+    deleteSelection,
+    getEdgeToolbarPopover: () => edgeToolbarPopover.value,
+    getEditingEdgeLabelId: () => editingEdgeLabelId.value,
+    getSelectionToolbarPopover: () => selectionToolbarPopover.value,
+    save,
+    selectAllNodes: () => state.selectAllNodes(),
+    selectEdge: () => state.selectEdge(),
+    selectNode: () => state.selectNode(),
+  })
 
   onMounted(async () => {
-    if (bootstrap.raw) {
-      const parsed = parseCanvasDocument(bootstrap.raw)
-      if (parsed.document) {
-        state.replaceDocument(parsed.document, bootstrap.path || "")
-        state.issues = {
-          errors: parsed.errors,
-          warnings: parsed.warnings,
-        }
-      }
-    } else if (bootstrap.path) {
-      try {
-        await state.open(bootstrap.path)
-        suggestedFilename.value = getFileName(bootstrap.path)
-        fileSource.value = "workspace"
-        await rememberRecentPath(bootstrap.path, "workspace")
-      } catch (error) {
-        showMessage(error instanceof Error ? error.message : t("messageUnableOpenCanvasFile"), 4000, "error")
-      }
-    } else {
-      newCanvas()
-    }
-
-    refreshRecentFiles()
-    await refreshWorkspaceDocuments()
-    await refreshFileNodeMetadata()
-    resetViewport()
+    await initializeCanvasEditor({
+      bootstrap,
+      fileSource,
+      getFileName,
+      newCanvas,
+      refreshFileNodeMetadata,
+      refreshRecentFiles,
+      refreshWorkspaceDocuments,
+      rememberRecentPath,
+      resetViewport,
+      state,
+      suggestedFilename,
+      t,
+    })
     window.addEventListener("keydown", handleKeydown)
   })
 
@@ -1333,14 +793,16 @@ export function useCanvasEditor(
   watch(
     () => `${state.selectedEdgeId}|${state.selectedNodeIds.join(",")}`,
     () => {
-      applySelectedNodeAsEdgeSource()
-      closeSelectionPopover()
-      closeEdgePopover()
-      cancelEdgeLabelEditing()
-      clearSelectionBox()
-      if (!edgeReconnectDraft.visible || edgeReconnectDraft.edgeId !== state.selectedEdgeId) {
-        clearEdgeReconnectDraft()
-      }
+      syncCanvasEditorSelectionUi({
+        applySelectedNodeAsEdgeSource,
+        cancelEdgeLabelEditing,
+        clearEdgeReconnectDraft,
+        clearSelectionBox,
+        closeEdgePopover,
+        closeSelectionPopover,
+        edgeReconnectDraft,
+        state,
+      })
     },
   )
 

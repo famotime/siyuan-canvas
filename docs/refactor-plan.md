@@ -2,36 +2,31 @@
 
 ## 1. 项目快照
 
-- 生成日期：2026-04-11
-- 范围：`src/index.ts`、`src/main.ts`、`src/App.vue`、`src/api.ts`、`src/canvas/**`、`src/components/canvas/**`、`tests/**`
-- 目标：在不改变当前画布编辑行为的前提下，降低编辑器组合层和工作区视图层的复杂度，补齐生命周期与集成测试边界，并为后续功能迭代建立稳定模块边界
+- 生成日期：2026-04-14
+- 范围：`siyuan-canvas` 编辑器编排层、工作区视图层、文件预览解析链路
+- 目标：在不改变现有行为的前提下，降低 `use-canvas-editor.ts` 与 `CanvasWorkspace.vue` 的编排复杂度，收敛重复的文件预览模型，给后续功能迭代提供更稳定的模块边界
 - 文档刷新目标：`docs/project-structure.md`、`README.md`
-- 基线验证：
-  - [x] `pnpm test`（2026-04-11，16/16 文件通过，90/90 用例通过）
-- 当前仓库状态：
-  - `docs/project-structure.md` 尚不存在，获批范围完成后需要新增
-  - 当前工作区无待处理的未提交改动
+- 当前基线：`pnpm test` 通过（23 个测试文件，189 个测试通过）
 
 ## 2. 架构与模块分析
 
 | 模块 | 关键文件 | 当前职责 | 主要痛点 | 测试覆盖情况 |
 | --- | --- | --- | --- | --- |
-| 插件入口与挂载 | `src/index.ts`、`src/main.ts`、`src/App.vue` | 负责插件启动、Tab 注册、设置面板、Vue 挂载与主题同步 | `src/index.ts` 同时承担平台探测、命令注册、设置持久化、Tab 生命周期；`src/main.ts` 还夹带主题同步逻辑，入口边界偏厚 | 有 `tests/canvas-theme-sync.test.ts`，但缺少插件生命周期、设置面板、最近文件持久化测试 |
-| 编辑器组合层 | `src/canvas/use-canvas-editor.ts` | 聚合文件读写、状态管理、节点/边编辑、拖拽、缩放、快捷键、最近文件、冲突处理、文件节点解析 | 单文件约 1341 行，职责覆盖“文件生命周期 + 交互手势 + 视图状态 + 业务动作”；公共返回面过宽，内部隐式不变式较多，重构难度和回归风险最高 | 通过 `tests/canvas-selection-toolbar.test.ts`、`tests/canvas-workspace.test.ts` 间接覆盖，但缺少针对组合层动作编排的直接测试 |
-| 工作区视图层 | `src/components/canvas/CanvasWorkspace.vue` | 渲染工具栏、舞台、节点、边、悬浮工具栏、侧边检查器，并处理局部 DOM 行为 | 单文件约 2110 行，模板、交互辅助函数、主题观察、样式全部集中；表现层与控制层边界弱，维护成本高 | `tests/canvas-workspace.test.ts` 覆盖较多 UI 行为，但缺少子组件级隔离测试 |
-| 纯文档与几何逻辑 | `src/canvas/document.ts`、`src/canvas/node-interaction.ts`、`src/canvas/selection-toolbar.ts`、`src/canvas/viewport.ts`、`src/canvas/board.ts` | 负责文档 CRUD、布局计算、分组边界、连接锚点、视口与工具栏几何计算 | `document.ts` 同时承载 CRUD、布局、分组、边界推导，仍可继续拆分；但整体已偏纯函数，边界相对清晰 | 覆盖强，`tests/canvas-document.test.ts`、`tests/canvas-selection-toolbar.test.ts`、`tests/canvas-node-interaction.test.ts`、`tests/canvas-viewport.test.ts`、`tests/canvas-board.test.ts` 已覆盖核心行为 |
-| 文件解析与预览链路 | `src/canvas/file-service.ts`、`src/canvas/siyuan-text-gateway.ts`、`src/canvas/file-node-resolution.ts`、`src/canvas/file-node-preview.ts`、`src/canvas/format.ts`、`src/canvas/markdown-preview.ts` | 负责 `.canvas` 解析/序列化、SiYuan 文本网关、文件节点解析与预览生成 | 单模块体量不大，但组合层直接拼接太多依赖；预览与解析策略分散在组合层周围 | 单元测试较完整，缺口主要在“组合层如何调用这些服务”的集成场景 |
-| 插件数据与本地化 | `src/canvas/plugin-data.ts`、`src/i18n/canvas.ts`、`src/types/**` | 插件设置、最近文件、翻译和类型边界 | 风险较低，问题主要是被厚组合层直接耦合，缺少更明确的应用服务边界 | `tests/canvas-plugin-data.test.ts`、`tests/canvas-i18n.test.ts` 已提供基础覆盖 |
-| SiYuan API 适配 | `src/api.ts` | 提供模板继承下来的大量 API 包装，并包含当前画布真正使用的文档/资源解析查询 | 文件体量大、风格与仓库其他文件不一致、导出面远超当前插件使用范围；当前画布只依赖少量函数，认知负担偏高 | 目前无直接测试；若重构需先提取纯辅助函数并补测试 |
+| 插件入口与宿主桥接 | `src/index.ts`、`src/main.ts`、`src/App.vue` | 插件生命周期、页签挂载、主题同步、把 bootstrap 注入工作区 | 入口本身较薄，风险较低；当前主要受下游 editor/workspace 大模块牵制 | `tests/canvas-plugin-lifecycle.test.ts`、`tests/canvas-theme-sync.test.ts` |
+| 编辑器主编排层 | `src/canvas/use-canvas-editor.ts` | 聚合状态、计算属性、节点/边操作、文件动作、键盘快捷键、挂载生命周期、文件选择器、节点激活 | 单文件约 42 KB，职责横跨状态、视图模型、插件桥、事件处理；新增行为时容易继续堆叠在同一入口，回归面大 | `tests/canvas-use-editor-actions.test.ts`、`tests/canvas-editor-gestures.test.ts`、`tests/canvas-editor-bindings.test.ts` |
+| 文件动作与节点元数据 | `src/canvas/use-canvas-editor-file-actions.ts`、`src/canvas/use-canvas-editor-file-nodes.ts`、`src/canvas/file-target-resolution.ts`、`src/canvas/file-target-preview.ts` | 工作区/本地文件打开保存、冲突处理、文件节点解析、文档/图片/子画布预览 | `file-node-*` 与 `file-target-*` 两套模型并存，职责边界容易混淆；预览、解析、图片路径兜底分散在多处 | `tests/canvas-file-target-resolution.test.ts`、`tests/canvas-file-target-preview.test.ts`、`tests/canvas-file-node-resolution.test.ts`、`tests/canvas-use-editor-actions.test.ts` |
+| 几何与手势层 | `src/canvas/use-canvas-editor-gestures.ts`、`src/canvas/document.ts`、`src/canvas/selection-toolbar.ts`、`src/canvas/node-interaction.ts` | 拖拽、缩放、框选、连线、边端点重连、纯文档变换 | 纯函数基础较好，但上层编排层仍直接拼装太多行为，导致边界未完全释放 | `tests/canvas-editor-gestures.test.ts`、`tests/canvas-selection-toolbar.test.ts`、`tests/canvas-node-interaction.test.ts`、`tests/canvas-document.test.ts` |
+| 工作区视图层 | `src/components/canvas/CanvasWorkspace.vue`、`src/components/canvas/use-canvas-workspace-behavior.ts`、`src/components/canvas/canvas-workspace-display.ts` | 渲染工具栏、节点、边、文件卡片、预览、选择工具条、Inspector、对话框 | 单文件约 94 KB；模板、样式、文件卡片预览逻辑、图片回退、对话框和工具条全部堆在一个 SFC 中，可读性和可测试性都在下降 | `tests/canvas-workspace.test.ts`、`tests/canvas-workspace-display.test.ts` |
+| 文档与测试资产 | `docs/project-structure.md`、`README.md`、`tests/*.test.ts` | 结构说明、用户能力说明、回归保护 | 文档目前能描述现状，但一旦做结构调整需要同步刷新；大型集成测试已经是主保护网，适合在重构前继续加固 | 全量 `pnpm test` |
 
 ## 3. 按优先级排序的重构待办
 
 | ID | 优先级 | 模块/场景 | 涉及文件 | 重构目标 | 风险等级 | 重构前测试清单 | 文档影响 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| RF-001 | P0 | 拆分编辑器组合层 | `src/canvas/use-canvas-editor.ts`，计划新增 `src/canvas/editor-*` 或 `src/canvas/use-*` 子模块，必要时同步调整 `tests/canvas-selection-toolbar.test.ts`、`tests/canvas-workspace.test.ts` | 将“文件生命周期/最近文件/冲突处理”“节点与边动作”“视口与手势”“文件节点元数据刷新”拆成明确子模块，保留 `CanvasWorkspace` 当前对外行为与返回绑定契约 | 高 | - [x] 补充组合层直测，覆盖 `new/open/import/save/export/conflict/recentFiles` 基本流程；- [x] 定向执行 `pnpm test -- tests/canvas-selection-toolbar.test.ts`; - [x] 定向执行 `pnpm test -- tests/canvas-workspace.test.ts`; - [x] 定向执行 `pnpm test -- tests/canvas-editor-state.test.ts tests/canvas-file-service.test.ts` | `docs/project-structure.md`：新增编辑器子模块结构；`README.md`：如开发结构说明发生变化则更新 | done |
-| RF-002 | P1 | 拆分工作区视图层 | `src/components/canvas/CanvasWorkspace.vue`，计划新增 `src/components/canvas/*` 子组件或提取共享显示辅助模块，必要时同步调整 `tests/canvas-workspace.test.ts` | 将工具栏、舞台节点层、浮动选择工具栏、检查器面板从超大单文件中抽离，保留现有 DOM 行为、主题同步和关键测试钩子 | 中高 | - [x] 定向执行 `pnpm test -- tests/canvas-workspace.test.ts`; - [x] 定向执行 `pnpm test -- tests/canvas-selection-toolbar.test.ts`; - [x] 先补充子组件/显示辅助测试，覆盖颜色映射、内联编辑和选择工具栏显隐 | `docs/project-structure.md`：补充组件层级与职责；`README.md`：一般无需改用户能力描述，若开发结构说明新增则更新 | done |
-| RF-003 | P1 | 精简插件入口与设置/Tab 生命周期 | `src/index.ts`、`src/main.ts`、`src/App.vue`，计划新增入口辅助模块；必要时新增 `tests/canvas-plugin-lifecycle.test.ts` | 将平台探测、Tab 注册、设置 UI 构建、最近文件持久化与 Vue 挂载主题同步拆开，入口仅保留插件生命周期编排 | 中 | - [x] 新增入口直测，覆盖 `openCanvasTab`、设置默认值、最近文件记录上限、主题绑定清理；- [x] 定向执行 `pnpm test -- tests/canvas-theme-sync.test.ts`; - [x] 定向执行 `pnpm test -- tests/canvas-plugin-data.test.ts` | `docs/project-structure.md`：补充插件入口职责图；`README.md`：同步开发说明与配置入口 | done |
-| RF-004 | P2 | 缩小 SiYuan API 适配暴露面 | `src/api.ts`，计划提取仅供画布使用的查询辅助模块并补测试 | 把当前插件真正使用的文档/资源解析逻辑从通用模板 API 中剥离，降低 `use-canvas-editor.ts` 对超大 API 文件的直接耦合 | 中 | - [x] 先为路径候选与查询辅助逻辑补充纯函数测试；- [x] 再定向执行 `pnpm test -- tests/canvas-file-node-resolution.test.ts tests/canvas-workspace.test.ts` | `docs/project-structure.md`：补充 API 边界；`README.md`：通常无需变更 | done |
+| RF-001 | P0 | 拆分编辑器主编排层 | `src/canvas/use-canvas-editor.ts`，以及新增/调整 `src/canvas/use-canvas-editor-*.ts` 辅助模块、相关 tests | 把文件选择与节点激活、节点/边编辑命令、生命周期与快捷键等职责从 `use-canvas-editor.ts` 中继续拆出，令主入口只保留装配与绑定 | 高 | - [x] `pnpm test -- tests/canvas-use-editor-actions.test.ts` 保护打开/保存/最近文件/文件节点行为；- [x] `pnpm test -- tests/canvas-editor-gestures.test.ts` 保护手势；- [x] `pnpm test -- tests/canvas-editor-bindings.test.ts` 保护返回接口；- [x] `pnpm test` 验证全量回归 | `docs/project-structure.md` 需要更新 editor 编排分层；`README.md` 需要更新项目结构说明 | done |
+| RF-002 | P0 | 拆分工作区视图层 | `src/components/canvas/CanvasWorkspace.vue`，以及新增工作区子组件/预览组件/对话框组件，相关 tests | 把文件卡片预览、创建连线对话框、底部工具栏或 Inspector 等高耦合视图片区块拆成更小组件，缩减单一 SFC 的模板和状态耦合 | 高 | - [ ] `pnpm test -- tests/canvas-workspace.test.ts` 先补/调整工作区回归用例；- [ ] 覆盖 file card、document preview、dialog、toolbar 的渲染与事件透传；- [ ] `pnpm test` | `docs/project-structure.md` 需要更新组件树与职责映射；`README.md` 需要更新 UI 分层说明 | in_progress |
+| RF-003 | P1 | 收敛文件预览解析模型 | `src/canvas/file-node-resolution.ts`、`src/canvas/file-node-preview.ts`、`src/canvas/file-target-resolution.ts`、`src/canvas/file-target-preview.ts`、`src/canvas/use-canvas-editor-file-nodes.ts`、相关 tests | 合并或明确 `file-node-*` 与 `file-target-*` 两套模型的边界，减少重复 badge/detail/imageSrc 组装逻辑，为后续 file node 行为扩展提供单一数据通路 | 中 | - [ ] `pnpm test -- tests/canvas-file-node-resolution.test.ts tests/canvas-file-node-preview.test.ts tests/canvas-file-target-resolution.test.ts tests/canvas-file-target-preview.test.ts`; - [ ] `pnpm test -- tests/canvas-use-editor-actions.test.ts`; - [ ] `pnpm test -- tests/canvas-workspace.test.ts` | `docs/project-structure.md` 需要更新 file preview/resolution 链路；`README.md` 如对外结构描述变化则同步 | pending |
+| RF-004 | P2 | 提炼共享预览图片与 HTML 兜底逻辑 | `src/components/canvas/CanvasWorkspace.vue`、`src/canvas/markdown-preview.ts` 或新增共享 helper、相关 tests | 把 file card 图片路径候选与 document preview 图片回退逻辑抽成可复用 helper，减少 UI 内联字符串替换与状态散落 | 中 | - [ ] `pnpm test -- tests/canvas-workspace.test.ts`; - [ ] `pnpm test -- tests/canvas-markdown-preview.test.ts`; - [ ] `pnpm test` | `docs/project-structure.md` 需要补充预览辅助模块；`README.md` 通常仅小幅调整 | pending |
 
 优先级说明：
 - `P0`：价值和风险都最高，优先执行
@@ -48,33 +43,26 @@
 
 | ID | 开始日期 | 结束日期 | 验证命令 | 结果 | 已刷新文档 | 备注 |
 | --- | --- | --- | --- | --- | --- | --- |
-| BASELINE | 2026-04-11 | 2026-04-11 | `pnpm test` | pass | 无 | 16/16 文件通过，90/90 用例通过 |
-| RF-001 | 2026-04-11 | 2026-04-11 | `pnpm test -- tests/canvas-use-editor-actions.test.ts`; `pnpm test -- tests/canvas-selection-toolbar.test.ts`; `pnpm test -- tests/canvas-workspace.test.ts tests/canvas-editor-state.test.ts tests/canvas-file-service.test.ts`; `pnpm test` | pass | `docs/refactor-plan.md` | 新增 `tests/canvas-use-editor-actions.test.ts`；拆出 `use-canvas-editor-file-actions.ts`、`use-canvas-editor-file-nodes.ts`、`use-canvas-editor-gestures.ts`、`use-canvas-editor-shared.ts` |
-| RF-002 | 2026-04-11 | 2026-04-11 | `pnpm test -- tests/canvas-workspace-display.test.ts`; `pnpm test -- tests/canvas-workspace.test.ts`; `pnpm test -- tests/canvas-selection-toolbar.test.ts`; `pnpm test` | pass | `docs/refactor-plan.md` | 新增 `canvas-workspace-display.ts`、`canvas-selection-toolbar-icon.ts`、`use-canvas-workspace-behavior.ts` 与 `tests/canvas-workspace-display.test.ts`，将视图显示与悬浮工具栏行为从 `CanvasWorkspace.vue` 中拆出 |
-| RF-003 | 2026-04-11 | 2026-04-11 | `pnpm test -- tests/canvas-plugin-lifecycle.test.ts`; `pnpm test -- tests/canvas-theme-sync.test.ts`; `pnpm test -- tests/canvas-plugin-data.test.ts`; `pnpm test` | pass | `docs/refactor-plan.md` | 新增 `canvas-plugin-lifecycle.test.ts`；拆出 `plugin-runtime.ts`、`plugin-settings-panel.ts`、`plugin-tabs.ts`，将 `src/index.ts` 精简为生命周期编排层 |
-| RF-004 | 2026-04-11 | 2026-04-11 | `pnpm test -- tests/canvas-siyuan-file-node-lookups.test.ts`; `pnpm test -- tests/canvas-file-node-resolution.test.ts tests/canvas-workspace.test.ts`; `pnpm test -- tests/canvas-selection-toolbar.test.ts tests/canvas-use-editor-actions.test.ts`; `pnpm test` | pass | `docs/refactor-plan.md`、`docs/project-structure.md`、`README.md` | 新增 `siyuan-file-node-lookups.ts`、`siyuan-kernel-file-node-lookups.ts` 与 `tests/canvas-siyuan-file-node-lookups.test.ts`；`src/api.ts` 改为兼容层并委托画布专用 lookup 模块 |
+| BASELINE | 2026-04-14 | 2026-04-14 | `pnpm test` | pass | 未开始 | 23 个测试文件，189 个测试通过，作为重构前基线 |
+| RF-001 | 2026-04-14 | 2026-04-14 | `pnpm test -- tests/canvas-editor-shortcuts.test.ts`; `pnpm test -- tests/canvas-use-editor-actions.test.ts`; `pnpm test -- tests/canvas-selection-toolbar.test.ts`; `pnpm test -- tests/canvas-editor-gestures.test.ts`; `pnpm test -- tests/canvas-editor-bindings.test.ts`; `pnpm test` | pass | `docs/project-structure.md`、`README.md` | 新增 `use-canvas-editor-shortcuts.ts`、`use-canvas-editor-file-picker.ts`、`use-canvas-editor-node-activation.ts`、`use-canvas-editor-node-edge-actions.ts`、`use-canvas-editor-lifecycle.ts`；`use-canvas-editor.ts` 从 42148 B 缩减到 27323 B |
+| RF-002 | 2026-04-14 |  | `pnpm test -- tests/canvas-workspace.test.ts` | in_progress | `docs/project-structure.md`、`README.md` | 执行中；准备先补工作区拆分回归测试 |
+| RF-003 |  |  | `pnpm test -- tests/canvas-file-node-resolution.test.ts tests/canvas-file-node-preview.test.ts tests/canvas-file-target-resolution.test.ts tests/canvas-file-target-preview.test.ts` | pending | `docs/project-structure.md`、`README.md` | 待批准 |
+| RF-004 |  |  | `pnpm test -- tests/canvas-workspace.test.ts tests/canvas-markdown-preview.test.ts` | pending | `docs/project-structure.md`、`README.md` | 待批准 |
 
 ## 5. 决策与确认
 
-- 用户批准的条目：`RF-001`、`RF-002`、`RF-003`、`RF-004`（2026-04-11）
+- 用户批准的条目：`RF-001`、`RF-002`、`RF-003`、`RF-004`（2026-04-14，用户要求“根据 docs\\refactor-plan.md 逐个执行重构计划”）
 - 延后的条目：无
-- 阻塞条目及原因：
-- 建议执行顺序：`RF-001` -> `RF-002` -> `RF-003` -> `RF-004`
-- 建议首批批准范围：至少先批准 `RF-001`；如果希望一次完成主干结构整理，可一并批准 `RF-002` 与 `RF-003`
+- 阻塞条目及原因：无
 
 ## 6. 文档刷新
 
-- `docs/project-structure.md`：
-  - 已新增并同步当前模块结构、文件清单与职责映射
-- `README.md`：
-  - 已同步开发结构说明、命令与项目结构入口说明
-- 最终同步检查：
-  - `docs/project-structure.md` 已反映重构后的入口层、编辑器组合层、工作区视图层与 SiYuan lookup 边界
-  - `README.md` 已补充 `pnpm dev` 与当前项目结构说明
-  - 最终验证已执行 `pnpm test` 与 `pnpm build`
+- `docs/project-structure.md`：待获批条目完成后刷新
+- `README.md`：待获批条目完成后刷新
+- 最终同步检查：未开始
 
 ## 7. 下一步
 
-1. 如需继续发布流程，可在当前结构基础上执行 `pnpm build`、打包插件并进行发布前检查。
-2. 若后续继续收缩模板遗留的 `src/api.ts` 兼容面，可独立立项，不必再牵动画布主流程模块。
-3. 后续新增画布能力时，优先在现有分层上扩展对应 helper/composable，而不是回填到单个大文件。
+1. 由用户明确批准要执行的条目 ID（例如：`RF-001`、`RF-001 RF-002`）
+2. 对获批的第一个条目先补充/调整测试并跑定向验证
+3. 在定向测试通过后实施对应重构，并同步回写本计划与文档刷新状态
