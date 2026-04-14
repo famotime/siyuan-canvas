@@ -720,6 +720,40 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".file-card__document-preview").html()).toContain("Document preview")
   })
 
+  it("falls back to an alternate asset path when a document preview image fails to load", async () => {
+    currentEditor = createEditorMock({
+      id: "file-document-image-1",
+      file: "/data/spec.sy",
+      type: "file",
+    })
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Document",
+      clampMode: "viewport",
+      detail: "/Projects/Canvas/Spec",
+      headline: "Spec",
+      helper: "Opens in SiYuan",
+      kind: "document",
+      previewHtml: '<p><img src="/data/assets/road.png" alt="road"></p>',
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const image = wrapper.find(".file-card__document-preview img")
+
+    expect(image.exists()).toBe(true)
+    expect(image.attributes("src")).toBe("/data/assets/road.png")
+
+    await image.trigger("error")
+
+    expect(wrapper.find(".file-card__document-preview img").attributes("src")).toBe("/assets/road.png")
+  })
+
   it("keeps mouse wheel events inside the file picker dialog instead of zooming the canvas", async () => {
     currentEditor = createEditorMock()
     currentEditor.filePickerDialog.visible = true

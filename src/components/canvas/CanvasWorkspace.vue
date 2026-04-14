@@ -268,7 +268,8 @@
                   <div
                     v-if="['block', 'document'].includes(editor.getFileNodePreview(node).kind) && editor.getFileNodePreview(node).previewHtml"
                     class="file-card__document-preview markdown-preview"
-                    v-html="editor.getFileNodePreview(node).previewHtml"
+                    v-html="getFileCardDocumentPreviewHtml(node)"
+                    @error.capture="handleFileCardPreviewImageError(node, $event)"
                   />
                   <div class="file-card__helper">
                     {{ editor.getFileNodePreview(node).helper }}
@@ -1413,6 +1414,7 @@ type EdgeNodePickerKind = "source" | "target"
 const activeEdgeNodePicker = ref<EdgeNodePickerKind | null>(null)
 const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
+const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>>({})
 const hoveredEdgeId = ref("")
 const sourceEdgePickerRef = ref<HTMLElement>()
 const sourceEdgeSearchRef = ref<HTMLInputElement>()
@@ -1648,6 +1650,27 @@ function getFileCardTooltip(node: CanvasNode): string | undefined {
   return editor.getFileNodePreview(node).detail || undefined
 }
 
+function getFileCardDocumentPreviewHtml(node: CanvasNode): string {
+  if (node.type !== "file") {
+    return ""
+  }
+
+  const preview = editor.getFileNodePreview(node)
+  const previewHtml = preview.previewHtml || ""
+  const overrides = fileCardPreviewImageOverrides.value[node.id]
+  if (!previewHtml || !overrides) {
+    return previewHtml
+  }
+
+  return previewHtml.replace(
+    /(<img\b[^>]*\bsrc=(["']))([^"']+)(\2)/gi,
+    (match, prefix: string, _quote: string, source: string, suffix: string) => {
+      const override = overrides[source]
+      return override ? `${prefix}${override}${suffix}` : match
+    },
+  )
+}
+
 function handleFileCardImageError(node: CanvasNode) {
   if (node.type !== "file") {
     return
@@ -1670,6 +1693,48 @@ function handleFileCardImageError(node: CanvasNode) {
   fileCardImageOverrides.value = {
     ...fileCardImageOverrides.value,
     [node.id]: nextSource,
+  }
+}
+
+function handleFileCardPreviewImageError(node: CanvasNode, event: Event) {
+  if (node.type !== "file") {
+    return
+  }
+
+  const target = event.target
+  if (!(target instanceof HTMLImageElement)) {
+    return
+  }
+
+  const currentSource = target.getAttribute("src")?.trim()
+  if (!currentSource) {
+    return
+  }
+
+  const storedCandidates = target.dataset.canvasImageCandidates
+  const candidates = storedCandidates
+    ? JSON.parse(storedCandidates) as string[]
+    : getFileCardImageCandidates(currentSource)
+  const currentIndex = Number.parseInt(target.dataset.canvasImageCandidateIndex || "", 10)
+  const resolvedIndex = Number.isNaN(currentIndex)
+    ? candidates.indexOf(currentSource)
+    : currentIndex
+  const nextSource = candidates[resolvedIndex + 1]
+
+  if (!nextSource || nextSource === currentSource) {
+    return
+  }
+
+  target.dataset.canvasImageCandidates = JSON.stringify(candidates)
+  target.dataset.canvasImageCandidateIndex = String(resolvedIndex + 1)
+  target.setAttribute("src", nextSource)
+
+  fileCardPreviewImageOverrides.value = {
+    ...fileCardPreviewImageOverrides.value,
+    [node.id]: {
+      ...(fileCardPreviewImageOverrides.value[node.id] || {}),
+      [candidates[0] || currentSource]: nextSource,
+    },
   }
 }
 
