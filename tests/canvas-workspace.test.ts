@@ -412,7 +412,7 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='edge-overlay-edge-1']").classes()).not.toContain("stage__edge--hovered")
   })
 
-  it("renders four edge resize handles, one corner resize handle, and four connection anchors for each card", () => {
+  it("renders segmented edge resize handles, one corner resize handle, and four enlarged connection anchors for each card", () => {
     const node = createTextNode()
     currentEditor = createEditorMock(node)
 
@@ -424,7 +424,15 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    expect(wrapper.findAll("[data-testid^='node-resize-']")).toHaveLength(5)
+    expect(wrapper.findAll("[data-testid^='node-resize-']")).toHaveLength(9)
+    expect(wrapper.find("[data-testid='node-resize-top-left']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='node-resize-top-right']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='node-resize-right-top']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='node-resize-right-bottom']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='node-resize-bottom-left']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='node-resize-bottom-right']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='node-resize-left-top']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='node-resize-left-bottom']").exists()).toBe(true)
     expect(wrapper.findAll("[data-testid^='node-anchor-']")).toHaveLength(4)
     expect(wrapper.find("[data-testid='node-resize-corner']").exists()).toBe(true)
   })
@@ -441,14 +449,18 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    await wrapper.find("[data-testid='node-resize-left']").trigger("pointerdown")
-    await wrapper.find("[data-testid='node-resize-right']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-resize-top-left']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-resize-top-right']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-resize-left-top']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-resize-right-bottom']").trigger("pointerdown")
     await wrapper.find("[data-testid='node-resize-corner']").trigger("pointerdown")
     await wrapper.find("[data-testid='node-anchor-top']").trigger("pointerdown")
     await wrapper.find("[data-testid='node-anchor-bottom']").trigger("pointerdown")
 
-    expect(currentEditor.startResize).toHaveBeenNthCalledWith(1, node, "left", expect.anything())
-    expect(currentEditor.startResize).toHaveBeenNthCalledWith(2, node, "right", expect.anything())
+    expect(currentEditor.startResize).toHaveBeenNthCalledWith(1, node, "top", expect.anything())
+    expect(currentEditor.startResize).toHaveBeenNthCalledWith(2, node, "top", expect.anything())
+    expect(currentEditor.startResize).toHaveBeenNthCalledWith(3, node, "left", expect.anything())
+    expect(currentEditor.startResize).toHaveBeenNthCalledWith(4, node, "right", expect.anything())
     expect(currentEditor.startCornerResize).toHaveBeenCalledWith(node, expect.anything())
     expect(currentEditor.startConnectionDrag).toHaveBeenNthCalledWith(1, node, "top", expect.anything())
     expect(currentEditor.startConnectionDrag).toHaveBeenNthCalledWith(2, node, "bottom", expect.anything())

@@ -318,13 +318,13 @@
               @pointerdown.stop.prevent="editor.startConnectionDrag(node, side, $event)"
             />
             <button
-              v-for="side in editor.sides"
-              :key="`resize-${node.id}-${side}`"
+              v-for="segment in NODE_RESIZE_SEGMENTS"
+              :key="`resize-${node.id}-${segment.id}`"
               class="canvas-node__resize-handle"
-              :class="`canvas-node__resize-handle--${side}`"
-              :data-testid="`node-resize-${side}`"
+              :class="`canvas-node__resize-handle--${segment.id}`"
+              :data-testid="`node-resize-${segment.id}`"
               type="button"
-              @pointerdown.stop.prevent="editor.startResize(node, side, $event)"
+              @pointerdown.stop.prevent="editor.startResize(node, segment.side, $event)"
             />
             <button
               class="canvas-node__resize-corner"
@@ -1243,6 +1243,7 @@ import { createCanvasI18n } from "@/i18n/canvas"
 import type {
   CanvasEdge,
   CanvasNode,
+  CanvasSide,
 } from "@/canvas/types"
 import {
   applyFilePreviewImageOverrides,
@@ -1279,6 +1280,16 @@ const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
 const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>>({})
 const hoveredEdgeId = ref("")
+const NODE_RESIZE_SEGMENTS: Array<{ id: string, side: CanvasSide }> = [
+  { id: "top-left", side: "top" },
+  { id: "top-right", side: "top" },
+  { id: "right-top", side: "right" },
+  { id: "right-bottom", side: "right" },
+  { id: "bottom-left", side: "bottom" },
+  { id: "bottom-right", side: "bottom" },
+  { id: "left-top", side: "left" },
+  { id: "left-bottom", side: "left" },
+]
 
 function valueFromEvent(event: Event): string {
   return (event.target as HTMLInputElement).value
@@ -2147,6 +2158,7 @@ watch(
 }
 
 .canvas-node {
+  --canvas-node-midpoint-shield: 60px;
   position: absolute;
   z-index: 1;
   display: flex;
@@ -2168,7 +2180,12 @@ watch(
 }
 
 .canvas-node--selected {
+  z-index: 3;
   box-shadow: 0 0 0 2px var(--canvas-selection-border), var(--canvas-shadow-strong);
+}
+
+.canvas-node:hover {
+  z-index: 3;
 }
 
 .canvas-node__body {
@@ -2375,14 +2392,14 @@ watch(
   border: 0;
   padding: 0;
   background: transparent;
+  pointer-events: auto;
 }
 
 .canvas-node__anchor {
-  width: 22px;
-  height: 22px;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
-  background: var(--canvas-anchor-bg);
-  box-shadow: var(--canvas-anchor-shadow);
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.78);
   transition:
@@ -2400,17 +2417,26 @@ watch(
   transform: translate(-50%, -50%) scale(1);
 }
 
-.canvas-node__anchor--active {
-  background: var(--canvas-accent-soft);
-  box-shadow: 0 0 0 2px var(--canvas-selection-fill);
-}
-
 .canvas-node__anchor::before {
   content: "";
   position: absolute;
-  inset: 5px;
+  inset: 7px;
+  border-radius: 999px;
+  background: var(--canvas-anchor-bg);
+  box-shadow: var(--canvas-anchor-shadow);
+}
+
+.canvas-node__anchor::after {
+  content: "";
+  position: absolute;
+  inset: 13px;
   border-radius: 999px;
   background: var(--canvas-accent);
+}
+
+.canvas-node__anchor--active::before {
+  background: var(--canvas-accent-soft);
+  box-shadow: 0 0 0 2px var(--canvas-selection-fill);
 }
 
 .canvas-node__anchor--top {
@@ -2434,6 +2460,7 @@ watch(
 }
 
 .canvas-node__resize-handle {
+  z-index: 2;
   opacity: 0;
   transition: opacity 0.16s ease;
 }
@@ -2445,43 +2472,69 @@ watch(
   opacity: 1;
 }
 
-.canvas-node__resize-handle--top,
-.canvas-node__resize-handle--bottom {
-  left: 14px;
-  right: 14px;
+.canvas-node__resize-handle--top-left,
+.canvas-node__resize-handle--top-right,
+.canvas-node__resize-handle--bottom-left,
+.canvas-node__resize-handle--bottom-right {
+  width: max(0px, calc(50% - var(--canvas-node-midpoint-shield) / 2));
   height: 12px;
 }
 
-.canvas-node__resize-handle--left,
-.canvas-node__resize-handle--right {
-  top: 14px;
-  bottom: 14px;
+.canvas-node__resize-handle--left-top,
+.canvas-node__resize-handle--left-bottom,
+.canvas-node__resize-handle--right-top,
+.canvas-node__resize-handle--right-bottom {
   width: 12px;
+  height: max(0px, calc(50% - var(--canvas-node-midpoint-shield) / 2));
 }
 
-.canvas-node__resize-handle--top {
+.canvas-node__resize-handle--top-left,
+.canvas-node__resize-handle--top-right {
   top: -6px;
   cursor: ns-resize;
 }
 
-.canvas-node__resize-handle--right {
-  position: absolute;
+.canvas-node__resize-handle--top-left,
+.canvas-node__resize-handle--bottom-left {
+  left: 14px;
+}
+
+.canvas-node__resize-handle--top-right,
+.canvas-node__resize-handle--bottom-right {
+  right: 14px;
+}
+
+.canvas-node__resize-handle--right-top,
+.canvas-node__resize-handle--right-bottom {
   right: -6px;
   cursor: ew-resize;
 }
 
-.canvas-node__resize-handle--bottom {
-  bottom: -6px;
-  cursor: ns-resize;
-}
-
-.canvas-node__resize-handle--left {
+.canvas-node__resize-handle--left-top,
+.canvas-node__resize-handle--left-bottom {
   left: -6px;
   cursor: ew-resize;
 }
 
+.canvas-node__resize-handle--bottom-left,
+.canvas-node__resize-handle--bottom-right {
+  bottom: -6px;
+  cursor: ns-resize;
+}
+
+.canvas-node__resize-handle--left-top,
+.canvas-node__resize-handle--right-top {
+  top: 14px;
+}
+
+.canvas-node__resize-handle--left-bottom,
+.canvas-node__resize-handle--right-bottom {
+  bottom: 14px;
+}
+
 .canvas-node__resize-corner {
   position: absolute;
+  z-index: 2;
   right: 10px;
   bottom: 10px;
   width: 16px;
