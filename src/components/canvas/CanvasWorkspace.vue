@@ -579,6 +579,11 @@
           v-if="editor.bottomToolbarVisible"
           class="bottom-toolbar"
           data-testid="bottom-toolbar"
+          :style="{
+            '--selection-toolbar-tooltip-bg': 'var(--canvas-floating-tooltip-bg)',
+            '--selection-toolbar-tooltip-border': 'var(--canvas-floating-border)',
+            '--selection-toolbar-tooltip-text': 'var(--canvas-floating-tooltip-text)',
+          }"
           @click.stop
           @pointerdown.stop
         >
@@ -1864,6 +1869,9 @@ watch(
 }
 
 .bottom-toolbar {
+  --selection-toolbar-tooltip-bg: var(--canvas-floating-tooltip-bg);
+  --selection-toolbar-tooltip-border: var(--canvas-floating-border);
+  --selection-toolbar-tooltip-text: var(--canvas-floating-tooltip-text);
   position: absolute;
   left: 50%;
   bottom: 20px;
@@ -1880,6 +1888,7 @@ watch(
 }
 
 .bottom-toolbar__button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;

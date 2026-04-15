@@ -1512,6 +1512,7 @@ describe("CanvasWorkspace", () => {
 
     const toolbarText = wrapper.find(".toolbar").text()
     const inspectorText = wrapper.find(".inspector").text()
+    const bottomToolbarStyle = getComputedStyle(wrapper.find("[data-testid='bottom-toolbar']").element as HTMLElement)
 
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("title")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("title")).toBe("打开")
@@ -1534,6 +1535,8 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='bottom-toolbar-group']").attributes("title")).toBe("分组")
     expect(wrapper.find("[data-testid='bottom-toolbar-group']").attributes("aria-label")).toBe("分组")
     expect(wrapper.find("[data-testid='bottom-toolbar-group']").attributes("data-tooltip")).toBe("分组")
+    expect(bottomToolbarStyle.getPropertyValue("--selection-toolbar-tooltip-bg").trim()).not.toBe("")
+    expect(bottomToolbarStyle.getPropertyValue("--selection-toolbar-tooltip-border").trim()).not.toBe("")
     expect(wrapper.find(".workspace__inspector-handle").attributes("title")).toBe("收起侧栏")
     expect(inspectorText).toContain("文档")
     expect(inspectorText).toContain("未保存的工作区路径")
