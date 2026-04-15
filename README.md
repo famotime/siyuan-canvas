@@ -8,19 +8,20 @@ SiYuan Canvas is a SiYuan plugin for importing, editing, and exporting Obsidian 
 - Imports local `.canvas` files for editing inside SiYuan
 - Edits `text`, `file`, `link`, and `group` nodes
 - Creates and edits edges with side anchors and labels
-- Saves back to the workspace or exports a standard `.canvas` file for Obsidian
-- Preserves unknown JSON Canvas fields during parse and export
+- Saves back to the workspace as a standard `.canvas` file
+- Preserves unknown JSON Canvas fields during parse and save
 
 ## Current interaction model
 
 - Open a blank canvas from the top bar or command palette
-- Use the toolbar to open a workspace path, import a local file, save, or export
-- Add nodes from the toolbar
+- Use the top toolbar to start a new canvas, import a local `.canvas` file, or save the current workspace file
+- Activate the canvas surface to reveal the bottom toolbar for adding text, file, connect, and group actions
 - Drag node headers to move cards
 - Drag the bottom-right handle to resize cards
 - Edit node and edge properties in the right inspector
 - Double-click link nodes to open the URL
 - Double-click `.canvas` file nodes to open them in a new plugin tab
+- Use the create-edge dialog or floating edge toolbar to create and adjust connections
 
 ## Development
 
@@ -37,7 +38,8 @@ Set `VITE_SIYUAN_WORKSPACE_PATH` in `.env` if you want `pnpm dev` to build direc
 
 - `src/index.ts` keeps the plugin lifecycle thin and delegates runtime detection, tab wiring, and settings UI to focused helpers in `src/canvas/`.
 - `src/canvas/use-canvas-editor.ts` is the editor composition entry, with file actions, file-node metadata, and pointer gestures split into dedicated `use-canvas-editor-*` modules.
-- `src/components/canvas/CanvasWorkspace.vue` remains the main workspace view, while shared toolbar icons, display helpers, and inline-editing behavior live in `src/components/canvas/*.ts`.
+- `src/components/canvas/CanvasWorkspace.vue` remains the main workspace composition view, with `CanvasFileCard.vue` and `CanvasCreateEdgeDialog.vue` extracting file preview and edge-dialog UI from the large SFC.
+- `src/canvas/file-target-resolution.ts`, `src/canvas/file-target-preview.ts`, and `src/canvas/file-preview-fallbacks.ts` now form the primary file preview pipeline, while older `file-node-*` modules are compatibility adapters.
 - `src/canvas/siyuan-file-node-lookups.ts` contains pure lookup logic for SiYuan document and asset resolution, with runtime SQL access isolated in `src/canvas/siyuan-kernel-file-node-lookups.ts`.
 - `tests/` mirrors the canvas modules with focused Vitest coverage for editor flows, plugin lifecycle, theme sync, display helpers, parsing, geometry, and persistence.
 

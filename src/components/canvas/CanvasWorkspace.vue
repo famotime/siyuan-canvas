@@ -212,69 +212,18 @@
                 />
               </template>
               <template v-else-if="node.type === 'file'">
-                <div
-                  class="file-card"
-                  :title="getFileCardTooltip(node)"
-                >
-                  <span class="file-card__badge">
-                    {{ editor.getFileNodePreview(node).badge }}
-                  </span>
-                  <div
-                    v-if="editor.getFileNodePreview(node).kind === 'canvas' && editor.getFileNodePreview(node).thumbnail"
-                    class="file-card__canvas-preview"
-                  >
-                    <svg
-                      class="file-card__thumbnail"
-                      :viewBox="getCanvasThumbnailViewBox(editor.getFileNodePreview(node).thumbnail)"
-                      preserveAspectRatio="xMidYMid meet"
-                    >
-                      <path
-                        v-for="(edge, edgeIndex) in editor.getFileNodePreview(node).thumbnail?.edges || []"
-                        :key="`thumbnail-edge-${node.id}-${edgeIndex}`"
-                        class="file-card__thumbnail-edge"
-                        :d="`M ${edge.fromX} ${edge.fromY} L ${edge.toX} ${edge.toY}`"
-                      />
-                      <rect
-                        v-for="(thumbnailNode, thumbnailIndex) in editor.getFileNodePreview(node).thumbnail?.nodes || []"
-                        :key="`thumbnail-node-${node.id}-${thumbnailIndex}`"
-                        class="file-card__thumbnail-node"
-                        rx="16"
-                        :height="thumbnailNode.height"
-                        :width="thumbnailNode.width"
-                        :x="thumbnailNode.x"
-                        :y="thumbnailNode.y"
-                      />
-                    </svg>
-                  </div>
-                  <img
-                    v-if="getFileCardImageSource(node)"
-                    :src="getFileCardImageSource(node)"
-                    alt=""
-                    class="file-card__image"
-                    @error="handleFileCardImageError(node)"
-                  >
-                  <div
-                    v-if="shouldShowFileCardHeadline(node)"
-                    class="canvas-node__title"
-                  >
-                    {{ editor.getFileNodePreview(node).headline }}
-                  </div>
-                  <div
-                    v-if="shouldShowFileCardDetail(node)"
-                    class="canvas-node__meta"
-                  >
-                    {{ editor.getFileNodePreview(node).detail }}
-                  </div>
-                  <div
-                    v-if="['block', 'document'].includes(editor.getFileNodePreview(node).kind) && editor.getFileNodePreview(node).previewHtml"
-                    class="file-card__document-preview markdown-preview"
-                    v-html="getFileCardDocumentPreviewHtml(node)"
-                    @error.capture="handleFileCardPreviewImageError(node, $event)"
-                  />
-                  <div class="file-card__helper">
-                    {{ editor.getFileNodePreview(node).helper }}
-                  </div>
-                </div>
+                <CanvasFileCard
+                  :canvas-thumbnail-view-box="getCanvasThumbnailViewBox(editor.getFileNodePreview(node).thumbnail)"
+                  :document-preview-html="getFileCardDocumentPreviewHtml(node)"
+                  :image-src="getFileCardImageSource(node)"
+                  :node="node"
+                  :preview="editor.getFileNodePreview(node)"
+                  :show-detail="shouldShowFileCardDetail(node)"
+                  :show-headline="shouldShowFileCardHeadline(node)"
+                  :tooltip="getFileCardTooltip(node)"
+                  @image-error="handleFileCardImageError"
+                  @preview-image-error="handleFileCardPreviewImageError"
+                />
               </template>
               <template v-else-if="node.type === 'link'">
                 <div class="canvas-node__title">
@@ -1179,169 +1128,12 @@
       </aside>
     </div>
 
-    <div
+    <CanvasCreateEdgeDialog
       v-if="editor.createEdgeDialog.visible"
-      class="canvas-dialog-backdrop"
-      data-testid="create-edge-dialog"
-      @click.self="editor.closeCreateEdgeDialog"
-    >
-      <div class="canvas-dialog">
-        <div class="canvas-dialog__header">
-          <h2>{{ t("createEdgeDialogTitle") }}</h2>
-        </div>
-        <div class="canvas-dialog__field">
-          <span>{{ t("fieldSourceNode") }}</span>
-          <div
-            ref="sourceEdgePickerRef"
-            class="canvas-node-picker"
-          >
-            <button
-              class="canvas-node-picker__trigger canvas-dialog__control"
-              data-testid="create-edge-source-trigger"
-              type="button"
-              @click="toggleEdgeNodePicker('source')"
-            >
-              <span class="canvas-node-picker__trigger-label">{{ getEdgeNodeTriggerLabel('source') }}</span>
-              <span class="canvas-node-picker__trigger-chevron">{{ activeEdgeNodePicker === 'source' ? '▴' : '▾' }}</span>
-            </button>
-            <div
-              v-if="activeEdgeNodePicker === 'source'"
-              class="canvas-node-picker__panel"
-            >
-              <input
-                ref="sourceEdgeSearchRef"
-                v-model="editor.newEdgeSourceQuery"
-                class="canvas-dialog__control canvas-node-picker__search"
-                data-testid="create-edge-source-query"
-                :placeholder="t('fieldSearchNodePlaceholder')"
-              >
-              <div
-                class="canvas-node-picker__options"
-                data-testid="create-edge-source-options"
-              >
-                <button
-                  v-for="node in editor.edgeSources"
-                  :key="node.id"
-                  class="canvas-node-picker__option"
-                  data-testid="create-edge-source-option"
-                  type="button"
-                  @click="selectEdgeNodeOption('source', node.id)"
-                >
-                  {{ editor.getNodeTitle(node) }}
-                </button>
-                <p
-                  v-if="editor.edgeSources.length === 0"
-                  class="canvas-node-picker__empty"
-                >
-                  {{ t("fieldNoMatchingNodes") }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="canvas-dialog__field">
-          <span>{{ t("fieldTarget") }}</span>
-          <div
-            ref="targetEdgePickerRef"
-            class="canvas-node-picker"
-          >
-            <button
-              class="canvas-node-picker__trigger canvas-dialog__control"
-              data-testid="create-edge-target-trigger"
-              type="button"
-              @click="toggleEdgeNodePicker('target')"
-            >
-              <span class="canvas-node-picker__trigger-label">{{ getEdgeNodeTriggerLabel('target') }}</span>
-              <span class="canvas-node-picker__trigger-chevron">{{ activeEdgeNodePicker === 'target' ? '▴' : '▾' }}</span>
-            </button>
-            <div
-              v-if="activeEdgeNodePicker === 'target'"
-              class="canvas-node-picker__panel"
-            >
-              <input
-                ref="targetEdgeSearchRef"
-                v-model="editor.newEdgeTargetQuery"
-                class="canvas-dialog__control canvas-node-picker__search"
-                data-testid="create-edge-target-query"
-                :placeholder="t('fieldSearchNodePlaceholder')"
-              >
-              <div
-                class="canvas-node-picker__options"
-                data-testid="create-edge-target-options"
-              >
-                <button
-                  v-for="node in editor.edgeTargets"
-                  :key="node.id"
-                  class="canvas-node-picker__option"
-                  data-testid="create-edge-target-option"
-                  type="button"
-                  @click="selectEdgeNodeOption('target', node.id)"
-                >
-                  {{ editor.getNodeTitle(node) }}
-                </button>
-                <p
-                  v-if="editor.edgeTargets.length === 0"
-                  class="canvas-node-picker__empty"
-                >
-                  {{ t("fieldNoMatchingNodes") }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <label class="canvas-dialog__field">
-          {{ t("fieldEdgeLabel") }}
-          <input
-            v-model="editor.newEdgeLabel"
-            class="canvas-dialog__control"
-          >
-        </label>
-        <div class="canvas-dialog__row">
-          <label class="canvas-dialog__field">
-            <span>{{ t("fieldFromSide") }}</span>
-            <select
-              v-model="editor.newEdgeFromSide"
-              class="canvas-dialog__control"
-            >
-              <option
-                v-for="side in editor.sides"
-                :key="side"
-                :value="side"
-              >{{ getSideLabel(side) }}</option>
-            </select>
-          </label>
-          <label class="canvas-dialog__field">
-            <span>{{ t("fieldToSide") }}</span>
-            <select
-              v-model="editor.newEdgeToSide"
-              class="canvas-dialog__control"
-            >
-              <option
-                v-for="side in editor.sides"
-                :key="side"
-                :value="side"
-              >{{ getSideLabel(side) }}</option>
-            </select>
-          </label>
-        </div>
-        <div class="canvas-dialog__actions">
-          <button
-            class="toolbar__button"
-            type="button"
-            @click="editor.closeCreateEdgeDialog"
-          >
-            {{ t("dialogCancel") }}
-          </button>
-          <button
-            class="toolbar__button toolbar__button--primary"
-            type="button"
-            @click="editor.submitCreateEdgeDialog"
-          >
-            {{ t("inspectorCreateEdgeAction") }}
-          </button>
-        </div>
-      </div>
-    </div>
+      :editor="editor"
+      :get-side-label="getSideLabel"
+      :t="t"
+    />
 
     <input
       ref="fileInputRef"
@@ -1358,8 +1150,6 @@ import type { Plugin } from "siyuan"
 
 import {
   nextTick,
-  onBeforeUnmount,
-  onMounted,
   ref,
   watch,
 } from "vue"
@@ -1370,6 +1160,8 @@ import {
   SelectionToolbarIcon,
   createSelectionToolbarTooltips,
 } from "@/components/canvas/canvas-selection-toolbar-icon"
+import CanvasCreateEdgeDialog from "@/components/canvas/CanvasCreateEdgeDialog.vue"
+import CanvasFileCard from "@/components/canvas/CanvasFileCard.vue"
 import {
   CLEAR_SELECTION_COLOR,
   getCanvasNodeContentStyle as resolveCanvasNodeContentStyle,
@@ -1383,6 +1175,11 @@ import type {
   CanvasEdge,
   CanvasNode,
 } from "@/canvas/types"
+import {
+  applyFilePreviewImageOverrides,
+  getFilePreviewImageCandidates,
+  getNextFilePreviewImageSource,
+} from "@/canvas/file-preview-fallbacks"
 
 const props = defineProps<{
   bootstrap: CanvasTabBootstrap
@@ -1409,17 +1206,10 @@ const {
   setEditingTextareaRef,
   setSelectionToolbarRef,
 } = useCanvasWorkspaceBehavior(editor)
-type EdgeNodePickerKind = "source" | "target"
-
-const activeEdgeNodePicker = ref<EdgeNodePickerKind | null>(null)
 const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
 const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>>({})
 const hoveredEdgeId = ref("")
-const sourceEdgePickerRef = ref<HTMLElement>()
-const sourceEdgeSearchRef = ref<HTMLInputElement>()
-const targetEdgePickerRef = ref<HTMLElement>()
-const targetEdgeSearchRef = ref<HTMLInputElement>()
 
 function valueFromEvent(event: Event): string {
   return (event.target as HTMLInputElement).value
@@ -1473,63 +1263,6 @@ function clearHoveredEdge(edgeId: string) {
   if (hoveredEdgeId.value === edgeId) {
     hoveredEdgeId.value = ""
   }
-}
-
-function getEdgeNodeTriggerLabel(kind: EdgeNodePickerKind): string {
-  const nodeId = kind === "source" ? editor.newEdgeSourceId : editor.newEdgeTargetId
-  const fallbackLabel = kind === "source" ? t("fieldSelectSourceNode") : t("fieldSelectTargetNode")
-  const node = editor.state.document.nodes.find((candidate) => candidate.id === nodeId)
-  return node ? editor.getNodeTitle(node) : fallbackLabel
-}
-
-function toggleEdgeNodePicker(kind: EdgeNodePickerKind) {
-  const nextValue = activeEdgeNodePicker.value === kind ? null : kind
-  activeEdgeNodePicker.value = nextValue
-
-  if (nextValue === null) {
-    return
-  }
-
-  if (kind === "source") {
-    editor.newEdgeSourceQuery = ""
-  } else {
-    editor.newEdgeTargetQuery = ""
-  }
-
-  void nextTick(() => {
-    if (kind === "source") {
-      sourceEdgeSearchRef.value?.focus()
-      return
-    }
-
-    targetEdgeSearchRef.value?.focus()
-  })
-}
-
-function selectEdgeNodeOption(kind: EdgeNodePickerKind, nodeId: string) {
-  if (kind === "source") {
-    editor.setNewEdgeSourceId(nodeId)
-  } else {
-    editor.setNewEdgeTargetId(nodeId)
-  }
-
-  activeEdgeNodePicker.value = null
-}
-
-function handleWindowPointerDown(event: PointerEvent) {
-  if (!(event.target instanceof HTMLElement)) {
-    activeEdgeNodePicker.value = null
-    return
-  }
-
-  if (
-    sourceEdgePickerRef.value?.contains(event.target)
-    || targetEdgePickerRef.value?.contains(event.target)
-  ) {
-    return
-  }
-
-  activeEdgeNodePicker.value = null
 }
 
 function getInspectorSectionChevron(section: keyof typeof editor.inspectorSectionState): string {
@@ -1587,29 +1320,6 @@ function getCanvasNodeContentStyle(node: CanvasNode) {
   return resolveCanvasNodeContentStyle(node)
 }
 
-function getFileCardImageCandidates(source: string): string[] {
-  const normalized = source.trim().replace(/\\/g, "/")
-  if (!normalized) {
-    return []
-  }
-
-  const candidates = [normalized]
-
-  if (/^\/data\/assets\//i.test(normalized)) {
-    candidates.push(normalized.replace(/^\/data\/assets\//i, "/assets/"))
-  } else if (/^data\/assets\//i.test(normalized)) {
-    candidates.push(`/${normalized}`)
-    candidates.push(normalized.replace(/^data\/assets\//i, "/assets/"))
-  } else if (/^\/assets\//i.test(normalized)) {
-    candidates.push(normalized.replace(/^\/assets\//i, "/data/assets/"))
-  } else if (/^assets\//i.test(normalized)) {
-    candidates.push(`/data/${normalized}`)
-    candidates.push(`/${normalized}`)
-  }
-
-  return [...new Set(candidates.filter(Boolean))]
-}
-
 function getFileCardImageSource(node: CanvasNode): string | undefined {
   if (node.type !== "file") {
     return undefined
@@ -1620,7 +1330,7 @@ function getFileCardImageSource(node: CanvasNode): string | undefined {
     return undefined
   }
 
-  const candidates = getFileCardImageCandidates(preview.imageSrc)
+  const candidates = getFilePreviewImageCandidates(preview.imageSrc)
   const override = fileCardImageOverrides.value[node.id]
   return override && candidates.includes(override) ? override : candidates[0]
 }
@@ -1658,17 +1368,7 @@ function getFileCardDocumentPreviewHtml(node: CanvasNode): string {
   const preview = editor.getFileNodePreview(node)
   const previewHtml = preview.previewHtml || ""
   const overrides = fileCardPreviewImageOverrides.value[node.id]
-  if (!previewHtml || !overrides) {
-    return previewHtml
-  }
-
-  return previewHtml.replace(
-    /(<img\b[^>]*\bsrc=(["']))([^"']+)(\2)/gi,
-    (match, prefix: string, _quote: string, source: string, suffix: string) => {
-      const override = overrides[source]
-      return override ? `${prefix}${override}${suffix}` : match
-    },
-  )
+  return applyFilePreviewImageOverrides(previewHtml, overrides)
 }
 
 function handleFileCardImageError(node: CanvasNode) {
@@ -1681,12 +1381,10 @@ function handleFileCardImageError(node: CanvasNode) {
     return
   }
 
-  const candidates = getFileCardImageCandidates(preview.imageSrc)
   const currentSource = getFileCardImageSource(node)
-  const currentIndex = currentSource ? candidates.indexOf(currentSource) : -1
-  const nextSource = candidates[currentIndex + 1]
+  const nextSource = getNextFilePreviewImageSource(preview.imageSrc, currentSource)
 
-  if (!nextSource || nextSource === currentSource) {
+  if (!nextSource) {
     return
   }
 
@@ -1714,7 +1412,7 @@ function handleFileCardPreviewImageError(node: CanvasNode, event: Event) {
   const storedCandidates = target.dataset.canvasImageCandidates
   const candidates = storedCandidates
     ? JSON.parse(storedCandidates) as string[]
-    : getFileCardImageCandidates(currentSource)
+    : getFilePreviewImageCandidates(currentSource)
   const currentIndex = Number.parseInt(target.dataset.canvasImageCandidateIndex || "", 10)
   const resolvedIndex = Number.isNaN(currentIndex)
     ? candidates.indexOf(currentSource)
@@ -1803,23 +1501,6 @@ function handleEdgeLabelEditorKeydown(event: KeyboardEvent) {
     editor.cancelEdgeLabelEditing()
   }
 }
-
-onMounted(() => {
-  window.addEventListener("pointerdown", handleWindowPointerDown)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener("pointerdown", handleWindowPointerDown)
-})
-
-watch(
-  () => editor.createEdgeDialog.visible,
-  (visible) => {
-    if (!visible) {
-      activeEdgeNodePicker.value = null
-    }
-  },
-)
 
 watch(
   () => editor.editingEdgeLabelId,

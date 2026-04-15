@@ -63,4 +63,15 @@ describe("canvas file node resolution", () => {
     expect(result.title).toBe("legacy.md")
     expect(result.description).toBe("notes/legacy.md")
   })
+
+  it("keeps direct image paths previewable through the legacy file-node resolver", async () => {
+    const result = await resolveCanvasFileNode("/data/storage/maps/roadmap.assets/pasted.png", {
+      resolveAssetByPath: vi.fn(async () => null),
+      resolveDocumentByPath: vi.fn(async () => null),
+    })
+
+    expect(result.kind).toBe("asset")
+    expect(result.asset?.openPath).toBe("/data/storage/maps/roadmap.assets/pasted.png")
+    expect(result.title).toBe("pasted.png")
+  })
 })

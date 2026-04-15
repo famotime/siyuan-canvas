@@ -32,13 +32,15 @@
 - `src/canvas/siyuan-text-gateway.ts`
   Minimal SiYuan file API bridge used by `CanvasFileService`.
 - `src/canvas/file-node-resolution.ts`
-  Normalizes file-node lookup results into canvas-specific `file/document/asset/canvas` metadata.
+  Legacy compatibility adapter that now delegates file-node parsing to `file-target-resolution.ts` and maps results back into the older `file/document/asset/canvas` shape used by compatibility tests.
 - `src/canvas/file-node-preview.ts`
-  Converts resolved file-node metadata into preview card labels and image hints.
+  Compatibility preview wrapper for the older file-node model. Current preview semantics stay aligned with `file-target-preview.ts`.
 - `src/canvas/file-target-resolution.ts`
   Normalizes file-node input from paths and block IDs into document, canvas, image, or fallback targets.
 - `src/canvas/file-target-preview.ts`
   Builds rich preview payloads for document excerpts, canvas thumbnails, and image cards.
+- `src/canvas/file-preview-fallbacks.ts`
+  Shared image-source fallback helpers for file cards and rendered document previews.
 - `src/canvas/file-picker-dialog.ts`
   Groups picker-search results for the bottom-toolbar file action.
 - `src/canvas/workspace-image-files.ts`
@@ -69,7 +71,11 @@
 ## UI Layer
 
 - `src/components/canvas/CanvasWorkspace.vue`
-  Main canvas workspace view. Renders toolbar, stage, floating selection toolbar, and inspector.
+  Main canvas workspace composition view. Renders toolbar, stage, floating selection toolbar, file picker, and inspector while delegating file-card and create-edge dialog markup to child components.
+- `src/components/canvas/CanvasFileCard.vue`
+  Focused file-node card renderer for badges, canvas thumbnails, image previews, and document preview HTML.
+- `src/components/canvas/CanvasCreateEdgeDialog.vue`
+  Dedicated create-edge dialog with embedded source/target node pickers and submission controls.
 - `src/components/canvas/canvas-selection-toolbar-icon.ts`
   Selection toolbar icon map and render component.
 - `src/components/canvas/canvas-workspace-display.ts`
@@ -90,6 +96,12 @@
   Direct editor composition tests for open/import/save/export/conflict/recent-file flows.
 - `tests/canvas-workspace.test.ts`
   Workspace rendering and interaction tests.
+- `tests/canvas-file-card.test.ts`
+  Focused file-card rendering and image/document preview fallback event coverage.
+- `tests/canvas-create-edge-dialog.test.ts`
+  Dedicated create-edge dialog picker and footer-action coverage.
+- `tests/canvas-file-preview-fallbacks.test.ts`
+  Pure helper coverage for preview image candidate generation and HTML source replacement.
 - `tests/canvas-workspace-display.test.ts`
   Pure display helper coverage for color and group-label styling.
 - `tests/canvas-plugin-lifecycle.test.ts`

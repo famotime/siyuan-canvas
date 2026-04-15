@@ -5,6 +5,7 @@ import {
 } from "vitest"
 
 import { createCanvasFileNodePreview } from "@/canvas/file-node-preview"
+import { createCanvasFileTargetPreview } from "@/canvas/file-target-preview"
 
 describe("canvas file node preview", () => {
   it("creates a document preview card", () => {
@@ -57,5 +58,33 @@ describe("canvas file node preview", () => {
     expect(preview.badge).toBe("File")
     expect(preview.headline).toBe("legacy.md")
     expect(preview.detail).toBe("notes/legacy.md")
+  })
+
+  it("stays aligned with the file-target preview shape for asset-like inputs", () => {
+    const preview = createCanvasFileNodePreview({
+      asset: {
+        name: "diagram.png",
+        openPath: "/data/assets/diagram.png",
+        path: "assets/diagram.png",
+        title: "Architecture Diagram",
+      },
+      description: "assets/diagram.png",
+      kind: "asset",
+      path: "/data/assets/diagram.png",
+      title: "Architecture Diagram",
+    })
+
+    const targetPreview = createCanvasFileTargetPreview({
+      kind: "asset",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Architecture Diagram",
+    })
+
+    expect(preview.badge).toBe(targetPreview.badge)
+    expect(preview.headline).toBe(targetPreview.headline)
+    expect(preview.detail).toBe(targetPreview.detail)
+    expect(preview.helper).toBe(targetPreview.helper)
+    expect(preview.imageSrc).toBe(targetPreview.imageSrc)
   })
 })

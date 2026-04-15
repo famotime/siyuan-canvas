@@ -24,9 +24,9 @@
 | ID | 优先级 | 模块/场景 | 涉及文件 | 重构目标 | 风险等级 | 重构前测试清单 | 文档影响 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | RF-001 | P0 | 拆分编辑器主编排层 | `src/canvas/use-canvas-editor.ts`，以及新增/调整 `src/canvas/use-canvas-editor-*.ts` 辅助模块、相关 tests | 把文件选择与节点激活、节点/边编辑命令、生命周期与快捷键等职责从 `use-canvas-editor.ts` 中继续拆出，令主入口只保留装配与绑定 | 高 | - [x] `pnpm test -- tests/canvas-use-editor-actions.test.ts` 保护打开/保存/最近文件/文件节点行为；- [x] `pnpm test -- tests/canvas-editor-gestures.test.ts` 保护手势；- [x] `pnpm test -- tests/canvas-editor-bindings.test.ts` 保护返回接口；- [x] `pnpm test` 验证全量回归 | `docs/project-structure.md` 需要更新 editor 编排分层；`README.md` 需要更新项目结构说明 | done |
-| RF-002 | P0 | 拆分工作区视图层 | `src/components/canvas/CanvasWorkspace.vue`，以及新增工作区子组件/预览组件/对话框组件，相关 tests | 把文件卡片预览、创建连线对话框、底部工具栏或 Inspector 等高耦合视图片区块拆成更小组件，缩减单一 SFC 的模板和状态耦合 | 高 | - [ ] `pnpm test -- tests/canvas-workspace.test.ts` 先补/调整工作区回归用例；- [ ] 覆盖 file card、document preview、dialog、toolbar 的渲染与事件透传；- [ ] `pnpm test` | `docs/project-structure.md` 需要更新组件树与职责映射；`README.md` 需要更新 UI 分层说明 | in_progress |
-| RF-003 | P1 | 收敛文件预览解析模型 | `src/canvas/file-node-resolution.ts`、`src/canvas/file-node-preview.ts`、`src/canvas/file-target-resolution.ts`、`src/canvas/file-target-preview.ts`、`src/canvas/use-canvas-editor-file-nodes.ts`、相关 tests | 合并或明确 `file-node-*` 与 `file-target-*` 两套模型的边界，减少重复 badge/detail/imageSrc 组装逻辑，为后续 file node 行为扩展提供单一数据通路 | 中 | - [ ] `pnpm test -- tests/canvas-file-node-resolution.test.ts tests/canvas-file-node-preview.test.ts tests/canvas-file-target-resolution.test.ts tests/canvas-file-target-preview.test.ts`; - [ ] `pnpm test -- tests/canvas-use-editor-actions.test.ts`; - [ ] `pnpm test -- tests/canvas-workspace.test.ts` | `docs/project-structure.md` 需要更新 file preview/resolution 链路；`README.md` 如对外结构描述变化则同步 | pending |
-| RF-004 | P2 | 提炼共享预览图片与 HTML 兜底逻辑 | `src/components/canvas/CanvasWorkspace.vue`、`src/canvas/markdown-preview.ts` 或新增共享 helper、相关 tests | 把 file card 图片路径候选与 document preview 图片回退逻辑抽成可复用 helper，减少 UI 内联字符串替换与状态散落 | 中 | - [ ] `pnpm test -- tests/canvas-workspace.test.ts`; - [ ] `pnpm test -- tests/canvas-markdown-preview.test.ts`; - [ ] `pnpm test` | `docs/project-structure.md` 需要补充预览辅助模块；`README.md` 通常仅小幅调整 | pending |
+| RF-002 | P0 | 拆分工作区视图层 | `src/components/canvas/CanvasWorkspace.vue`、`src/components/canvas/CanvasFileCard.vue`、`src/components/canvas/CanvasCreateEdgeDialog.vue`、相关 tests | 把文件卡片预览、创建连线对话框、底部工具栏或 Inspector 等高耦合视图片区块拆成更小组件，缩减单一 SFC 的模板和状态耦合 | 高 | - [x] `corepack pnpm test -- tests/canvas-file-card.test.ts` 覆盖 file card 渲染与图片回退事件；- [x] `corepack pnpm test -- tests/canvas-create-edge-dialog.test.ts` 覆盖 dialog 渲染与节点选择；- [x] `corepack pnpm test -- tests/canvas-workspace.test.ts`; - [x] `corepack pnpm test` | `docs/project-structure.md` 已更新组件树与职责映射；`README.md` 已更新 UI 分层说明 | done |
+| RF-003 | P1 | 收敛文件预览解析模型 | `src/canvas/file-node-resolution.ts`、`src/canvas/file-node-preview.ts`、`src/canvas/file-target-resolution.ts`、`src/canvas/file-target-preview.ts`、`src/canvas/use-canvas-editor-file-nodes.ts`、相关 tests | 合并或明确 `file-node-*` 与 `file-target-*` 两套模型的边界，减少重复 badge/detail/imageSrc 组装逻辑，为后续 file node 行为扩展提供单一数据通路 | 中 | - [x] `corepack pnpm test -- tests/canvas-file-node-resolution.test.ts`; - [x] `corepack pnpm test -- tests/canvas-file-node-preview.test.ts tests/canvas-file-target-resolution.test.ts tests/canvas-file-target-preview.test.ts`; - [x] `corepack pnpm test -- tests/canvas-use-editor-actions.test.ts tests/canvas-workspace.test.ts`; - [x] `corepack pnpm test` | `docs/project-structure.md` 已更新 file preview/resolution 链路；`README.md` 已同步结构说明 | done |
+| RF-004 | P2 | 提炼共享预览图片与 HTML 兜底逻辑 | `src/components/canvas/CanvasWorkspace.vue`、`src/canvas/file-preview-fallbacks.ts`、相关 tests | 把 file card 图片路径候选与 document preview 图片回退逻辑抽成可复用 helper，减少 UI 内联字符串替换与状态散落 | 中 | - [x] `corepack pnpm test -- tests/canvas-file-preview-fallbacks.test.ts`; - [x] `corepack pnpm test -- tests/canvas-workspace.test.ts tests/canvas-markdown-preview.test.ts`; - [x] `corepack pnpm test` | `docs/project-structure.md` 已补充预览辅助模块；`README.md` 已同步结构说明 | done |
 
 优先级说明：
 - `P0`：价值和风险都最高，优先执行
@@ -45,9 +45,9 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | BASELINE | 2026-04-14 | 2026-04-14 | `pnpm test` | pass | 未开始 | 23 个测试文件，189 个测试通过，作为重构前基线 |
 | RF-001 | 2026-04-14 | 2026-04-14 | `pnpm test -- tests/canvas-editor-shortcuts.test.ts`; `pnpm test -- tests/canvas-use-editor-actions.test.ts`; `pnpm test -- tests/canvas-selection-toolbar.test.ts`; `pnpm test -- tests/canvas-editor-gestures.test.ts`; `pnpm test -- tests/canvas-editor-bindings.test.ts`; `pnpm test` | pass | `docs/project-structure.md`、`README.md` | 新增 `use-canvas-editor-shortcuts.ts`、`use-canvas-editor-file-picker.ts`、`use-canvas-editor-node-activation.ts`、`use-canvas-editor-node-edge-actions.ts`、`use-canvas-editor-lifecycle.ts`；`use-canvas-editor.ts` 从 42148 B 缩减到 27323 B |
-| RF-002 | 2026-04-14 |  | `pnpm test -- tests/canvas-workspace.test.ts` | in_progress | `docs/project-structure.md`、`README.md` | 执行中；准备先补工作区拆分回归测试 |
-| RF-003 |  |  | `pnpm test -- tests/canvas-file-node-resolution.test.ts tests/canvas-file-node-preview.test.ts tests/canvas-file-target-resolution.test.ts tests/canvas-file-target-preview.test.ts` | pending | `docs/project-structure.md`、`README.md` | 待批准 |
-| RF-004 |  |  | `pnpm test -- tests/canvas-workspace.test.ts tests/canvas-markdown-preview.test.ts` | pending | `docs/project-structure.md`、`README.md` | 待批准 |
+| RF-002 | 2026-04-14 | 2026-04-15 | `corepack pnpm test -- tests/canvas-file-card.test.ts`; `corepack pnpm test -- tests/canvas-create-edge-dialog.test.ts`; `corepack pnpm test -- tests/canvas-workspace.test.ts`; `corepack pnpm test` | pass | `docs/project-structure.md`、`README.md` | 新增 `CanvasFileCard.vue`、`CanvasCreateEdgeDialog.vue`；`CanvasWorkspace.vue` 去除了 file card 与 create-edge dialog 的内联模板与窗口级 picker 状态 |
+| RF-003 | 2026-04-15 | 2026-04-15 | `corepack pnpm test -- tests/canvas-file-node-resolution.test.ts`; `corepack pnpm test -- tests/canvas-file-node-preview.test.ts tests/canvas-file-target-resolution.test.ts tests/canvas-file-target-preview.test.ts`; `corepack pnpm test -- tests/canvas-use-editor-actions.test.ts tests/canvas-workspace.test.ts`; `corepack pnpm test` | pass | `docs/project-structure.md`、`README.md` | `file-node-resolution.ts` 改为委托 `file-target-resolution.ts`，保留兼容返回形状；补齐 legacy resolver 对直链图片路径的回归保护 |
+| RF-004 | 2026-04-15 | 2026-04-15 | `corepack pnpm test -- tests/canvas-file-preview-fallbacks.test.ts`; `corepack pnpm test -- tests/canvas-workspace.test.ts tests/canvas-markdown-preview.test.ts`; `corepack pnpm test` | pass | `docs/project-structure.md`、`README.md` | 新增 `file-preview-fallbacks.ts`，提取 file card 图片候选与预览 HTML 图片回退 helper，`CanvasWorkspace.vue` 只保留状态装配 |
 
 ## 5. 决策与确认
 
@@ -57,12 +57,12 @@
 
 ## 6. 文档刷新
 
-- `docs/project-structure.md`：待获批条目完成后刷新
-- `README.md`：待获批条目完成后刷新
-- 最终同步检查：未开始
+- `docs/project-structure.md`：已刷新，补充工作区子组件、文件预览解析边界和预览 fallback helper
+- `README.md`：已刷新，纠正当前交互模型与 UI 分层说明
+- 最终同步检查：已完成
 
 ## 7. 下一步
 
-1. 由用户明确批准要执行的条目 ID（例如：`RF-001`、`RF-001 RF-002`）
-2. 对获批的第一个条目先补充/调整测试并跑定向验证
-3. 在定向测试通过后实施对应重构，并同步回写本计划与文档刷新状态
+1. 已完成 `RF-001` 到 `RF-004` 的计划条目
+2. 如需继续压缩工作区复杂度，可在后续轮次考虑拆分 inspector 区块与 floating toolbar
+3. 后续新增 file preview 能力时，优先沿用 `file-target-*` 与 `file-preview-fallbacks.ts` 的单一路径

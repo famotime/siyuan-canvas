@@ -1,3 +1,8 @@
+import {
+  resolveCanvasFileTarget,
+  type CanvasFileTargetLookups,
+} from "@/canvas/file-target-resolution"
+
 export interface ResolvedCanvasDocument {
   hpath: string
   id: string
@@ -45,32 +50,104 @@ export async function resolveCanvasFileNode(
   path: string,
   lookups: ResolveCanvasFileNodeLookups,
 ): Promise<ResolvedCanvasFileNode> {
-  const fallback = createFallbackCanvasFileNode(path)
-  if (fallback.kind === "canvas") {
-    return fallback
+  const targetLookups: CanvasFileTargetLookups = {
+    resolveBlockById: async () => null,
+    resolveCanvasByPath: async (candidatePath) => {
+      const trimmed = candidatePath.trim()
+      if (!trimmed.endsWith(".canvas")) {
+        return null
+      }
+
+      return {
+        kind: "canvas",
+        path: trimmed,
+        title: getFileName(trimmed),
+      }
+    },
+    resolveDocumentByBlockId: async () => null,
+    resolveDocumentByPath: async (candidatePath) => {
+      const document = await lookups.resolveDocumentByPath(candidatePath)
+      return document
+        ? {
+            hpath: document.hpath,
+            id: document.id,
+            kind: "document" as const,
+            path: document.path,
+            title: document.title,
+          }
+        : null
+    },
+    resolveImageByBlockId: async () => null,
+    resolveImageByPath: async (candidatePath) => {
+      const asset = await lookups.resolveAssetByPath(candidatePath)
+      return asset
+        ? {
+            blockId: asset.blockId,
+            kind: "image" as const,
+            openPath: asset.openPath,
+            path: asset.path,
+            title: asset.title || asset.name,
+          }
+        : null
+    },
   }
 
-  const document = await lookups.resolveDocumentByPath(path)
-  if (document) {
-    return {
-      description: document.hpath || document.path,
-      document,
-      kind: "document",
-      path,
-      title: document.title || getFileName(document.path),
-    }
-  }
+  const resolved = await resolveCanvasFileTarget(path, targetLookups)
 
-  const asset = await lookups.resolveAssetByPath(path)
-  if (asset) {
-    return {
-      asset,
-      description: asset.path,
-      kind: "asset",
-      path,
-      title: asset.title || asset.name,
-    }
+  switch (resolved.kind) {
+    case "document":
+      return {
+        description: resolved.hpath || resolved.path,
+        document: {
+          hpath: resolved.hpath,
+          id: resolved.id,
+          path: resolved.path,
+          title: resolved.title,
+        },
+        kind: "document",
+        path,
+        title: resolved.title || getFileName(resolved.path),
+      }
+    case "canvas":
+      return {
+        description: resolved.path,
+        kind: "canvas",
+        path,
+        title: resolved.title || getFileName(resolved.path),
+      }
+    case "image":
+      return {
+        asset: {
+          blockId: resolved.blockId,
+          name: resolved.title || getFileName(resolved.path),
+          openPath: resolved.openPath,
+          path: resolved.path,
+          title: resolved.title,
+        },
+        description: resolved.path,
+        kind: "asset",
+        path,
+        title: resolved.title || getFileName(resolved.path),
+      }
+    case "block":
+      return {
+        description: resolved.hpath || resolved.path,
+        document: {
+          hpath: resolved.hpath,
+          id: resolved.rootId,
+          path: resolved.path,
+          title: resolved.title,
+        },
+        kind: "document",
+        path,
+        title: resolved.title || getFileName(resolved.path),
+      }
+    default:
+      return {
+        description: resolved.path,
+        kind: "file",
+        path,
+        title: resolved.title || getFileName(resolved.path),
+      }
   }
-
-  return fallback
 }
