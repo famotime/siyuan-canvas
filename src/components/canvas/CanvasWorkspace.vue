@@ -425,6 +425,8 @@
           <button
             class="selection-toolbar__button"
             data-testid="edge-toolbar-delete"
+            :aria-label="SELECTION_TOOLBAR_TOOLTIPS.delete"
+            :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.delete"
             :title="SELECTION_TOOLBAR_TOOLTIPS.delete"
             type="button"
             @click.stop="editor.deleteSelection"
@@ -436,6 +438,8 @@
               class="selection-toolbar__button"
               :class="{ 'selection-toolbar__button--active': editor.edgeToolbarPopover === 'color' }"
               data-testid="edge-toolbar-color"
+              :aria-label="SELECTION_TOOLBAR_TOOLTIPS.color"
+              :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.color"
               :title="SELECTION_TOOLBAR_TOOLTIPS.color"
               type="button"
               @click.stop="editor.toggleEdgePopover('color')"
@@ -471,6 +475,8 @@
           <button
             class="selection-toolbar__button"
             data-testid="edge-toolbar-center"
+            :aria-label="SELECTION_TOOLBAR_TOOLTIPS.center"
+            :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.center"
             :title="SELECTION_TOOLBAR_TOOLTIPS.center"
             type="button"
             @click.stop="editor.centerEdgeInViewport"
@@ -486,6 +492,8 @@
               :class="{ 'selection-toolbar__button--active': editor.edgeToolbarPopover === 'direction' }"
               data-testid="edge-toolbar-direction-trigger"
               type="button"
+              :aria-label="t('edgeToolbarDirection')"
+              :data-tooltip="t('edgeToolbarDirection')"
               :title="t('edgeToolbarDirection')"
               @click.stop="editor.toggleEdgePopover('direction')"
             >
@@ -542,6 +550,8 @@
           <button
             class="selection-toolbar__button"
             data-testid="edge-toolbar-edit-label"
+            :aria-label="t('edgeToolbarEditLabel')"
+            :data-tooltip="t('edgeToolbarEditLabel')"
             :title="t('edgeToolbarEditLabel')"
             type="button"
             @click.stop="editor.startEdgeLabelEditing"
@@ -576,6 +586,7 @@
             class="bottom-toolbar__button"
             data-testid="bottom-toolbar-text"
             :aria-label="t('bottomToolbarText')"
+            :data-tooltip="t('bottomToolbarText')"
             :title="t('bottomToolbarText')"
             type="button"
             @click.stop="editor.addNode('text')"
@@ -589,6 +600,7 @@
             class="bottom-toolbar__button"
             data-testid="bottom-toolbar-file"
             :aria-label="t('bottomToolbarFile')"
+            :data-tooltip="t('bottomToolbarFile')"
             :title="t('bottomToolbarFile')"
             type="button"
             @click.stop="editor.openFilePickerDialog"
@@ -602,6 +614,7 @@
             class="bottom-toolbar__button"
             data-testid="bottom-toolbar-connect"
             :aria-label="t('bottomToolbarConnect')"
+            :data-tooltip="t('bottomToolbarConnect')"
             :title="t('bottomToolbarConnect')"
             type="button"
             @click.stop="editor.openCreateEdgeDialog"
@@ -615,6 +628,7 @@
             class="bottom-toolbar__button"
             data-testid="bottom-toolbar-group"
             :aria-label="t('bottomToolbarGroup')"
+            :data-tooltip="t('bottomToolbarGroup')"
             :title="t('bottomToolbarGroup')"
             type="button"
             @click.stop="editor.addNode('group')"
@@ -2011,6 +2025,7 @@ watch(
 }
 
 .toolbar__button[data-tooltip]::after,
+.bottom-toolbar__button[data-tooltip]::after,
 .selection-toolbar__button::after,
 .selection-toolbar__menu-button::after {
   content: attr(data-tooltip);
@@ -2037,6 +2052,8 @@ watch(
 
 .toolbar__button[data-tooltip]:hover::after,
 .toolbar__button[data-tooltip]:focus-visible::after,
+.bottom-toolbar__button[data-tooltip]:hover::after,
+.bottom-toolbar__button[data-tooltip]:focus-visible::after,
 .selection-toolbar__button:hover::after,
 .selection-toolbar__button:focus-visible::after,
 .selection-toolbar__menu-button:hover::after,
