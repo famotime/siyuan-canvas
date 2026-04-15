@@ -467,9 +467,27 @@ describe("CanvasWorkspace", () => {
 
     const toolbarText = wrapper.find(".toolbar").text()
 
-    expect(toolbarText).toContain("新建")
-    expect(toolbarText).toContain("打开")
-    expect(toolbarText).toContain("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("title")).toBe("新建")
+    expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("title")).toBe("打开")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("title")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("title")).toBe("缩小")
+    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("title")).toBe("重置缩放")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("title")).toBe("放大")
+    expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("aria-label")).toBe("新建")
+    expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("aria-label")).toBe("打开")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-new'] .toolbar__icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='top-toolbar-open'] .toolbar__icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='top-toolbar-save'] .toolbar__icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out'] .toolbar__icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport'] .toolbar__icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in'] .toolbar__icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='top-toolbar-scale-value']").text()).toBe("100%")
+    expect(wrapper.find("[data-testid='top-toolbar-new']").text()).toBe("")
+    expect(wrapper.find("[data-testid='top-toolbar-open']").text()).toBe("")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").text()).toBe("")
+    expect(toolbarText).not.toContain("新建")
+    expect(toolbarText).not.toContain("打开")
     expect(toolbarText).not.toContain("导出")
     expect(toolbarText).not.toContain("设置")
     expect(toolbarText).not.toContain("文本")
@@ -477,6 +495,28 @@ describe("CanvasWorkspace", () => {
     expect(toolbarText).not.toContain("链接")
     expect(toolbarText).not.toContain("分组")
     expect(toolbarText).not.toContain("删除")
+  })
+
+  it("keeps the current zoom percentage between zoom controls and moves reset to the far right", () => {
+    currentEditor = createEditorMock()
+    currentEditor.viewport.scale = 1.37
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const zoomGroup = wrapper.findAll(".toolbar__group")[1]
+    const zoomChildren = zoomGroup?.element.children
+
+    expect(wrapper.find("[data-testid='top-toolbar-scale-value']").text()).toBe("137%")
+    expect(zoomChildren?.[0]?.getAttribute("data-testid")).toBe("top-toolbar-zoom-out")
+    expect(zoomChildren?.[1]?.getAttribute("data-testid")).toBe("top-toolbar-scale-value")
+    expect(zoomChildren?.[2]?.getAttribute("data-testid")).toBe("top-toolbar-zoom-in")
+    expect(zoomChildren?.[3]?.getAttribute("data-testid")).toBe("top-toolbar-reset-viewport")
   })
 
   it("wires stage interaction to canvas-surface activation and renders the bottom toolbar when active", async () => {
@@ -1048,6 +1088,7 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='selection-layout-action-left-align']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-layout-action-left-align']").attributes("title")).toBe("Left align")
     expect(wrapper.find("[data-testid='selection-layout-action-left-align'] .selection-toolbar__menu-icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-layout-action-left-align']").text()).toContain("Left align")
 
     await wrapper.find("[data-testid='selection-layout-action-left-align']").trigger("click")
 
@@ -1269,6 +1310,12 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='edge-toolbar-direction-trigger']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='edge-direction-menu']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='edge-toolbar-edit-label']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-none'] .selection-toolbar__menu-icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-single'] .selection-toolbar__menu-icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-both'] .selection-toolbar__menu-icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-none']").text()).toContain("无方向")
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-single']").text()).toContain("单向")
+    expect(wrapper.find("[data-testid='edge-toolbar-direction-both']").text()).toContain("双向")
     expect(wrapper.find("[data-testid='edge-toolbar-direction-single']").classes()).toContain("selection-toolbar__menu-button--active")
     expect(wrapper.find("[data-testid='edge-toolbar-direction-none']").classes()).not.toContain("selection-toolbar__menu-button--active")
 
@@ -1444,9 +1491,12 @@ describe("CanvasWorkspace", () => {
     const toolbarText = wrapper.find(".toolbar").text()
     const inspectorText = wrapper.find(".inspector").text()
 
-    expect(toolbarText).toContain("新建")
-    expect(toolbarText).toContain("打开")
-    expect(toolbarText).toContain("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("title")).toBe("新建")
+    expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("title")).toBe("打开")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("title")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("title")).toBe("缩小")
+    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("title")).toBe("重置缩放")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("title")).toBe("放大")
     expect(toolbarText).toContain("未命名.canvas")
     expect(toolbarText).toContain("1 个节点 / 0 条连线")
     expect(toolbarText).toContain("已保存")

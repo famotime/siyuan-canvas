@@ -10,42 +10,96 @@
     >
       <div class="toolbar__group">
         <button
-          class="toolbar__button toolbar__button--primary"
+          class="toolbar__button toolbar__button--icon toolbar__button--primary"
+          data-testid="top-toolbar-new"
+          :aria-label="t('toolbarNew')"
+          :data-tooltip="t('toolbarNew')"
+          :title="t('toolbarNew')"
+          type="button"
           @click="editor.newCanvas"
         >
-          {{ t("toolbarNew") }}
+          <CanvasIcon
+            class="toolbar__icon"
+            name="new"
+          />
         </button>
         <button
-          class="toolbar__button"
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-open"
+          :aria-label="t('toolbarOpen')"
+          :data-tooltip="t('toolbarOpen')"
+          :title="t('toolbarOpen')"
+          type="button"
           @click="editor.triggerImport"
         >
-          {{ t("toolbarOpen") }}
+          <CanvasIcon
+            class="toolbar__icon"
+            name="open"
+          />
         </button>
         <button
-          class="toolbar__button"
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-save"
+          :aria-label="t('toolbarSave')"
+          :data-tooltip="t('toolbarSave')"
+          :title="t('toolbarSave')"
+          type="button"
           @click="editor.save"
         >
-          {{ t("toolbarSave") }}
+          <CanvasIcon
+            class="toolbar__icon"
+            name="save"
+          />
         </button>
       </div>
       <div class="toolbar__group">
         <button
-          class="toolbar__button"
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-zoom-out"
+          :aria-label="t('toolbarZoomOut')"
+          :data-tooltip="t('toolbarZoomOut')"
+          :title="t('toolbarZoomOut')"
+          type="button"
           @click="editor.zoomOut"
         >
-          -
+          <CanvasIcon
+            class="toolbar__icon"
+            name="zoom-out"
+          />
         </button>
-        <button
-          class="toolbar__button toolbar__button--stat"
-          @click="editor.resetViewport"
+        <span
+          class="toolbar__stat"
+          data-testid="top-toolbar-scale-value"
         >
           {{ Math.round(editor.viewport.scale * 100) }}%
-        </button>
+        </span>
         <button
-          class="toolbar__button"
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-zoom-in"
+          :aria-label="t('toolbarZoomIn')"
+          :data-tooltip="t('toolbarZoomIn')"
+          :title="t('toolbarZoomIn')"
+          type="button"
           @click="editor.zoomIn"
         >
-          +
+          <CanvasIcon
+            class="toolbar__icon"
+            name="zoom-in"
+          />
+        </button>
+        <button
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-reset-viewport"
+          :aria-label="t('toolbarResetViewport')"
+          :data-tooltip="t('toolbarResetViewport')"
+          :title="t('toolbarResetViewport')"
+          type="button"
+          @click="editor.resetViewport"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="reset-viewport"
+          />
         </button>
       </div>
       <div class="toolbar__meta">
@@ -375,7 +429,7 @@
             type="button"
             @click.stop="editor.deleteSelection"
           >
-            <SelectionToolbarIcon class="selection-toolbar__icon" name="delete" />
+              <CanvasIcon class="selection-toolbar__icon" name="delete" />
           </button>
           <div class="selection-toolbar__menu">
             <button
@@ -386,7 +440,7 @@
               type="button"
               @click.stop="editor.toggleEdgePopover('color')"
             >
-              <SelectionToolbarIcon class="selection-toolbar__icon" name="color" />
+              <CanvasIcon class="selection-toolbar__icon" name="color" />
             </button>
             <div
               v-if="editor.edgeToolbarPopover === 'color'"
@@ -421,7 +475,7 @@
             type="button"
             @click.stop="editor.centerEdgeInViewport"
           >
-            <SelectionToolbarIcon class="selection-toolbar__icon" name="center" />
+            <CanvasIcon class="selection-toolbar__icon" name="center" />
           </button>
           <div
             class="selection-toolbar__menu"
@@ -435,7 +489,7 @@
               :title="t('edgeToolbarDirection')"
               @click.stop="editor.toggleEdgePopover('direction')"
             >
-              <SelectionToolbarIcon class="selection-toolbar__icon" name="connect" />
+              <CanvasIcon class="selection-toolbar__icon" name="connect" />
             </button>
             <div
               v-if="editor.edgeToolbarPopover === 'direction'"
@@ -451,6 +505,10 @@
                 type="button"
                 @click.stop="editor.updateSelectedEdgeDirection('none')"
               >
+                <CanvasIcon
+                  class="selection-toolbar__menu-icon"
+                  :name="EDGE_DIRECTION_ICON_NAMES.none"
+                />
                 {{ t("edgeDirectionNone") }}
               </button>
               <button
@@ -460,6 +518,10 @@
                 type="button"
                 @click.stop="editor.updateSelectedEdgeDirection('single')"
               >
+                <CanvasIcon
+                  class="selection-toolbar__menu-icon"
+                  :name="EDGE_DIRECTION_ICON_NAMES.single"
+                />
                 {{ t("edgeDirectionSingle") }}
               </button>
               <button
@@ -469,6 +531,10 @@
                 type="button"
                 @click.stop="editor.updateSelectedEdgeDirection('both')"
               >
+                <CanvasIcon
+                  class="selection-toolbar__menu-icon"
+                  :name="EDGE_DIRECTION_ICON_NAMES.both"
+                />
                 {{ t("edgeDirectionBoth") }}
               </button>
             </div>
@@ -480,7 +546,7 @@
             type="button"
             @click.stop="editor.startEdgeLabelEditing"
           >
-            <SelectionToolbarIcon class="selection-toolbar__icon" name="edit" />
+            <CanvasIcon class="selection-toolbar__icon" name="edit" />
           </button>
         </div>
 
@@ -514,7 +580,7 @@
             type="button"
             @click.stop="editor.addNode('text')"
           >
-            <SelectionToolbarIcon
+            <CanvasIcon
               class="bottom-toolbar__icon"
               name="text"
             />
@@ -527,7 +593,7 @@
             type="button"
             @click.stop="editor.openFilePickerDialog"
           >
-            <SelectionToolbarIcon
+            <CanvasIcon
               class="bottom-toolbar__icon"
               name="file"
             />
@@ -540,7 +606,7 @@
             type="button"
             @click.stop="editor.openCreateEdgeDialog"
           >
-            <SelectionToolbarIcon
+            <CanvasIcon
               class="bottom-toolbar__icon"
               name="connect"
             />
@@ -553,7 +619,7 @@
             type="button"
             @click.stop="editor.addNode('group')"
           >
-            <SelectionToolbarIcon
+            <CanvasIcon
               class="bottom-toolbar__icon"
               name="group"
             />
@@ -586,7 +652,7 @@
             type="button"
             @click.stop="editor.deleteSelection"
           >
-            <SelectionToolbarIcon
+            <CanvasIcon
               class="selection-toolbar__icon"
               name="delete"
             />
@@ -602,7 +668,7 @@
               type="button"
               @click.stop="editor.toggleSelectionPopover('color')"
             >
-              <SelectionToolbarIcon
+              <CanvasIcon
                 class="selection-toolbar__icon"
                 name="color"
               />
@@ -644,7 +710,7 @@
             type="button"
             @click.stop="editor.centerSelectionInViewport"
           >
-            <SelectionToolbarIcon
+            <CanvasIcon
               class="selection-toolbar__icon"
               name="center"
             />
@@ -659,7 +725,7 @@
             type="button"
             @click.stop="handleToolbarEdit"
           >
-            <SelectionToolbarIcon
+            <CanvasIcon
               class="selection-toolbar__icon"
               name="edit"
             />
@@ -674,7 +740,7 @@
               type="button"
               @click.stop="editor.createGroupFromSelection"
             >
-              <SelectionToolbarIcon
+              <CanvasIcon
                 class="selection-toolbar__icon"
                 name="group"
               />
@@ -690,7 +756,7 @@
                 type="button"
                 @click.stop="editor.toggleSelectionPopover('layout')"
               >
-                <SelectionToolbarIcon
+                <CanvasIcon
                   class="selection-toolbar__icon"
                   name="align"
                 />
@@ -712,7 +778,7 @@
                   type="button"
                   @click.stop="editor.applySelectionLayout(layoutAction.action)"
                 >
-                  <SelectionToolbarIcon
+                  <CanvasIcon
                     class="selection-toolbar__menu-icon"
                     :name="SELECTION_LAYOUT_ICON_NAMES[layoutAction.action]"
                   />
@@ -1156,8 +1222,11 @@ import {
 import type { CanvasTabBootstrap } from "@/main"
 import { useCanvasEditor } from "@/canvas/use-canvas-editor"
 import {
+  CanvasIcon,
+} from "@/components/canvas/canvas-icon"
+import {
+  EDGE_DIRECTION_ICON_NAMES,
   SELECTION_LAYOUT_ICON_NAMES,
-  SelectionToolbarIcon,
   createSelectionToolbarTooltips,
 } from "@/components/canvas/canvas-selection-toolbar-icon"
 import CanvasCreateEdgeDialog from "@/components/canvas/CanvasCreateEdgeDialog.vue"
@@ -1612,6 +1681,7 @@ watch(
 }
 
 .toolbar__button {
+  position: relative;
   border: 1px solid var(--canvas-border);
   border-radius: 999px;
   background: var(--canvas-surface);
@@ -1623,6 +1693,15 @@ watch(
     border-color 120ms ease,
     background-color 120ms ease,
     color 120ms ease;
+}
+
+.toolbar__button--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
 }
 
 .toolbar__button:hover:not(:disabled) {
@@ -1641,8 +1720,24 @@ watch(
   color: var(--canvas-accent-contrast);
 }
 
-.toolbar__button--stat {
-  min-width: 72px;
+.toolbar__icon {
+  display: inline-flex;
+  color: inherit;
+}
+
+.toolbar__icon :deep(svg) {
+  display: block;
+}
+
+.toolbar__stat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--canvas-text-muted);
 }
 
 .toolbar__dirty {
@@ -1902,6 +1997,7 @@ watch(
   background: var(--selection-toolbar-button-bg-hover);
 }
 
+.toolbar__button[data-tooltip]::after,
 .selection-toolbar__button::after,
 .selection-toolbar__menu-button::after {
   content: attr(data-tooltip);
@@ -1926,6 +2022,8 @@ watch(
     transform 120ms ease;
 }
 
+.toolbar__button[data-tooltip]:hover::after,
+.toolbar__button[data-tooltip]:focus-visible::after,
 .selection-toolbar__button:hover::after,
 .selection-toolbar__button:focus-visible::after,
 .selection-toolbar__menu-button:hover::after,
