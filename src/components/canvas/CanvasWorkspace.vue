@@ -1393,7 +1393,9 @@ function getEdgeLabelStyle(edge: CanvasEdge) {
 }
 
 function getCanvasNodeStyle(node: CanvasNode) {
-  return buildCanvasNodeStyle(node, editor.getNodeStyle(node))
+  return buildCanvasNodeStyle(node, editor.getNodeStyle(node), {
+    selected: editor.state.selectedNodeIds.includes(node.id),
+  })
 }
 
 function getCanvasNodeContentStyle(node: CanvasNode) {

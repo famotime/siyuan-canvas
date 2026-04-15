@@ -90,11 +90,18 @@ export function getSelectionColorStyle(color: string) {
 export function getCanvasNodeStyle(
   node: CanvasNode,
   baseStyle: Record<string, string>,
+  options: {
+    selected?: boolean
+  } = {},
 ) {
   const colorStyle = "color" in node && node.color ? selectionColorStyles[node.color] : undefined
+  const zIndex = node.type === "group"
+    ? options.selected ? "2" : "1"
+    : options.selected ? "4" : "3"
 
   return {
     ...baseStyle,
+    zIndex,
     ...(colorStyle ? {
       backgroundColor: colorStyle.background,
       borderColor: colorStyle.border,

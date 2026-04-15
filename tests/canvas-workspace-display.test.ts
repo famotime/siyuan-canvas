@@ -50,6 +50,107 @@ describe("canvas workspace display helpers", () => {
       left: "0px",
       top: "0px",
       width: "320px",
+      zIndex: "3",
+    })
+  })
+
+  it("keeps groups below regular nodes so inner nodes stay clickable", () => {
+    expect(getCanvasNodeStyle(
+      {
+        height: 240,
+        id: "group-0",
+        label: "Group",
+        type: "group",
+        width: 480,
+        x: 0,
+        y: 0,
+      },
+      {
+        height: "240px",
+        left: "0px",
+        top: "0px",
+        width: "480px",
+      },
+    )).toEqual({
+      height: "240px",
+      left: "0px",
+      top: "0px",
+      width: "480px",
+      zIndex: "1",
+    })
+
+    expect(getCanvasNodeStyle(
+      {
+        height: 240,
+        id: "group-1",
+        label: "Group",
+        type: "group",
+        width: 480,
+        x: 0,
+        y: 0,
+      },
+      {
+        height: "240px",
+        left: "0px",
+        top: "0px",
+        width: "480px",
+      },
+      { selected: true },
+    )).toEqual({
+      height: "240px",
+      left: "0px",
+      top: "0px",
+      width: "480px",
+      zIndex: "2",
+    })
+
+    expect(getCanvasNodeStyle(
+      {
+        height: 180,
+        id: "n0",
+        text: "text",
+        type: "text",
+        width: 320,
+        x: 0,
+        y: 0,
+      },
+      {
+        height: "180px",
+        left: "40px",
+        top: "20px",
+        width: "320px",
+      },
+    )).toEqual({
+      height: "180px",
+      left: "40px",
+      top: "20px",
+      width: "320px",
+      zIndex: "3",
+    })
+
+    expect(getCanvasNodeStyle(
+      {
+        height: 180,
+        id: "n1",
+        text: "text",
+        type: "text",
+        width: 320,
+        x: 0,
+        y: 0,
+      },
+      {
+        height: "180px",
+        left: "40px",
+        top: "20px",
+        width: "320px",
+      },
+      { selected: true },
+    )).toEqual({
+      height: "180px",
+      left: "40px",
+      top: "20px",
+      width: "320px",
+      zIndex: "4",
     })
   })
 
