@@ -282,6 +282,21 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='canvas-shell']").exists()).toBe(true)
   })
 
+  it("uses a plugin-specific class for the top toolbar container", () => {
+    currentEditor = createEditorMock()
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='top-toolbar']").classes()).toContain("canvas-toolbar")
+    expect(wrapper.find("[data-testid='top-toolbar']").classes()).not.toContain("toolbar")
+  })
+
   it("renders cards without the top metadata header", () => {
     currentEditor = createEditorMock()
 
@@ -477,7 +492,7 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    const toolbarText = wrapper.find(".toolbar").text()
+    const toolbarText = wrapper.find("[data-testid='top-toolbar']").text()
 
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("title")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("title")).toBe("打开")
@@ -1510,7 +1525,7 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    const toolbarText = wrapper.find(".toolbar").text()
+    const toolbarText = wrapper.find("[data-testid='top-toolbar']").text()
     const inspectorText = wrapper.find(".inspector").text()
     const bottomToolbarStyle = getComputedStyle(wrapper.find("[data-testid='bottom-toolbar']").element as HTMLElement)
 

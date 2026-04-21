@@ -5,7 +5,8 @@
     data-testid="canvas-shell"
   >
     <header
-      class="toolbar"
+      class="canvas-toolbar"
+      data-testid="top-toolbar"
       @pointerdown.capture="editor.deactivateCanvasSurface"
     >
       <div class="toolbar__group">
@@ -1623,6 +1624,7 @@ watch(
   --canvas-surface: var(--b3-theme-surface);
   --canvas-surface-elevated: var(--b3-theme-surface);
   --canvas-surface-overlay: rgba(255, 255, 255, 0.82);
+  --canvas-toolbar-bg: rgba(255, 255, 255, 0.92);
   --canvas-border: rgba(0, 0, 0, 0.1);
   --canvas-border-strong: rgba(0, 0, 0, 0.16);
   --canvas-text: var(--b3-theme-on-surface);
@@ -1667,6 +1669,7 @@ watch(
 
 .canvas-shell[data-theme-mode="dark"] {
   --canvas-surface-overlay: rgba(15, 23, 42, 0.68);
+  --canvas-toolbar-bg: rgba(15, 23, 42, 0.92);
   --canvas-border: rgba(255, 255, 255, 0.1);
   --canvas-border-strong: rgba(255, 255, 255, 0.16);
   --canvas-accent-soft: rgba(92, 155, 255, 0.2);
@@ -1688,14 +1691,14 @@ watch(
   --canvas-shell-highlight: rgba(92, 155, 255, 0.08);
 }
 
-.toolbar {
+.canvas-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid var(--canvas-border);
-  background: var(--canvas-surface-overlay);
+  background: var(--canvas-toolbar-bg);
   backdrop-filter: blur(16px);
 }
 

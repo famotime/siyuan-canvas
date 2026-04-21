@@ -97,6 +97,16 @@ describe("canvas theme sync", () => {
     expect(host.firstElementChild?.getAttribute("data-theme-mode")).toBe("light")
   })
 
+  it("keeps the current dark theme when host theme attributes disappear transiently", () => {
+    mountCanvasApp(host, {}, vi.fn())
+
+    document.documentElement.removeAttribute("data-theme-mode")
+    document.body.removeAttribute("data-theme-mode")
+    plugin.eventBus.emit("switch-protyle-mode")
+
+    expect(host.firstElementChild?.getAttribute("data-theme-mode")).toBe("dark")
+  })
+
   it("removes the theme listener when the canvas app unmounts", () => {
     mountCanvasApp(host, {}, vi.fn())
 

@@ -54,24 +54,18 @@ function normalizeThemeMode(value: unknown): CanvasThemeMode | null {
 }
 
 function detectHostThemeMode(element: HTMLElement): CanvasThemeMode {
-  const hostThemeMode = normalizeThemeMode(element.parentElement?.closest<HTMLElement>("[data-theme-mode]")?.dataset.themeMode)
-  if (hostThemeMode) {
-    return hostThemeMode
+  const explicitThemeMode = normalizeThemeMode(element.parentElement?.closest<HTMLElement>("[data-theme-mode]")?.dataset.themeMode)
+    ?? normalizeThemeMode(document.documentElement.dataset.themeMode)
+    ?? normalizeThemeMode(document.body?.dataset.themeMode)
+    ?? normalizeThemeMode((window as any).siyuan?.config?.appearance?.mode)
+
+  if (explicitThemeMode) {
+    return explicitThemeMode
   }
 
-  const rootThemeMode = normalizeThemeMode(document.documentElement.dataset.themeMode)
-  if (rootThemeMode) {
-    return rootThemeMode
-  }
-
-  const bodyThemeMode = normalizeThemeMode(document.body?.dataset.themeMode)
-  if (bodyThemeMode) {
-    return bodyThemeMode
-  }
-
-  const siyuanThemeMode = normalizeThemeMode((window as any).siyuan?.config?.appearance?.mode)
-  if (siyuanThemeMode) {
-    return siyuanThemeMode
+  const currentThemeMode = normalizeThemeMode(element.dataset.themeMode)
+  if (currentThemeMode) {
+    return currentThemeMode
   }
 
   if (document.documentElement.classList.contains("dark") || document.body?.classList.contains("dark")) {
