@@ -1,4 +1,4 @@
-# 思源 Canvas
+# 无界
 
 在思源笔记中打开、编辑和导出 Obsidian `.canvas` 画布文件。基于开放的 JSON Canvas 格式，实现两个笔记工具之间的画布互通。
 
