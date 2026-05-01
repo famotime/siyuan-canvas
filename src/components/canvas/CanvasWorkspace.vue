@@ -1344,10 +1344,8 @@ function handleNodeClick(node: CanvasNode, event: MouseEvent) {
   editor.selectNode(node.id, event)
 }
 
-function handleNodeWheel(node: CanvasNode, event: WheelEvent) {
-  if (editor.state.selectedNodeIds.includes(node.id)) {
-    event.stopPropagation()
-  }
+function handleNodeWheel(_node: CanvasNode, _event: WheelEvent) {
+  // Let wheel events bubble to stage for zoom
 }
 
 function handleEdgeClick(edgeId: string) {
