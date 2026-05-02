@@ -1,8 +1,8 @@
 {
   "name": "siyuan-canvas",
-  "author": "OpenAI Codex",
-  "url": "https://github.com/siyuan-note",
-  "version": "0.0.1",
+  "author": "Quincy Zou",
+  "url": "https://github.com/famotime/siyuan-canvas",
+  "version": "1.0.0",
   "minAppVersion": "2.10.14",
   "disabledInPublish": true,
   "backends": [
@@ -13,21 +13,14 @@
   ],
   "displayName": {
     "default": "SiYuan Canvas",
-    "en_US": "SiYuan Canvas",
     "zh_CN": "无界"
   },
   "description": {
     "default": "Import, edit, and export Obsidian JSON Canvas files inside SiYuan",
-    "en_US": "Import, edit, and export Obsidian JSON Canvas files inside SiYuan",
     "zh_CN": "在思源中导入、编辑并导出 Obsidian JSON Canvas 文件"
   },
   "readme": {
     "default": "README.md",
-    "en_US": "README.md",
     "zh_CN": "README_zh_CN.md"
-  },
-  "funding": {
-    "custom": []
-  },
-  "keywords": []
+  }
 }

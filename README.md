@@ -1,6 +1,8 @@
 # SiYuan Canvas
 
 SiYuan Canvas is a SiYuan plugin for importing, editing, and exporting Obsidian `.canvas` files using the open JSON Canvas format.
+![image](https://raw.githubusercontent.com/famotime/siyuan-canvas/main/assets/image-20260501190639-s2lebrh.png)
+
 
 ## What it does
 
@@ -10,6 +12,8 @@ SiYuan Canvas is a SiYuan plugin for importing, editing, and exporting Obsidian 
 - Creates and edits edges with side anchors and labels
 - Saves back to the workspace as a standard `.canvas` file
 - Preserves unknown JSON Canvas fields during parse and save
+
+<video controls="controls" src="https://raw.githubusercontent.com/famotime/siyuan-canvas/main/assets/4月22日1-20260422214002-iw8j5j0.mp4"></video>
 
 ## Current interaction model
 
@@ -22,17 +26,6 @@ SiYuan Canvas is a SiYuan plugin for importing, editing, and exporting Obsidian 
 - Double-click link nodes to open the URL
 - Double-click `.canvas` file nodes to open them in a new plugin tab
 - Use the create-edge dialog or floating edge toolbar to create and adjust connections
-
-## Development
-
-```bash
-pnpm install
-pnpm dev
-pnpm test
-pnpm build
-```
-
-Set `VITE_SIYUAN_WORKSPACE_PATH` in `.env` if you want `pnpm dev` to build directly into a local SiYuan workspace.
 
 ## Project structure
 
@@ -47,4 +40,3 @@ Set `VITE_SIYUAN_WORKSPACE_PATH` in `.env` if you want `pnpm dev` to build direc
 
 - The plugin targets the open JSON Canvas format maintained by `obsidianmd/jsoncanvas`.
 - The current implementation prioritizes file-format compatibility and core editing over full visual parity with Obsidian Canvas.
-- A detailed file-by-file map is maintained in `docs/project-structure.md`.

@@ -1,12 +1,15 @@
 {
   "name": "siyuan-canvas",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "type": "module",
   "description": "SiYuan plugin for importing, editing, and exporting Obsidian .canvas files",
-  "author": "",
+  "author": "Quincy Zou",
   "license": "MIT",
-  "homepage": "",
-  "repository": "",
+  "homepage": "https://github.com/famotime/siyuan-canvas",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/famotime/siyuan-canvas.git"
+  },
   "scripts": {
     "dev": "vite build --watch",
     "release": "node ./release.js",
