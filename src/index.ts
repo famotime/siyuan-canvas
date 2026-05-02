@@ -113,7 +113,11 @@ export default class SiyuanCanvasPlugin extends Plugin {
     showMessage(this.t("pluginLoaded"), 2500, "info")
   }
 
-  onunload() {}
+  onunload() {
+    this.removeData(STORAGE_KEY).catch(e => {
+      showMessage(`卸载 ${this.name} 时删除数据失败: ${e}`, 2500, "error")
+    })
+  }
 
   override openSetting(): void {
     this.openCanvasSettings()
