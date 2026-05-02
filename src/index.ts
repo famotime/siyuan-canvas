@@ -78,7 +78,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addCommand({
       langKey: "openCanvas",
       langText: this.t("openCanvas"),
-      hotkey: "Ctrl+Alt+C",
+      hotkey: "⌃⌥C",
       callback: () => {
         void this.openCanvasTab()
       },
@@ -114,9 +114,14 @@ export default class SiyuanCanvasPlugin extends Plugin {
   }
 
   onunload() {
-    this.removeData(STORAGE_KEY).catch(e => {
-      showMessage(`卸载 ${this.name} 时删除数据失败: ${e}`, 2500, "error")
-    })
+  }
+
+  async uninstall() {
+    try {
+      await this.removeData(STORAGE_KEY)
+    } catch (e) {
+      showMessage(this.t("uninstallDataRemoveFailed", { name: this.name, error: String(e) }), 2500, "error")
+    }
   }
 
   override openSetting(): void {

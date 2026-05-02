@@ -135,5 +135,6 @@
   "messageUnablePasteImageWithoutWorkspaceCanvas": "请先将当前画布保存到工作区后再粘贴图片。",
   "messageCanvasSavedByOverwritingDiskVersion": "Canvas 已通过覆盖磁盘版本保存。",
   "messageUnableOverwriteDiskVersion": "无法覆盖磁盘版本。",
-  "messageLoadedNewerCanvasVersionFromDisk": "已加载磁盘上的较新 Canvas 版本。"
+  "messageLoadedNewerCanvasVersionFromDisk": "已加载磁盘上的较新 Canvas 版本。",
+  "uninstallDataRemoveFailed": "卸载 {name} 时删除数据失败：{error}"
 }

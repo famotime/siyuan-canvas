@@ -135,5 +135,6 @@
   "messageUnablePasteImageWithoutWorkspaceCanvas": "Save the current canvas to the workspace before pasting images.",
   "messageCanvasSavedByOverwritingDiskVersion": "Canvas saved by overwriting the disk version.",
   "messageUnableOverwriteDiskVersion": "Unable to overwrite the disk version.",
-  "messageLoadedNewerCanvasVersionFromDisk": "Loaded the newer canvas version from disk."
+  "messageLoadedNewerCanvasVersionFromDisk": "Loaded the newer canvas version from disk.",
+  "uninstallDataRemoveFailed": "Failed to remove data when uninstalling {name}: {error}"
 }
