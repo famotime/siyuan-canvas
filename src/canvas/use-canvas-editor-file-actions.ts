@@ -113,19 +113,40 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     return normalizeWorkspaceCanvasPath(input, CANVAS_DEFAULT_DIRECTORY)
   }
 
+  async function confirmUnsavedChanges(): Promise<boolean> {
+    if (!state.isDirty) return true
+    return openConfirmDialog(
+      t("confirmUnsavedChangesTitle"),
+      t("confirmUnsavedChangesDescription"),
+    )
+  }
+
   async function rememberRecentPath(path: string, sourceType: CanvasRecentFileSource) {
     await plugin.rememberRecentCanvas?.(path, getCanvasFileName(path), sourceType)
     refreshRecentFiles()
   }
 
-  function newCanvas() {
+  async function nextUntitledName(): Promise<string> {
+    const baseName = t("untitledCanvas").replace(/\.canvas$/i, "")
+    const first = `${baseName}.canvas`
+    if (!await workspacePathExists(`${CANVAS_DEFAULT_DIRECTORY}/${first}`)) return first
+    for (let i = 2; i <= 99; i++) {
+      const candidate = `${baseName} (${i}).canvas`
+      if (!await workspacePathExists(`${CANVAS_DEFAULT_DIRECTORY}/${candidate}`)) return candidate
+    }
+    return first
+  }
+
+  async function newCanvas() {
+    if (!await confirmUnsavedChanges()) return
     state.replaceDocument(createEmptyCanvasDocument(), "")
-    suggestedFilename.value = t("untitledCanvas")
+    suggestedFilename.value = await nextUntitledName()
     fileSource.value = "unsaved"
     resetViewport()
   }
 
   async function openWorkspacePath(path: string) {
+    if (!await confirmUnsavedChanges()) return
     try {
       await state.open(path)
       suggestedFilename.value = getCanvasFileName(path)
@@ -138,6 +159,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
   }
 
   async function openLocalPath(path: string, fallbackTitle?: string) {
+    if (!await confirmUnsavedChanges()) return
     try {
       const raw = await readLocalFileText(path)
       const parsed = parseCanvasDocument(raw)

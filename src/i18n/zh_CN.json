@@ -129,5 +129,14 @@
   "messageUnableOpenRecentCanvasFile": "无法打开最近的 Canvas 文件。",
   "messageUnablePasteImageWithoutWorkspaceCanvas": "请先将当前画布保存到工作区后再粘贴图片。",
   "messageUnableOverwriteDiskVersion": "无法覆盖磁盘版本。",
-  "uninstallDataRemoveFailed": "卸载 {name} 时删除数据失败：{error}"
+  "uninstallDataRemoveFailed": "卸载 {name} 时删除数据失败：{error}",
+  "confirmUnsavedChangesTitle": "未保存的更改",
+  "confirmUnsavedChangesDescription": "当前画布有未保存的更改，是否继续？",
+  "nodeActivated": "已打开 {title}",
+  "filePickerGroupDocuments": "文档",
+  "filePickerGroupCanvases": "画布",
+  "filePickerGroupBlocks": "块",
+  "filePickerGroupImages": "图片",
+  "confirmDeleteCanvasTitle": "删除 Canvas 文件",
+  "confirmDeleteCanvasDescription": "确定要删除该文件吗？此操作不可撤销。{path}"
 }

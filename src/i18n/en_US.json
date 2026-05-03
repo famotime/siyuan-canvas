@@ -129,5 +129,14 @@
   "messageUnableOpenRecentCanvasFile": "Unable to open recent canvas file.",
   "messageUnablePasteImageWithoutWorkspaceCanvas": "Save the current canvas to the workspace before pasting images.",
   "messageUnableOverwriteDiskVersion": "Unable to overwrite the disk version.",
-  "uninstallDataRemoveFailed": "Failed to remove data when uninstalling {name}: {error}"
+  "uninstallDataRemoveFailed": "Failed to remove data when uninstalling {name}: {error}",
+  "confirmUnsavedChangesTitle": "Unsaved changes",
+  "confirmUnsavedChangesDescription": "The current canvas has unsaved changes. Do you want to continue without saving?",
+  "nodeActivated": "Opened {title}",
+  "filePickerGroupDocuments": "Documents",
+  "filePickerGroupCanvases": "Canvases",
+  "filePickerGroupBlocks": "Blocks",
+  "filePickerGroupImages": "Images",
+  "confirmDeleteCanvasTitle": "Delete Canvas File",
+  "confirmDeleteCanvasDescription": "Are you sure you want to delete this file? This action cannot be undone. {path}"
 }

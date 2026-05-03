@@ -19,6 +19,7 @@ import {
   createDefaultCanvasPluginData,
   normalizeCanvasPluginData,
   rememberRecentCanvasFile,
+  removeRecentCanvasFile,
   updateCanvasPluginUiState,
 } from "@/canvas/plugin-data"
 import { openCanvasPluginSettingsPanel } from "@/canvas/plugin-settings-panel"
@@ -165,6 +166,11 @@ export default class SiyuanCanvasPlugin extends Plugin {
       sourceType,
       title: title || getCanvasFileName(path) || path,
     })
+    await this.persistCanvasData()
+  }
+
+  public async removeRecentCanvasFile(path: string): Promise<void> {
+    this.canvasData = removeRecentCanvasFile(this.canvasData, path)
     await this.persistCanvasData()
   }
 

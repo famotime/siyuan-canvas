@@ -16,7 +16,7 @@ interface InitializeCanvasEditorOptions {
   bootstrap: CanvasTabBootstrap
   fileSource: Ref<CanvasEditorFileSource>
   getFileName: (path: string) => string
-  newCanvas: () => void
+  newCanvas: () => Promise<void>
   refreshFileNodeMetadata: () => Promise<void>
   refreshRecentFiles: () => void
   refreshWorkspaceDocuments: () => Promise<void>
@@ -73,7 +73,7 @@ export async function initializeCanvasEditor(options: InitializeCanvasEditorOpti
       showMessage(error instanceof Error ? error.message : t('messageUnableOpenCanvasFile'), 4000, 'error')
     }
   } else {
-    newCanvas()
+    await newCanvas()
   }
 
   refreshRecentFiles()

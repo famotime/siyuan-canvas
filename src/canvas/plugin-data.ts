@@ -163,6 +163,17 @@ export function rememberRecentCanvasFile(
   }
 }
 
+export function removeRecentCanvasFile(
+  data: CanvasPluginData,
+  path: string,
+): CanvasPluginData {
+  const normalized = normalizeCanvasPluginData(data)
+  return {
+    ...normalized,
+    recentFiles: normalized.recentFiles.filter((item) => item.path !== path),
+  }
+}
+
 export function updateCanvasPluginUiState(
   data: CanvasPluginData,
   ui: Partial<CanvasPluginUiState>,

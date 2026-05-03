@@ -199,7 +199,7 @@
             </defs>
             <g
               v-for="edge in editor.state.document.edges"
-              :key="edge.id"
+              :key="`path-${edge.id}`"
             >
               <path
                 class="stage__edge"
@@ -210,16 +210,6 @@
                 :style="getEdgeStrokeStyle(edge)"
                 @click.stop="editor.selectEdge(edge.id)"
               />
-              <text
-                v-if="edge.label"
-                class="stage__edge-label"
-                :x="editor.getEdgeLabelPosition(edge).x"
-                :y="editor.getEdgeLabelPosition(edge).y"
-                :style="getEdgeLabelStyle(edge)"
-                @click.stop="editor.selectEdge(edge.id)"
-              >
-                {{ edge.label }}
-              </text>
             </g>
             <path
               v-if="editor.connectionDraft.visible"
@@ -235,6 +225,21 @@
               :marker-start="editor.edgeReconnectDraft.endpoint === 'from' ? 'url(#canvas-edge-arrow-start)' : undefined"
               :marker-end="editor.edgeReconnectDraft.endpoint === 'to' ? 'url(#canvas-edge-arrow-end)' : undefined"
             />
+            <g
+              v-for="edge in editor.state.document.edges"
+              :key="`label-${edge.id}`"
+            >
+              <text
+                v-if="edge.label"
+                class="stage__edge-label"
+                :x="editor.getEdgeLabelPosition(edge).x"
+                :y="editor.getEdgeLabelPosition(edge).y"
+                :style="getEdgeLabelStyle(edge)"
+                @click.stop="editor.selectEdge(edge.id)"
+              >
+                {{ edge.label }}
+              </text>
+            </g>
           </svg>
 
           <article
@@ -831,18 +836,21 @@
               >
             </label>
             <div class="canvas-node-picker__options">
-              <button
-                v-for="result in getFilePickerResults()"
-                :key="`file-picker-${result.kind}-${result.path}`"
-                class="canvas-node-picker__option"
-                :data-testid="`file-picker-option-${result.kind}`"
-                type="button"
-                @click="editor.selectFilePickerResult(result)"
-              >
-                <span class="canvas-node-picker__option-kind">{{ getFilePickerKindLabel(result.kind) }}</span>
-                <strong>{{ result.title }}</strong>
-                <span>{{ result.subtitle }}</span>
-              </button>
+              <template v-for="group in getFilePickerGroups()" :key="group.kind">
+                <div class="canvas-node-picker__group-header">{{ getFilePickerGroupLabel(group.kind) }}</div>
+                <button
+                  v-for="result in group.items"
+                  :key="`file-picker-${result.kind}-${result.path}`"
+                  class="canvas-node-picker__option"
+                  :data-testid="`file-picker-option-${result.kind}`"
+                  type="button"
+                  @click="editor.selectFilePickerResult(result)"
+                >
+                  <span class="canvas-node-picker__option-kind">{{ getFilePickerKindLabel(result.kind) }}</span>
+                  <strong v-html="highlightText(result.title, editor.filePickerDialog.query)" />
+                  <span v-html="highlightText(result.subtitle, editor.filePickerDialog.query)" />
+                </button>
+              </template>
             </div>
           </div>
         </div>
@@ -878,15 +886,27 @@
                 v-if="editor.workspaceDocuments.length"
                 class="recent-list"
               >
-                <button
+                <div
                   v-for="documentEntry in editor.workspaceDocuments"
                   :key="documentEntry.path"
                   class="recent-list__item"
-                  @click="editor.openWorkspacePath(documentEntry.path)"
                 >
-                  <strong>{{ documentEntry.title }}</strong>
-                  <span>{{ documentEntry.path }}</span>
-                </button>
+                  <button
+                    class="recent-list__item-open"
+                    @click="editor.openWorkspacePath(documentEntry.path)"
+                  >
+                    <strong>{{ documentEntry.title }}</strong>
+                    <span>{{ documentEntry.path }}</span>
+                  </button>
+                  <button
+                    class="recent-list__item-delete"
+                    :title="t('selectionToolbarDelete')"
+                    type="button"
+                    @click.stop="editor.deleteWorkspaceDocument(documentEntry.path)"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
               <p v-else>
                 {{ t("inspectorNoWorkspaceCanvasFiles") }}<br>
@@ -943,15 +963,27 @@
                 v-if="editor.recentFiles.length"
                 class="recent-list"
               >
-                <button
+                <div
                   v-for="recent in editor.recentFiles"
                   :key="recent.path"
                   class="recent-list__item"
-                  @click="editor.openRecentFile(recent)"
                 >
-                  <strong>{{ recent.title }}</strong>
-                  <span>{{ recent.path }}</span>
-                </button>
+                  <button
+                    class="recent-list__item-open"
+                    @click="editor.openRecentFile(recent)"
+                  >
+                    <strong>{{ recent.title }}</strong>
+                    <span>{{ recent.path }}</span>
+                  </button>
+                  <button
+                    class="recent-list__item-delete"
+                    :title="t('selectionToolbarDelete')"
+                    type="button"
+                    @click.stop="editor.deleteWorkspaceDocument(recent.path)"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
               <p v-else>
                 {{ t("inspectorNoRecentWorkspaceFiles") }}
@@ -1346,8 +1378,23 @@ function handleNodeClick(node: CanvasNode, event: MouseEvent) {
   editor.selectNode(node.id, event)
 }
 
-function handleNodeWheel(_node: CanvasNode, _event: WheelEvent) {
-  // Let wheel events bubble to stage for zoom
+function handleNodeWheel(node: CanvasNode, event: WheelEvent) {
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  const isSelected = editor.state.selectedNodeIds.includes(node.id)
+  if (isSelected) {
+    event.stopPropagation()
+    return
+  }
+  const scrollable = target.closest('.canvas-node__body, .markdown-preview pre, .file-card__document-preview') as HTMLElement | null
+  if (!scrollable) return
+  const { scrollHeight, clientHeight, scrollTop } = scrollable
+  if (scrollHeight <= clientHeight) return
+  const atTop = scrollTop <= 0 && event.deltaY < 0
+  const atBottom = scrollTop + clientHeight >= scrollHeight - 1 && event.deltaY > 0
+  if (!atTop && !atBottom) {
+    event.stopPropagation()
+  }
 }
 
 function handleEdgeClick(edgeId: string) {
@@ -1547,7 +1594,24 @@ function getFilePickerResults() {
   ]
 }
 
-function getFilePickerKindLabel(kind: "block" | "canvas" | "document" | "image"): string {
+type FilePickerKind = "block" | "canvas" | "document" | "image"
+
+function getFilePickerGroups() {
+  const g = editor.filePickerDialog.groups
+  const candidates = [
+    { kind: "document" as FilePickerKind, items: g.documents },
+    { kind: "canvas" as FilePickerKind, items: g.canvases },
+    { kind: "block" as FilePickerKind, items: g.blocks },
+    { kind: "image" as FilePickerKind, items: g.images },
+  ]
+  return candidates.filter((group) => group.items.length > 0)
+}
+
+function getFilePickerGroupLabel(kind: FilePickerKind): string {
+  return t(`filePickerGroup${kind.charAt(0).toUpperCase()}${kind.slice(1)}s` as any)
+}
+
+function getFilePickerKindLabel(kind: FilePickerKind): string {
   switch (kind) {
     case "block":
       return "Block"
@@ -1560,6 +1624,23 @@ function getFilePickerKindLabel(kind: "block" | "canvas" | "document" | "image")
     default:
       return kind
   }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+}
+
+function highlightText(text: string, query: string): string {
+  if (!query) return escapeHtml(text)
+  const escaped = escapeHtml(text)
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const regex = new RegExp(`(${escapedQuery})`, "gi")
+  return escaped.replace(regex, "<mark>$1</mark>")
 }
 
 function getCanvasThumbnailViewBox(thumbnail?: {
@@ -2200,6 +2281,10 @@ watch(
   text-anchor: middle;
   fill: var(--canvas-text-muted);
   pointer-events: all;
+  paint-order: stroke;
+  stroke: var(--b3-theme-background, #fff);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 .canvas-node {
@@ -2709,22 +2794,51 @@ watch(
 }
 
 .recent-list__item {
-  display: grid;
-  gap: 4px;
-  justify-items: start;
+  display: flex;
+  align-items: stretch;
   border: 1px solid var(--canvas-border);
   border-radius: 12px;
   background: var(--canvas-surface);
+  overflow: hidden;
+}
+
+.recent-list__item-open {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
   padding: 10px;
   text-align: left;
   cursor: pointer;
   color: inherit;
+  border: 0;
+  background: transparent;
+  min-width: 0;
 }
 
-.recent-list__item span {
+.recent-list__item-open span {
   font-size: 12px;
   color: var(--canvas-text-muted);
   word-break: break-all;
+}
+
+.recent-list__item-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  flex-shrink: 0;
+  border: 0;
+  border-left: 1px solid var(--canvas-border);
+  background: transparent;
+  color: var(--canvas-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.recent-list__item-delete:hover {
+  background: var(--canvas-floating-button-bg-hover);
+  color: var(--canvas-text);
 }
 
 .issues strong {
@@ -2857,6 +2971,21 @@ watch(
 
 .canvas-node-picker__option:hover {
   background: var(--canvas-floating-button-bg-hover);
+}
+
+.canvas-node-picker__option mark {
+  background: var(--b3-theme-primary-light);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.canvas-node-picker__group-header {
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--canvas-text-muted);
+  letter-spacing: 0.04em;
 }
 
 .canvas-node-picker__empty {

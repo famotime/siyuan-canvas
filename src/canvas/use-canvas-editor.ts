@@ -31,7 +31,9 @@ import {
 } from "vue"
 import {
   readDir,
+  removeFile,
 } from "@/api"
+import { openConfirmDialog } from "@/canvas/confirm-dialog"
 import {
   createCanvasBoardMetrics,
   toBoardX,
@@ -439,6 +441,22 @@ export function useCanvasEditor(
     }
   }
 
+  async function deleteWorkspaceDocument(path: string) {
+    const confirmed = await openConfirmDialog(
+      t("confirmDeleteCanvasTitle"),
+      t("confirmDeleteCanvasDescription", { path }),
+    )
+    if (!confirmed) return
+    try {
+      await removeFile(path)
+    } catch {
+      // file may already be absent on disk
+    }
+    await plugin.removeRecentCanvasFile?.(path)
+    refreshRecentFiles()
+    await refreshWorkspaceDocuments()
+  }
+
   async function openDocumentAtBlock(blockId: string, documentId?: string) {
     const targetDocumentId = documentId || (await findSiyuanDocumentByBlockId(blockId))?.id
 
@@ -713,6 +731,7 @@ export function useCanvasEditor(
     getResolvedFileNode,
     openDocumentByBlockId: openDocumentAtBlock,
     plugin,
+    t,
   })
   const {
     clearConnectionDraft,
@@ -825,6 +844,7 @@ export function useCanvasEditor(
       filePickerDialog,
       displayNodes,
       deactivateCanvasSurface,
+      deleteWorkspaceDocument,
       connectionDraft,
       edgeColorOptions: selectionColors,
       edgeLabelDraft,
