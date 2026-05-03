@@ -6,10 +6,15 @@
   "minAppVersion": "2.10.14",
   "disabledInPublish": true,
   "backends": [
-    "all"
+    "windows",
+    "linux",
+    "darwin",
+    "docker"
   ],
   "frontends": [
-    "all"
+    "desktop",
+    "browser-desktop",
+    "desktop-window"
   ],
   "displayName": {
     "default": "Canvas",

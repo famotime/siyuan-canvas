@@ -61,6 +61,7 @@ import {
   getCanvasFileName,
 } from "@/canvas/use-canvas-editor-shared"
 import {
+  CANVAS_DEFAULT_DIRECTORY,
   createDefaultCanvasPluginSettings,
   createDefaultCanvasPluginUiState,
 } from "@/canvas/plugin-data"
@@ -418,7 +419,7 @@ export function useCanvasEditor(
   }
 
   async function refreshWorkspaceDocuments() {
-    const directory = getPluginSettings().defaultCanvasDirectory
+    const directory = CANVAS_DEFAULT_DIRECTORY
 
     try {
       const entries = await readDir(directory) as Array<{
@@ -709,7 +710,6 @@ export function useCanvasEditor(
 
   const { activateNode } = createCanvasEditorNodeActivationActions({
     ensureCanvasPath,
-    getNodeTitle,
     getResolvedFileNode,
     openDocumentByBlockId: openDocumentAtBlock,
     plugin,

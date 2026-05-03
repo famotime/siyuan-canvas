@@ -1707,10 +1707,17 @@ watch(
 
 .toolbar__meta {
   display: inline-flex;
+  align-items: center;
   gap: 16px;
   margin-left: auto;
   font-size: 13px;
+  line-height: 1;
   color: var(--canvas-text-muted);
+}
+
+.toolbar__meta > span {
+  display: inline-flex;
+  align-items: center;
 }
 
 .toolbar__button {
@@ -1751,6 +1758,13 @@ watch(
   border-color: transparent;
   background: var(--canvas-accent);
   color: var(--canvas-accent-contrast);
+}
+
+.toolbar__button--primary:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--canvas-accent);
+  color: var(--canvas-accent-contrast);
+  filter: brightness(0.92);
 }
 
 .toolbar__icon {

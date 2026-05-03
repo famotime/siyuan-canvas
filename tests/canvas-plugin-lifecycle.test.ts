@@ -90,6 +90,7 @@ class PluginMock {
   public app = {}
   public commands: any[] = []
   public i18n?: Record<string, string>
+  public icons: string[] = []
   public name = "siyuan-canvas"
   public setting: unknown
   public tabs: any[] = []
@@ -98,6 +99,10 @@ class PluginMock {
 
   addCommand = vi.fn((config: any) => {
     this.commands.push(config)
+  })
+
+  addIcons = vi.fn((svg: string) => {
+    this.icons.push(svg)
   })
 
   addTab = vi.fn((config: any) => {
@@ -300,10 +305,10 @@ describe("canvas plugin lifecycle", () => {
       app: plugin.app,
       custom: expect.objectContaining({
         data: { path: "/data/storage/siyuan-canvas/example.canvas" },
-        icon: "iconGraph",
+        icon: "iconCanvasTab",
         title: "example.canvas",
       }),
-      keepCursor: true,
+      keepCursor: false,
       openNewTab: true,
     }))
     expect(openTab).toHaveBeenNthCalledWith(2, expect.objectContaining({
@@ -337,17 +342,11 @@ describe("canvas plugin lifecycle", () => {
     expect(setting.options).toEqual({ width: "560px" })
     expect(setting.open).toHaveBeenCalledWith("siyuan-canvas")
 
-    const defaultDirectoryInput = setting.items[0].createActionElement() as HTMLInputElement
-    const recentFilesLimitInput = setting.items[1].createActionElement() as HTMLInputElement
-    const detectExternalChangesInput = setting.items[2].createActionElement() as HTMLInputElement
+    const recentFilesLimitInput = setting.items[0].createActionElement() as HTMLInputElement
+    const detectExternalChangesInput = setting.items[1].createActionElement() as HTMLInputElement
 
-    expect(defaultDirectoryInput.value).toBe("/data/storage/siyuan-canvas")
     expect(recentFilesLimitInput.value).toBe("8")
     expect(detectExternalChangesInput.checked).toBe(true)
-
-    defaultDirectoryInput.value = "/custom/canvas"
-    defaultDirectoryInput.dispatchEvent(new Event("change"))
-    await Promise.resolve()
 
     recentFilesLimitInput.value = "1"
     recentFilesLimitInput.dispatchEvent(new Event("change"))
@@ -358,7 +357,6 @@ describe("canvas plugin lifecycle", () => {
     await Promise.resolve()
 
     expect(plugin.getCanvasSettings()).toEqual({
-      defaultCanvasDirectory: "/custom/canvas",
       detectExternalChanges: false,
       recentFilesLimit: 1,
     })
@@ -375,7 +373,6 @@ describe("canvas plugin lifecycle", () => {
         },
       ],
       settings: {
-        defaultCanvasDirectory: "/persisted/canvas",
         detectExternalChanges: false,
         recentFilesLimit: 3,
       },
@@ -395,7 +392,6 @@ describe("canvas plugin lifecycle", () => {
     await plugin.onload()
 
     expect(plugin.getCanvasSettings()).toEqual({
-      defaultCanvasDirectory: "/persisted/canvas",
       detectExternalChanges: false,
       recentFilesLimit: 3,
     })
@@ -418,7 +414,7 @@ describe("canvas plugin lifecycle", () => {
     expect(plugin.addTab).toHaveBeenCalledTimes(1)
     expect(plugin.addTopBar).toHaveBeenCalledTimes(1)
     expect(plugin.addCommand).toHaveBeenCalledTimes(3)
-    expect(showMessage).toHaveBeenCalledWith(expect.any(String), 2500, "info")
+    expect(plugin.addIcons).toHaveBeenCalledTimes(1)
   })
 
   it("updates persisted inspector section UI state", async () => {

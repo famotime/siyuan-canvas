@@ -571,8 +571,8 @@ describe("useCanvasEditor file lifecycle flows", () => {
     }])
     expect(editor.filePickerDialog.groups.canvases).toEqual([{
       kind: "canvas",
-      path: "/data/storage/siyuan-canvas/road.canvas",
-      subtitle: "/data/storage/siyuan-canvas/road.canvas",
+      path: "/data/storage/petal/siyuan-canvas/road.canvas",
+      subtitle: "/data/storage/petal/siyuan-canvas/road.canvas",
       title: "road.canvas",
     }])
 
@@ -1041,7 +1041,7 @@ Preview body
   })
 
   it("opens a workspace canvas path through a dialog when prompt is unavailable", async () => {
-    workspaceFiles.set("/data/storage/siyuan-canvas/opened.canvas", createCanvasRaw("opened from workspace"))
+    workspaceFiles.set("/data/storage/petal/siyuan-canvas/opened.canvas", createCanvasRaw("opened from workspace"))
     queueDialogResponse("opened")
 
     const { editor, plugin, wrapper } = await mountEditor()
@@ -1050,20 +1050,20 @@ Preview body
     await flushEditor()
 
     expect(window.prompt).not.toHaveBeenCalled()
-    expect(editor.state.filePath).toBe("/data/storage/siyuan-canvas/opened.canvas")
+    expect(editor.state.filePath).toBe("/data/storage/petal/siyuan-canvas/opened.canvas")
     expect(editor.state.document.nodes[0]).toMatchObject({
       id: "n1",
       text: "opened from workspace",
       type: "text",
     })
     expect(plugin.rememberRecentCanvas).toHaveBeenCalledWith(
-      "/data/storage/siyuan-canvas/opened.canvas",
+      "/data/storage/petal/siyuan-canvas/opened.canvas",
       "opened.canvas",
       "workspace",
     )
     expect(editor.recentFiles).toEqual([
       expect.objectContaining({
-        path: "/data/storage/siyuan-canvas/opened.canvas",
+        path: "/data/storage/petal/siyuan-canvas/opened.canvas",
         title: "opened.canvas",
       }),
     ])
@@ -1130,7 +1130,7 @@ Preview body
     await editor.save()
     await flushEditor()
 
-    const savedPath = "/data/storage/siyuan-canvas/saved-workspace.canvas"
+    const savedPath = "/data/storage/petal/siyuan-canvas/saved-workspace.canvas"
     const savedRaw = workspaceFiles.get(savedPath)
 
     expect(window.prompt).not.toHaveBeenCalled()
@@ -1181,10 +1181,10 @@ Preview body
   })
 
   it("re-prompts for a new workspace filename after overwrite is declined", async () => {
-    workspaceFiles.set("/data/storage/siyuan-canvas/existing.canvas", createCanvasRaw("already there"))
-    queueDialogResponse("/data/storage/siyuan-canvas/existing.canvas")
+    workspaceFiles.set("/data/storage/petal/siyuan-canvas/existing.canvas", createCanvasRaw("already there"))
+    queueDialogResponse("/data/storage/petal/siyuan-canvas/existing.canvas")
     queueConfirmResponse(false)
-    queueDialogResponse("/data/storage/siyuan-canvas/renamed.canvas")
+    queueDialogResponse("/data/storage/petal/siyuan-canvas/renamed.canvas")
 
     const { editor, wrapper } = await mountEditor()
 
@@ -1198,14 +1198,14 @@ Preview body
     await flushEditor()
 
     expect(confirm).toHaveBeenCalledOnce()
-    expect(workspaceFiles.get("/data/storage/siyuan-canvas/existing.canvas")).toContain("\"text\": \"already there\"")
-    expect(workspaceFiles.get("/data/storage/siyuan-canvas/renamed.canvas")).toContain("\"text\": \"saved after rename\"")
+    expect(workspaceFiles.get("/data/storage/petal/siyuan-canvas/existing.canvas")).toContain("\"text\": \"already there\"")
+    expect(workspaceFiles.get("/data/storage/petal/siyuan-canvas/renamed.canvas")).toContain("\"text\": \"saved after rename\"")
 
     wrapper.unmount()
   })
 
   it("captures external save conflicts and can overwrite the disk version afterwards", async () => {
-    const path = "/data/storage/siyuan-canvas/conflict.canvas"
+    const path = "/data/storage/petal/siyuan-canvas/conflict.canvas"
     workspaceFiles.set(path, createCanvasRaw("original on disk"))
 
     queueDialogResponse(path)
@@ -1240,7 +1240,7 @@ Preview body
   })
 
   it("loads the newer disk version into the editor after a conflict is detected", async () => {
-    const path = "/data/storage/siyuan-canvas/load-conflict.canvas"
+    const path = "/data/storage/petal/siyuan-canvas/load-conflict.canvas"
     workspaceFiles.set(path, createCanvasRaw("before conflict"))
 
     queueDialogResponse(path)
@@ -1285,14 +1285,14 @@ Preview body
 
     const { editor, wrapper } = await mountEditor()
 
-    expect(apiMock.readDir).toHaveBeenCalledWith("/data/storage/siyuan-canvas")
+    expect(apiMock.readDir).toHaveBeenCalledWith("/data/storage/petal/siyuan-canvas")
     expect(editor.workspaceDocuments).toEqual([
       {
-        path: "/data/storage/siyuan-canvas/alpha.canvas",
+        path: "/data/storage/petal/siyuan-canvas/alpha.canvas",
         title: "alpha.canvas",
       },
       {
-        path: "/data/storage/siyuan-canvas/beta.canvas",
+        path: "/data/storage/petal/siyuan-canvas/beta.canvas",
         title: "beta.canvas",
       },
     ])
@@ -1301,7 +1301,7 @@ Preview body
   })
 
   it("keeps recent files from both workspace and local opens", async () => {
-    workspaceFiles.set("/data/storage/siyuan-canvas/workspace.canvas", createCanvasRaw("workspace version"))
+    workspaceFiles.set("/data/storage/petal/siyuan-canvas/workspace.canvas", createCanvasRaw("workspace version"))
 
     queueDialogResponse("workspace")
     const { editor, wrapper } = await mountEditor()
@@ -1324,7 +1324,7 @@ Preview body
 
     expect(editor.recentFiles.map((item: any) => item.path)).toEqual([
       localPath,
-      "/data/storage/siyuan-canvas/workspace.canvas",
+      "/data/storage/petal/siyuan-canvas/workspace.canvas",
     ])
     expect(editor.recentFiles.map((item: any) => item.sourceType)).toEqual([
       "local",

@@ -32,6 +32,7 @@ interface CanvasWorkspaceEditor {
     document: {
       nodes: CanvasNode[]
     }
+    isDirty: boolean
     selectedNodeIds: string[]
   }
   updateTextNodeContent: (nodeId: string, text: string) => void
@@ -40,6 +41,7 @@ interface CanvasWorkspaceEditor {
 export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   const editingMarkdown = ref("")
   const editingNodeId = ref("")
+  const editingOriginalText = ref("")
   const editingTextareaRef = ref<HTMLTextAreaElement>()
   const canvasShellRef = ref<HTMLElement>()
   const edgeToolbarRef = ref<HTMLElement>()
@@ -177,7 +179,13 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
 
     editor.selectNode(node.id)
     editingNodeId.value = node.id
-    editingMarkdown.value = node.type === "group" ? (node.label || "") : node.text
+    const initialText: string = node.type === "group"
+      ? (node.label || "")
+      : node.type === "text"
+        ? (node.text || "")
+        : ""
+    editingMarkdown.value = initialText
+    editingOriginalText.value = initialText
     void nextTick(() => {
       editingTextareaRef.value?.focus()
       editingTextareaRef.value?.setSelectionRange(editingMarkdown.value.length, editingMarkdown.value.length)
@@ -192,7 +200,18 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     editor.updateTextNodeContent(editingNodeId.value, editingMarkdown.value)
     editingNodeId.value = ""
     editingMarkdown.value = ""
+    editingOriginalText.value = ""
   }
+
+  watch(editingMarkdown, (next) => {
+    if (!editingNodeId.value) {
+      return
+    }
+
+    if (next !== editingOriginalText.value) {
+      editor.state.isDirty = true
+    }
+  })
 
   async function handleImport(event: Event) {
     const input = event.target as HTMLInputElement

@@ -30,20 +30,6 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
   }
 
   setting.addItem({
-    title: t("settingsDefaultCanvasDirectoryTitle"),
-    description: t("settingsDefaultCanvasDirectoryDescription"),
-    createActionElement: () => {
-      const input = document.createElement("input")
-      input.className = "b3-text-field fn__flex-center"
-      input.value = draft.defaultCanvasDirectory
-      input.addEventListener("change", () => {
-        draft.defaultCanvasDirectory = input.value.trim() || "/data/storage/siyuan-canvas"
-        void saveDraft()
-      })
-      return input
-    },
-  })
-  setting.addItem({
     title: t("settingsRecentCanvasFileLimitTitle"),
     description: t("settingsRecentCanvasFileLimitDescription"),
     createActionElement: () => {

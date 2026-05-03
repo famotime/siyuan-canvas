@@ -26,6 +26,7 @@ import {
   readLocalFileText,
   writeLocalFileText,
 } from "@/canvas/local-file-system"
+import { CANVAS_DEFAULT_DIRECTORY } from "@/canvas/plugin-data"
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 
@@ -109,7 +110,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
   } = options
 
   function ensureCanvasPath(input: string): string {
-    return normalizeWorkspaceCanvasPath(input, getPluginSettings().defaultCanvasDirectory)
+    return normalizeWorkspaceCanvasPath(input, CANVAS_DEFAULT_DIRECTORY)
   }
 
   async function rememberRecentPath(path: string, sourceType: CanvasRecentFileSource) {
@@ -165,7 +166,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
       confirmLabel: t("dialogConfirm"),
       initialValue: state.filePath && fileSource.value === "workspace"
         ? state.filePath
-        : `${getPluginSettings().defaultCanvasDirectory}/${t("untitledCanvas")}`,
+        : `${CANVAS_DEFAULT_DIRECTORY}/${t("untitledCanvas")}`,
       title: t("promptWorkspacePath"),
     })
     const path = ensureCanvasPath(input || "")
@@ -216,7 +217,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     return {
       path: state.filePath && fileSource.value === "workspace"
         ? state.filePath
-        : `${getPluginSettings().defaultCanvasDirectory}/${suggestedFilename.value || t("untitledCanvas")}`,
+        : `${CANVAS_DEFAULT_DIRECTORY}/${suggestedFilename.value || t("untitledCanvas")}`,
       sourceType: "workspace",
     }
   }
@@ -225,7 +226,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     const defaults = getDefaultSaveTarget()
     const path = defaults.sourceType === "local"
       ? normalizeLocalCanvasPath(input, state.filePath)
-      : normalizeWorkspaceCanvasPath(input, getPluginSettings().defaultCanvasDirectory)
+      : normalizeWorkspaceCanvasPath(input, CANVAS_DEFAULT_DIRECTORY)
 
     if (!path) {
       return null
@@ -282,7 +283,6 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     suggestedFilename.value = getCanvasFileName(path)
     fileSource.value = "local"
     await rememberRecentPath(path, "local")
-    showMessage(t("messageCanvasSaved"), 2500, "info")
   }
 
   async function saveWorkspace(path: string) {
@@ -293,7 +293,6 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     fileSource.value = "workspace"
     await rememberRecentPath(path, "workspace")
     await refreshWorkspaceDocuments()
-    showMessage(t("messageCanvasSaved"), 2500, "info")
   }
 
   async function save() {
@@ -351,7 +350,6 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
         force: true,
       })
       await rememberRecentPath(state.filePath, "workspace")
-      showMessage(t("messageCanvasSavedByOverwritingDiskVersion"), 2500, "info")
     } catch (error) {
       showMessage(error instanceof Error ? error.message : t("messageUnableOverwriteDiskVersion"), 4000, "error")
     }
@@ -362,7 +360,6 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     state.loadConflictVersion()
     suggestedFilename.value = getCanvasFileName(conflictPath)
     fileSource.value = "workspace"
-    showMessage(t("messageLoadedNewerCanvasVersionFromDisk"), 2500, "info")
   }
 
   function openSettings() {

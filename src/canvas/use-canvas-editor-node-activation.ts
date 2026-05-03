@@ -2,11 +2,10 @@ import type { CanvasNode } from '@/canvas/types'
 import type { ResolvedCanvasFileTarget } from '@/canvas/file-target-resolution'
 import type { CanvasPluginBridge } from '@/canvas/use-canvas-editor-shared'
 
-import { openTab, showMessage } from 'siyuan'
+import { openTab } from 'siyuan'
 
 interface CanvasEditorNodeActivationOptions {
   ensureCanvasPath: (input: string) => string
-  getNodeTitle: (node: CanvasNode) => string
   getResolvedFileNode: (node: Extract<CanvasNode, { type: 'file' }>) => ResolvedCanvasFileTarget & {
     detail: string
   }
@@ -17,7 +16,6 @@ interface CanvasEditorNodeActivationOptions {
 export function createCanvasEditorNodeActivationActions(options: CanvasEditorNodeActivationOptions) {
   const {
     ensureCanvasPath,
-    getNodeTitle,
     getResolvedFileNode,
     openDocumentByBlockId,
     plugin,
@@ -68,14 +66,8 @@ export function createCanvasEditorNodeActivationActions(options: CanvasEditorNod
           keepCursor: true,
           openNewTab: true,
         })
-        return
       }
-
-      showMessage(resolved.detail || node.file, 2500, 'info')
-      return
     }
-
-    showMessage(getNodeTitle(node), 2500, 'info')
   }
 
   return {

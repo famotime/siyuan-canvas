@@ -15,6 +15,7 @@ import {
 } from "siyuan"
 import PluginInfoString from "@/../plugin.json"
 import {
+  CANVAS_DEFAULT_DIRECTORY,
   createDefaultCanvasPluginData,
   normalizeCanvasPluginData,
   rememberRecentCanvasFile,
@@ -25,6 +26,8 @@ import { detectCanvasPluginRuntime } from "@/canvas/plugin-runtime"
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import {
   CANVAS_EDITOR_TAB_TYPE,
+  CANVAS_TAB_ICON_ID,
+  CANVAS_TAB_ICON_SVG,
   openCanvasEditorTab,
   registerCanvasEditorTab,
 } from "@/canvas/plugin-tabs"
@@ -38,6 +41,8 @@ import "@/index.scss"
 
 const pluginInfo = PluginInfoString as { name: string, version: string }
 const STORAGE_KEY = "canvas-plugin-data"
+
+const TOPBAR_ICON_SVG = '<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M24 24V19L39 4L44 9L29 24H24Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 24H9C6.23858 24 4 26.2386 4 29C4 31.7614 6.23858 34 9 34H39C41.7614 34 44 36.2386 44 39C44 41.7614 41.7614 44 39 44H18" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
 export default class SiyuanCanvasPlugin extends Plugin {
   public isBrowser = false
@@ -65,10 +70,11 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.isElectron = runtime.isElectron
 
     bindPlugin(this)
+    this.addIcons(`<symbol id="${CANVAS_TAB_ICON_ID}" viewBox="0 0 48 48">${CANVAS_TAB_ICON_SVG}</symbol>`)
     registerCanvasEditorTab(this, CANVAS_EDITOR_TAB_TYPE)
 
     this.addTopBar({
-      icon: '<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M24 24V19L39 4L44 9L29 24H24Z" fill="none" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 24H9C6.23858 24 4 26.2386 4 29C4 31.7614 6.23858 34 9 34H39C41.7614 34 44 36.2386 44 39C44 41.7614 41.7614 44 39 44H18" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      icon: TOPBAR_ICON_SVG,
       title: this.t("addTopBarIcon"),
       callback: () => {
         void this.openCanvasTab()
@@ -91,7 +97,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
         const path = await openTextInputDialog({
           cancelLabel: this.t("dialogCancel"),
           confirmLabel: this.t("dialogConfirm"),
-          initialValue: "/data/storage/siyuan-canvas/untitled.canvas",
+          initialValue: `${CANVAS_DEFAULT_DIRECTORY}/${this.t("untitledCanvas")}`,
           title: this.t("promptWorkspacePath"),
         })
         if (!path) {
@@ -109,8 +115,6 @@ export default class SiyuanCanvasPlugin extends Plugin {
         this.openCanvasSettings()
       },
     })
-
-    showMessage(this.t("pluginLoaded"), 2500, "info")
   }
 
   onunload() {

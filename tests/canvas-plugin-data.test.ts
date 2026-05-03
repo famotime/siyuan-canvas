@@ -14,7 +14,6 @@ describe("canvas plugin data", () => {
   it("provides default settings for canvas persistence", () => {
     const data = createDefaultCanvasPluginData()
 
-    expect(data.settings.defaultCanvasDirectory).toBe("/data/storage/siyuan-canvas")
     expect(data.settings.detectExternalChanges).toBe(true)
     expect(data.settings.recentFilesLimit).toBe(8)
     expect(data.recentFiles).toEqual([])
