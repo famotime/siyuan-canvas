@@ -2,18 +2,14 @@
   "name": "siyuan-canvas",
   "author": "Quincy Zou",
   "url": "https://github.com/famotime/siyuan-canvas",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "minAppVersion": "2.10.14",
   "disabledInPublish": true,
   "backends": [
-    "windows",
-    "linux",
-    "darwin",
-    "docker"
+    "windows"
   ],
   "frontends": [
     "desktop",
-    "browser-desktop",
     "desktop-window"
   ],
   "displayName": {
@@ -21,8 +17,8 @@
     "zh_CN": "无界"
   },
   "description": {
-    "default": "Import, edit, and export Obsidian JSON Canvas files inside SiYuan",
-    "zh_CN": "在思源中导入、编辑并导出 Obsidian JSON Canvas 文件"
+    "default": "Import, edit, and export Obsidian Canvas files inside SiYuan",
+    "zh_CN": "在思源中导入、编辑并导出 Obsidian Canvas 文件"
   },
   "readme": {
     "default": "README.md",
