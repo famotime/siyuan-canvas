@@ -113,6 +113,8 @@
   "promptWorkspaceSavePath": "工作区保存路径",
   "confirmOverwriteCanvasTitle": "覆盖现有 Canvas 文件",
   "confirmOverwriteCanvasDescription": "目标文件已存在：{path}",
+  "settingsDefaultCanvasDirectoryTitle": "默认画布目录",
+  "settingsDefaultCanvasDirectoryDescription": "新建画布文件的工作区路径。默认为 /data/storage/petal/siyuan-canvas。",
   "settingsRecentCanvasFileLimitTitle": "最近 Canvas 文件数量",
   "settingsRecentCanvasFileLimitDescription": "控制编辑器中显示多少条最近打开的 Canvas 路径。",
   "settingsDetectExternalFileChangesTitle": "检测外部文件变更",

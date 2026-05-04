@@ -63,7 +63,6 @@ import {
   getCanvasFileName,
 } from "@/canvas/use-canvas-editor-shared"
 import {
-  CANVAS_DEFAULT_DIRECTORY,
   createDefaultCanvasPluginSettings,
   createDefaultCanvasPluginUiState,
 } from "@/canvas/plugin-data"
@@ -421,7 +420,7 @@ export function useCanvasEditor(
   }
 
   async function refreshWorkspaceDocuments() {
-    const directory = CANVAS_DEFAULT_DIRECTORY
+    const directory = getPluginSettings().defaultCanvasDirectory
 
     try {
       const entries = await readDir(directory) as Array<{
@@ -949,6 +948,7 @@ export function useCanvasEditor(
       toggleSelectionPopover,
       updateSelectedEdgeDirection,
       selectedEdgeDirectionMode,
+      defaultCanvasDirectory: computed(() => getPluginSettings().defaultCanvasDirectory),
     },
     ["fileInputRef", "stageRef"],
   )

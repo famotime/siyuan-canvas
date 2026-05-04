@@ -113,6 +113,8 @@
   "promptWorkspaceSavePath": "Workspace save path",
   "confirmOverwriteCanvasTitle": "Overwrite existing canvas file",
   "confirmOverwriteCanvasDescription": "The target file already exists: {path}",
+  "settingsDefaultCanvasDirectoryTitle": "Default canvas directory",
+  "settingsDefaultCanvasDirectoryDescription": "The workspace path where new canvas files are saved. Defaults to /data/storage/petal/siyuan-canvas.",
   "settingsRecentCanvasFileLimitTitle": "Recent canvas file limit",
   "settingsRecentCanvasFileLimitDescription": "Controls how many recent canvas paths are shown in the editor.",
   "settingsDetectExternalFileChangesTitle": "Detect external file changes",

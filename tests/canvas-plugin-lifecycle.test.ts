@@ -342,9 +342,11 @@ describe("canvas plugin lifecycle", () => {
     expect(setting.options).toEqual({ width: "560px" })
     expect(setting.open).toHaveBeenCalledWith("siyuan-canvas")
 
-    const recentFilesLimitInput = setting.items[0].createActionElement() as HTMLInputElement
-    const detectExternalChangesInput = setting.items[1].createActionElement() as HTMLInputElement
+    const defaultDirectoryInput = setting.items[0].createActionElement() as HTMLInputElement
+    const recentFilesLimitInput = setting.items[1].createActionElement() as HTMLInputElement
+    const detectExternalChangesInput = setting.items[2].createActionElement() as HTMLInputElement
 
+    expect(defaultDirectoryInput.value).toBe("/data/storage/petal/siyuan-canvas")
     expect(recentFilesLimitInput.value).toBe("8")
     expect(detectExternalChangesInput.checked).toBe(true)
 
@@ -357,6 +359,7 @@ describe("canvas plugin lifecycle", () => {
     await Promise.resolve()
 
     expect(plugin.getCanvasSettings()).toEqual({
+      defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
       recentFilesLimit: 1,
     })
@@ -392,6 +395,7 @@ describe("canvas plugin lifecycle", () => {
     await plugin.onload()
 
     expect(plugin.getCanvasSettings()).toEqual({
+      defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
       recentFilesLimit: 3,
     })

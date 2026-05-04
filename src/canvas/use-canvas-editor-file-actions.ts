@@ -26,7 +26,6 @@ import {
   readLocalFileText,
   writeLocalFileText,
 } from "@/canvas/local-file-system"
-import { CANVAS_DEFAULT_DIRECTORY } from "@/canvas/plugin-data"
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 
@@ -109,8 +108,12 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     t,
   } = options
 
+  function defaultDirectory(): string {
+    return getPluginSettings().defaultCanvasDirectory
+  }
+
   function ensureCanvasPath(input: string): string {
-    return normalizeWorkspaceCanvasPath(input, CANVAS_DEFAULT_DIRECTORY)
+    return normalizeWorkspaceCanvasPath(input, defaultDirectory())
   }
 
   async function confirmUnsavedChanges(): Promise<boolean> {
@@ -127,12 +130,13 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
   }
 
   async function nextUntitledName(): Promise<string> {
+    const dir = defaultDirectory()
     const baseName = t("untitledCanvas").replace(/\.canvas$/i, "")
     const first = `${baseName}.canvas`
-    if (!await workspacePathExists(`${CANVAS_DEFAULT_DIRECTORY}/${first}`)) return first
+    if (!await workspacePathExists(`${dir}/${first}`)) return first
     for (let i = 2; i <= 99; i++) {
       const candidate = `${baseName} (${i}).canvas`
-      if (!await workspacePathExists(`${CANVAS_DEFAULT_DIRECTORY}/${candidate}`)) return candidate
+      if (!await workspacePathExists(`${dir}/${candidate}`)) return candidate
     }
     return first
   }
@@ -188,7 +192,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
       confirmLabel: t("dialogConfirm"),
       initialValue: state.filePath && fileSource.value === "workspace"
         ? state.filePath
-        : `${CANVAS_DEFAULT_DIRECTORY}/${t("untitledCanvas")}`,
+        : `${defaultDirectory()}/${t("untitledCanvas")}`,
       title: t("promptWorkspacePath"),
     })
     const path = ensureCanvasPath(input || "")
@@ -239,7 +243,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     return {
       path: state.filePath && fileSource.value === "workspace"
         ? state.filePath
-        : `${CANVAS_DEFAULT_DIRECTORY}/${suggestedFilename.value || t("untitledCanvas")}`,
+        : `${defaultDirectory()}/${suggestedFilename.value || t("untitledCanvas")}`,
       sourceType: "workspace",
     }
   }
@@ -248,7 +252,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     const defaults = getDefaultSaveTarget()
     const path = defaults.sourceType === "local"
       ? normalizeLocalCanvasPath(input, state.filePath)
-      : normalizeWorkspaceCanvasPath(input, CANVAS_DEFAULT_DIRECTORY)
+      : normalizeWorkspaceCanvasPath(input, defaultDirectory())
 
     if (!path) {
       return null

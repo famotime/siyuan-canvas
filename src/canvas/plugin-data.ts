@@ -3,6 +3,7 @@ export type CanvasRecentFileSource = "local" | "workspace"
 export const CANVAS_DEFAULT_DIRECTORY = "/data/storage/petal/siyuan-canvas"
 
 export interface CanvasPluginSettings {
+  defaultCanvasDirectory: string
   detectExternalChanges: boolean
   recentFilesLimit: number
 }
@@ -36,6 +37,7 @@ export interface CanvasPluginData {
 
 export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
   return {
+    defaultCanvasDirectory: CANVAS_DEFAULT_DIRECTORY,
     detectExternalChanges: true,
     recentFilesLimit: 8,
   }
@@ -105,6 +107,10 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     : defaults.recentFiles
 
   const settings = {
+    defaultCanvasDirectory: typeof candidate.settings?.defaultCanvasDirectory === "string"
+      && candidate.settings.defaultCanvasDirectory.trim()
+      ? candidate.settings.defaultCanvasDirectory.trim()
+      : defaults.settings.defaultCanvasDirectory,
     detectExternalChanges: typeof candidate.settings?.detectExternalChanges === "boolean"
       ? candidate.settings.detectExternalChanges
       : defaults.settings.detectExternalChanges,

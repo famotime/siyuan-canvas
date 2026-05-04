@@ -30,6 +30,22 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
   }
 
   setting.addItem({
+    title: t("settingsDefaultCanvasDirectoryTitle"),
+    description: t("settingsDefaultCanvasDirectoryDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.className = "b3-text-field fn__flex-center"
+      input.type = "text"
+      input.value = draft.defaultCanvasDirectory
+      input.addEventListener("change", () => {
+        draft.defaultCanvasDirectory = input.value.trim() || draft.defaultCanvasDirectory
+        input.value = draft.defaultCanvasDirectory
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
     title: t("settingsRecentCanvasFileLimitTitle"),
     description: t("settingsRecentCanvasFileLimitDescription"),
     createActionElement: () => {

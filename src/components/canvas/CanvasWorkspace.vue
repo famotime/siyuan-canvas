@@ -910,7 +910,7 @@
               </div>
               <p v-else>
                 {{ t("inspectorNoWorkspaceCanvasFiles") }}<br>
-                <code>{{ CANVAS_DEFAULT_DIRECTORY }}/</code>
+                <code>{{ editor.defaultCanvasDirectory }}/</code>
               </p>
               <div
                 v-if="editor.state.conflict"
@@ -1274,7 +1274,6 @@ import {
 } from "vue"
 import type { CanvasTabBootstrap } from "@/main"
 import { useCanvasEditor } from "@/canvas/use-canvas-editor"
-import { CANVAS_DEFAULT_DIRECTORY } from "@/canvas/plugin-data"
 import {
   CanvasIcon,
 } from "@/components/canvas/canvas-icon"

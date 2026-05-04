@@ -15,7 +15,6 @@ import {
 } from "siyuan"
 import PluginInfoString from "@/../plugin.json"
 import {
-  CANVAS_DEFAULT_DIRECTORY,
   createDefaultCanvasPluginData,
   normalizeCanvasPluginData,
   rememberRecentCanvasFile,
@@ -98,7 +97,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
         const path = await openTextInputDialog({
           cancelLabel: this.t("dialogCancel"),
           confirmLabel: this.t("dialogConfirm"),
-          initialValue: `${CANVAS_DEFAULT_DIRECTORY}/${this.t("untitledCanvas")}`,
+          initialValue: `${this.canvasData.settings.defaultCanvasDirectory}/${this.t("untitledCanvas")}`,
           title: this.t("promptWorkspacePath"),
         })
         if (!path) {
