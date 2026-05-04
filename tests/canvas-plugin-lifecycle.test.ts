@@ -361,6 +361,7 @@ describe("canvas plugin lifecycle", () => {
     expect(plugin.getCanvasSettings()).toEqual({
       defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
+      enableDebugLog: false,
       recentFilesLimit: 1,
     })
   })
@@ -397,6 +398,7 @@ describe("canvas plugin lifecycle", () => {
     expect(plugin.getCanvasSettings()).toEqual({
       defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
+      enableDebugLog: false,
       recentFilesLimit: 3,
     })
     expect(plugin.getRecentCanvasFiles()).toEqual([

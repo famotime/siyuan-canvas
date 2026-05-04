@@ -896,7 +896,6 @@
                     @click="editor.openWorkspacePath(documentEntry.path)"
                   >
                     <strong>{{ documentEntry.title }}</strong>
-                    <span>{{ documentEntry.path }}</span>
                   </button>
                   <button
                     class="recent-list__item-delete"
@@ -973,13 +972,12 @@
                     @click="editor.openRecentFile(recent)"
                   >
                     <strong>{{ recent.title }}</strong>
-                    <span>{{ recent.path }}</span>
                   </button>
                   <button
                     class="recent-list__item-delete"
                     :title="t('selectionToolbarDelete')"
                     type="button"
-                    @click.stop="editor.deleteWorkspaceDocument(recent.path)"
+                    @click.stop="editor.removeRecentFileRecord(recent.path)"
                   >
                     &times;
                   </button>

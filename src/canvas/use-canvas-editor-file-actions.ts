@@ -57,29 +57,14 @@ function normalizeWorkspaceCanvasPath(input: string, baseDirectory: string): str
   return normalized.startsWith("/") ? normalized : `${baseDirectory}/${normalized}`
 }
 
-function normalizeLocalCanvasPath(input: string, currentPath: string): string {
-  const trimmed = input.trim()
-  if (!trimmed) {
-    return ""
-  }
-
-  const normalized = trimmed.endsWith(".canvas") ? trimmed : `${trimmed}.canvas`
-  if (
-    normalized.includes("/")
-    || normalized.includes("\\")
-    || /^[a-z]:/i.test(normalized)
-    || normalized.startsWith("\\\\")
-    || !currentPath
-  ) {
-    return normalized
-  }
-
-  const slashIndex = Math.max(currentPath.lastIndexOf("/"), currentPath.lastIndexOf("\\"))
-  if (slashIndex < 0) {
-    return normalized
-  }
-
-  return `${currentPath.slice(0, slashIndex + 1)}${normalized}`
+function sanitizeCanvasFileName(name: string): string {
+  return name
+    .replace(/[\\/:*?"'<>|]/g, "_")
+    .replace(/[~[\]()!&{}=#%;$]/g, "")
+    .replace(/[\x00-\x1f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\.+$/, "")
 }
 
 async function workspacePathExists(path: string): Promise<boolean> {
@@ -108,6 +93,12 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     t,
   } = options
 
+  function debugLog(...args: unknown[]) {
+    if (getPluginSettings().enableDebugLog) {
+      console.log("[Canvas]", ...args)
+    }
+  }
+
   function defaultDirectory(): string {
     return getPluginSettings().defaultCanvasDirectory
   }
@@ -135,7 +126,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     const first = `${baseName}.canvas`
     if (!await workspacePathExists(`${dir}/${first}`)) return first
     for (let i = 2; i <= 99; i++) {
-      const candidate = `${baseName} (${i}).canvas`
+      const candidate = `${baseName}-${i}.canvas`
       if (!await workspacePathExists(`${dir}/${candidate}`)) return candidate
     }
     return first
@@ -217,7 +208,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
 
     const localPath = getSelectedLocalPath(file)
     const title = file.name || getCanvasFileName(localPath)
-    suggestedFilename.value = title
+    suggestedFilename.value = sanitizeCanvasFileName(title) || title
     state.replaceDocument(parsed.document, localPath, { raw })
     state.issues = {
       errors: parsed.errors,
@@ -248,24 +239,14 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     }
   }
 
-  function normalizeSaveTarget(input: string): ResolvedSaveTarget | null {
-    const defaults = getDefaultSaveTarget()
-    const path = defaults.sourceType === "local"
-      ? normalizeLocalCanvasPath(input, state.filePath)
-      : normalizeWorkspaceCanvasPath(input, defaultDirectory())
-
-    if (!path) {
-      return null
-    }
-
-    return {
-      path,
-      sourceType: defaults.sourceType,
-    }
-  }
-
   async function resolveSaveTarget(): Promise<ResolvedSaveTarget | null> {
-    let candidate = getDefaultSaveTarget().path
+    const defaults = getDefaultSaveTarget()
+    debugLog("resolveSaveTarget: defaults =", JSON.stringify(defaults))
+    debugLog("resolveSaveTarget: state.filePath =", state.filePath)
+    debugLog("resolveSaveTarget: fileSource.value =", fileSource.value)
+    debugLog("resolveSaveTarget: defaultDirectory() =", defaultDirectory())
+    let candidate = getCanvasFileName(defaults.path).replace(/\.canvas$/i, "")
+    debugLog("resolveSaveTarget: candidate (filename) =", candidate)
 
     while (true) {
       const input = await openTextInputDialog({
@@ -274,15 +255,29 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
         initialValue: candidate,
         title: t("promptCanvasSavePath"),
       })
-      const target = normalizeSaveTarget(input || "")
-      if (!target) {
+      const rawName = sanitizeCanvasFileName((input || "").trim().split(/[/\\]/).pop() || "").replace(/\.canvas$/i, "")
+      debugLog("resolveSaveTarget: user input =", JSON.stringify(input), "→ sanitized name =", JSON.stringify(rawName))
+      if (!rawName) {
         return null
+      }
+      const dirPath = defaults.sourceType === "local" && state.filePath
+        ? state.filePath.replace(/[/\\][^/\\]+$/, "")
+        : defaultDirectory()
+      const sep = dirPath.includes("\\") ? "\\" : "/"
+      const targetPath = `${dirPath}${sep}${rawName}.canvas`
+      debugLog("resolveSaveTarget: dirPath =", dirPath)
+      debugLog("resolveSaveTarget: targetPath =", targetPath)
+      const target: ResolvedSaveTarget = {
+        path: targetPath,
+        sourceType: defaults.sourceType,
       }
 
       const isCurrentPath = target.path === state.filePath && target.sourceType === fileSource.value
+      debugLog("resolveSaveTarget: isCurrentPath =", isCurrentPath)
       const exists = target.sourceType === "local"
         ? await localPathExists(target.path)
         : await workspacePathExists(target.path)
+      debugLog("resolveSaveTarget: exists =", exists)
 
       if (exists && !isCurrentPath) {
         const overwrite = await openConfirmDialog(
@@ -290,7 +285,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
           t("confirmOverwriteCanvasDescription", { path: target.path }),
         )
         if (!overwrite) {
-          candidate = target.path
+          candidate = rawName
           continue
         }
       }
@@ -324,17 +319,22 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
   async function save() {
     const target = await resolveSaveTarget()
     if (!target) {
+      debugLog("save: user cancelled")
       return
     }
+    debugLog("save: target =", JSON.stringify(target))
 
     try {
       if (target.sourceType === "local") {
+        debugLog("save: calling saveLocal(", target.path, ")")
         await saveLocal(target.path)
         return
       }
 
+      debugLog("save: calling saveWorkspace(", target.path, ")")
       await saveWorkspace(target.path)
     } catch (error) {
+      debugLog("save: error caught", error)
       if (state.conflict) {
         showMessage(t("messageCanvasFileChangedOnDisk"), 5000, "error")
         return

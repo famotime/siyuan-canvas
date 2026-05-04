@@ -37,11 +37,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
       input.className = "b3-text-field fn__flex-center"
       input.type = "text"
       input.value = draft.defaultCanvasDirectory
-      input.addEventListener("change", () => {
-        draft.defaultCanvasDirectory = input.value.trim() || draft.defaultCanvasDirectory
-        input.value = draft.defaultCanvasDirectory
-        void saveDraft()
-      })
+      input.disabled = true
       return input
     },
   })
@@ -73,6 +69,20 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
       input.checked = draft.detectExternalChanges
       input.addEventListener("change", () => {
         draft.detectExternalChanges = input.checked
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
+    title: t("settingsEnableDebugLogTitle"),
+    description: t("settingsEnableDebugLogDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.type = "checkbox"
+      input.checked = draft.enableDebugLog
+      input.addEventListener("change", () => {
+        draft.enableDebugLog = input.checked
         void saveDraft()
       })
       return input

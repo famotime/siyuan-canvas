@@ -426,11 +426,12 @@ export function useCanvasEditor(
       const entries = await readDir(directory) as Array<{
         isDir: boolean
         name: string
+        updated: number
       }> | null
 
       workspaceDocuments.value = (Array.isArray(entries) ? entries : [])
         .filter((entry) => !entry.isDir && entry.name.endsWith(".canvas"))
-        .sort((left, right) => left.name.localeCompare(right.name))
+        .sort((left, right) => (right.updated ?? 0) - (left.updated ?? 0))
         .map((entry) => ({
           path: `${directory}/${entry.name}`,
           title: entry.name,
@@ -454,6 +455,11 @@ export function useCanvasEditor(
     await plugin.removeRecentCanvasFile?.(path)
     refreshRecentFiles()
     await refreshWorkspaceDocuments()
+  }
+
+  async function removeRecentFileRecord(path: string) {
+    await plugin.removeRecentCanvasFile?.(path)
+    refreshRecentFiles()
   }
 
   async function openDocumentAtBlock(blockId: string, documentId?: string) {
@@ -844,6 +850,7 @@ export function useCanvasEditor(
       displayNodes,
       deactivateCanvasSurface,
       deleteWorkspaceDocument,
+      removeRecentFileRecord,
       connectionDraft,
       edgeColorOptions: selectionColors,
       edgeLabelDraft,
