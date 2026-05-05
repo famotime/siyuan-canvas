@@ -281,7 +281,7 @@ watch(activeEdgeNodePicker, async (kind) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.24);
+  background: color-mix(in srgb, var(--b3-theme-on-surface) 24%, transparent);
   backdrop-filter: blur(4px);
 }
 

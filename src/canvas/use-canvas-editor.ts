@@ -48,6 +48,7 @@ import {
 } from "@/canvas/document"
 import { createCanvasEditorBindings } from "@/canvas/editor-bindings"
 import { CanvasEditorState } from "@/canvas/editor-state"
+import { CanvasHistoryStack, cloneCanvasDocument } from "@/canvas/canvas-history"
 import { createCanvasEditorFileActions } from "@/canvas/use-canvas-editor-file-actions"
 import { createCanvasEditorFilePickerActions } from "@/canvas/use-canvas-editor-file-picker"
 import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-file-nodes"
@@ -105,6 +106,10 @@ export function useCanvasEditor(
   const t = createCanvasI18n(plugin.i18n)
   const fileService = new CanvasFileService(new SiyuanCanvasTextGateway())
   const state = reactive(new CanvasEditorState(fileService))
+  const history = new CanvasHistoryStack({ capacity: 100 })
+  // Vue 反应式不能感知 class 内部状态，这里靠版本号触发 canUndo/canRedo 的 computed 重算
+  const historyVersion = ref(0)
+  const isSaving = ref(false)
   const viewport = reactive({
     scale: 1,
     x: 0,
@@ -755,8 +760,95 @@ export function useCanvasEditor(
   }
 
   function commitDocument(nextDocument: CanvasDocument) {
+    // 在变更前抓快照入历史栈，undo 时可还原文档与选区
+    history.record({
+      document: cloneCanvasDocument(state.document),
+      selectedNodeIds: [...state.selectedNodeIds],
+      selectedNodeId: state.selectedNodeId,
+      selectedEdgeId: state.selectedEdgeId,
+    })
+    historyVersion.value++
     state.patchDocument(nextDocument)
     state.issues = validateCanvasDocument(nextDocument)
+  }
+
+  function applyHistorySnapshot(snapshot: ReturnType<typeof cloneCanvasDocument> extends infer _T ? import("@/canvas/canvas-history").CanvasHistorySnapshot : never) {
+    state.document = snapshot.document
+    state.selectedNodeIds = [...snapshot.selectedNodeIds]
+    state.selectedNodeId = snapshot.selectedNodeId
+    state.selectedEdgeId = snapshot.selectedEdgeId
+    state.isDirty = true
+    state.issues = validateCanvasDocument(snapshot.document)
+  }
+
+  function undo() {
+    const current = {
+      document: cloneCanvasDocument(state.document),
+      selectedNodeIds: [...state.selectedNodeIds],
+      selectedNodeId: state.selectedNodeId,
+      selectedEdgeId: state.selectedEdgeId,
+    }
+    const previous = history.undo(current)
+    if (!previous) {
+      return
+    }
+    applyHistorySnapshot(previous)
+    historyVersion.value++
+  }
+
+  function redo() {
+    const current = {
+      document: cloneCanvasDocument(state.document),
+      selectedNodeIds: [...state.selectedNodeIds],
+      selectedNodeId: state.selectedNodeId,
+      selectedEdgeId: state.selectedEdgeId,
+    }
+    const next = history.redo(current)
+    if (!next) {
+      return
+    }
+    applyHistorySnapshot(next)
+    historyVersion.value++
+  }
+
+  function duplicateSelection() {
+    if (state.selectedNodeIds.length === 0) {
+      return
+    }
+    const idMap = new Map<string, string>()
+    const offset = 24
+    const newNodes: CanvasNode[] = []
+    for (const node of state.document.nodes) {
+      if (!state.selectedNodeIds.includes(node.id)) {
+        continue
+      }
+      const newId = `${node.id}-copy-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      idMap.set(node.id, newId)
+      newNodes.push({
+        ...cloneCanvasDocument({ nodes: [node], edges: [] }).nodes[0],
+        id: newId,
+        x: node.x + offset,
+        y: node.y + offset,
+      } as CanvasNode)
+    }
+    if (newNodes.length === 0) {
+      return
+    }
+
+    const nextDocument: CanvasDocument = {
+      ...state.document,
+      nodes: [...state.document.nodes, ...newNodes],
+    }
+    commitDocument(nextDocument)
+    state.selectNodes([...idMap.values()])
+  }
+
+  function zoomToActualSize() {
+    viewport.scale = 1
+  }
+
+  function zoomToFit() {
+    resetViewport()
   }
 
   function closeSelectionPopover() {
@@ -800,7 +892,7 @@ export function useCanvasEditor(
     openWorkspacePath,
     overwriteConflictVersion,
     rememberRecentPath,
-    save,
+    save: saveImpl,
     triggerImport,
   } = createCanvasEditorFileActions({
     fileInputRef,
@@ -813,6 +905,45 @@ export function useCanvasEditor(
     state,
     suggestedFilename,
     t,
+  })
+
+  /**
+   * 保存包装：维护 isSaving 标志，让顶栏徽标可以呈现 saving 态。
+   * 同时在打开新文件 / 新建画布时清空历史栈，避免跨文档 undo 出诡异结果。
+   */
+  async function save() {
+    if (isSaving.value) {
+      return
+    }
+    isSaving.value = true
+    try {
+      await saveImpl()
+    } finally {
+      isSaving.value = false
+    }
+  }
+
+  function clearHistory() {
+    history.clear()
+    historyVersion.value++
+  }
+
+  // 跟踪 filePath 变化（newCanvas / open* 都会改 filePath），切换文档时清空历史
+  watch(
+    () => state.filePath,
+    () => {
+      clearHistory()
+    },
+  )
+
+  const canUndo = computed(() => {
+    // 读 historyVersion 触发重算
+    void historyVersion.value
+    return history.canUndo
+  })
+  const canRedo = computed(() => {
+    void historyVersion.value
+    return history.canRedo
   })
   const {
     addNode,
@@ -959,13 +1090,20 @@ export function useCanvasEditor(
     closeEdgePopover,
     closeSelectionPopover,
     deleteSelection,
+    duplicateSelection,
     getEdgeToolbarPopover: () => edgeToolbarPopover.value,
     getEditingEdgeLabelId: () => editingEdgeLabelId.value,
     getSelectionToolbarPopover: () => selectionToolbarPopover.value,
+    redo,
     save,
     selectAllNodes: () => state.selectAllNodes(),
     selectEdge: () => state.selectEdge(),
     selectNode: () => state.selectNode(),
+    undo,
+    zoomIn,
+    zoomOut,
+    zoomToActualSize,
+    zoomToFit,
   })
 
   onMounted(async () => {
@@ -1112,6 +1250,14 @@ export function useCanvasEditor(
       viewport,
       zoomIn,
       zoomOut,
+      zoomToActualSize,
+      zoomToFit,
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      isSaving,
+      duplicateSelection,
       getRenderedMarkdown,
       handleClipboardImagePaste,
       handleNodePointerDown,

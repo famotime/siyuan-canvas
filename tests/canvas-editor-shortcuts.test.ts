@@ -12,17 +12,45 @@ import { createCanvasEditorKeyboardHandler } from '@/canvas/use-canvas-editor-sh
 function createKeyboardEvent(key: string, options: {
   ctrlKey?: boolean
   metaKey?: boolean
+  shiftKey?: boolean
+  altKey?: boolean
   target?: EventTarget | null
 } = {}) {
   const event = {
+    altKey: options.altKey ?? false,
     ctrlKey: options.ctrlKey ?? false,
     key,
     metaKey: options.metaKey ?? false,
     preventDefault: vi.fn(),
+    shiftKey: options.shiftKey ?? false,
     target: options.target ?? null,
   } as unknown as KeyboardEvent
 
   return event
+}
+
+function createBaseHandlerOptions() {
+  return {
+    canDelete: () => false,
+    cancelEdgeLabelEditing: vi.fn(),
+    closeEdgePopover: vi.fn(),
+    closeSelectionPopover: vi.fn(),
+    deleteSelection: vi.fn(),
+    duplicateSelection: vi.fn(),
+    getEdgeToolbarPopover: () => 'closed' as const,
+    getEditingEdgeLabelId: () => '',
+    getSelectionToolbarPopover: () => 'closed' as const,
+    redo: vi.fn(),
+    save: vi.fn(),
+    selectAllNodes: vi.fn(),
+    selectEdge: vi.fn(),
+    selectNode: vi.fn(),
+    undo: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+    zoomToActualSize: vi.fn(),
+    zoomToFit: vi.fn(),
+  }
 }
 
 describe('canvas editor keyboard handler', () => {
@@ -149,5 +177,95 @@ describe('canvas editor keyboard handler', () => {
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
     expect(save).toHaveBeenCalledOnce()
+  })
+
+  it('undoes on accelerator+z', () => {
+    const undo = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      undo,
+    })
+    const event = createKeyboardEvent('z', { ctrlKey: true })
+
+    handler.handleKeydown(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(undo).toHaveBeenCalledOnce()
+  })
+
+  it('redoes on accelerator+y', () => {
+    const redo = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      redo,
+    })
+    const event = createKeyboardEvent('y', { ctrlKey: true })
+
+    handler.handleKeydown(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(redo).toHaveBeenCalledOnce()
+  })
+
+  it('redoes on accelerator+shift+z', () => {
+    const redo = vi.fn()
+    const undo = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      redo,
+      undo,
+    })
+    const event = createKeyboardEvent('z', { ctrlKey: true, shiftKey: true })
+
+    handler.handleKeydown(event)
+
+    expect(redo).toHaveBeenCalledOnce()
+    expect(undo).not.toHaveBeenCalled()
+  })
+
+  it('duplicates the selection on accelerator+d', () => {
+    const duplicateSelection = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      duplicateSelection,
+    })
+    const event = createKeyboardEvent('d', { ctrlKey: true })
+
+    handler.handleKeydown(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(duplicateSelection).toHaveBeenCalledOnce()
+  })
+
+  it('zooms in on accelerator+= and out on accelerator+-', () => {
+    const zoomIn = vi.fn()
+    const zoomOut = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      zoomIn,
+      zoomOut,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('=', { ctrlKey: true }))
+    handler.handleKeydown(createKeyboardEvent('-', { ctrlKey: true }))
+
+    expect(zoomIn).toHaveBeenCalledOnce()
+    expect(zoomOut).toHaveBeenCalledOnce()
+  })
+
+  it('returns to actual size on accelerator+0 and fits on F', () => {
+    const zoomToActualSize = vi.fn()
+    const zoomToFit = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      zoomToActualSize,
+      zoomToFit,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('0', { ctrlKey: true }))
+    handler.handleKeydown(createKeyboardEvent('f'))
+
+    expect(zoomToActualSize).toHaveBeenCalledOnce()
+    expect(zoomToFit).toHaveBeenCalledOnce()
   })
 })

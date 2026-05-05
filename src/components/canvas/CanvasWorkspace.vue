@@ -9,7 +9,7 @@
       data-testid="top-toolbar"
       @pointerdown.capture="editor.deactivateCanvasSurface"
     >
-      <div class="toolbar__group">
+      <div class="toolbar__group" :aria-label="t('toolbarGroupFile')">
         <button
           class="toolbar__button toolbar__button--icon toolbar__button--primary"
           data-testid="top-toolbar-new"
@@ -37,10 +37,15 @@
           />
         </button>
         <button
-          class="toolbar__button toolbar__button--icon"
+          class="toolbar__button toolbar__button--icon toolbar__button--save"
+          :class="{
+            'toolbar__button--has-badge': editor.state.isDirty || editor.state.conflict,
+            'toolbar__button--saving': editor.isSaving,
+          }"
           data-testid="top-toolbar-save"
-          :aria-label="t('toolbarSave')"
-          :data-tooltip="t('toolbarSave')"
+          :aria-label="editor.isSaving ? t('toolbarSaving') : t('toolbarSave')"
+          :data-tooltip="editor.isSaving ? t('toolbarSaving') : t('toolbarSave')"
+          :disabled="editor.isSaving"
           type="button"
           @click="editor.save"
         >
@@ -48,9 +53,59 @@
             class="toolbar__icon"
             name="save"
           />
+          <span
+            v-if="editor.state.conflict"
+            class="toolbar__button-badge toolbar__button-badge--danger"
+            data-testid="top-toolbar-save-badge-conflict"
+            aria-hidden="true"
+          />
+          <span
+            v-else-if="editor.isSaving"
+            class="toolbar__button-badge toolbar__button-badge--saving"
+            data-testid="top-toolbar-save-badge-saving"
+            aria-hidden="true"
+          />
+          <span
+            v-else-if="editor.state.isDirty"
+            class="toolbar__button-badge toolbar__button-badge--dirty"
+            data-testid="top-toolbar-save-badge-dirty"
+            aria-hidden="true"
+          />
         </button>
       </div>
-      <div class="toolbar__group">
+      <span class="toolbar__divider" aria-hidden="true" />
+      <div class="toolbar__group" :aria-label="t('toolbarGroupHistory')">
+        <button
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-undo"
+          :aria-label="t('toolbarUndo')"
+          :data-tooltip="t('toolbarUndo')"
+          :disabled="!editor.canUndo"
+          type="button"
+          @click="editor.undo"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="undo"
+          />
+        </button>
+        <button
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-redo"
+          :aria-label="t('toolbarRedo')"
+          :data-tooltip="t('toolbarRedo')"
+          :disabled="!editor.canRedo"
+          type="button"
+          @click="editor.redo"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="redo"
+          />
+        </button>
+      </div>
+      <span class="toolbar__divider" aria-hidden="true" />
+      <div class="toolbar__group" :aria-label="t('toolbarGroupView')">
         <button
           class="toolbar__button toolbar__button--icon"
           data-testid="top-toolbar-zoom-out"
@@ -64,12 +119,16 @@
             name="zoom-out"
           />
         </button>
-        <span
-          class="toolbar__stat"
+        <button
+          class="toolbar__stat toolbar__stat--button"
           data-testid="top-toolbar-scale-value"
+          :aria-label="t('toolbarZoomActual')"
+          :data-tooltip="t('toolbarZoomActual')"
+          type="button"
+          @click="editor.zoomToActualSize"
         >
           {{ Math.round(editor.viewport.scale * 100) }}%
-        </span>
+        </button>
         <button
           class="toolbar__button toolbar__button--icon"
           data-testid="top-toolbar-zoom-in"
@@ -86,8 +145,8 @@
         <button
           class="toolbar__button toolbar__button--icon"
           data-testid="top-toolbar-reset-viewport"
-          :aria-label="t('toolbarResetViewport')"
-          :data-tooltip="t('toolbarResetViewport')"
+          :aria-label="t('toolbarZoomFit')"
+          :data-tooltip="t('toolbarZoomFit')"
           type="button"
           @click="editor.resetViewport"
         >
@@ -98,12 +157,30 @@
         </button>
       </div>
       <div class="toolbar__meta">
-        <span>{{ editor.state.filePath || editor.suggestedFilename || t("untitledCanvas") }}</span>
-        <span>{{ t("toolbarGraphStats", { nodes: editor.state.document.nodes.length, edges: editor.state.document.edges.length }) }}</span>
-        <span :class="editor.state.isDirty ? 'toolbar__dirty' : 'toolbar__saved'">
-          {{ editor.state.isDirty ? t("toolbarUnsavedChanges") : t("toolbarSaved") }}
+        <span class="toolbar__meta-name">{{ editor.state.filePath || editor.suggestedFilename || t("untitledCanvas") }}</span>
+        <span class="toolbar__meta-stats">{{ t("toolbarGraphStats", { nodes: editor.state.document.nodes.length, edges: editor.state.document.edges.length }) }}</span>
+        <span
+          class="toolbar__status"
+          :class="{
+            'toolbar__status--dirty': editor.state.isDirty && !editor.state.conflict,
+            'toolbar__status--saved': !editor.state.isDirty && !editor.state.conflict && !editor.isSaving,
+            'toolbar__status--saving': editor.isSaving,
+            'toolbar__status--conflict': !!editor.state.conflict,
+          }"
+        >
+          <span class="toolbar__status-dot" aria-hidden="true" />
+          {{
+            editor.state.conflict
+              ? t("toolbarConflictState")
+              : editor.isSaving
+                ? t("toolbarSavingState")
+                : editor.state.isDirty
+                  ? t("toolbarUnsavedChanges")
+                  : t("toolbarSaved")
+          }}
         </span>
       </div>
+      <span class="toolbar__divider" aria-hidden="true" />
       <div class="toolbar__group">
         <button
           class="toolbar__button toolbar__button--icon"
@@ -145,6 +222,33 @@
         @wheel.passive="editor.handleWheelZoom"
         @contextmenu.prevent
       >
+        <div
+          v-if="editor.state.conflict"
+          class="conflict-banner"
+          role="alert"
+          data-testid="conflict-banner"
+        >
+          <div class="conflict-banner__body">
+            <strong class="conflict-banner__title">{{ t('conflictBannerTitle') }}</strong>
+            <span class="conflict-banner__description">{{ t('conflictBannerDescription') }}</span>
+          </div>
+          <div class="conflict-banner__actions">
+            <button
+              class="conflict-banner__button"
+              type="button"
+              @click="editor.loadConflictVersion"
+            >
+              {{ t('conflictBannerLoadDisk') }}
+            </button>
+            <button
+              class="conflict-banner__button conflict-banner__button--primary"
+              type="button"
+              @click="editor.overwriteConflictVersion"
+            >
+              {{ t('conflictBannerOverwrite') }}
+            </button>
+          </div>
+        </div>
         <div
           class="stage__world"
           :style="{
@@ -308,6 +412,14 @@
                 >
                   <div class="link-card__header">
                     <span class="link-card__url">{{ node.url }}</span>
+                    <a
+                      class="link-card__open"
+                      :href="node.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      :title="t('linkCardOpenInBrowser')"
+                      @click.stop
+                    >↗</a>
                   </div>
                   <div class="link-card__iframe-wrapper">
                     <iframe
@@ -316,6 +428,12 @@
                       sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
                       loading="lazy"
                       @error="onLinkIframeError(node.id)"
+                    />
+                    <!-- 未选中时遮罩拦截 iframe 抢焦点；选中后才允许直接交互 -->
+                    <div
+                      v-if="!editor.state.selectedNodeIds.includes(node.id)"
+                      class="link-card__shield"
+                      aria-hidden="true"
                     />
                   </div>
                 </div>
@@ -480,6 +598,7 @@
             <div
               v-if="editor.edgeToolbarPopover === 'color'"
               class="selection-toolbar__popover selection-toolbar__popover--colors"
+              role="menu"
               data-testid="edge-color-palette"
               @click.stop
               @pointerdown.stop
@@ -531,6 +650,7 @@
             <div
               v-if="editor.edgeToolbarPopover === 'direction'"
               class="selection-toolbar__popover selection-toolbar__popover--layout"
+              role="menu"
               data-testid="edge-direction-menu"
               @click.stop
               @pointerdown.stop
@@ -705,6 +825,8 @@
               :class="{ 'selection-toolbar__button--active': editor.selectionToolbarPopover === 'color' }"
               :aria-label="SELECTION_TOOLBAR_TOOLTIPS.color"
               :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.color"
+              :aria-haspopup="'menu'"
+              :aria-expanded="editor.selectionToolbarPopover === 'color'"
               data-testid="selection-toolbar-color"
               type="button"
               @click.stop="editor.toggleSelectionPopover('color')"
@@ -717,6 +839,7 @@
             <div
               v-if="editor.selectionToolbarPopover === 'color'"
               class="selection-toolbar__popover selection-toolbar__popover--colors"
+              role="menu"
               data-testid="selection-color-palette"
               @click.stop
               @pointerdown.stop
@@ -789,6 +912,8 @@
                 :class="{ 'selection-toolbar__button--active': editor.selectionToolbarPopover === 'layout' }"
                 :aria-label="SELECTION_TOOLBAR_TOOLTIPS.align"
                 :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.align"
+                :aria-haspopup="'menu'"
+                :aria-expanded="editor.selectionToolbarPopover === 'layout'"
                 data-testid="selection-toolbar-align"
                 type="button"
                 @click.stop="editor.toggleSelectionPopover('layout')"
@@ -801,6 +926,7 @@
               <div
                 v-if="editor.selectionToolbarPopover === 'layout'"
                 class="selection-toolbar__popover selection-toolbar__popover--layout"
+                role="menu"
                 data-testid="selection-layout-menu"
                 @click.stop
                 @pointerdown.stop
@@ -908,6 +1034,8 @@
               data-testid="inspector-toolbar-sort"
               :title="t('inspectorSort')"
               type="button"
+              :aria-haspopup="'menu'"
+              :aria-expanded="sortDropdownOpen"
               @click.stop="sortDropdownOpen = !sortDropdownOpen"
             >
               <CanvasIcon
@@ -930,6 +1058,7 @@
             <div
               v-if="sortDropdownOpen"
               class="inspector__sort-dropdown"
+              role="menu"
               @click.stop
             >
               <div class="inspector__sort-dropdown-group">
@@ -1713,6 +1842,13 @@ function showHelpDialog() {
     { key: t("helpShortcutDelete"), action: t("helpActionDelete") },
     { key: t("helpShortcutCtrlA"), action: t("helpActionCtrlA") },
     { key: t("helpShortcutCtrlS"), action: t("helpActionCtrlS") },
+    { key: t("helpShortcutUndo"), action: t("helpActionUndo") },
+    { key: t("helpShortcutRedo"), action: t("helpActionRedo") },
+    { key: t("helpShortcutDuplicate"), action: t("helpActionDuplicate") },
+    { key: t("helpShortcutZoomIn"), action: t("helpActionZoomIn") },
+    { key: t("helpShortcutZoomOut"), action: t("helpActionZoomOut") },
+    { key: t("helpShortcutZoomActual"), action: t("helpActionZoomActual") },
+    { key: t("helpShortcutZoomFit"), action: t("helpActionZoomFit") },
     { key: t("helpShortcutWheel"), action: t("helpActionWheel") },
     { key: t("helpShortcutDrag"), action: t("helpActionDrag") },
     { key: t("helpShortcutDragNode"), action: t("helpActionDragNode") },
@@ -2009,43 +2145,70 @@ watch(
 </script>
 
 <style scoped lang="scss">
+/* 设计 token 全部从思源 --b3-* 派生；color-mix 统一处理透明/混色，主题切换零失配 */
 .canvas-shell {
+  /* 表面层 */
   --canvas-bg: var(--b3-theme-background);
   --canvas-surface: var(--b3-theme-surface);
   --canvas-surface-elevated: var(--b3-theme-surface);
-  --canvas-surface-overlay: rgba(255, 255, 255, 0.82);
-  --canvas-toolbar-bg: rgba(255, 255, 255, 0.92);
-  --canvas-border: rgba(0, 0, 0, 0.1);
-  --canvas-border-strong: rgba(0, 0, 0, 0.16);
+  --canvas-surface-overlay: color-mix(in srgb, var(--b3-theme-surface) 82%, transparent);
+  --canvas-toolbar-bg: color-mix(in srgb, var(--b3-theme-surface) 92%, transparent);
+
+  /* 边框 */
+  --canvas-border: var(--b3-border-color);
+  --canvas-border-strong: color-mix(in srgb, var(--b3-theme-on-surface) 16%, transparent);
+
+  /* 文字 */
   --canvas-text: var(--b3-theme-on-surface);
   --canvas-text-muted: var(--b3-theme-on-surface-light);
+
+  /* 强调色 */
   --canvas-accent: var(--b3-theme-primary);
   --canvas-accent-contrast: var(--b3-theme-on-primary);
-  --canvas-accent-soft: rgba(53, 103, 214, 0.14);
-  --canvas-success: #2f7d4e;
-  --canvas-danger: #c04f2a;
-  --canvas-grid: rgba(15, 23, 42, 0.08);
-  --canvas-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
-  --canvas-shadow-strong: 0 18px 42px rgba(15, 23, 42, 0.18);
-  --canvas-floating-bg: rgba(255, 255, 255, 0.94);
-  --canvas-floating-border: rgba(0, 0, 0, 0.08);
-  --canvas-floating-button-bg: rgba(15, 23, 42, 0.06);
-  --canvas-floating-button-bg-hover: rgba(15, 23, 42, 0.12);
+  --canvas-accent-soft: color-mix(in srgb, var(--b3-theme-primary) 14%, transparent);
+  --canvas-accent-strong: color-mix(in srgb, var(--b3-theme-primary) 72%, transparent);
+
+  /* 语义色 */
+  --canvas-success: var(--b3-card-success-color, #2f7d4e);
+  --canvas-success-soft: color-mix(in srgb, var(--canvas-success) 16%, transparent);
+  --canvas-danger: var(--b3-card-error-color, #c04f2a);
+  --canvas-danger-soft: color-mix(in srgb, var(--canvas-danger) 16%, transparent);
+  --canvas-warning: var(--b3-card-warning-color, #d68f2c);
+
+  /* 栅格与阴影 */
+  --canvas-grid: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+  --canvas-shadow: 0 8px 20px color-mix(in srgb, var(--b3-theme-on-surface) 12%, transparent);
+  --canvas-shadow-strong: 0 12px 28px color-mix(in srgb, var(--b3-theme-on-surface) 18%, transparent);
+
+  /* 浮层 */
+  --canvas-floating-bg: color-mix(in srgb, var(--b3-theme-surface) 94%, transparent);
+  --canvas-floating-border: color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent);
+  --canvas-floating-button-bg: color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
+  --canvas-floating-button-bg-hover: color-mix(in srgb, var(--b3-theme-on-surface) 12%, transparent);
   --canvas-floating-text: var(--canvas-text);
-  --canvas-floating-tooltip-bg: rgba(15, 23, 42, 0.96);
-  --canvas-floating-tooltip-text: #f8fafc;
-  --canvas-selection-border: rgba(53, 103, 214, 0.72);
-  --canvas-selection-fill: rgba(53, 103, 214, 0.14);
+  --canvas-floating-tooltip-bg: color-mix(in srgb, var(--b3-theme-on-surface) 92%, var(--b3-theme-surface));
+  --canvas-floating-tooltip-text: var(--b3-theme-surface);
+
+  /* 选区 / 节点 */
+  --canvas-selection-border: var(--canvas-accent-strong);
+  --canvas-selection-fill: var(--canvas-accent-soft);
   --canvas-card-bg: var(--canvas-surface);
-  --canvas-group-bg: rgba(53, 103, 214, 0.08);
-  --canvas-code-bg: rgba(15, 23, 42, 0.06);
+  --canvas-group-bg: color-mix(in srgb, var(--b3-theme-primary) 8%, transparent);
+  --canvas-code-bg: color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
+
+  /* 检查器 */
   --canvas-inspector-bg: var(--canvas-surface-elevated);
   --canvas-inspector-section-bg: var(--canvas-surface-overlay);
+
+  /* 锚点 / 调整尺寸 */
   --canvas-anchor-bg: var(--canvas-surface);
-  --canvas-anchor-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
-  --canvas-resize-handle: rgba(15, 23, 42, 0.18);
-  --canvas-resize-handle-hover: rgba(15, 23, 42, 0.26);
-  --canvas-shell-highlight: rgba(53, 103, 214, 0.08);
+  --canvas-anchor-shadow: 0 0 0 1px color-mix(in srgb, var(--b3-theme-on-surface) 12%, transparent);
+  --canvas-resize-handle: color-mix(in srgb, var(--b3-theme-on-surface) 18%, transparent);
+  --canvas-resize-handle-hover: color-mix(in srgb, var(--b3-theme-on-surface) 26%, transparent);
+
+  /* 整体氛围 */
+  --canvas-shell-highlight: color-mix(in srgb, var(--b3-theme-primary) 8%, transparent);
+
   position: relative;
   display: grid;
   grid-template-rows: auto 1fr;
@@ -2057,36 +2220,19 @@ watch(
     linear-gradient(135deg, var(--canvas-bg), var(--canvas-surface));
 }
 
+/* 暗色模式下 color-mix 自动适配，仅调整少量浮层透明度 */
 .canvas-shell[data-theme-mode="dark"] {
-  --canvas-surface-overlay: rgba(15, 23, 42, 0.68);
-  --canvas-toolbar-bg: rgba(15, 23, 42, 0.92);
-  --canvas-border: rgba(255, 255, 255, 0.1);
-  --canvas-border-strong: rgba(255, 255, 255, 0.16);
-  --canvas-accent-soft: rgba(92, 155, 255, 0.2);
-  --canvas-grid: rgba(255, 255, 255, 0.08);
-  --canvas-shadow: 0 18px 34px rgba(2, 6, 23, 0.32);
-  --canvas-shadow-strong: 0 18px 42px rgba(2, 6, 23, 0.46);
-  --canvas-floating-bg: rgba(15, 23, 42, 0.92);
-  --canvas-floating-border: rgba(255, 255, 255, 0.1);
-  --canvas-floating-button-bg: rgba(255, 255, 255, 0.08);
-  --canvas-floating-button-bg-hover: rgba(255, 255, 255, 0.14);
-  --canvas-floating-text: #f8fafc;
-  --canvas-selection-border: rgba(92, 155, 255, 0.82);
-  --canvas-selection-fill: rgba(92, 155, 255, 0.18);
-  --canvas-group-bg: rgba(92, 155, 255, 0.12);
-  --canvas-code-bg: rgba(255, 255, 255, 0.08);
-  --canvas-anchor-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
-  --canvas-resize-handle: rgba(255, 255, 255, 0.18);
-  --canvas-resize-handle-hover: rgba(255, 255, 255, 0.26);
-  --canvas-shell-highlight: rgba(92, 155, 255, 0.08);
+  --canvas-surface-overlay: color-mix(in srgb, var(--b3-theme-surface) 68%, transparent);
+  --canvas-toolbar-bg: color-mix(in srgb, var(--b3-theme-surface) 92%, transparent);
+  --canvas-floating-bg: color-mix(in srgb, var(--b3-theme-surface) 92%, transparent);
 }
 
 .canvas-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--canvas-border);
   background: var(--canvas-toolbar-bg);
   backdrop-filter: blur(16px);
@@ -2094,31 +2240,94 @@ watch(
 
 .toolbar__group {
   display: inline-flex;
-  gap: 8px;
+  gap: 4px;
+  align-items: center;
+}
+
+.toolbar__divider {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: var(--canvas-border);
 }
 
 .toolbar__meta {
   display: inline-flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   margin-left: auto;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
   color: var(--canvas-text-muted);
 }
 
-.toolbar__meta > span {
+.toolbar__meta-name {
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--canvas-text);
+}
+
+.toolbar__meta-stats {
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbar__status {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--canvas-floating-button-bg);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.toolbar__status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.toolbar__status--saved {
+  color: var(--canvas-success);
+  background: var(--canvas-success-soft);
+}
+
+.toolbar__status--dirty {
+  color: var(--canvas-warning);
+  background: color-mix(in srgb, var(--canvas-warning) 16%, transparent);
+}
+
+.toolbar__status--saving {
+  color: var(--canvas-text-muted);
+}
+
+.toolbar__status--saving .toolbar__status-dot {
+  animation: toolbar-status-pulse 1.4s ease-in-out infinite;
+}
+
+.toolbar__status--conflict {
+  color: var(--canvas-danger);
+  background: var(--canvas-danger-soft);
+}
+
+@keyframes toolbar-status-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 
 .toolbar__button {
   position: relative;
-  border: 1px solid var(--canvas-border);
-  border-radius: 999px;
-  background: var(--canvas-surface);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   color: var(--canvas-text);
-  padding: 8px 14px;
+  padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
   transition:
@@ -2131,19 +2340,23 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   padding: 0;
 }
 
 .toolbar__button:hover:not(:disabled) {
-  border-color: var(--canvas-border-strong);
-  background: var(--canvas-surface-overlay);
+  background: var(--canvas-floating-button-bg-hover);
 }
 
 .toolbar__button:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.4;
+}
+
+.toolbar__button:focus-visible {
+  outline: 2px solid var(--canvas-accent);
+  outline-offset: 1px;
 }
 
 .toolbar__button--primary {
@@ -2157,6 +2370,30 @@ watch(
   background: var(--canvas-accent);
   color: var(--canvas-accent-contrast);
   filter: brightness(0.92);
+}
+
+.toolbar__button-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--canvas-toolbar-bg);
+  pointer-events: none;
+}
+
+.toolbar__button-badge--dirty {
+  background: var(--canvas-warning, #d68f2c);
+}
+
+.toolbar__button-badge--danger {
+  background: var(--canvas-danger);
+}
+
+.toolbar__button-badge--saving {
+  background: var(--canvas-accent);
+  animation: toolbar-status-pulse 1.4s ease-in-out infinite;
 }
 
 .toolbar__icon {
@@ -2173,10 +2410,23 @@ watch(
   align-items: center;
   justify-content: center;
   min-width: 56px;
-  padding: 0 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--canvas-text-muted);
+}
+
+.toolbar__stat--button {
+  cursor: pointer;
+  font: inherit;
+}
+
+.toolbar__stat--button:hover {
+  background: var(--canvas-floating-button-bg-hover);
+  color: var(--canvas-text);
 }
 
 .toolbar__dirty {
@@ -2185,6 +2435,75 @@ watch(
 
 .toolbar__saved {
   color: var(--canvas-success);
+}
+
+.conflict-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--canvas-floating-bg);
+  border: 1px solid var(--canvas-danger);
+  box-shadow: var(--canvas-shadow-strong);
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+}
+
+.conflict-banner__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.conflict-banner__title {
+  font-size: 13px;
+  color: var(--canvas-danger);
+}
+
+.conflict-banner__description {
+  font-size: 12px;
+  color: var(--canvas-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conflict-banner__actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.conflict-banner__button {
+  border: 1px solid var(--canvas-border);
+  border-radius: 8px;
+  background: var(--canvas-surface);
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--canvas-text);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.conflict-banner__button:hover {
+  background: var(--canvas-floating-button-bg-hover);
+}
+
+.conflict-banner__button--primary {
+  background: var(--canvas-accent);
+  color: var(--canvas-accent-contrast);
+  border-color: transparent;
+}
+
+.conflict-banner__button--primary:hover {
+  filter: brightness(0.92);
 }
 
 .workspace {
@@ -2237,7 +2556,7 @@ watch(
   border: 1px solid var(--canvas-selection-border);
   border-radius: 12px;
   background: linear-gradient(135deg, var(--canvas-selection-fill), transparent);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b3-theme-surface) 18%, transparent);
   pointer-events: none;
 }
 
@@ -2323,27 +2642,27 @@ watch(
 }
 
 .selection-toolbar--light {
-  --selection-toolbar-bg: rgba(255, 255, 255, 0.96);
-  --selection-toolbar-border: rgba(15, 23, 42, 0.1);
-  --selection-toolbar-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+  --selection-toolbar-bg: var(--canvas-floating-bg);
+  --selection-toolbar-border: var(--canvas-floating-border);
+  --selection-toolbar-shadow: var(--canvas-shadow-strong);
   --selection-toolbar-text: var(--canvas-text);
-  --selection-toolbar-button-bg: rgba(15, 23, 42, 0.06);
-  --selection-toolbar-button-bg-hover: rgba(15, 23, 42, 0.12);
-  --selection-toolbar-tooltip-bg: rgba(255, 255, 255, 0.98);
-  --selection-toolbar-tooltip-border: rgba(15, 23, 42, 0.12);
-  --selection-toolbar-tooltip-text: var(--canvas-text);
+  --selection-toolbar-button-bg: var(--canvas-floating-button-bg);
+  --selection-toolbar-button-bg-hover: var(--canvas-floating-button-bg-hover);
+  --selection-toolbar-tooltip-bg: var(--canvas-floating-tooltip-bg);
+  --selection-toolbar-tooltip-border: var(--canvas-floating-border);
+  --selection-toolbar-tooltip-text: var(--canvas-floating-tooltip-text);
 }
 
 .selection-toolbar--dark {
-  --selection-toolbar-bg: rgba(15, 23, 42, 0.94);
-  --selection-toolbar-border: rgba(255, 255, 255, 0.1);
-  --selection-toolbar-shadow: 0 18px 44px rgba(2, 6, 23, 0.48);
-  --selection-toolbar-text: #f8fafc;
-  --selection-toolbar-button-bg: rgba(255, 255, 255, 0.08);
-  --selection-toolbar-button-bg-hover: rgba(255, 255, 255, 0.14);
-  --selection-toolbar-tooltip-bg: rgba(15, 23, 42, 0.98);
-  --selection-toolbar-tooltip-border: rgba(255, 255, 255, 0.12);
-  --selection-toolbar-tooltip-text: #f8fafc;
+  --selection-toolbar-bg: var(--canvas-floating-bg);
+  --selection-toolbar-border: var(--canvas-floating-border);
+  --selection-toolbar-shadow: var(--canvas-shadow-strong);
+  --selection-toolbar-text: var(--canvas-text);
+  --selection-toolbar-button-bg: var(--canvas-floating-button-bg);
+  --selection-toolbar-button-bg-hover: var(--canvas-floating-button-bg-hover);
+  --selection-toolbar-tooltip-bg: var(--canvas-floating-tooltip-bg);
+  --selection-toolbar-tooltip-border: var(--canvas-floating-border);
+  --selection-toolbar-tooltip-text: var(--canvas-floating-tooltip-text);
 }
 
 .selection-toolbar__button {
@@ -2501,7 +2820,7 @@ watch(
   border: 2px solid var(--canvas-accent);
   border-radius: 999px;
   background: var(--canvas-surface);
-  box-shadow: 0 0 0 4px rgba(53, 103, 214, 0.14);
+  box-shadow: 0 0 0 4px var(--canvas-accent-soft);
   transform: translate(-50%, -50%);
   cursor: crosshair;
 }
@@ -2555,7 +2874,7 @@ watch(
 .stage__edge--overlay {
   opacity: 0;
   stroke-width: 4;
-  filter: drop-shadow(0 0 6px rgba(53, 103, 214, 0.2));
+  filter: drop-shadow(0 0 6px var(--canvas-accent-soft));
   pointer-events: none;
   transition:
     opacity 0.16s ease,
@@ -2570,7 +2889,7 @@ watch(
 .stage__edge--hovered,
 .stage__edge--selected.stage__edge--overlay {
   stroke-width: 4;
-  filter: drop-shadow(0 0 10px rgba(53, 103, 214, 0.28));
+  filter: drop-shadow(0 0 10px var(--canvas-accent-soft));
 }
 
 .stage__edge--hit-area {
@@ -2603,7 +2922,7 @@ watch(
   display: flex;
   flex-direction: column;
   border: 1px solid var(--canvas-border);
-  border-radius: 18px;
+  border-radius: 10px;
   overflow: hidden;
   box-shadow: var(--canvas-shadow);
   background: var(--canvas-card-bg);
@@ -2797,7 +3116,7 @@ watch(
   border-radius: 12px;
   border: 1px solid var(--canvas-border);
   background:
-    linear-gradient(180deg, rgba(53, 103, 214, 0.08), rgba(15, 23, 42, 0.02)),
+    linear-gradient(180deg, var(--canvas-accent-soft), color-mix(in srgb, var(--b3-theme-on-surface) 2%, transparent)),
     var(--canvas-surface);
 }
 
@@ -2809,14 +3128,14 @@ watch(
 
 .file-card__thumbnail-edge {
   fill: none;
-  stroke: rgba(53, 103, 214, 0.58);
+  stroke: var(--canvas-accent-strong);
   stroke-linecap: round;
   stroke-width: 10px;
 }
 
 .file-card__thumbnail-node {
-  fill: rgba(255, 255, 255, 0.88);
-  stroke: rgba(15, 23, 42, 0.12);
+  fill: color-mix(in srgb, var(--b3-theme-surface) 88%, transparent);
+  stroke: color-mix(in srgb, var(--b3-theme-on-surface) 12%, transparent);
   stroke-width: 4px;
 }
 
@@ -3196,7 +3515,7 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.24);
+  background: color-mix(in srgb, var(--b3-theme-on-surface) 24%, transparent);
   backdrop-filter: blur(4px);
 }
 
@@ -3374,6 +3693,7 @@ watch(
 .link-card__header {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   background: var(--canvas-surface);
   border-bottom: 1px solid var(--canvas-border);
@@ -3382,12 +3702,32 @@ watch(
 }
 
 .link-card__url {
+  flex: 1;
   font-size: 12px;
   color: var(--canvas-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  width: 100%;
+}
+
+.link-card__open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--canvas-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.link-card__open:hover {
+  background: var(--canvas-floating-button-bg-hover);
+  color: var(--canvas-accent);
 }
 
 .link-card__iframe-wrapper {
@@ -3401,10 +3741,19 @@ watch(
   width: 100%;
   height: 100%;
   border: 0;
-  background: #fff;
+  background: var(--canvas-surface);
   position: absolute;
   top: 0;
   left: 0;
+}
+
+/* 未选中时盖一层透明遮罩，确保拖动事件能落在节点上而不是 iframe；选中后让出指针权 */
+.link-card__shield {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+  cursor: grab;
 }
 
 .link-card__fallback {

@@ -262,6 +262,14 @@ function createEditorMock(node = createTextNode()) {
     },
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
+    zoomToActualSize: vi.fn(),
+    zoomToFit: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    canUndo: false,
+    canRedo: false,
+    isSaving: false,
+    duplicateSelection: vi.fn(),
   })
 }
 
@@ -501,9 +509,9 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("保存")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小")
-    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("重置缩放")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
+    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("aria-label")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("aria-label")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("保存")
@@ -540,8 +548,9 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    const zoomGroup = wrapper.findAll(".toolbar__group")[1]
-    const zoomChildren = zoomGroup?.element.children
+    // 视图分组：找到包含 zoom-out 按钮的 .toolbar__group 父级
+    const zoomGroup = wrapper.find("[data-testid='top-toolbar-zoom-out']").element.parentElement
+    const zoomChildren = zoomGroup?.children
 
     expect(wrapper.find("[data-testid='top-toolbar-scale-value']").text()).toBe("137%")
     expect(zoomChildren?.[0]?.getAttribute("data-testid")).toBe("top-toolbar-zoom-out")
@@ -1539,11 +1548,11 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("保存")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小")
-    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("重置缩放")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
+    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
     expect(toolbarText).toContain("未命名.canvas")
-    expect(toolbarText).toContain("1 个节点 / 0 条连线")
+    expect(toolbarText).toContain("1 节点 · 0 连线")
     expect(toolbarText).toContain("已保存")
     expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("aria-label")).toBe("卡片")
     expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("data-tooltip")).toBe("卡片")

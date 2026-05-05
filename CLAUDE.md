@@ -1,6 +1,20 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## 项目概述
 
 思源笔记插件，用于导入、编辑和导出 Obsidian `.canvas` 文件（JSON Canvas 格式）。显示名称 "Canvas" / "无界"。
+
+## 常用命令
+
+- `pnpm build` / `npm run build` — 生产构建（Vite library 模式，输出到 `./dist` 并打包为 `package.zip`）。
+- `pnpm dev` — `vite build --watch`，监听构建。若设置了环境变量 `VITE_SIYUAN_WORKSPACE_PATH`，构建产物会直接写入 `${workspace}/data/plugins/siyuan-canvas`，配合 `rollup-plugin-livereload` 在思源中热更新；否则输出到 `./dev`。
+- `pnpm test` — 运行 Vitest（一次性）。
+- `pnpm test:watch` — Vitest watch 模式。
+- 跑单个测试：`pnpm test -- tests/<file>.test.ts`，或加 `-t "<test name>"` 过滤用例。
+- 发布版本：`pnpm release` / `release:patch` / `release:minor` / `release:major` / `release:manual`（运行 `release.js`）。
+- 仓库未配置独立的 lint 脚本；`@antfu/eslint-config` + ESLint 9 已安装，可直接 `npx eslint .`。
 
 ## 架构概览
 
@@ -23,27 +37,27 @@
 
 ### 数据流
 
-Canvas 文件通过 `format.ts`（JSON Canvas 规范）解析为 `CanvasDocument`（nodes + edges）。`CanvasEditorState` 管理活动文档、选区、脏状态和冲突。`CanvasFileService` 通过 `CanvasTextGateway` 抽象层处理读写。
+Canvas 文件通过 `format.ts`（JSON Canvas 规范）解析为 `CanvasDocument`（nodes + edges）。`CanvasEditorState` 管理活动文档、选区、脏状态和冲突。`CanvasFileService` 通过 `CanvasTextGateway` 抽象层处理读写。解析/保存须保留未知 JSON Canvas 字段（与上游 `obsidianmd/jsoncanvas` 兼容）。
 
 ### 文件预览管线
 
-`file-target-resolution.ts` → `file-target-preview.ts` → `file-preview-fallbacks.ts`（新路径）。`file-node-resolution.ts` 和 `file-node-preview.ts` 是遗留兼容适配器。
+新路径：`file-target-resolution.ts` → `file-target-preview.ts` → `file-preview-fallbacks.ts`。`file-node-resolution.ts` 与 `file-node-preview.ts` 是遗留兼容适配器，新功能应走新管线。`siyuan-file-node-lookups.ts` 是纯查找逻辑，运行时 SQL 访问隔离在 `siyuan-kernel-file-node-lookups.ts`。
 
 ### 构建系统
 
-Vite library mode（CJS 输出），`siyuan` 和 `process` 为外部依赖，输出 `index.js` + `index.css`，静态资源通过 `vite-plugin-static-copy` 复制到 `dist/`，打包为 `package.zip`。测试配置在 `vite.config.ts` 的 `test` 字段中（非独立 vitest.config），排除了 `.worktrees/`、`dist/`、`dev/` 目录。
+Vite library mode（CJS 输出），`siyuan` 和 `process` 为外部依赖，输出 `index.js` + `index.css`，静态资源（`plugin.json`、`icon.png`、`preview.png`、`README*.md`、`src/i18n/*.json`）通过 `vite-plugin-static-copy` 复制到 `dist/`，再由 `vite-plugin-zip-pack` 打包为 `package.zip`。测试配置在 `vite.config.ts` 的 `test` 字段中（非独立 vitest.config），排除了 `.worktrees/`、`dist/`、`dev/` 目录。
 
 ## 目录结构约定
 
 - `src/canvas/` - 核心画布逻辑、类型、格式解析、编辑器状态
 - `src/components/canvas/` - 画布 Vue 组件（CanvasWorkspace、CanvasFileCard 等）
 - `src/components/SiyuanTheme/` - 思源风格 UI 组件（SyButton、SyInput 等）
-- `src/i18n/` - 国际化（en_US/zh_CN，133 个键值，zh_CN 为回退语言）
+- `src/i18n/` - 国际化（en_US/zh_CN，zh_CN 为回退语言）
 - `src/types/` - 思源 API 类型声明
 - `src/api.ts` - 思源 kernel API 封装
-- `tests/` - Vitest 测试文件（28 个），命名与源码对应
+- `tests/` - Vitest 测试文件，命名与源码对应
 - `docs/` - 设计文档、重构计划、JSON Canvas 规范
-- `plugin-sample-vite-vue/` - 官方思源插件开发样板项目
+- `plugin-sample-vite-vue/` - 官方思源插件开发样板项目（参考用，勿改）
 - `developer_docs/` - 思源插件开发 API 参考文档
 
 ## 编码规范
@@ -53,7 +67,7 @@ Vite library mode（CJS 输出），`siyuan` 和 `process` 为外部依赖，输
 - Vue 组件用 PascalCase（`CanvasWorkspace.vue`），画布模块用 kebab-case（`selection-toolbar.ts`）
 - Vue SFC 块顺序：template → script → style
 - 测试文件放在 `tests/*.test.ts`，命名与源码对应（如 `viewport.ts` → `canvas-viewport.test.ts`），新模块需配套测试
-- 路径别名：`@/*` → `./src/*`，`@/libs/*` → `./src/libs/*`
+- 路径别名：`@/*` → `./src/*`（vite alias），TS path 中亦可见 `@/libs/*` → `./src/libs/*`
 - TypeScript `strict: false`，`noUnusedLocals`/`noUnusedParameters` 为 `true`
 
 ## 提交规范
