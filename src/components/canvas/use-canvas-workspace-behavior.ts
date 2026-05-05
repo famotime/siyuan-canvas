@@ -9,11 +9,14 @@ import {
   watch,
 } from "vue"
 import { getNodeSelectionColorValue } from "@/components/canvas/canvas-workspace-display"
+import { isWebUrl } from "@/canvas/url-detection"
 
 interface CanvasWorkspaceEditor {
   activateNode: (node: CanvasNode) => void
   closeEdgePopover: () => void
   closeSelectionPopover: () => void
+  convertTextToLink: (nodeId: string, url: string) => void
+  convertLinkToText: (nodeId: string, text: string) => void
   edgeToolbar: {
     visible: boolean
   }
@@ -172,7 +175,7 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   }
 
   function handleNodeDoubleClick(node: CanvasNode) {
-    if (!["group", "text"].includes(node.type)) {
+    if (!["group", "text", "link"].includes(node.type)) {
       editor.activateNode(node)
       return
     }
@@ -183,7 +186,9 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
       ? (node.label || "")
       : node.type === "text"
         ? (node.text || "")
-        : ""
+        : node.type === "link"
+          ? (node.url || "")
+          : ""
     editingMarkdown.value = initialText
     editingOriginalText.value = initialText
     void nextTick(() => {
@@ -197,7 +202,20 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
       return
     }
 
-    editor.updateTextNodeContent(editingNodeId.value, editingMarkdown.value)
+    const trimmed = editingMarkdown.value.trim()
+    const node = editor.state.document.nodes.find((candidate) => candidate.id === editingNodeId.value)
+    if (node?.type === "text" && isWebUrl(trimmed)) {
+      editor.convertTextToLink(editingNodeId.value, trimmed)
+    } else if (node?.type === "link") {
+      if (isWebUrl(trimmed)) {
+        editor.updateTextNodeContent(editingNodeId.value, trimmed)
+      } else {
+        editor.convertLinkToText(editingNodeId.value, editingMarkdown.value)
+      }
+    } else {
+      editor.updateTextNodeContent(editingNodeId.value, editingMarkdown.value)
+    }
+
     editingNodeId.value = ""
     editingMarkdown.value = ""
     editingOriginalText.value = ""

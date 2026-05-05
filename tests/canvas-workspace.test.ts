@@ -14,6 +14,10 @@ import {
 } from "vue"
 import zhCN from "@/i18n/zh_CN.json"
 
+vi.mock("@/canvas/help-dialog", () => ({
+  openHelpDialog: vi.fn(),
+}))
+
 import CanvasWorkspace from "@/components/canvas/CanvasWorkspace.vue"
 
 let currentEditor: Record<string, any>
@@ -494,12 +498,12 @@ describe("CanvasWorkspace", () => {
 
     const toolbarText = wrapper.find("[data-testid='top-toolbar']").text()
 
-    expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("title")).toBe("新建")
-    expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("title")).toBe("打开")
-    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("title")).toBe("保存")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("title")).toBe("缩小")
-    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("title")).toBe("重置缩放")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("title")).toBe("放大")
+    expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
+    expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小")
+    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("重置缩放")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大")
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("aria-label")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("aria-label")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("保存")
@@ -517,8 +521,8 @@ describe("CanvasWorkspace", () => {
     expect(toolbarText).not.toContain("打开")
     expect(toolbarText).not.toContain("导出")
     expect(toolbarText).not.toContain("设置")
-    expect(toolbarText).not.toContain("文本")
-    expect(toolbarText).not.toContain("文件")
+    expect(toolbarText).not.toContain("卡片")
+    expect(toolbarText).not.toContain("笔记")
     expect(toolbarText).not.toContain("链接")
     expect(toolbarText).not.toContain("分组")
     expect(toolbarText).not.toContain("删除")
@@ -1030,13 +1034,13 @@ describe("CanvasWorkspace", () => {
     expect(toolbar.attributes("style")).toContain("top: 88px;")
     expect(wrapper.find("[data-testid='selection-toolbar-edit']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-toolbar-create-group']").exists()).toBe(false)
-    expect(wrapper.find("[data-testid='selection-toolbar-delete']").attributes("title")).toBe("删除")
+    expect(wrapper.find("[data-testid='selection-toolbar-delete']").attributes("data-tooltip")).toBe("删除")
     expect(wrapper.find("[data-testid='selection-toolbar-delete']").attributes("aria-label")).toBe("删除")
     expect(wrapper.find("[data-testid='selection-toolbar-delete'] .selection-toolbar__icon").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-toolbar-delete']").text()).toBe("")
-    expect(wrapper.find("[data-testid='selection-toolbar-color']").attributes("title")).toBe("颜色")
-    expect(wrapper.find("[data-testid='selection-toolbar-center']").attributes("title")).toBe("聚焦")
-    expect(wrapper.find("[data-testid='selection-toolbar-edit']").attributes("title")).toBe("编辑")
+    expect(wrapper.find("[data-testid='selection-toolbar-color']").attributes("data-tooltip")).toBe("颜色")
+    expect(wrapper.find("[data-testid='selection-toolbar-center']").attributes("data-tooltip")).toBe("聚焦")
+    expect(wrapper.find("[data-testid='selection-toolbar-edit']").attributes("data-tooltip")).toBe("编辑")
 
     await wrapper.find("[data-testid='selection-toolbar-color']").trigger("click")
 
@@ -1109,11 +1113,11 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='selection-toolbar-create-group']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-toolbar-edit']").exists()).toBe(false)
     expect(wrapper.find("[data-testid='selection-toolbar-align']").exists()).toBe(true)
-    expect(wrapper.find("[data-testid='selection-toolbar-create-group']").attributes("title")).toBe("创建分组")
-    expect(wrapper.find("[data-testid='selection-toolbar-align']").attributes("title")).toBe("对齐")
+    expect(wrapper.find("[data-testid='selection-toolbar-create-group']").attributes("data-tooltip")).toBe("创建分组")
+    expect(wrapper.find("[data-testid='selection-toolbar-align']").attributes("data-tooltip")).toBe("对齐")
     expect(wrapper.find("[data-testid='selection-layout-menu']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-layout-action-left-align']").exists()).toBe(true)
-    expect(wrapper.find("[data-testid='selection-layout-action-left-align']").attributes("title")).toBe("Left align")
+    expect(wrapper.find("[data-testid='selection-layout-action-left-align']").attributes("data-tooltip")).toBe("Left align")
     expect(wrapper.find("[data-testid='selection-layout-action-left-align'] .selection-toolbar__menu-icon").exists()).toBe(true)
     expect(wrapper.find("[data-testid='selection-layout-action-left-align']").text()).toContain("Left align")
 
@@ -1153,7 +1157,7 @@ describe("CanvasWorkspace", () => {
     expect(currentEditor.updateTextNodeContent).toHaveBeenCalledWith(node.id, "## Toolbar edit")
   })
 
-  it("reuses the existing activate flow when the floating toolbar edits a non-text node", async () => {
+  it("opens link URL editing from the floating toolbar edit action", async () => {
     const node = createLinkNode()
     currentEditor = createEditorMock(node)
     currentEditor.selectionToolbar = {
@@ -1174,8 +1178,14 @@ describe("CanvasWorkspace", () => {
 
     await wrapper.find("[data-testid='selection-toolbar-edit']").trigger("click")
 
-    expect(currentEditor.activateNode).toHaveBeenCalledWith(node)
-    expect(wrapper.find(".canvas-node__editor").exists()).toBe(false)
+    const textarea = wrapper.find(".canvas-node__editor")
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe(node.url)
+
+    await textarea.setValue("https://updated.example.com")
+    await textarea.trigger("blur")
+
+    expect(currentEditor.updateTextNodeContent).toHaveBeenCalledWith(node.id, "https://updated.example.com")
   })
 
   it("opens group label editing from the floating toolbar edit action", async () => {
@@ -1331,13 +1341,10 @@ describe("CanvasWorkspace", () => {
     })
 
     expect(wrapper.find("[data-testid='edge-toolbar']").exists()).toBe(true)
-    expect(wrapper.find("[data-testid='edge-toolbar-delete']").attributes("title")).toBe("删除")
     expect(wrapper.find("[data-testid='edge-toolbar-delete']").attributes("aria-label")).toBe("删除")
     expect(wrapper.find("[data-testid='edge-toolbar-delete']").attributes("data-tooltip")).toBe("删除")
-    expect(wrapper.find("[data-testid='edge-toolbar-color']").attributes("title")).toBe("颜色")
     expect(wrapper.find("[data-testid='edge-toolbar-color']").attributes("aria-label")).toBe("颜色")
     expect(wrapper.find("[data-testid='edge-toolbar-color']").attributes("data-tooltip")).toBe("颜色")
-    expect(wrapper.find("[data-testid='edge-toolbar-center']").attributes("title")).toBe("聚焦")
     expect(wrapper.find("[data-testid='edge-toolbar-center']").attributes("aria-label")).toBe("聚焦")
     expect(wrapper.find("[data-testid='edge-toolbar-center']").attributes("data-tooltip")).toBe("聚焦")
     expect(wrapper.find("[data-testid='edge-toolbar-direction-trigger']").exists()).toBe(true)
@@ -1529,25 +1536,21 @@ describe("CanvasWorkspace", () => {
     const inspectorText = wrapper.find(".inspector").text()
     const bottomToolbarStyle = getComputedStyle(wrapper.find("[data-testid='bottom-toolbar']").element as HTMLElement)
 
-    expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("title")).toBe("新建")
-    expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("title")).toBe("打开")
-    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("title")).toBe("保存")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("title")).toBe("缩小")
-    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("title")).toBe("重置缩放")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("title")).toBe("放大")
+    expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
+    expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小")
+    expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("重置缩放")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大")
     expect(toolbarText).toContain("未命名.canvas")
     expect(toolbarText).toContain("1 个节点 / 0 条连线")
     expect(toolbarText).toContain("已保存")
-    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("title")).toBe("文本")
-    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("aria-label")).toBe("文本")
-    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("data-tooltip")).toBe("文本")
-    expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("title")).toBe("文件")
-    expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("aria-label")).toBe("文件")
-    expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("data-tooltip")).toBe("文件")
-    expect(wrapper.find("[data-testid='bottom-toolbar-connect']").attributes("title")).toBe("创建连线")
-    expect(wrapper.find("[data-testid='bottom-toolbar-connect']").attributes("aria-label")).toBe("创建连线")
-    expect(wrapper.find("[data-testid='bottom-toolbar-connect']").attributes("data-tooltip")).toBe("创建连线")
-    expect(wrapper.find("[data-testid='bottom-toolbar-group']").attributes("title")).toBe("分组")
+    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("aria-label")).toBe("卡片")
+    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("data-tooltip")).toBe("卡片")
+    expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("aria-label")).toBe("笔记")
+    expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("data-tooltip")).toBe("笔记")
+    expect(wrapper.find("[data-testid='bottom-toolbar-connect']").attributes("aria-label")).toBe("连线")
+    expect(wrapper.find("[data-testid='bottom-toolbar-connect']").attributes("data-tooltip")).toBe("连线")
     expect(wrapper.find("[data-testid='bottom-toolbar-group']").attributes("aria-label")).toBe("分组")
     expect(wrapper.find("[data-testid='bottom-toolbar-group']").attributes("data-tooltip")).toBe("分组")
     expect(bottomToolbarStyle.getPropertyValue("--selection-toolbar-tooltip-bg").trim()).not.toBe("")

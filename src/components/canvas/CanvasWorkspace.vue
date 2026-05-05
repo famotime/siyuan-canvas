@@ -15,7 +15,6 @@
           data-testid="top-toolbar-new"
           :aria-label="t('toolbarNew')"
           :data-tooltip="t('toolbarNew')"
-          :title="t('toolbarNew')"
           type="button"
           @click="editor.newCanvas"
         >
@@ -29,7 +28,6 @@
           data-testid="top-toolbar-open"
           :aria-label="t('toolbarOpen')"
           :data-tooltip="t('toolbarOpen')"
-          :title="t('toolbarOpen')"
           type="button"
           @click="editor.triggerImport"
         >
@@ -43,7 +41,6 @@
           data-testid="top-toolbar-save"
           :aria-label="t('toolbarSave')"
           :data-tooltip="t('toolbarSave')"
-          :title="t('toolbarSave')"
           type="button"
           @click="editor.save"
         >
@@ -59,7 +56,6 @@
           data-testid="top-toolbar-zoom-out"
           :aria-label="t('toolbarZoomOut')"
           :data-tooltip="t('toolbarZoomOut')"
-          :title="t('toolbarZoomOut')"
           type="button"
           @click="editor.zoomOut"
         >
@@ -79,7 +75,6 @@
           data-testid="top-toolbar-zoom-in"
           :aria-label="t('toolbarZoomIn')"
           :data-tooltip="t('toolbarZoomIn')"
-          :title="t('toolbarZoomIn')"
           type="button"
           @click="editor.zoomIn"
         >
@@ -93,7 +88,6 @@
           data-testid="top-toolbar-reset-viewport"
           :aria-label="t('toolbarResetViewport')"
           :data-tooltip="t('toolbarResetViewport')"
-          :title="t('toolbarResetViewport')"
           type="button"
           @click="editor.resetViewport"
         >
@@ -109,6 +103,21 @@
         <span :class="editor.state.isDirty ? 'toolbar__dirty' : 'toolbar__saved'">
           {{ editor.state.isDirty ? t("toolbarUnsavedChanges") : t("toolbarSaved") }}
         </span>
+      </div>
+      <div class="toolbar__group">
+        <button
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-help"
+          :aria-label="t('helpDialogTitle')"
+          :data-tooltip="t('helpDialogTitle')"
+          type="button"
+          @click="showHelpDialog"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="help"
+          />
+        </button>
       </div>
     </header>
 
@@ -286,11 +295,29 @@
                 />
               </template>
               <template v-else-if="node.type === 'link'">
-                <div class="canvas-node__title">
-                  {{ node.url }}
-                </div>
-                <div class="canvas-node__meta">
-                  {{ t("nodeLinkHelper") }}
+                <textarea
+                  v-if="editingNodeId === node.id"
+                  :ref="setEditingTextareaRef"
+                  v-model="editingMarkdown"
+                  class="canvas-node__editor"
+                  @blur="commitTextNodeEditing"
+                />
+                <div
+                  v-else
+                  class="link-card"
+                >
+                  <div class="link-card__header">
+                    <span class="link-card__url">{{ node.url }}</span>
+                  </div>
+                  <div class="link-card__iframe-wrapper">
+                    <iframe
+                      :src="node.url"
+                      class="link-card__iframe"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+                      loading="lazy"
+                      @error="onLinkIframeError(node.id)"
+                    />
+                  </div>
                 </div>
               </template>
               <template v-else />
@@ -433,7 +460,6 @@
             data-testid="edge-toolbar-delete"
             :aria-label="SELECTION_TOOLBAR_TOOLTIPS.delete"
             :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.delete"
-            :title="SELECTION_TOOLBAR_TOOLTIPS.delete"
             type="button"
             @click.stop="editor.deleteSelection"
           >
@@ -446,7 +472,6 @@
               data-testid="edge-toolbar-color"
               :aria-label="SELECTION_TOOLBAR_TOOLTIPS.color"
               :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.color"
-              :title="SELECTION_TOOLBAR_TOOLTIPS.color"
               type="button"
               @click.stop="editor.toggleEdgePopover('color')"
             >
@@ -483,7 +508,6 @@
             data-testid="edge-toolbar-center"
             :aria-label="SELECTION_TOOLBAR_TOOLTIPS.center"
             :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.center"
-            :title="SELECTION_TOOLBAR_TOOLTIPS.center"
             type="button"
             @click.stop="editor.centerEdgeInViewport"
           >
@@ -500,7 +524,6 @@
               type="button"
               :aria-label="t('edgeToolbarDirection')"
               :data-tooltip="t('edgeToolbarDirection')"
-              :title="t('edgeToolbarDirection')"
               @click.stop="editor.toggleEdgePopover('direction')"
             >
               <CanvasIcon class="selection-toolbar__icon" name="connect" />
@@ -558,7 +581,6 @@
             data-testid="edge-toolbar-edit-label"
             :aria-label="t('edgeToolbarEditLabel')"
             :data-tooltip="t('edgeToolbarEditLabel')"
-            :title="t('edgeToolbarEditLabel')"
             type="button"
             @click.stop="editor.startEdgeLabelEditing"
           >
@@ -598,7 +620,6 @@
             data-testid="bottom-toolbar-text"
             :aria-label="t('bottomToolbarText')"
             :data-tooltip="t('bottomToolbarText')"
-            :title="t('bottomToolbarText')"
             type="button"
             @click.stop="editor.addNode('text')"
           >
@@ -612,7 +633,6 @@
             data-testid="bottom-toolbar-file"
             :aria-label="t('bottomToolbarFile')"
             :data-tooltip="t('bottomToolbarFile')"
-            :title="t('bottomToolbarFile')"
             type="button"
             @click.stop="editor.openFilePickerDialog"
           >
@@ -626,7 +646,6 @@
             data-testid="bottom-toolbar-connect"
             :aria-label="t('bottomToolbarConnect')"
             :data-tooltip="t('bottomToolbarConnect')"
-            :title="t('bottomToolbarConnect')"
             type="button"
             @click.stop="editor.openCreateEdgeDialog"
           >
@@ -640,7 +659,6 @@
             data-testid="bottom-toolbar-group"
             :aria-label="t('bottomToolbarGroup')"
             :data-tooltip="t('bottomToolbarGroup')"
-            :title="t('bottomToolbarGroup')"
             type="button"
             @click.stop="editor.addNode('group')"
           >
@@ -673,7 +691,6 @@
             data-testid="selection-toolbar-delete"
             :aria-label="SELECTION_TOOLBAR_TOOLTIPS.delete"
             :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.delete"
-            :title="SELECTION_TOOLBAR_TOOLTIPS.delete"
             type="button"
             @click.stop="editor.deleteSelection"
           >
@@ -689,7 +706,6 @@
               :aria-label="SELECTION_TOOLBAR_TOOLTIPS.color"
               :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.color"
               data-testid="selection-toolbar-color"
-              :title="SELECTION_TOOLBAR_TOOLTIPS.color"
               type="button"
               @click.stop="editor.toggleSelectionPopover('color')"
             >
@@ -731,7 +747,6 @@
             data-testid="selection-toolbar-center"
             :aria-label="SELECTION_TOOLBAR_TOOLTIPS.center"
             :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.center"
-            :title="SELECTION_TOOLBAR_TOOLTIPS.center"
             type="button"
             @click.stop="editor.centerSelectionInViewport"
           >
@@ -746,7 +761,6 @@
             data-testid="selection-toolbar-edit"
             :aria-label="SELECTION_TOOLBAR_TOOLTIPS.edit"
             :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.edit"
-            :title="SELECTION_TOOLBAR_TOOLTIPS.edit"
             type="button"
             @click.stop="handleToolbarEdit"
           >
@@ -761,7 +775,6 @@
               data-testid="selection-toolbar-create-group"
               :aria-label="SELECTION_TOOLBAR_TOOLTIPS.createGroup"
               :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.createGroup"
-              :title="SELECTION_TOOLBAR_TOOLTIPS.createGroup"
               type="button"
               @click.stop="editor.createGroupFromSelection"
             >
@@ -777,7 +790,6 @@
                 :aria-label="SELECTION_TOOLBAR_TOOLTIPS.align"
                 :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.align"
                 data-testid="selection-toolbar-align"
-                :title="SELECTION_TOOLBAR_TOOLTIPS.align"
                 type="button"
                 @click.stop="editor.toggleSelectionPopover('layout')"
               >
@@ -799,7 +811,6 @@
                   class="selection-toolbar__menu-button"
                   :data-testid="`selection-layout-action-${layoutAction.action}`"
                   :data-tooltip="layoutAction.label"
-                  :title="layoutAction.label"
                   type="button"
                   @click.stop="editor.applySelectionLayout(layoutAction.action)"
                 >
@@ -865,6 +876,57 @@
           v-if="editor.inspectorExpanded"
           class="inspector__content"
         >
+          <div class="inspector__toolbar">
+            <button
+              class="inspector__toolbar-button"
+              data-testid="inspector-toolbar-new-canvas"
+              :title="t('inspectorNewCanvas')"
+              type="button"
+              @click="editor.newCanvas"
+            >
+              <CanvasIcon
+                name="new-canvas"
+                :size="16"
+              />
+            </button>
+            <button
+              class="inspector__toolbar-button"
+              data-testid="inspector-toolbar-new-folder"
+              :title="t('inspectorNewFolder')"
+              type="button"
+              @click="editor.createWorkspaceFolder"
+            >
+              <CanvasIcon
+                name="new-folder"
+                :size="16"
+              />
+            </button>
+            <button
+              class="inspector__toolbar-button"
+              :class="{ 'inspector__toolbar-button--active': editor.workspaceSortMode === 'name' }"
+              data-testid="inspector-toolbar-sort"
+              :title="t('inspectorSort')"
+              type="button"
+              @click="editor.toggleWorkspaceSortMode"
+            >
+              <CanvasIcon
+                name="sort"
+                :size="16"
+              />
+            </button>
+            <button
+              class="inspector__toolbar-button"
+              data-testid="inspector-toolbar-expand-all"
+              :title="t('inspectorExpandAll')"
+              type="button"
+              @click="editor.expandAllInspectorSections"
+            >
+              <CanvasIcon
+                name="expand-all"
+                :size="16"
+              />
+            </button>
+          </div>
           <section class="inspector__section">
             <button
               class="inspector__section-toggle"
@@ -1281,6 +1343,7 @@ import {
   createSelectionToolbarTooltips,
 } from "@/components/canvas/canvas-selection-toolbar-icon"
 import CanvasCreateEdgeDialog from "@/components/canvas/CanvasCreateEdgeDialog.vue"
+import { openHelpDialog } from "@/canvas/help-dialog"
 import CanvasFileCard from "@/components/canvas/CanvasFileCard.vue"
 import {
   CLEAR_SELECTION_COLOR,
@@ -1351,6 +1414,7 @@ function getIssueLevelLabel(level: "error" | "warning"): string {
 }
 
 function handleStagePointerDown(event: PointerEvent) {
+  commitTextNodeEditing()
   editor.activateCanvasSurface()
   editor.startPan(event)
 }
@@ -1373,6 +1437,17 @@ function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
 function handleNodeClick(node: CanvasNode, event: MouseEvent) {
   editor.activateCanvasSurface()
   editor.selectNode(node.id, event)
+}
+
+function onLinkIframeError(nodeId: string) {
+  const iframe = document.querySelector(`[data-node-id="${nodeId}"] .link-card__iframe`) as HTMLIFrameElement | null
+  if (iframe) {
+    iframe.style.display = "none"
+    const fallback = document.createElement("div")
+    fallback.className = "link-card__fallback"
+    fallback.textContent = t("linkCardFallback")
+    iframe.parentElement?.appendChild(fallback)
+  }
 }
 
 function handleNodeWheel(node: CanvasNode, event: WheelEvent) {
@@ -1407,6 +1482,21 @@ function clearHoveredEdge(edgeId: string) {
   if (hoveredEdgeId.value === edgeId) {
     hoveredEdgeId.value = ""
   }
+}
+
+function showHelpDialog() {
+  const shortcuts = [
+    { key: t("helpShortcutDoubleClick"), action: t("helpActionDoubleClick") },
+    { key: t("helpShortcutEscape"), action: t("helpActionEscape") },
+    { key: t("helpShortcutDelete"), action: t("helpActionDelete") },
+    { key: t("helpShortcutCtrlA"), action: t("helpActionCtrlA") },
+    { key: t("helpShortcutCtrlS"), action: t("helpActionCtrlS") },
+    { key: t("helpShortcutWheel"), action: t("helpActionWheel") },
+    { key: t("helpShortcutDrag"), action: t("helpActionDrag") },
+    { key: t("helpShortcutDragNode"), action: t("helpActionDragNode") },
+    { key: t("helpShortcutDragAnchor"), action: t("helpActionDragAnchor") },
+  ]
+  openHelpDialog(t("helpDialogTitle"), shortcuts)
 }
 
 function getInspectorSectionChevron(section: keyof typeof editor.inspectorSectionState): string {
@@ -2321,6 +2411,11 @@ watch(
   overflow: auto;
 }
 
+.canvas-node--link .canvas-node__body {
+  padding: 0;
+  overflow: hidden;
+}
+
 .canvas-node__title {
   font-weight: 600;
   line-height: 1.5;
@@ -2701,6 +2796,36 @@ watch(
   gap: 0;
 }
 
+.inspector__toolbar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.inspector__toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 8px;
+  background: var(--canvas-inspector-section-bg);
+  color: var(--canvas-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.inspector__toolbar-button:hover {
+  background: var(--canvas-surface);
+  color: inherit;
+}
+
+.inspector__toolbar-button--active {
+  background: var(--canvas-surface);
+  color: inherit;
+}
+
 .inspector__section {
   display: grid;
   gap: 10px;
@@ -3013,5 +3138,61 @@ watch(
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   border: 0;
+}
+
+.link-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.link-card__header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--canvas-surface);
+  border-bottom: 1px solid var(--canvas-border);
+  min-height: 32px;
+  box-sizing: border-box;
+}
+
+.link-card__url {
+  font-size: 12px;
+  color: var(--canvas-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.link-card__iframe-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.link-card__iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.link-card__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--canvas-text-muted);
+  text-align: center;
 }
 </style>

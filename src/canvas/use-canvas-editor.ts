@@ -30,10 +30,12 @@ import {
   watch,
 } from "vue"
 import {
+  putFile,
   readDir,
   removeFile,
 } from "@/api"
 import { openConfirmDialog } from "@/canvas/confirm-dialog"
+import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import {
   createCanvasBoardMetrics,
   toBoardX,
@@ -119,6 +121,7 @@ export function useCanvasEditor(
   const stageRef = ref<HTMLElement>()
   const recentFiles = ref<CanvasRecentFile[]>([])
   const workspaceDocuments = ref<Array<{ path: string, title: string }>>([])
+  const workspaceSortMode = ref<'updated' | 'name'>('updated')
   const suggestedFilename = ref(bootstrap.title || t("untitledCanvas"))
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
   const edgeToolbarPopover = ref<"closed" | "color" | "direction">("closed")
@@ -429,16 +432,64 @@ export function useCanvasEditor(
         updated: number
       }> | null
 
-      workspaceDocuments.value = (Array.isArray(entries) ? entries : [])
+      const filtered = (Array.isArray(entries) ? entries : [])
         .filter((entry) => !entry.isDir && entry.name.endsWith(".canvas"))
-        .sort((left, right) => (right.updated ?? 0) - (left.updated ?? 0))
-        .map((entry) => ({
-          path: `${directory}/${entry.name}`,
-          title: entry.name,
-        }))
+
+      filtered.sort((left, right) => {
+        if (workspaceSortMode.value === 'name') {
+          return left.name.localeCompare(right.name, 'zh-CN')
+        }
+        return (right.updated ?? 0) - (left.updated ?? 0)
+      })
+
+      workspaceDocuments.value = filtered.map((entry) => ({
+        path: `${directory}/${entry.name}`,
+        title: entry.name,
+      }))
     } catch {
       workspaceDocuments.value = []
     }
+  }
+
+  async function createWorkspaceFolder() {
+    const directory = getPluginSettings().defaultCanvasDirectory
+    const folderName = await openTextInputDialog({
+      cancelLabel: t("dialogCancel"),
+      confirmLabel: t("dialogConfirm"),
+      initialValue: "",
+      title: t("inspectorFolderNamePrompt"),
+    })
+    if (!folderName || !folderName.trim()) return
+    const folderPath = `${directory}/${folderName.trim()}`
+    try {
+      await putFile(folderPath, true, new Blob([]))
+      await refreshWorkspaceDocuments()
+      showMessage(t("inspectorNewFolder") + ": " + folderName.trim())
+    } catch {
+      showMessage(t("messageUnableSaveCanvas"), 4000, "error")
+    }
+  }
+
+  function toggleWorkspaceSortMode() {
+    workspaceSortMode.value = workspaceSortMode.value === 'updated' ? 'name' : 'updated'
+    refreshWorkspaceDocuments()
+  }
+
+  async function expandAllInspectorSections() {
+    const allKeys = Object.keys(inspectorSectionState) as Array<keyof typeof inspectorSectionState>
+    for (const key of allKeys) {
+      inspectorSectionState[key] = true
+    }
+    await plugin.updateCanvasUiState?.({
+      inspectorSections: {
+        createEdge: true,
+        document: true,
+        edge: true,
+        node: true,
+        recent: true,
+        selection: true,
+      },
+    })
   }
 
   async function deleteWorkspaceDocument(path: string) {
@@ -663,6 +714,8 @@ export function useCanvasEditor(
     updateTextNodeContent,
     zoomIn,
     zoomOut,
+    convertTextToLink,
+    convertLinkToText,
   } = createCanvasEditorNodeEdgeActions({
     activateCanvasSurface,
     board,
@@ -849,7 +902,9 @@ export function useCanvasEditor(
       filePickerDialog,
       displayNodes,
       deactivateCanvasSurface,
+      createWorkspaceFolder,
       deleteWorkspaceDocument,
+      expandAllInspectorSections,
       removeRecentFileRecord,
       connectionDraft,
       edgeColorOptions: selectionColors,
@@ -914,6 +969,8 @@ export function useCanvasEditor(
       toggleInspectorSection,
       updateFilePickerQuery,
       updateTextNodeContent,
+      convertTextToLink,
+      convertLinkToText,
       updateEdgeField,
       updateEdgeSide,
       updateNodeField,
@@ -937,7 +994,9 @@ export function useCanvasEditor(
       openWorkspacePath,
       overwriteConflictVersion,
       recentFiles,
+      toggleWorkspaceSortMode,
       workspaceDocuments,
+      workspaceSortMode,
       selectionColors,
       selectionLayoutActions,
       selectionToolbar,

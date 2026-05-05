@@ -31,6 +31,7 @@ import {
   upsertCanvasNode,
 } from '@/canvas/document'
 import { renderMarkdownPreview } from '@/canvas/markdown-preview'
+import { isWebUrl } from '@/canvas/url-detection'
 import { centerViewportOnBounds } from '@/canvas/selection-toolbar'
 import { clampViewportScale } from '@/canvas/viewport'
 
@@ -342,6 +343,42 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     }
   }
 
+  function convertTextToLink(nodeId: string, url: string) {
+    const node = state.document.nodes.find((candidate) => candidate.id === nodeId)
+    if (!node || node.type !== 'text') {
+      return
+    }
+
+    commitDocument(upsertCanvasNode(state.document, {
+      color: node.color,
+      height: node.height,
+      id: node.id,
+      type: 'link',
+      url,
+      width: node.width,
+      x: node.x,
+      y: node.y,
+    }))
+  }
+
+  function convertLinkToText(nodeId: string, text: string) {
+    const node = state.document.nodes.find((candidate) => candidate.id === nodeId)
+    if (!node || node.type !== 'link') {
+      return
+    }
+
+    commitDocument(upsertCanvasNode(state.document, {
+      color: node.color,
+      height: node.height,
+      id: node.id,
+      text,
+      type: 'text',
+      width: node.width,
+      x: node.x,
+      y: node.y,
+    }))
+  }
+
   function updateNodeField(field: string, value: string) {
     if (!selectedNode.value) {
       return
@@ -485,6 +522,8 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     cancelEdgeLabelEditing,
     centerEdgeInViewport,
     centerSelectionInViewport,
+    convertTextToLink,
+    convertLinkToText,
     closeCreateEdgeDialog,
     createEdgeFromSelection,
     createGroupFromSelection,
