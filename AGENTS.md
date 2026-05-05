@@ -5,6 +5,9 @@
 
 `tests/` holds Vitest coverage for the canvas modules; mirror production names when adding specs, for example `src/canvas/viewport.ts` -> `tests/canvas-viewport.test.ts`. Use `docs/` for design notes and JSON Canvas references, `developer_docs/` for bundled SiYuan API documentation, `asset/` for static assets, and `sample_canvas/` for example files. Build output goes to `dist/`.
 
+- `plugin-sample-vite-vue/` - 官方思源插件开发样板项目
+- `developer_docs/` - 思源插件开发 API 参考文档
+
 ## Build, Test, and Development Commands
 Use `pnpm install` to sync dependencies.
 

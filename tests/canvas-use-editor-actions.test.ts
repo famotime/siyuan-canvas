@@ -138,12 +138,18 @@ function confirmMock(
   })
 }
 
+const WORKSPACE_DIR = "/data/storage/petal/siyuan-canvas"
 const apiMock = {
   putFile: vi.fn(async (path: string, _isDir: boolean, file: Blob) => {
     workspaceFiles.set(path, await file.text())
     return { code: 0 }
   }),
-  readDir: vi.fn(async () => [...workspaceDirectoryEntries]),
+  readDir: vi.fn(async (path: string) => {
+    if (path === WORKSPACE_DIR) {
+      return [...workspaceDirectoryEntries]
+    }
+    return []
+  }),
 }
 
 const localFsMock = {
@@ -1288,12 +1294,24 @@ Preview body
     expect(apiMock.readDir).toHaveBeenCalledWith("/data/storage/petal/siyuan-canvas")
     expect(editor.workspaceDocuments).toEqual([
       {
-        path: "/data/storage/petal/siyuan-canvas/alpha.canvas",
-        title: "alpha.canvas",
+        type: "folder",
+        path: "/data/storage/petal/siyuan-canvas/nested",
+        name: "nested",
+        children: [],
       },
       {
+        type: "file",
+        path: "/data/storage/petal/siyuan-canvas/alpha.canvas",
+        name: "alpha.canvas",
+        updated: undefined,
+        created: undefined,
+      },
+      {
+        type: "file",
         path: "/data/storage/petal/siyuan-canvas/beta.canvas",
-        title: "beta.canvas",
+        name: "beta.canvas",
+        updated: undefined,
+        created: undefined,
       },
     ])
 

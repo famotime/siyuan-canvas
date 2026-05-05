@@ -42,6 +42,7 @@ import {
 const fileNodeLookupMock = {
   findSiyuanAssetByPath: vi.fn(async () => null),
   findSiyuanDocumentByPath: vi.fn(async () => null),
+  readDir: vi.fn(async () => []),
 }
 const siyuanMock = {
   openTab: vi.fn(),

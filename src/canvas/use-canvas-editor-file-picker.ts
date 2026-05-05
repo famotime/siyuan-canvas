@@ -76,7 +76,10 @@ interface CanvasEditorFilePickerActionsOptions {
     x: number
     y: number
   }
-  workspaceDocuments: Ref<Array<{ path: string, title: string }>>
+  workspaceDocuments: Ref<Array<
+    | { type: 'file', path: string, name: string, updated?: number, created?: number }
+    | { type: 'folder', path: string, name: string, children: any[] }
+  >>
 }
 
 const SIYUAN_BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
@@ -199,20 +202,33 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
       },
       searchWorkspaceCanvasFiles: async (keyword) => {
         const normalizedQuery = keyword.trim().toLowerCase()
-        return workspaceDocuments.value
+
+        function flattenTree(nodes: typeof workspaceDocuments.value): Array<{ path: string, name: string }> {
+          const result: Array<{ path: string, name: string }> = []
+          for (const node of nodes) {
+            if (node.type === 'file') {
+              result.push(node)
+            } else {
+              result.push(...flattenTree(node.children))
+            }
+          }
+          return result
+        }
+
+        return flattenTree(workspaceDocuments.value)
           .filter((document) => {
             if (!normalizedQuery) {
               return true
             }
 
-            return document.title.toLowerCase().includes(normalizedQuery)
+            return document.name.toLowerCase().includes(normalizedQuery)
               || document.path.toLowerCase().includes(normalizedQuery)
           })
           .map((document) => ({
             kind: 'canvas' as const,
             path: document.path,
             subtitle: document.path,
-            title: document.title,
+            title: document.name,
           }))
       },
     })

@@ -120,8 +120,25 @@ export function useCanvasEditor(
   const fileSource = ref<CanvasEditorFileSource>(bootstrap.path ? "workspace" : "unsaved")
   const stageRef = ref<HTMLElement>()
   const recentFiles = ref<CanvasRecentFile[]>([])
-  const workspaceDocuments = ref<Array<{ path: string, title: string }>>([])
-  const workspaceSortMode = ref<'updated' | 'name'>('updated')
+  type WorkspaceTreeNode = {
+    type: 'file'
+    path: string
+    name: string
+    updated?: number
+    created?: number
+  } | {
+    type: 'folder'
+    path: string
+    name: string
+    children: WorkspaceTreeNode[]
+  }
+  type WorkspaceSortField = 'name' | 'updated' | 'created'
+  type WorkspaceSortDirection = 'asc' | 'desc'
+
+  const workspaceDocuments = ref<WorkspaceTreeNode[]>([])
+  const expandedFolders = ref<Set<string>>(new Set())
+  const workspaceSortField = ref<WorkspaceSortField>('updated')
+  const workspaceSortDirection = ref<WorkspaceSortDirection>('desc')
   const suggestedFilename = ref(bootstrap.title || t("untitledCanvas"))
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
   const edgeToolbarPopover = ref<"closed" | "color" | "direction">("closed")
@@ -422,30 +439,63 @@ export function useCanvasEditor(
     bottomToolbarVisible.value = false
   }
 
+  async function readDirectoryTree(dirPath: string): Promise<WorkspaceTreeNode[]> {
+    let entries: Array<{ isDir: boolean; name: string; updated?: number; created?: number }>
+    try {
+      entries = (await readDir(dirPath) as typeof entries) ?? []
+    } catch {
+      return []
+    }
+
+    const nodes: WorkspaceTreeNode[] = []
+    for (const entry of entries) {
+      const fullPath = `${dirPath}/${entry.name}`
+      if (entry.isDir) {
+        const children = await readDirectoryTree(fullPath)
+        nodes.push({ type: 'folder', path: fullPath, name: entry.name, children })
+      } else if (entry.name.endsWith('.canvas')) {
+        nodes.push({
+          type: 'file',
+          path: fullPath,
+          name: entry.name,
+          updated: entry.updated,
+          created: entry.created,
+        })
+      }
+    }
+    return nodes
+  }
+
+  function sortWorkspaceTree(nodes: WorkspaceTreeNode[]): WorkspaceTreeNode[] {
+    const sorted = [...nodes].sort((a, b) => {
+      if (a.type === 'folder' && b.type !== 'folder') return -1
+      if (a.type !== 'folder' && b.type === 'folder') return 1
+
+      const field = workspaceSortField.value
+      const dir = workspaceSortDirection.value === 'asc' ? 1 : -1
+
+      if (field === 'name') {
+        return dir * a.name.localeCompare(b.name, 'zh-CN')
+      }
+
+      const aVal = a.type === 'file' ? (a[field] ?? 0) : 0
+      const bVal = b.type === 'file' ? (b[field] ?? 0) : 0
+      return dir * (bVal - aVal)
+    })
+
+    return sorted.map((node) =>
+      node.type === 'folder'
+        ? { ...node, children: sortWorkspaceTree(node.children) }
+        : node,
+    )
+  }
+
   async function refreshWorkspaceDocuments() {
     const directory = getPluginSettings().defaultCanvasDirectory
 
     try {
-      const entries = await readDir(directory) as Array<{
-        isDir: boolean
-        name: string
-        updated: number
-      }> | null
-
-      const filtered = (Array.isArray(entries) ? entries : [])
-        .filter((entry) => !entry.isDir && entry.name.endsWith(".canvas"))
-
-      filtered.sort((left, right) => {
-        if (workspaceSortMode.value === 'name') {
-          return left.name.localeCompare(right.name, 'zh-CN')
-        }
-        return (right.updated ?? 0) - (left.updated ?? 0)
-      })
-
-      workspaceDocuments.value = filtered.map((entry) => ({
-        path: `${directory}/${entry.name}`,
-        title: entry.name,
-      }))
+      const tree = await readDirectoryTree(directory)
+      workspaceDocuments.value = sortWorkspaceTree(tree)
     } catch {
       workspaceDocuments.value = []
     }
@@ -470,9 +520,38 @@ export function useCanvasEditor(
     }
   }
 
-  function toggleWorkspaceSortMode() {
-    workspaceSortMode.value = workspaceSortMode.value === 'updated' ? 'name' : 'updated'
+  function collectFolderPaths(nodes: WorkspaceTreeNode[]): string[] {
+    const paths: string[] = []
+    for (const node of nodes) {
+      if (node.type === 'folder') {
+        paths.push(node.path)
+        paths.push(...collectFolderPaths(node.children))
+      }
+    }
+    return paths
+  }
+
+  function setWorkspaceSortField(field: WorkspaceSortField) {
+    workspaceSortField.value = field
     refreshWorkspaceDocuments()
+  }
+
+  function setWorkspaceSortDirection(direction: WorkspaceSortDirection) {
+    workspaceSortDirection.value = direction
+    refreshWorkspaceDocuments()
+  }
+
+  function toggleFolderExpand(path: string) {
+    if (expandedFolders.value.has(path)) {
+      expandedFolders.value.delete(path)
+    } else {
+      expandedFolders.value.add(path)
+    }
+    expandedFolders.value = new Set(expandedFolders.value)
+  }
+
+  function expandAllFolders() {
+    expandedFolders.value = new Set(collectFolderPaths(workspaceDocuments.value))
   }
 
   async function expandAllInspectorSections() {
@@ -490,6 +569,7 @@ export function useCanvasEditor(
         selection: true,
       },
     })
+    expandAllFolders()
   }
 
   async function deleteWorkspaceDocument(path: string) {
@@ -506,6 +586,59 @@ export function useCanvasEditor(
     await plugin.removeRecentCanvasFile?.(path)
     refreshRecentFiles()
     await refreshWorkspaceDocuments()
+  }
+
+  async function moveWorkspaceFile(sourcePath: string, targetFolderPath: string): Promise<boolean> {
+    const fileName = sourcePath.substring(sourcePath.lastIndexOf('/') + 1)
+    const targetFilePath = `${targetFolderPath}/${fileName}`
+    const sourceDir = sourcePath.substring(0, sourcePath.lastIndexOf('/'))
+
+    if (sourceDir === targetFolderPath) return false
+
+    try {
+      const entries = await readDir(targetFolderPath) as Array<{ name: string }> | null
+      if (Array.isArray(entries) && entries.some((e) => e.name === fileName)) {
+        showMessage(t("messageFileAlreadyExists"), 4000, "error")
+        return false
+      }
+    } catch {
+      // directory may not exist or be unreadable
+    }
+
+    try {
+      const response = await fetch("/api/file/getFile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: sourcePath }),
+      })
+      if (!response.ok) {
+        showMessage(t("messageUnableMoveFile"), 4000, "error")
+        return false
+      }
+      const content = await response.text()
+      const blob = new Blob([content], { type: "application/json" })
+      await putFile(targetFilePath, false, blob)
+    } catch {
+      showMessage(t("messageUnableMoveFile"), 4000, "error")
+      return false
+    }
+
+    try {
+      await removeFile(sourcePath)
+    } catch {
+      try { await removeFile(targetFilePath) } catch { /* cleanup best-effort */ }
+      showMessage(t("messageUnableMoveFile"), 4000, "error")
+      return false
+    }
+
+    if (state.filePath === sourcePath) {
+      state.filePath = targetFilePath
+    }
+    await plugin.removeRecentCanvasFile?.(sourcePath)
+    refreshRecentFiles()
+    await refreshWorkspaceDocuments()
+    showMessage(t("messageFileMoved", { name: fileName, folder: targetFolderPath }))
+    return true
   }
 
   async function removeRecentFileRecord(path: string) {
@@ -904,6 +1037,7 @@ export function useCanvasEditor(
       deactivateCanvasSurface,
       createWorkspaceFolder,
       deleteWorkspaceDocument,
+      moveWorkspaceFile,
       expandAllInspectorSections,
       removeRecentFileRecord,
       connectionDraft,
@@ -994,9 +1128,14 @@ export function useCanvasEditor(
       openWorkspacePath,
       overwriteConflictVersion,
       recentFiles,
-      toggleWorkspaceSortMode,
+      expandAllFolders,
+      expandedFolders,
+      setWorkspaceSortDirection,
+      setWorkspaceSortField,
+      toggleFolderExpand,
       workspaceDocuments,
-      workspaceSortMode,
+      workspaceSortDirection,
+      workspaceSortField,
       selectionColors,
       selectionLayoutActions,
       selectionToolbar,

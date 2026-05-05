@@ -875,6 +875,7 @@
         <div
           v-if="editor.inspectorExpanded"
           class="inspector__content"
+          @click="sortDropdownOpen = false"
         >
           <div class="inspector__toolbar">
             <button
@@ -903,11 +904,11 @@
             </button>
             <button
               class="inspector__toolbar-button"
-              :class="{ 'inspector__toolbar-button--active': editor.workspaceSortMode === 'name' }"
+              :class="{ 'inspector__toolbar-button--active': sortDropdownOpen }"
               data-testid="inspector-toolbar-sort"
               :title="t('inspectorSort')"
               type="button"
-              @click="editor.toggleWorkspaceSortMode"
+              @click.stop="sortDropdownOpen = !sortDropdownOpen"
             >
               <CanvasIcon
                 name="sort"
@@ -926,6 +927,42 @@
                 :size="16"
               />
             </button>
+            <div
+              v-if="sortDropdownOpen"
+              class="inspector__sort-dropdown"
+              @click.stop
+            >
+              <div class="inspector__sort-dropdown-group">
+                <button
+                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'name' }]"
+                  type="button"
+                  @click="editor.setWorkspaceSortField('name'); sortDropdownOpen = false"
+                >{{ t('inspectorSortByName') }}</button>
+                <button
+                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'updated' }]"
+                  type="button"
+                  @click="editor.setWorkspaceSortField('updated'); sortDropdownOpen = false"
+                >{{ t('inspectorSortByUpdated') }}</button>
+                <button
+                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'created' }]"
+                  type="button"
+                  @click="editor.setWorkspaceSortField('created'); sortDropdownOpen = false"
+                >{{ t('inspectorSortByCreated') }}</button>
+              </div>
+              <div class="inspector__sort-dropdown-divider" />
+              <div class="inspector__sort-dropdown-group">
+                <button
+                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortDirection === 'asc' }]"
+                  type="button"
+                  @click="editor.setWorkspaceSortDirection('asc'); sortDropdownOpen = false"
+                >{{ t('inspectorSortAsc') }}</button>
+                <button
+                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortDirection === 'desc' }]"
+                  type="button"
+                  @click="editor.setWorkspaceSortDirection('desc'); sortDropdownOpen = false"
+                >{{ t('inspectorSortDesc') }}</button>
+              </div>
+            </div>
           </div>
           <section class="inspector__section">
             <button
@@ -946,28 +983,135 @@
               <p>{{ editor.state.isDirty ? t("inspectorPendingSave") : t("inspectorInSync") }}</p>
               <div
                 v-if="editor.workspaceDocuments.length"
-                class="recent-list"
+                class="workspace-tree"
+                @dragover.prevent
+                @drop.prevent="onRootDrop"
               >
-                <div
-                  v-for="documentEntry in editor.workspaceDocuments"
-                  :key="documentEntry.path"
-                  class="recent-list__item"
+                <template
+                  v-for="node in editor.workspaceDocuments"
+                  :key="node.path"
                 >
-                  <button
-                    class="recent-list__item-open"
-                    @click="editor.openWorkspacePath(documentEntry.path)"
+                  <div
+                    v-if="node.type === 'folder'"
+                    class="workspace-tree__folder"
                   >
-                    <strong>{{ documentEntry.title }}</strong>
-                  </button>
-                  <button
-                    class="recent-list__item-delete"
-                    :title="t('selectionToolbarDelete')"
-                    type="button"
-                    @click.stop="editor.deleteWorkspaceDocument(documentEntry.path)"
+                    <button
+                      :class="['workspace-tree__folder-header', { 'workspace-tree__folder-header--drop-target': dragOverFolderPath === node.path }]"
+                      type="button"
+                      @click="editor.toggleFolderExpand(node.path)"
+                      @dragover.prevent="onFolderDragOver"
+                      @dragenter.prevent="onFolderDragEnter($event, node.path)"
+                      @dragleave="onFolderDragLeave($event, node.path)"
+                      @drop.prevent="onFolderDrop($event, node.path)"
+                    >
+                      <span class="workspace-tree__folder-chevron">{{ editor.expandedFolders.has(node.path) ? '▼' : '▶' }}</span>
+                      <span class="workspace-tree__folder-name">{{ node.name }}</span>
+                    </button>
+                    <div
+                      v-if="editor.expandedFolders.has(node.path)"
+                      class="workspace-tree__folder-children"
+                    >
+                      <template
+                        v-for="child in node.children"
+                        :key="child.path"
+                      >
+                        <div
+                          v-if="child.type === 'file'"
+                          class="workspace-tree__file"
+                          draggable="true"
+                          @dragstart="onFileDragStart($event, child.path)"
+                          @dragend="onDragEnd"
+                        >
+                          <button
+                            class="workspace-tree__file-open"
+                            @click="editor.openWorkspacePath(child.path)"
+                          >
+                            <strong>{{ child.name }}</strong>
+                          </button>
+                          <button
+                            class="workspace-tree__file-delete"
+                            :title="t('selectionToolbarDelete')"
+                            type="button"
+                            @click.stop="editor.deleteWorkspaceDocument(child.path)"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                        <div
+                          v-else-if="child.type === 'folder'"
+                          class="workspace-tree__folder workspace-tree__folder--nested"
+                        >
+                          <button
+                            :class="['workspace-tree__folder-header', { 'workspace-tree__folder-header--drop-target': dragOverFolderPath === child.path }]"
+                            type="button"
+                            @click="editor.toggleFolderExpand(child.path)"
+                            @dragover.prevent="onFolderDragOver"
+                            @dragenter.prevent="onFolderDragEnter($event, child.path)"
+                            @dragleave="onFolderDragLeave($event, child.path)"
+                            @drop.prevent="onFolderDrop($event, child.path)"
+                          >
+                            <span class="workspace-tree__folder-chevron">{{ editor.expandedFolders.has(child.path) ? '▼' : '▶' }}</span>
+                            <span class="workspace-tree__folder-name">{{ child.name }}</span>
+                          </button>
+                          <div
+                            v-if="editor.expandedFolders.has(child.path)"
+                            class="workspace-tree__folder-children"
+                          >
+                            <template
+                              v-for="grandchild in child.children"
+                              :key="grandchild.path"
+                            >
+                              <div
+                                v-if="grandchild.type === 'file'"
+                                class="workspace-tree__file"
+                                draggable="true"
+                                @dragstart="onFileDragStart($event, grandchild.path)"
+                                @dragend="onDragEnd"
+                              >
+                                <button
+                                  class="workspace-tree__file-open"
+                                  @click="editor.openWorkspacePath(grandchild.path)"
+                                >
+                                  <strong>{{ grandchild.name }}</strong>
+                                </button>
+                                <button
+                                  class="workspace-tree__file-delete"
+                                  :title="t('selectionToolbarDelete')"
+                                  type="button"
+                                  @click.stop="editor.deleteWorkspaceDocument(grandchild.path)"
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                  <div
+                    v-else-if="node.type === 'file'"
+                    class="workspace-tree__file"
+                    draggable="true"
+                    @dragstart="onFileDragStart($event, node.path)"
+                    @dragend="onDragEnd"
                   >
-                    &times;
-                  </button>
-                </div>
+                    <button
+                      class="workspace-tree__file-open"
+                      @click="editor.openWorkspacePath(node.path)"
+                    >
+                      <strong>{{ node.name }}</strong>
+                    </button>
+                    <button
+                      class="workspace-tree__file-delete"
+                      :title="t('selectionToolbarDelete')"
+                      type="button"
+                      @click.stop="editor.deleteWorkspaceDocument(node.path)"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </template>
               </div>
               <p v-else>
                 {{ t("inspectorNoWorkspaceCanvasFiles") }}<br>
@@ -1329,6 +1473,7 @@ import type { Plugin } from "siyuan"
 
 import {
   nextTick,
+  onBeforeUnmount,
   ref,
   watch,
 } from "vue"
@@ -1394,6 +1539,83 @@ const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
 const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>>({})
 const hoveredEdgeId = ref("")
+const sortDropdownOpen = ref(false)
+const dragSourcePath = ref<string | null>(null)
+const dragOverFolderPath = ref<string | null>(null)
+let dragExpandTimer: ReturnType<typeof setTimeout> | null = null
+
+function onFileDragStart(event: DragEvent, filePath: string) {
+  if (!event.dataTransfer) return
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', filePath)
+  dragSourcePath.value = filePath
+}
+
+function onFolderDragOver(event: DragEvent) {
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+}
+
+function onFolderDragEnter(event: DragEvent, folderPath: string) {
+  event.preventDefault()
+  dragOverFolderPath.value = folderPath
+  if (!editor.expandedFolders.has(folderPath)) {
+    if (dragExpandTimer) clearTimeout(dragExpandTimer)
+    dragExpandTimer = setTimeout(() => {
+      editor.toggleFolderExpand(folderPath)
+      dragExpandTimer = null
+    }, 600)
+  }
+}
+
+function onFolderDragLeave(event: DragEvent, folderPath: string) {
+  const related = event.relatedTarget as HTMLElement | null
+  if (related && (event.currentTarget as HTMLElement).contains(related)) return
+  if (dragOverFolderPath.value === folderPath) {
+    dragOverFolderPath.value = null
+  }
+  if (dragExpandTimer) {
+    clearTimeout(dragExpandTimer)
+    dragExpandTimer = null
+  }
+}
+
+async function onFolderDrop(event: DragEvent, folderPath: string) {
+  event.preventDefault()
+  if (dragExpandTimer) {
+    clearTimeout(dragExpandTimer)
+    dragExpandTimer = null
+  }
+  dragOverFolderPath.value = null
+  const sourcePath = event.dataTransfer?.getData('text/plain') || dragSourcePath.value
+  if (!sourcePath) return
+  dragSourcePath.value = null
+  await editor.moveWorkspaceFile(sourcePath, folderPath)
+}
+
+async function onRootDrop(event: DragEvent) {
+  event.preventDefault()
+  const sourcePath = event.dataTransfer?.getData('text/plain') || dragSourcePath.value
+  if (!sourcePath) return
+  dragSourcePath.value = null
+  await editor.moveWorkspaceFile(sourcePath, editor.defaultCanvasDirectory)
+}
+
+function onDragEnd() {
+  dragSourcePath.value = null
+  dragOverFolderPath.value = null
+  if (dragExpandTimer) {
+    clearTimeout(dragExpandTimer)
+    dragExpandTimer = null
+  }
+}
+
+onBeforeUnmount(() => {
+  if (dragExpandTimer) {
+    clearTimeout(dragExpandTimer)
+    dragExpandTimer = null
+  }
+})
 const NODE_RESIZE_SEGMENTS: Array<{ id: string, side: CanvasSide }> = [
   { id: "top-left", side: "top" },
   { id: "top-right", side: "top" },
@@ -3194,5 +3416,168 @@ watch(
   font-size: 13px;
   color: var(--canvas-text-muted);
   text-align: center;
+}
+
+.inspector__sort-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  min-width: 160px;
+  margin-top: 4px;
+  padding: 4px 0;
+  border: 1px solid var(--canvas-border);
+  border-radius: 8px;
+  background: var(--canvas-surface);
+  box-shadow: var(--canvas-shadow-strong);
+}
+
+.inspector__sort-dropdown-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.inspector__sort-dropdown-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--canvas-border);
+}
+
+.inspector__sort-dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--canvas-text-muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.inspector__sort-dropdown-item:hover {
+  background: var(--canvas-surface);
+  color: var(--canvas-text);
+}
+
+.inspector__sort-dropdown-item--active {
+  color: var(--canvas-text);
+  font-weight: 600;
+}
+
+.inspector__toolbar {
+  position: relative;
+}
+
+.workspace-tree {
+  display: grid;
+  gap: 2px;
+}
+
+.workspace-tree__folder-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--canvas-text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.workspace-tree__folder-header:hover {
+  background: var(--canvas-surface);
+  color: var(--canvas-text);
+}
+
+.workspace-tree__folder-header--drop-target {
+  background: var(--canvas-surface);
+  color: var(--canvas-text);
+  outline: 2px dashed var(--b3-theme-primary, #4dd0e1);
+  outline-offset: -2px;
+}
+
+.workspace-tree__file[draggable="true"] {
+  cursor: grab;
+}
+
+.workspace-tree__file[draggable="true"]:active {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.workspace-tree__folder-chevron {
+  font-size: 10px;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.workspace-tree__folder-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-tree__folder-children {
+  display: grid;
+  gap: 2px;
+  padding-left: 18px;
+}
+
+.workspace-tree__file {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--canvas-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.workspace-tree__file-open {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--canvas-text);
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.workspace-tree__file-open:hover {
+  background: var(--canvas-surface);
+}
+
+.workspace-tree__file-open strong {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-tree__file-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--canvas-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.workspace-tree__file-delete:hover {
+  background: var(--canvas-floating-button-bg-hover);
+  color: var(--canvas-text);
 }
 </style>
