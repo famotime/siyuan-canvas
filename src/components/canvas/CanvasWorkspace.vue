@@ -369,7 +369,32 @@
             @dblclick.stop="handleNodeDoubleClick(node)"
             @wheel.passive="handleNodeWheel(node, $event)"
           >
-            <div class="canvas-node__body">
+            <header
+              v-if="node.type !== 'group'"
+              class="canvas-node__header"
+              data-drag-handle="true"
+            >
+              <CanvasIcon
+                class="canvas-node__header-icon"
+                :name="getNodeHeaderIconName(node)"
+                :size="14"
+              />
+              <span class="canvas-node__header-title">{{ getNodeHeaderTitle(node) }}</span>
+              <a
+                v-if="node.type === 'link' && node.url"
+                class="canvas-node__header-action"
+                :href="node.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                :title="t('linkCardOpenInBrowser')"
+                @click.stop
+                @pointerdown.stop
+              >↗</a>
+            </header>
+            <div
+              class="canvas-node__body"
+              :class="{ 'canvas-node__body--selectable': node.type === 'text' || node.type === 'link' }"
+            >
               <template v-if="node.type === 'text'">
                 <textarea
                   v-if="editingNodeId === node.id"
@@ -410,17 +435,6 @@
                   v-else
                   class="link-card"
                 >
-                  <div class="link-card__header">
-                    <span class="link-card__url">{{ node.url }}</span>
-                    <a
-                      class="link-card__open"
-                      :href="node.url"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      :title="t('linkCardOpenInBrowser')"
-                      @click.stop
-                    >↗</a>
-                  </div>
                   <div class="link-card__iframe-wrapper">
                     <iframe
                       :src="node.url"
@@ -1093,6 +1107,52 @@
               </div>
             </div>
           </div>
+          <nav
+            class="inspector__tabs"
+            role="tablist"
+            data-testid="inspector-tabs"
+          >
+            <button
+              class="inspector__tab"
+              :class="{ 'inspector__tab--active': activeInspectorTab === 'documents' }"
+              data-testid="inspector-tab-documents"
+              role="tab"
+              :aria-selected="activeInspectorTab === 'documents'"
+              type="button"
+              @click="activeInspectorTab = 'documents'"
+            >{{ t('inspectorTabDocuments') }}</button>
+            <button
+              class="inspector__tab"
+              :class="{ 'inspector__tab--active': activeInspectorTab === 'selection' }"
+              data-testid="inspector-tab-selection"
+              role="tab"
+              :aria-selected="activeInspectorTab === 'selection'"
+              type="button"
+              @click="activeInspectorTab = 'selection'"
+            >
+              {{ t('inspectorTabSelection') }}
+              <span
+                v-if="editor.selectedNodeCount > 0 || editor.selectedEdge"
+                class="inspector__tab-badge"
+              >{{ editor.selectedNodeCount > 0 ? editor.selectedNodeCount : '·' }}</span>
+            </button>
+            <button
+              class="inspector__tab"
+              :class="{ 'inspector__tab--active': activeInspectorTab === 'issues' }"
+              data-testid="inspector-tab-issues"
+              role="tab"
+              :aria-selected="activeInspectorTab === 'issues'"
+              type="button"
+              @click="activeInspectorTab = 'issues'"
+            >
+              {{ t('inspectorTabIssues') }}
+              <span
+                v-if="totalInspectorIssueCount > 0"
+                class="inspector__tab-badge inspector__tab-badge--danger"
+              >{{ totalInspectorIssueCount }}</span>
+            </button>
+          </nav>
+          <template v-if="activeInspectorTab === 'documents'">
           <section class="inspector__section">
             <button
               class="inspector__section-toggle"
@@ -1127,14 +1187,26 @@
                     <button
                       :class="['workspace-tree__folder-header', { 'workspace-tree__folder-header--drop-target': dragOverFolderPath === node.path }]"
                       type="button"
+                      :title="node.path"
+                      :aria-expanded="editor.expandedFolders.has(node.path)"
                       @click="editor.toggleFolderExpand(node.path)"
                       @dragover.prevent="onFolderDragOver"
                       @dragenter.prevent="onFolderDragEnter($event, node.path)"
                       @dragleave="onFolderDragLeave($event, node.path)"
                       @drop.prevent="onFolderDrop($event, node.path)"
                     >
-                      <span class="workspace-tree__folder-chevron">{{ editor.expandedFolders.has(node.path) ? '▼' : '▶' }}</span>
-                      <span class="workspace-tree__folder-name">{{ node.name }}</span>
+                      <CanvasIcon
+                        class="workspace-tree__chevron"
+                        :class="{ 'workspace-tree__chevron--expanded': editor.expandedFolders.has(node.path) }"
+                        name="chevron-right"
+                        :size="12"
+                      />
+                      <CanvasIcon
+                        class="workspace-tree__folder-icon"
+                        :name="editor.expandedFolders.has(node.path) ? 'folder-open' : 'folder'"
+                        :size="14"
+                      />
+                      <span class="workspace-tree__name">{{ node.name }}</span>
                     </button>
                     <div
                       v-if="editor.expandedFolders.has(node.path)"
@@ -1146,16 +1218,23 @@
                       >
                         <div
                           v-if="child.type === 'file'"
-                          class="workspace-tree__file"
+                          :class="['workspace-tree__file', { 'workspace-tree__file--active': child.path === editor.state.filePath }]"
                           draggable="true"
+                          :title="child.path"
                           @dragstart="onFileDragStart($event, child.path)"
                           @dragend="onDragEnd"
                         >
                           <button
                             class="workspace-tree__file-open"
+                            type="button"
                             @click="editor.openWorkspacePath(child.path)"
                           >
-                            <strong>{{ child.name }}</strong>
+                            <CanvasIcon
+                              class="workspace-tree__file-icon"
+                              name="canvas-file"
+                              :size="14"
+                            />
+                            <span class="workspace-tree__name">{{ child.name }}</span>
                           </button>
                           <button
                             class="workspace-tree__file-delete"
@@ -1163,7 +1242,7 @@
                             type="button"
                             @click.stop="editor.deleteWorkspaceDocument(child.path)"
                           >
-                            &times;
+                            <CanvasIcon name="close" :size="12" />
                           </button>
                         </div>
                         <div
@@ -1173,14 +1252,26 @@
                           <button
                             :class="['workspace-tree__folder-header', { 'workspace-tree__folder-header--drop-target': dragOverFolderPath === child.path }]"
                             type="button"
+                            :title="child.path"
+                            :aria-expanded="editor.expandedFolders.has(child.path)"
                             @click="editor.toggleFolderExpand(child.path)"
                             @dragover.prevent="onFolderDragOver"
                             @dragenter.prevent="onFolderDragEnter($event, child.path)"
                             @dragleave="onFolderDragLeave($event, child.path)"
                             @drop.prevent="onFolderDrop($event, child.path)"
                           >
-                            <span class="workspace-tree__folder-chevron">{{ editor.expandedFolders.has(child.path) ? '▼' : '▶' }}</span>
-                            <span class="workspace-tree__folder-name">{{ child.name }}</span>
+                            <CanvasIcon
+                              class="workspace-tree__chevron"
+                              :class="{ 'workspace-tree__chevron--expanded': editor.expandedFolders.has(child.path) }"
+                              name="chevron-right"
+                              :size="12"
+                            />
+                            <CanvasIcon
+                              class="workspace-tree__folder-icon"
+                              :name="editor.expandedFolders.has(child.path) ? 'folder-open' : 'folder'"
+                              :size="14"
+                            />
+                            <span class="workspace-tree__name">{{ child.name }}</span>
                           </button>
                           <div
                             v-if="editor.expandedFolders.has(child.path)"
@@ -1192,16 +1283,23 @@
                             >
                               <div
                                 v-if="grandchild.type === 'file'"
-                                class="workspace-tree__file"
+                                :class="['workspace-tree__file', { 'workspace-tree__file--active': grandchild.path === editor.state.filePath }]"
                                 draggable="true"
+                                :title="grandchild.path"
                                 @dragstart="onFileDragStart($event, grandchild.path)"
                                 @dragend="onDragEnd"
                               >
                                 <button
                                   class="workspace-tree__file-open"
+                                  type="button"
                                   @click="editor.openWorkspacePath(grandchild.path)"
                                 >
-                                  <strong>{{ grandchild.name }}</strong>
+                                  <CanvasIcon
+                                    class="workspace-tree__file-icon"
+                                    name="canvas-file"
+                                    :size="14"
+                                  />
+                                  <span class="workspace-tree__name">{{ grandchild.name }}</span>
                                 </button>
                                 <button
                                   class="workspace-tree__file-delete"
@@ -1209,7 +1307,7 @@
                                   type="button"
                                   @click.stop="editor.deleteWorkspaceDocument(grandchild.path)"
                                 >
-                                  &times;
+                                  <CanvasIcon name="close" :size="12" />
                                 </button>
                               </div>
                             </template>
@@ -1220,16 +1318,23 @@
                   </div>
                   <div
                     v-else-if="node.type === 'file'"
-                    class="workspace-tree__file"
+                    :class="['workspace-tree__file', { 'workspace-tree__file--active': node.path === editor.state.filePath }]"
                     draggable="true"
+                    :title="node.path"
                     @dragstart="onFileDragStart($event, node.path)"
                     @dragend="onDragEnd"
                   >
                     <button
                       class="workspace-tree__file-open"
+                      type="button"
                       @click="editor.openWorkspacePath(node.path)"
                     >
-                      <strong>{{ node.name }}</strong>
+                      <CanvasIcon
+                        class="workspace-tree__file-icon"
+                        name="canvas-file"
+                        :size="14"
+                      />
+                      <span class="workspace-tree__name">{{ node.name }}</span>
                     </button>
                     <button
                       class="workspace-tree__file-delete"
@@ -1237,48 +1342,15 @@
                       type="button"
                       @click.stop="editor.deleteWorkspaceDocument(node.path)"
                     >
-                      &times;
+                      <CanvasIcon name="close" :size="12" />
                     </button>
                   </div>
                 </template>
               </div>
-              <p v-else>
+              <p v-else class="workspace-tree__empty">
                 {{ t("inspectorNoWorkspaceCanvasFiles") }}<br>
                 <code>{{ editor.defaultCanvasDirectory }}/</code>
               </p>
-              <div
-                v-if="editor.state.conflict"
-                class="conflict-panel"
-              >
-                <strong>{{ t("inspectorExternalChangeDetected") }}</strong>
-                <span>{{ t("inspectorExternalChangeDescription") }}</span>
-                <div class="conflict-panel__actions">
-                  <button
-                    class="toolbar__button"
-                    @click="editor.loadConflictVersion"
-                  >
-                    {{ t("inspectorLoadDiskVersion") }}
-                  </button>
-                  <button
-                    class="toolbar__button toolbar__button--primary"
-                    @click="editor.overwriteConflictVersion"
-                  >
-                    {{ t("inspectorOverwriteDiskVersion") }}
-                  </button>
-                </div>
-              </div>
-              <div
-                v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
-                class="issues"
-              >
-                <div
-                  v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
-                  :key="issue.code + issue.path"
-                >
-                  <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
-                  <span>{{ issue.message }}</span>
-                </div>
-              </div>
             </div>
           </section>
 
@@ -1301,12 +1373,19 @@
                   v-for="recent in editor.recentFiles"
                   :key="recent.path"
                   class="recent-list__item"
+                  :title="recent.path"
                 >
                   <button
                     class="recent-list__item-open"
+                    type="button"
                     @click="editor.openRecentFile(recent)"
                   >
-                    <strong>{{ recent.title }}</strong>
+                    <CanvasIcon
+                      class="recent-list__item-icon"
+                      name="canvas-file"
+                      :size="14"
+                    />
+                    <span class="workspace-tree__name">{{ recent.title }}</span>
                   </button>
                   <button
                     class="recent-list__item-delete"
@@ -1314,7 +1393,7 @@
                     type="button"
                     @click.stop="editor.removeRecentFileRecord(recent.path)"
                   >
-                    &times;
+                    <CanvasIcon name="close" :size="12" />
                   </button>
                 </div>
               </div>
@@ -1323,7 +1402,9 @@
               </p>
             </div>
           </section>
+          </template>
 
+          <template v-if="activeInspectorTab === 'selection'">
           <section
             v-if="editor.selectedNodeCount > 1"
             class="inspector__section"
@@ -1576,6 +1657,54 @@
               </button>
             </div>
           </section>
+          </template>
+
+          <template v-if="activeInspectorTab === 'issues'">
+            <section
+              v-if="editor.state.conflict"
+              class="inspector__section"
+              data-testid="inspector-conflict-section"
+            >
+              <h2>{{ t("inspectorExternalChangeDetected") }}</h2>
+              <p>{{ t("inspectorExternalChangeDescription") }}</p>
+              <div class="conflict-panel__actions">
+                <button
+                  class="toolbar__button"
+                  type="button"
+                  @click="editor.loadConflictVersion"
+                >
+                  {{ t("inspectorLoadDiskVersion") }}
+                </button>
+                <button
+                  class="toolbar__button toolbar__button--primary"
+                  type="button"
+                  @click="editor.overwriteConflictVersion"
+                >
+                  {{ t("inspectorOverwriteDiskVersion") }}
+                </button>
+              </div>
+            </section>
+            <section
+              class="inspector__section"
+              data-testid="inspector-issues-section"
+            >
+              <h2>{{ t("inspectorTabIssues") }}</h2>
+              <div
+                v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
+                class="issues"
+              >
+                <div
+                  v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
+                  :key="issue.code + issue.path"
+                  :class="['issues__item', `issues__item--${issue.level}`]"
+                >
+                  <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
+                  <span>{{ issue.message }}</span>
+                </div>
+              </div>
+              <p v-else class="issues__empty">{{ t('inspectorNoIssues') }}</p>
+            </section>
+          </template>
         </div>
       </aside>
     </div>
@@ -1601,6 +1730,7 @@
 import type { Plugin } from "siyuan"
 
 import {
+  computed,
   nextTick,
   onBeforeUnmount,
   ref,
@@ -1611,6 +1741,7 @@ import { useCanvasEditor } from "@/canvas/use-canvas-editor"
 import {
   CanvasIcon,
 } from "@/components/canvas/canvas-icon"
+import type { CanvasIconName } from "@/components/canvas/canvas-icon"
 import {
   EDGE_DIRECTION_ICON_NAMES,
   SELECTION_LAYOUT_ICON_NAMES,
@@ -1672,6 +1803,28 @@ const sortDropdownOpen = ref(false)
 const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
 let dragExpandTimer: ReturnType<typeof setTimeout> | null = null
+
+type InspectorTab = 'documents' | 'selection' | 'issues'
+const activeInspectorTab = ref<InspectorTab>('documents')
+
+const totalInspectorIssueCount = computed(() => {
+  const errors = editor.state.issues.errors.length
+  const warnings = editor.state.issues.warnings.length
+  const conflict = editor.state.conflict ? 1 : 0
+  return errors + warnings + conflict
+})
+
+// 选区/边变更时若用户尚停留在文档 tab，自动切到选区 tab，避免反复手动切换
+watch(
+  () => `${editor.state.selectedEdgeId}|${editor.state.selectedNodeIds.length}`,
+  (next, prev) => {
+    if (next === prev) return
+    const hasSelection = editor.state.selectedEdgeId !== '' || editor.state.selectedNodeIds.length > 0
+    if (hasSelection && activeInspectorTab.value === 'documents') {
+      activeInspectorTab.value = 'selection'
+    }
+  },
+)
 
 function onFileDragStart(event: DragEvent, filePath: string) {
   if (!event.dataTransfer) return
@@ -1912,6 +2065,40 @@ function getCanvasNodeStyle(node: CanvasNode) {
 
 function getCanvasNodeContentStyle(node: CanvasNode) {
   return resolveCanvasNodeContentStyle(node)
+}
+
+/**
+ * 节点 header 上显示的类型图标。文本/文件/链接三类节点 header 的图标视觉锚点
+ * 来自 canvas-icon 字典，与底部 toolbar 添加按钮保持一致。
+ */
+function getNodeHeaderIconName(node: CanvasNode): CanvasIconName {
+  if (node.type === "text") return "text"
+  if (node.type === "file") return "canvas-file"
+  if (node.type === "link") return "open"
+  return "text"
+}
+
+/**
+ * 节点 header 上显示的标题。优先使用节点已有元数据，最后退化到节点类型默认文案。
+ */
+function getNodeHeaderTitle(node: CanvasNode): string {
+  if (node.type === "text") {
+    const firstLine = (node.text || "").split("\n").find((line) => line.trim().length > 0) ?? ""
+    return firstLine.trim().slice(0, 60) || t("nodeKindText")
+  }
+  if (node.type === "file") {
+    return editor.getFileNodeDescription?.(node)
+      || (node.file ? node.file.split("/").pop() || node.file : t("toolbarFile"))
+  }
+  if (node.type === "link") {
+    if (!node.url) return t("nodeKindExternalLink")
+    try {
+      return new URL(node.url).hostname || node.url
+    } catch {
+      return node.url
+    }
+  }
+  return ""
 }
 
 function getFileCardImageSource(node: CanvasNode): string | undefined {
@@ -2927,7 +3114,7 @@ watch(
   box-shadow: var(--canvas-shadow);
   background: var(--canvas-card-bg);
   color: var(--canvas-text);
-  cursor: grab;
+  /* cursor: grab 移到 header；body 区域可选中文本 */
   touch-action: none;
 }
 
@@ -2946,15 +3133,80 @@ watch(
   z-index: 3;
 }
 
+/* 节点顶部 header：唯一拖拽手柄；包含类型图标 + 标题 + 可选操作 */
+.canvas-node__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--canvas-border);
+  background: var(--canvas-floating-button-bg);
+  color: var(--canvas-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.canvas-node__header:active {
+  cursor: grabbing;
+}
+
+.canvas-node--selected .canvas-node__header {
+  background: var(--canvas-accent-soft);
+  color: var(--canvas-accent);
+}
+
+.canvas-node__header-icon {
+  flex-shrink: 0;
+}
+
+.canvas-node__header-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-node__header-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -2px -4px -2px 0;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.canvas-node__header-action:hover {
+  background: var(--canvas-floating-button-bg-hover);
+  color: var(--canvas-accent);
+}
+
 .canvas-node__body {
   flex: 1;
-  padding: 16px 14px 20px;
+  padding: 12px 14px 16px;
   overflow: auto;
+}
+
+/* 文本/链接节点的 body 是用户内容区，可选择文本/不触发拖动 */
+.canvas-node__body--selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .canvas-node--link .canvas-node__body {
   padding: 0;
   overflow: hidden;
+  cursor: default;
 }
 
 .canvas-node__title {
@@ -3367,6 +3619,68 @@ watch(
   color: inherit;
 }
 
+/* 三 tab 顶部导航：文档 / 选区 / 问题 */
+.inspector__tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 12px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--canvas-floating-button-bg);
+}
+
+.inspector__tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--canvas-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.inspector__tab:hover {
+  color: var(--canvas-text);
+}
+
+.inspector__tab--active {
+  background: var(--canvas-surface);
+  color: var(--canvas-text);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+}
+
+.inspector__tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--canvas-floating-button-bg-hover);
+  color: var(--canvas-text);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.inspector__tab--active .inspector__tab-badge {
+  background: var(--canvas-accent-soft);
+  color: var(--canvas-accent);
+}
+
+.inspector__tab-badge--danger {
+  background: var(--canvas-danger-soft);
+  color: var(--canvas-danger);
+}
+
 .inspector__section {
   display: grid;
   gap: 10px;
@@ -3432,8 +3746,42 @@ watch(
 
 .issues {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   font-size: 12px;
+}
+
+.issues__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-left: 3px solid var(--canvas-warning);
+  background: var(--canvas-floating-button-bg);
+}
+
+.issues__item--error {
+  border-left-color: var(--canvas-danger);
+  background: var(--canvas-danger-soft);
+}
+
+.issues__item--warning {
+  border-left-color: var(--canvas-warning);
+}
+
+.issues__item strong {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--canvas-text-muted);
+}
+
+.issues__empty {
+  margin: 0;
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--canvas-text-muted);
 }
 
 .conflict-panel {
@@ -3453,55 +3801,68 @@ watch(
 
 .recent-list {
   display: grid;
-  gap: 8px;
+  gap: 1px;
 }
 
 .recent-list__item {
   display: flex;
   align-items: stretch;
-  border: 1px solid var(--canvas-border);
-  border-radius: 12px;
-  background: var(--canvas-surface);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   overflow: hidden;
+  transition: background 0.15s ease;
+}
+
+.recent-list__item:hover {
+  background: var(--canvas-floating-button-bg);
 }
 
 .recent-list__item-open {
   flex: 1;
-  display: grid;
-  gap: 4px;
-  justify-items: start;
-  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
   text-align: left;
   cursor: pointer;
-  color: inherit;
+  color: var(--canvas-text);
   border: 0;
   background: transparent;
   min-width: 0;
+  font: inherit;
 }
 
-.recent-list__item-open span {
-  font-size: 12px;
+.recent-list__item-icon {
+  flex-shrink: 0;
   color: var(--canvas-text-muted);
-  word-break: break-all;
 }
 
 .recent-list__item-delete {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 24px;
+  height: 24px;
+  margin: auto 4px;
   flex-shrink: 0;
   border: 0;
-  border-left: 1px solid var(--canvas-border);
+  border-radius: 4px;
   background: transparent;
   color: var(--canvas-text-muted);
   cursor: pointer;
-  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.recent-list__item:hover .recent-list__item-delete,
+.recent-list__item-delete:focus-visible {
+  opacity: 1;
 }
 
 .recent-list__item-delete:hover {
-  background: var(--canvas-floating-button-bg-hover);
-  color: var(--canvas-text);
+  background: var(--canvas-danger-soft);
+  color: var(--canvas-danger);
 }
 
 .issues strong {
@@ -3822,7 +4183,25 @@ watch(
 
 .workspace-tree {
   display: grid;
-  gap: 2px;
+  gap: 1px;
+}
+
+.workspace-tree__empty {
+  margin: 0;
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--canvas-text-muted);
+  line-height: 1.6;
+}
+
+.workspace-tree__empty code {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--canvas-code-bg);
+  font-size: 11px;
 }
 
 .workspace-tree__folder-header {
@@ -3830,26 +4209,24 @@ watch(
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 5px 6px;
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--canvas-text-muted);
+  color: var(--canvas-text);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
+  text-align: left;
 }
 
 .workspace-tree__folder-header:hover {
-  background: var(--canvas-surface);
-  color: var(--canvas-text);
+  background: var(--canvas-floating-button-bg);
 }
 
 .workspace-tree__folder-header--drop-target {
-  background: var(--canvas-surface);
-  color: var(--canvas-text);
-  outline: 2px dashed var(--b3-theme-primary, #4dd0e1);
-  outline-offset: -2px;
+  background: var(--canvas-accent-soft);
+  box-shadow: inset 2px 0 0 var(--canvas-accent);
 }
 
 .workspace-tree__file[draggable="true"] {
@@ -3861,72 +4238,113 @@ watch(
   cursor: grabbing;
 }
 
-.workspace-tree__folder-chevron {
-  font-size: 10px;
-  width: 12px;
-  text-align: center;
+.workspace-tree__chevron {
   flex-shrink: 0;
+  color: var(--canvas-text-muted);
+  transition: transform 0.15s ease;
 }
 
-.workspace-tree__folder-name {
-  font-weight: 600;
+.workspace-tree__chevron--expanded {
+  transform: rotate(90deg);
+}
+
+.workspace-tree__folder-icon,
+.workspace-tree__file-icon {
+  flex-shrink: 0;
+  color: var(--canvas-text-muted);
+}
+
+.workspace-tree__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 13px;
 }
 
 .workspace-tree__folder-children {
   display: grid;
-  gap: 2px;
-  padding-left: 18px;
+  gap: 1px;
+  padding-left: 16px;
+  position: relative;
+}
+
+/* 树形左侧引导线，让层级更清晰 */
+.workspace-tree__folder-children::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--canvas-border);
 }
 
 .workspace-tree__file {
   display: flex;
   align-items: stretch;
-  border: 1px solid var(--canvas-border);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 6px;
   overflow: hidden;
+  transition: background 0.15s ease;
+}
+
+.workspace-tree__file:hover {
+  background: var(--canvas-floating-button-bg);
+}
+
+.workspace-tree__file--active {
+  background: var(--canvas-accent-soft);
+  box-shadow: inset 2px 0 0 var(--canvas-accent);
+}
+
+.workspace-tree__file--active .workspace-tree__file-icon,
+.workspace-tree__file--active .workspace-tree__name {
+  color: var(--canvas-accent);
+}
+
+.workspace-tree__file--active .workspace-tree__name {
+  font-weight: 600;
 }
 
 .workspace-tree__file-open {
   flex: 1;
-  display: grid;
-  gap: 4px;
-  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
   border: 0;
   background: transparent;
   color: var(--canvas-text);
   cursor: pointer;
   text-align: left;
   min-width: 0;
-}
-
-.workspace-tree__file-open:hover {
-  background: var(--canvas-surface);
-}
-
-.workspace-tree__file-open strong {
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: inherit;
 }
 
 .workspace-tree__file-delete {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 24px;
+  height: 24px;
+  margin: auto 4px;
   border: 0;
+  border-radius: 4px;
   background: transparent;
   color: var(--canvas-text-muted);
   cursor: pointer;
-  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.workspace-tree__file:hover .workspace-tree__file-delete,
+.workspace-tree__file--active .workspace-tree__file-delete,
+.workspace-tree__file-delete:focus-visible {
+  opacity: 1;
 }
 
 .workspace-tree__file-delete:hover {
-  background: var(--canvas-floating-button-bg-hover);
-  color: var(--canvas-text);
+  background: var(--canvas-danger-soft);
+  color: var(--canvas-danger);
 }
 </style>

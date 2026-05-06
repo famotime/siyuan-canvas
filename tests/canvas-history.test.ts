@@ -106,6 +106,45 @@ describe("CanvasHistoryStack", () => {
     expect(history.canUndo).toBe(false)
     expect(history.canRedo).toBe(false)
   })
+
+  it("coalesces consecutive records with the same coalesceKey within window", () => {
+    const history = new CanvasHistoryStack({ defaultCoalesceMs: 200 })
+    history.record(makeSnapshot("a"), { coalesceKey: "drag-1", now: 1000 })
+    history.record(makeSnapshot("b"), { coalesceKey: "drag-1", now: 1100 })
+    history.record(makeSnapshot("c"), { coalesceKey: "drag-1", now: 1180 })
+
+    // 三次 drag-1 在 200ms 窗口内只入栈一次（最早的快照 a）
+    const previous = history.undo(makeSnapshot("d"))
+    expect(previous?.document.nodes[0].text).toBe("a")
+    expect(history.canUndo).toBe(false)
+  })
+
+  it("starts a new step when coalesceKey changes", () => {
+    const history = new CanvasHistoryStack()
+    history.record(makeSnapshot("a"), { coalesceKey: "drag-1", now: 1000 })
+    history.record(makeSnapshot("b"), { coalesceKey: "drag-2", now: 1100 })
+
+    expect(history.undo(makeSnapshot("z"))?.document.nodes[0].text).toBe("b")
+    expect(history.undo(makeSnapshot("y"))?.document.nodes[0].text).toBe("a")
+  })
+
+  it("starts a new step when window has elapsed", () => {
+    const history = new CanvasHistoryStack({ defaultCoalesceMs: 200 })
+    history.record(makeSnapshot("a"), { coalesceKey: "drag-1", now: 1000 })
+    history.record(makeSnapshot("b"), { coalesceKey: "drag-1", now: 1500 })
+
+    expect(history.undo(makeSnapshot("z"))?.document.nodes[0].text).toBe("b")
+    expect(history.undo(makeSnapshot("y"))?.document.nodes[0].text).toBe("a")
+  })
+
+  it("treats records without coalesceKey as separate steps", () => {
+    const history = new CanvasHistoryStack()
+    history.record(makeSnapshot("a"), { now: 1000 })
+    history.record(makeSnapshot("b"), { now: 1010 })
+
+    expect(history.undo(makeSnapshot("z"))?.document.nodes[0].text).toBe("b")
+    expect(history.undo(makeSnapshot("y"))?.document.nodes[0].text).toBe("a")
+  })
 })
 
 describe("cloneCanvasDocument", () => {

@@ -12,22 +12,46 @@ export interface CanvasHistoryStackOptions {
    * 历史栈最多保留多少步。超出时丢弃最早的一步。默认 100。
    */
   capacity?: number
+  /**
+   * 默认的合并窗口（毫秒）。指定 coalesceKey 的 record 在窗口内会被合并为单步。默认 200ms。
+   */
+  defaultCoalesceMs?: number
+}
+
+export interface CanvasHistoryRecordOptions {
+  /**
+   * 如果连续两次 record 的 coalesceKey 相同且时间间隔 < coalesceMs，则不入栈，
+   * 视为延续同一步操作。例如 `drag-${nodeId}` 用于拖拽合并，`resize-${nodeId}` 用于尺寸合并。
+   */
+  coalesceKey?: string
+  /**
+   * 覆盖 stack 默认的合并窗口。
+   */
+  coalesceMs?: number
+  /**
+   * 当前时间戳，单测中可注入；默认 Date.now()。
+   */
+  now?: number
 }
 
 /**
  * 简单的快照式历史栈。每次外部数据变更都先 `record(snapshot)`，
  * undo/redo 调用方负责把返回的快照应用回业务状态。
  *
- * 对比命令模式，快照法实现简单、对现有 commitDocument 入口侵入小，
- * 同时由于 CanvasDocument 体量可控（一般几十~几百节点的 JSON），内存可承受。
+ * 支持基于 `coalesceKey` 的相邻合并：拖拽节点、resize 节点这类高频连续变更
+ * 不会撑爆历史栈，每次"完整操作"只生成一个 undo 步。
  */
 export class CanvasHistoryStack {
   private undoStack: CanvasHistorySnapshot[] = []
   private redoStack: CanvasHistorySnapshot[] = []
   private readonly capacity: number
+  private readonly defaultCoalesceMs: number
+  private lastCoalesceKey: string | undefined
+  private lastRecordAt = 0
 
   constructor(options: CanvasHistoryStackOptions = {}) {
     this.capacity = Math.max(1, options.capacity ?? 100)
+    this.defaultCoalesceMs = Math.max(0, options.defaultCoalesceMs ?? 200)
   }
 
   get canUndo(): boolean {
@@ -38,13 +62,31 @@ export class CanvasHistoryStack {
     return this.redoStack.length > 0
   }
 
-  /** 记录一个新的"现在状态"快照，并清空 redo 栈（线性历史） */
-  record(snapshot: CanvasHistorySnapshot): void {
+  /**
+   * 记录一个新的"现在状态"快照。
+   * 若 coalesceKey 与上一次相同且在 coalesceMs 窗口内，则跳过入栈（视为同一步操作的中间态）。
+   * 任何成功入栈都会清空 redo 栈（线性历史）。
+   */
+  record(snapshot: CanvasHistorySnapshot, options: CanvasHistoryRecordOptions = {}): void {
+    const now = options.now ?? Date.now()
+    const coalesceMs = options.coalesceMs ?? this.defaultCoalesceMs
+
+    if (
+      options.coalesceKey
+      && this.lastCoalesceKey === options.coalesceKey
+      && now - this.lastRecordAt < coalesceMs
+    ) {
+      this.lastRecordAt = now
+      return
+    }
+
     this.undoStack.push(snapshot)
     if (this.undoStack.length > this.capacity) {
       this.undoStack.shift()
     }
     this.redoStack = []
+    this.lastCoalesceKey = options.coalesceKey
+    this.lastRecordAt = now
   }
 
   /**
@@ -58,6 +100,8 @@ export class CanvasHistoryStack {
 
     const previous = this.undoStack.pop() as CanvasHistorySnapshot
     this.redoStack.push(currentSnapshot)
+    // 撤销后断开合并链，避免下一次拖拽与撤销前的同 key 操作误合
+    this.lastCoalesceKey = undefined
     return previous
   }
 
@@ -72,12 +116,15 @@ export class CanvasHistoryStack {
 
     const next = this.redoStack.pop() as CanvasHistorySnapshot
     this.undoStack.push(currentSnapshot)
+    this.lastCoalesceKey = undefined
     return next
   }
 
   clear(): void {
     this.undoStack = []
     this.redoStack = []
+    this.lastCoalesceKey = undefined
+    this.lastRecordAt = 0
   }
 }
 

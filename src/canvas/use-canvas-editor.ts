@@ -759,14 +759,17 @@ export function useCanvasEditor(
     viewport.y = stage.clientHeight / 2 - centerY
   }
 
-  function commitDocument(nextDocument: CanvasDocument) {
+  function commitDocument(nextDocument: CanvasDocument, options: { coalesceKey?: string } = {}) {
     // 在变更前抓快照入历史栈，undo 时可还原文档与选区
-    history.record({
-      document: cloneCanvasDocument(state.document),
-      selectedNodeIds: [...state.selectedNodeIds],
-      selectedNodeId: state.selectedNodeId,
-      selectedEdgeId: state.selectedEdgeId,
-    })
+    history.record(
+      {
+        document: cloneCanvasDocument(state.document),
+        selectedNodeIds: [...state.selectedNodeIds],
+        selectedNodeId: state.selectedNodeId,
+        selectedEdgeId: state.selectedEdgeId,
+      },
+      { coalesceKey: options.coalesceKey },
+    )
     historyVersion.value++
     state.patchDocument(nextDocument)
     state.issues = validateCanvasDocument(nextDocument)

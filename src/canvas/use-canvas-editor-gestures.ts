@@ -69,7 +69,7 @@ export interface CanvasEditorEdgeReconnectDraftState {
 
 interface CanvasEditorGestureOptions {
   board: ComputedRef<CanvasBoardMetrics>
-  commitDocument: (document: CanvasDocument) => void
+  commitDocument: (document: CanvasDocument, options?: { coalesceKey?: string }) => void
   connectionDraft: CanvasEditorConnectionDraftState
   edgeReconnectDraft: CanvasEditorEdgeReconnectDraftState
   getAnchor: (node: CanvasNode, side: CanvasSide) => { x: number, y: number }
@@ -175,7 +175,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return false
     }
 
-    return !target.closest(".canvas-node__resize-handle, .canvas-node__resize-corner, .canvas-node__anchor, a, button, input, textarea, select")
+    // 排除节点上"应该消化点击"的元素：尺寸把手、连接锚点、可交互控件、文本可选择体
+    return !target.closest(".canvas-node__resize-handle, .canvas-node__resize-corner, .canvas-node__anchor, .canvas-node__body--selectable, a, button, input, textarea, select")
   }
 
   function isStageGestureTarget(target: EventTarget | null): target is Element {
@@ -347,7 +348,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         })
       }, state.document)
 
-      commitDocument(movedDocument)
+      commitDocument(movedDocument, { coalesceKey: `drag-${node.id}` })
     })
   }
 
@@ -575,11 +576,14 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
     event.preventDefault?.()
     startPointerGesture(event, (dx, dy) => {
-      commitDocument(setCanvasNodeGeometry(
-        state.document,
-        node.id,
-        resizeCanvasNodeFromSide(node, side, dx / viewport.scale, dy / viewport.scale),
-      ))
+      commitDocument(
+        setCanvasNodeGeometry(
+          state.document,
+          node.id,
+          resizeCanvasNodeFromSide(node, side, dx / viewport.scale, dy / viewport.scale),
+        ),
+        { coalesceKey: `resize-${node.id}-${side}` },
+      )
     })
   }
 
@@ -590,11 +594,14 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
     event.preventDefault?.()
     startPointerGesture(event, (dx, dy) => {
-      commitDocument(setCanvasNodeGeometry(
-        state.document,
-        node.id,
-        resizeCanvasNodeFromCorner(node, dx / viewport.scale, dy / viewport.scale),
-      ))
+      commitDocument(
+        setCanvasNodeGeometry(
+          state.document,
+          node.id,
+          resizeCanvasNodeFromCorner(node, dx / viewport.scale, dy / viewport.scale),
+        ),
+        { coalesceKey: `resize-corner-${node.id}` },
+      )
     })
   }
 

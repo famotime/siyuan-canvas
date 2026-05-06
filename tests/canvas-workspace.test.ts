@@ -309,7 +309,7 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar']").classes()).not.toContain("toolbar")
   })
 
-  it("renders cards without the top metadata header", () => {
+  it("renders text cards with a drag-handle header above the body", () => {
     currentEditor = createEditorMock()
 
     const wrapper = mount(CanvasWorkspace, {
@@ -320,8 +320,12 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    expect(wrapper.find(".canvas-node__header").exists()).toBe(false)
+    const header = wrapper.find(".canvas-node--text .canvas-node__header")
+    expect(header.exists()).toBe(true)
+    expect(header.attributes("data-drag-handle")).toBe("true")
     expect(wrapper.find(".markdown-preview").exists()).toBe(true)
+    // body 区被标记为可选中，drag 不能从这里发起
+    expect(wrapper.find(".canvas-node--text .canvas-node__body--selectable").exists()).toBe(true)
   })
 
   it("lets a text card enter inline markdown editing and saves on blur", async () => {
@@ -1528,7 +1532,7 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".workspace__inspector-handle").attributes("style")).toContain("right: 8px;")
   })
 
-  it("renders toolbar and sidebar labels in Chinese from plugin i18n", () => {
+  it("renders toolbar and sidebar labels in Chinese from plugin i18n", async () => {
     currentEditor = createEditorMock()
     currentEditor.suggestedFilename = ""
     currentEditor.bottomToolbarVisible = true
@@ -1571,7 +1575,12 @@ describe("CanvasWorkspace", () => {
     expect(inspectorText).toContain("当前工作区目录下暂无 Canvas 文件。")
     expect(inspectorText).toContain("最近打开")
     expect(inspectorText).toContain("暂无最近打开的工作区文件。")
-    expect(inspectorText).toContain("节点")
-    expect(inspectorText).toContain("创建连线")
+
+    // 切到"选区"tab 后，节点/创建连线相关标签应出现
+    await wrapper.find("[data-testid='inspector-tab-selection']").trigger("click")
+    await wrapper.vm.$nextTick()
+    const selectionTabText = wrapper.find(".inspector").text()
+    expect(selectionTabText).toContain("节点")
+    expect(selectionTabText).toContain("创建连线")
   })
 })
