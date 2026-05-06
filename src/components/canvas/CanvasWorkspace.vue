@@ -1135,7 +1135,13 @@
               :aria-selected="activeInspectorTab === 'documents'"
               type="button"
               @click="activeInspectorTab = 'documents'"
-            >{{ t('inspectorTabDocuments') }}</button>
+            >
+              {{ t('inspectorTabDocuments') }}
+              <span
+                v-if="totalInspectorIssueCount > 0"
+                class="inspector__tab-badge inspector__tab-badge--danger"
+              >{{ totalInspectorIssueCount }}</span>
+            </button>
             <button
               class="inspector__tab"
               :class="{ 'inspector__tab--active': activeInspectorTab === 'selection' }"
@@ -1150,21 +1156,6 @@
                 v-if="editor.selectedNodeCount > 0 || editor.selectedEdge"
                 class="inspector__tab-badge"
               >{{ editor.selectedNodeCount > 0 ? editor.selectedNodeCount : '·' }}</span>
-            </button>
-            <button
-              class="inspector__tab"
-              :class="{ 'inspector__tab--active': activeInspectorTab === 'issues' }"
-              data-testid="inspector-tab-issues"
-              role="tab"
-              :aria-selected="activeInspectorTab === 'issues'"
-              type="button"
-              @click="activeInspectorTab = 'issues'"
-            >
-              {{ t('inspectorTabIssues') }}
-              <span
-                v-if="totalInspectorIssueCount > 0"
-                class="inspector__tab-badge inspector__tab-badge--danger"
-              >{{ totalInspectorIssueCount }}</span>
             </button>
           </nav>
           <template v-if="activeInspectorTab === 'documents'">
@@ -1415,6 +1406,48 @@
               <p v-else>
                 {{ t("inspectorNoRecentWorkspaceFiles") }}
               </p>
+            </div>
+          </section>
+
+          <section
+            v-if="editor.state.conflict"
+            class="inspector__section"
+            data-testid="inspector-conflict-section"
+          >
+            <h2>{{ t("inspectorExternalChangeDetected") }}</h2>
+            <p>{{ t("inspectorExternalChangeDescription") }}</p>
+            <div class="conflict-panel__actions">
+              <button
+                class="toolbar__button"
+                type="button"
+                @click="editor.loadConflictVersion"
+              >
+                {{ t("inspectorLoadDiskVersion") }}
+              </button>
+              <button
+                class="toolbar__button toolbar__button--primary"
+                type="button"
+                @click="editor.overwriteConflictVersion"
+              >
+                {{ t("inspectorOverwriteDiskVersion") }}
+              </button>
+            </div>
+          </section>
+          <section
+            v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
+            class="inspector__section"
+            data-testid="inspector-issues-section"
+          >
+            <h2>{{ t("inspectorTabIssues") }}</h2>
+            <div class="issues">
+              <div
+                v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
+                :key="issue.code + issue.path"
+                :class="['issues__item', `issues__item--${issue.level}`]"
+              >
+                <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
+                <span>{{ issue.message }}</span>
+              </div>
             </div>
           </section>
           </template>
@@ -1674,52 +1707,6 @@
           </section>
           </template>
 
-          <template v-if="activeInspectorTab === 'issues'">
-            <section
-              v-if="editor.state.conflict"
-              class="inspector__section"
-              data-testid="inspector-conflict-section"
-            >
-              <h2>{{ t("inspectorExternalChangeDetected") }}</h2>
-              <p>{{ t("inspectorExternalChangeDescription") }}</p>
-              <div class="conflict-panel__actions">
-                <button
-                  class="toolbar__button"
-                  type="button"
-                  @click="editor.loadConflictVersion"
-                >
-                  {{ t("inspectorLoadDiskVersion") }}
-                </button>
-                <button
-                  class="toolbar__button toolbar__button--primary"
-                  type="button"
-                  @click="editor.overwriteConflictVersion"
-                >
-                  {{ t("inspectorOverwriteDiskVersion") }}
-                </button>
-              </div>
-            </section>
-            <section
-              class="inspector__section"
-              data-testid="inspector-issues-section"
-            >
-              <h2>{{ t("inspectorTabIssues") }}</h2>
-              <div
-                v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
-                class="issues"
-              >
-                <div
-                  v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
-                  :key="issue.code + issue.path"
-                  :class="['issues__item', `issues__item--${issue.level}`]"
-                >
-                  <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
-                  <span>{{ issue.message }}</span>
-                </div>
-              </div>
-              <p v-else class="issues__empty">{{ t('inspectorNoIssues') }}</p>
-            </section>
-          </template>
         </div>
       </aside>
     </div>
@@ -1829,7 +1816,7 @@ const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
 let dragExpandTimer: ReturnType<typeof setTimeout> | null = null
 
-type InspectorTab = 'documents' | 'selection' | 'issues'
+type InspectorTab = 'documents' | 'selection'
 const activeInspectorTab = ref<InspectorTab>('documents')
 
 const totalInspectorIssueCount = computed(() => {
