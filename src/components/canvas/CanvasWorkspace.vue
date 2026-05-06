@@ -184,6 +184,19 @@
       <div class="toolbar__group">
         <button
           class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-command-palette"
+          :aria-label="t('commandPaletteOpen')"
+          :data-tooltip="t('commandPaletteOpen')"
+          type="button"
+          @click="commandPaletteOpen = true"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="search"
+          />
+        </button>
+        <button
+          class="toolbar__button toolbar__button--icon"
           data-testid="top-toolbar-help"
           :aria-label="t('helpDialogTitle')"
           :data-tooltip="t('helpDialogTitle')"
@@ -965,6 +978,8 @@
           </template>
         </div>
 
+        <CanvasMinimap :editor="editor" />
+
         <div
           v-if="editor.filePickerDialog.visible"
           class="canvas-dialog-backdrop"
@@ -1716,6 +1731,13 @@
       :t="t"
     />
 
+    <CanvasCommandPalette
+      :open="commandPaletteOpen"
+      :editor="editor"
+      :t="t"
+      @close="commandPaletteOpen = false"
+    />
+
     <input
       ref="fileInputRef"
       accept=".canvas,application/json"
@@ -1733,6 +1755,7 @@ import {
   computed,
   nextTick,
   onBeforeUnmount,
+  onMounted,
   ref,
   watch,
 } from "vue"
@@ -1748,8 +1771,10 @@ import {
   createSelectionToolbarTooltips,
 } from "@/components/canvas/canvas-selection-toolbar-icon"
 import CanvasCreateEdgeDialog from "@/components/canvas/CanvasCreateEdgeDialog.vue"
+import CanvasCommandPalette from "@/components/canvas/CanvasCommandPalette.vue"
 import { openHelpDialog } from "@/canvas/help-dialog"
 import CanvasFileCard from "@/components/canvas/CanvasFileCard.vue"
+import CanvasMinimap from "@/components/canvas/CanvasMinimap.vue"
 import {
   CLEAR_SELECTION_COLOR,
   getCanvasNodeContentStyle as resolveCanvasNodeContentStyle,
@@ -1897,6 +1922,21 @@ onBeforeUnmount(() => {
     clearTimeout(dragExpandTimer)
     dragExpandTimer = null
   }
+  window.removeEventListener("keydown", handleGlobalKeydown, true)
+})
+
+// Ctrl/Cmd + K 打开命令面板。capture 阶段拦截，避免被画布的全局 keydown 当成普通快捷键
+const commandPaletteOpen = ref(false)
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "k") {
+    event.preventDefault()
+    event.stopPropagation()
+    commandPaletteOpen.value = true
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", handleGlobalKeydown, true)
 })
 const NODE_RESIZE_SEGMENTS: Array<{ id: string, side: CanvasSide }> = [
   { id: "top-left", side: "top" },
@@ -2002,6 +2042,7 @@ function showHelpDialog() {
     { key: t("helpShortcutZoomOut"), action: t("helpActionZoomOut") },
     { key: t("helpShortcutZoomActual"), action: t("helpActionZoomActual") },
     { key: t("helpShortcutZoomFit"), action: t("helpActionZoomFit") },
+    { key: t("helpShortcutCommandPalette"), action: t("helpActionCommandPalette") },
     { key: t("helpShortcutWheel"), action: t("helpActionWheel") },
     { key: t("helpShortcutDrag"), action: t("helpActionDrag") },
     { key: t("helpShortcutDragNode"), action: t("helpActionDragNode") },
@@ -3485,6 +3526,43 @@ watch(
 .canvas-node:hover .canvas-node__resize-corner,
 .canvas-node--selected .canvas-node__resize-corner {
   opacity: 1;
+}
+
+/* 触屏环境（无 hover、粗指针）：放大命中区域、selected 节点的锚点常驻 */
+@media (hover: none) and (pointer: coarse) {
+  .canvas-node__anchor {
+    width: 44px;
+    height: 44px;
+  }
+
+  .canvas-node--selected .canvas-node__anchor {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .canvas-node__resize-corner {
+    width: 22px;
+    height: 22px;
+  }
+
+  .canvas-node--selected .canvas-node__resize-corner {
+    opacity: 1;
+  }
+
+  /* 触屏没有 hover 显示 tooltip 的语义，干脆禁用 ::after 的 tooltip 浮层避免 tap 抖动 */
+  .toolbar__button[data-tooltip]::after,
+  .bottom-toolbar__button[data-tooltip]::after,
+  .selection-toolbar__button::after,
+  .selection-toolbar__menu-button::after {
+    display: none;
+  }
+
+  /* 底栏按钮 hover 抬升对触屏无意义且会闪烁，关掉 */
+  .bottom-toolbar__button:hover,
+  .selection-toolbar__button:hover,
+  .selection-toolbar__menu-button:hover {
+    transform: none;
+  }
 }
 
 .canvas-node__resize-handle--top-left,

@@ -204,9 +204,18 @@
   "helpActionZoomActual": "实际大小",
   "helpShortcutZoomFit": "F",
   "helpActionZoomFit": "适应内容",
+  "helpShortcutCommandPalette": "Ctrl + K",
+  "helpActionCommandPalette": "打开命令面板",
   "conflictBannerTitle": "磁盘上有更新",
   "conflictBannerDescription": "其他程序修改了同一份 .canvas 文件。请选择保留哪一份。",
   "conflictBannerLoadDisk": "用磁盘版本",
   "conflictBannerOverwrite": "覆盖磁盘版本",
-  "linkCardOpenInBrowser": "在浏览器打开"
+  "linkCardOpenInBrowser": "在浏览器打开",
+  "commandPaletteTitle": "命令面板",
+  "commandPalettePlaceholder": "输入命令、文件名或节点关键词…",
+  "commandPaletteKindCommand": "命令",
+  "commandPaletteKindRecent": "最近",
+  "commandPaletteKindNode": "节点",
+  "commandPaletteNoResults": "无匹配项",
+  "commandPaletteOpen": "命令面板 (Ctrl+K)"
 }

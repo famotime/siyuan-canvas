@@ -204,9 +204,18 @@
   "helpActionZoomActual": "Actual size",
   "helpShortcutZoomFit": "F",
   "helpActionZoomFit": "Fit to content",
+  "helpShortcutCommandPalette": "Ctrl + K",
+  "helpActionCommandPalette": "Open command palette",
   "conflictBannerTitle": "Disk version updated",
   "conflictBannerDescription": "Another process modified this .canvas file. Choose which version to keep.",
   "conflictBannerLoadDisk": "Use disk version",
   "conflictBannerOverwrite": "Overwrite disk version",
-  "linkCardOpenInBrowser": "Open in browser"
+  "linkCardOpenInBrowser": "Open in browser",
+  "commandPaletteTitle": "Command palette",
+  "commandPalettePlaceholder": "Type a command, file name, or node keyword…",
+  "commandPaletteKindCommand": "Command",
+  "commandPaletteKindRecent": "Recent",
+  "commandPaletteKindNode": "Node",
+  "commandPaletteNoResults": "No matches",
+  "commandPaletteOpen": "Command palette (Ctrl+K)"
 }
