@@ -91,12 +91,17 @@ function createFileNodeAtViewport(
     x: number
     y: number
   },
+  stagePoint?: { x: number, y: number },
 ): Extract<CanvasNode, { type: 'file' }> {
   const node = createCanvasNode('file')
-  node.x = Math.round((200 - viewport.x) / viewport.scale + board.left)
-  node.y = Math.round((160 - viewport.y) / viewport.scale + board.top)
+  const sx = stagePoint?.x ?? 200
+  const sy = stagePoint?.y ?? 160
+  node.x = Math.round((sx - viewport.x) / viewport.scale + board.left)
+  node.y = Math.round((sy - viewport.y) / viewport.scale + board.top)
   return node
 }
+
+export { createFileNodeAtViewport }
 
 export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePickerActionsOptions) {
   const {
