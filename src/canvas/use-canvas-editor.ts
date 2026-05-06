@@ -52,6 +52,7 @@ import { CanvasHistoryStack, cloneCanvasDocument } from "@/canvas/canvas-history
 import { createCanvasEditorFileActions } from "@/canvas/use-canvas-editor-file-actions"
 import { createCanvasEditorFilePickerActions } from "@/canvas/use-canvas-editor-file-picker"
 import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-file-nodes"
+import { createCanvasEditorStageDropActions } from "@/canvas/use-canvas-editor-stage-drop"
 import {
   createCanvasEditorGestureHandlers,
   type CanvasEditorConnectionDraftState,
@@ -646,6 +647,65 @@ export function useCanvasEditor(
     return true
   }
 
+  async function renameWorkspaceDocument(oldPath: string) {
+    const dir = oldPath.substring(0, oldPath.lastIndexOf('/'))
+    const currentFullName = oldPath.substring(oldPath.lastIndexOf('/') + 1)
+    const currentBaseName = currentFullName.replace(/\.canvas$/i, '')
+
+    const newName = await openTextInputDialog({
+      cancelLabel: t("dialogCancel"),
+      confirmLabel: t("dialogConfirm"),
+      initialValue: currentBaseName,
+      title: t("inspectorRenamePrompt"),
+    })
+    if (!newName || !newName.trim()) return
+
+    const sanitized = newName.trim()
+      .replace(/[\\/:*?"'<>|]/g, "_")
+      .replace(/[~[\]()!&{}=#%;$]/g, "")
+      .replace(/[\x00-\x1f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\.+$/, "")
+    if (!sanitized || sanitized === currentBaseName) return
+
+    const newPath = `${dir}/${sanitized}.canvas`
+
+    try {
+      const response = await fetch("/api/file/getFile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: oldPath }),
+      })
+      if (!response.ok) {
+        showMessage(t("messageUnableRenameFile"), 4000, "error")
+        return
+      }
+      const content = await response.text()
+      const blob = new Blob([content], { type: "application/json" })
+      await putFile(newPath, false, blob)
+    } catch {
+      showMessage(t("messageUnableRenameFile"), 4000, "error")
+      return
+    }
+
+    try {
+      await removeFile(oldPath)
+    } catch {
+      try { await removeFile(newPath) } catch { /* cleanup best-effort */ }
+      showMessage(t("messageUnableRenameFile"), 4000, "error")
+      return
+    }
+
+    if (state.filePath === oldPath) {
+      state.filePath = newPath
+    }
+    await plugin.removeRecentCanvasFile?.(oldPath)
+    refreshRecentFiles()
+    await refreshWorkspaceDocuments()
+    showMessage(t("messageFileRenamed", { name: sanitized }))
+  }
+
   async function removeRecentFileRecord(path: string) {
     await plugin.removeRecentCanvasFile?.(path)
     refreshRecentFiles()
@@ -1037,6 +1097,20 @@ export function useCanvasEditor(
     workspaceDocuments,
   })
 
+  const {
+    handleStageDragOver,
+    handleStageDrop,
+  } = createCanvasEditorStageDropActions({
+    board,
+    commitDocument,
+    fileSource,
+    refreshFileNodeMetadata,
+    selectNode,
+    state,
+    t,
+    viewport,
+  })
+
   function toggleInspector() {
     inspectorExpanded.value = !inspectorExpanded.value
   }
@@ -1179,6 +1253,7 @@ export function useCanvasEditor(
       createWorkspaceFolder,
       deleteWorkspaceDocument,
       moveWorkspaceFile,
+      renameWorkspaceDocument,
       expandAllInspectorSections,
       removeRecentFileRecord,
       connectionDraft,
@@ -1263,6 +1338,8 @@ export function useCanvasEditor(
       duplicateSelection,
       getRenderedMarkdown,
       handleClipboardImagePaste,
+      handleStageDragOver,
+      handleStageDrop,
       handleNodePointerDown,
       handleWheelZoom,
       inspectorExpanded,

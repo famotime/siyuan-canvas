@@ -234,6 +234,9 @@
         @paste="handleStagePaste"
         @wheel.passive="editor.handleWheelZoom"
         @contextmenu.prevent
+        @dragover="editor.handleStageDragOver"
+        @dragenter.prevent
+        @drop.prevent="editor.handleStageDrop"
       >
         <div
           v-if="editor.state.conflict"
@@ -1032,6 +1035,43 @@
           class="inspector__content"
           @click="sortDropdownOpen = false"
         >
+          <nav
+            class="inspector__tabs"
+            role="tablist"
+            data-testid="inspector-tabs"
+          >
+            <button
+              class="inspector__tab"
+              :class="{ 'inspector__tab--active': activeInspectorTab === 'documents' }"
+              data-testid="inspector-tab-documents"
+              role="tab"
+              :aria-selected="activeInspectorTab === 'documents'"
+              type="button"
+              @click="activeInspectorTab = 'documents'"
+            >
+              {{ t('inspectorTabDocuments') }}
+              <span
+                v-if="totalInspectorIssueCount > 0"
+                class="inspector__tab-badge inspector__tab-badge--danger"
+              >{{ totalInspectorIssueCount }}</span>
+            </button>
+            <button
+              class="inspector__tab"
+              :class="{ 'inspector__tab--active': activeInspectorTab === 'selection' }"
+              data-testid="inspector-tab-selection"
+              role="tab"
+              :aria-selected="activeInspectorTab === 'selection'"
+              type="button"
+              @click="activeInspectorTab = 'selection'"
+            >
+              {{ t('inspectorTabSelection') }}
+              <span
+                v-if="editor.selectedNodeCount > 0 || editor.selectedEdge"
+                class="inspector__tab-badge"
+              >{{ editor.selectedNodeCount > 0 ? editor.selectedNodeCount : '·' }}</span>
+            </button>
+          </nav>
+          <template v-if="activeInspectorTab === 'documents'">
           <div class="inspector__toolbar">
             <button
               class="inspector__toolbar-button"
@@ -1122,43 +1162,6 @@
               </div>
             </div>
           </div>
-          <nav
-            class="inspector__tabs"
-            role="tablist"
-            data-testid="inspector-tabs"
-          >
-            <button
-              class="inspector__tab"
-              :class="{ 'inspector__tab--active': activeInspectorTab === 'documents' }"
-              data-testid="inspector-tab-documents"
-              role="tab"
-              :aria-selected="activeInspectorTab === 'documents'"
-              type="button"
-              @click="activeInspectorTab = 'documents'"
-            >
-              {{ t('inspectorTabDocuments') }}
-              <span
-                v-if="totalInspectorIssueCount > 0"
-                class="inspector__tab-badge inspector__tab-badge--danger"
-              >{{ totalInspectorIssueCount }}</span>
-            </button>
-            <button
-              class="inspector__tab"
-              :class="{ 'inspector__tab--active': activeInspectorTab === 'selection' }"
-              data-testid="inspector-tab-selection"
-              role="tab"
-              :aria-selected="activeInspectorTab === 'selection'"
-              type="button"
-              @click="activeInspectorTab = 'selection'"
-            >
-              {{ t('inspectorTabSelection') }}
-              <span
-                v-if="editor.selectedNodeCount > 0 || editor.selectedEdge"
-                class="inspector__tab-badge"
-              >{{ editor.selectedNodeCount > 0 ? editor.selectedNodeCount : '·' }}</span>
-            </button>
-          </nav>
-          <template v-if="activeInspectorTab === 'documents'">
           <section class="inspector__section">
             <button
               class="inspector__section-toggle"
@@ -1227,6 +1230,7 @@
                           :class="['workspace-tree__file', { 'workspace-tree__file--active': child.path === editor.state.filePath }]"
                           draggable="true"
                           :title="child.path"
+                          @contextmenu.prevent="editor.renameWorkspaceDocument(child.path)"
                           @dragstart="onFileDragStart($event, child.path)"
                           @dragend="onDragEnd"
                         >
@@ -1292,6 +1296,7 @@
                                 :class="['workspace-tree__file', { 'workspace-tree__file--active': grandchild.path === editor.state.filePath }]"
                                 draggable="true"
                                 :title="grandchild.path"
+                                @contextmenu.prevent="editor.renameWorkspaceDocument(grandchild.path)"
                                 @dragstart="onFileDragStart($event, grandchild.path)"
                                 @dragend="onDragEnd"
                               >
@@ -1327,6 +1332,7 @@
                     :class="['workspace-tree__file', { 'workspace-tree__file--active': node.path === editor.state.filePath }]"
                     draggable="true"
                     :title="node.path"
+                    @contextmenu.prevent="editor.renameWorkspaceDocument(node.path)"
                     @dragstart="onFileDragStart($event, node.path)"
                     @dragend="onDragEnd"
                   >
