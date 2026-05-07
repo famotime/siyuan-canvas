@@ -157,7 +157,6 @@
         </button>
       </div>
       <div class="toolbar__meta">
-        <span class="toolbar__meta-name">{{ editor.state.filePath || editor.suggestedFilename || t("untitledCanvas") }}</span>
         <span class="toolbar__meta-stats">{{ t("toolbarGraphStats", { nodes: editor.state.document.nodes.length, edges: editor.state.document.edges.length }) }}</span>
         <span
           class="toolbar__status"
@@ -2038,8 +2037,10 @@ function showHelpDialog() {
     { key: t("helpShortcutCommandPalette"), action: t("helpActionCommandPalette") },
     { key: t("helpShortcutWheel"), action: t("helpActionWheel") },
     { key: t("helpShortcutDrag"), action: t("helpActionDrag") },
+    { key: t("helpShortcutDragSecondary"), action: t("helpActionDragSecondary") },
     { key: t("helpShortcutDragNode"), action: t("helpActionDragNode") },
     { key: t("helpShortcutDragAnchor"), action: t("helpActionDragAnchor") },
+    { key: t("helpShortcutRenameDocument"), action: t("helpActionRenameDocument") },
   ]
   openHelpDialog(t("helpDialogTitle"), shortcuts)
 }
@@ -2480,15 +2481,6 @@ watch(
   font-size: 12px;
   line-height: 1;
   color: var(--canvas-text-muted);
-}
-
-.toolbar__meta-name {
-  max-width: 28ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-  color: var(--canvas-text);
 }
 
 .toolbar__meta-stats {

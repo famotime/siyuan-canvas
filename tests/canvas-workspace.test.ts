@@ -18,6 +18,7 @@ vi.mock("@/canvas/help-dialog", () => ({
   openHelpDialog: vi.fn(),
 }))
 
+import { openHelpDialog } from "@/canvas/help-dialog"
 import CanvasWorkspace from "@/components/canvas/CanvasWorkspace.vue"
 
 let currentEditor: Record<string, any>
@@ -499,6 +500,8 @@ describe("CanvasWorkspace", () => {
 
   it("removes retired top toolbar buttons and keeps file controls", () => {
     currentEditor = createEditorMock()
+    currentEditor.state.filePath = "/data/storage/petal/siyuan-canvas/project.canvas"
+    currentEditor.suggestedFilename = "project.canvas"
 
     const wrapper = mount(CanvasWorkspace, {
       props: {
@@ -538,6 +541,39 @@ describe("CanvasWorkspace", () => {
     expect(toolbarText).not.toContain("链接")
     expect(toolbarText).not.toContain("分组")
     expect(toolbarText).not.toContain("删除")
+    expect(toolbarText).not.toContain("/data/storage/petal/siyuan-canvas/project.canvas")
+    expect(toolbarText).not.toContain("project.canvas")
+    expect(wrapper.find(".toolbar__meta-name").exists()).toBe(false)
+  })
+
+  it("passes the new right-click canvas and document tree rename tips into the help dialog", async () => {
+    currentEditor = createEditorMock()
+    vi.mocked(openHelpDialog).mockClear()
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='top-toolbar-help']").trigger("click")
+
+    expect(openHelpDialog).toHaveBeenCalledTimes(1)
+    expect(openHelpDialog).toHaveBeenCalledWith(
+      "帮助 — 快捷键与操作",
+      expect.arrayContaining([
+        {
+          key: "鼠标右键拖拽画布空白区域",
+          action: "平移画布",
+        },
+        {
+          key: "文档树中右键文档",
+          action: "重命名文档",
+        },
+      ]),
+    )
   })
 
   it("keeps the current zoom percentage between zoom controls and moves reset to the far right", () => {
@@ -1555,9 +1591,10 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
     expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
-    expect(toolbarText).toContain("未命名.canvas")
     expect(toolbarText).toContain("1 节点 · 0 连线")
     expect(toolbarText).toContain("已保存")
+    expect(toolbarText).not.toContain("未命名.canvas")
+    expect(wrapper.find(".toolbar__meta-name").exists()).toBe(false)
     expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("aria-label")).toBe("卡片")
     expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("data-tooltip")).toBe("卡片")
     expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("aria-label")).toBe("笔记")
