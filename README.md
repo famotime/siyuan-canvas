@@ -1,5 +1,7 @@
 # SiYuan Canvas
 
+**English** · [简体中文](README_zh_CN.md)
+
 SiYuan Canvas is a SiYuan plugin for importing, editing, and exporting Obsidian `.canvas` files using the open JSON Canvas format.
 ![image](https://raw.githubusercontent.com/famotime/siyuan-canvas/main/assets/image-20260501190639-s2lebrh.png)
 
