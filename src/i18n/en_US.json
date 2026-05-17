@@ -83,6 +83,7 @@
   "inspectorSortAsc": "Ascending",
   "inspectorSortDesc": "Descending",
   "inspectorExpandAll": "Expand All",
+  "inspectorCollapseAll": "Collapse All",
   "inspectorRenamePrompt": "Rename File",
   "inspectorFolderNamePrompt": "New Folder",
   "inspectorUnsavedWorkspacePath": "Unsaved workspace path",

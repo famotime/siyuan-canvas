@@ -1114,7 +1114,7 @@
             <button
               class="inspector__toolbar-button"
               data-testid="inspector-toolbar-expand-all"
-              :title="t('inspectorExpandAll')"
+              :title="editor.allFoldersExpanded ? t('inspectorCollapseAll') : t('inspectorExpandAll')"
               type="button"
               @click="editor.expandAllInspectorSections"
             >

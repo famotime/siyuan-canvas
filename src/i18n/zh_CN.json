@@ -1,5 +1,5 @@
 {
-  "addTopBarIcon": "Canvas 无界",
+  "addTopBarIcon": "无界",
   "openCanvas": "打开 Canvas 工作区",
   "openCanvasPath": "按路径打开 Canvas",
   "openCanvasSettings": "打开 Canvas 设置",
@@ -83,6 +83,7 @@
   "inspectorSortAsc": "升序",
   "inspectorSortDesc": "降序",
   "inspectorExpandAll": "全部展开",
+  "inspectorCollapseAll": "全部折叠",
   "inspectorRenamePrompt": "重命名文件",
   "inspectorFolderNamePrompt": "新建文件夹",
   "inspectorUnsavedWorkspacePath": "未保存的工作区路径",

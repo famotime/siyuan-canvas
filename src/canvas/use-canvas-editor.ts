@@ -560,6 +560,15 @@ export function useCanvasEditor(
     expandedFolders.value = new Set(collectFolderPaths(workspaceDocuments.value))
   }
 
+  function collapseAllFolders() {
+    expandedFolders.value = new Set()
+  }
+
+  const allFoldersExpanded = computed(() => {
+    const allPaths = collectFolderPaths(workspaceDocuments.value)
+    return allPaths.length > 0 && allPaths.every(p => expandedFolders.value.has(p))
+  })
+
   async function expandAllInspectorSections() {
     const allKeys = Object.keys(inspectorSectionState) as Array<keyof typeof inspectorSectionState>
     for (const key of allKeys) {
@@ -575,7 +584,11 @@ export function useCanvasEditor(
         selection: true,
       },
     })
-    expandAllFolders()
+    if (allFoldersExpanded.value) {
+      collapseAllFolders()
+    } else {
+      expandAllFolders()
+    }
   }
 
   async function deleteWorkspaceDocument(path: string) {
@@ -1355,6 +1368,8 @@ export function useCanvasEditor(
       overwriteConflictVersion,
       recentFiles,
       expandAllFolders,
+      collapseAllFolders,
+      allFoldersExpanded,
       expandedFolders,
       setWorkspaceSortDirection,
       setWorkspaceSortField,

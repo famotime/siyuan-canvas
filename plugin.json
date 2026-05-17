@@ -18,7 +18,7 @@
   },
   "description": {
     "default": "Import, edit, and export Obsidian Canvas files inside SiYuan",
-    "zh_CN": "在思源中导入、编辑并导出 Obsidian Canvas 文件"
+    "zh_CN": "在思源中导入、编辑 Obsidian 画布，支持原生 canvas 文件，与 Obsidian 兼容互通。"
   },
   "readme": {
     "default": "README.md",
