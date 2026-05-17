@@ -194,6 +194,9 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.setting = openCanvasPluginSettingsPanel({
       createSetting: (options) => new Setting(options),
       getSettings: () => this.getCanvasSettings(),
+      onSettingsChanged: () => {
+        window.dispatchEvent(new CustomEvent("siyuan-canvas-settings-changed"))
+      },
       pluginName: this.name,
       saveSettings: async (settings) => {
         await this.updateCanvasSettings(settings)

@@ -7,6 +7,7 @@ export interface CanvasPluginSettings {
   detectExternalChanges: boolean
   enableDebugLog: boolean
   recentFilesLimit: number
+  showCanvasThumbnails: boolean
 }
 
 export interface CanvasInspectorSectionsState {
@@ -42,6 +43,7 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     detectExternalChanges: true,
     enableDebugLog: false,
     recentFilesLimit: 8,
+    showCanvasThumbnails: false,
   }
 }
 
@@ -123,6 +125,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
       && Number(candidate.settings?.recentFilesLimit) > 0
       ? Number(candidate.settings?.recentFilesLimit)
       : defaults.settings.recentFilesLimit,
+    showCanvasThumbnails: typeof candidate.settings?.showCanvasThumbnails === "boolean"
+      ? candidate.settings.showCanvasThumbnails
+      : defaults.settings.showCanvasThumbnails,
   }
 
   const defaultInspectorSections = defaults.ui.inspectorSections

@@ -147,6 +147,8 @@
   "settingsRecentCanvasFileLimitDescription": "Controls how many recent canvas paths are shown in the editor.",
   "settingsDetectExternalFileChangesTitle": "Detect external file changes",
   "settingsDetectExternalFileChangesDescription": "Warn before saving if the underlying canvas file changed on disk.",
+  "settingsShowCanvasThumbnailsTitle": "Show canvas thumbnail",
+  "settingsShowCanvasThumbnailsDescription": "When enabled, show the whole-canvas minimap in the bottom-right corner. Off by default.",
   "settingsEnableDebugLogTitle": "Enable debug logging",
   "settingsEnableDebugLogDescription": "When enabled, output Canvas save flow debug information in the browser console.",
   "messageSelectTargetNodeFirst": "Select a target node first.",

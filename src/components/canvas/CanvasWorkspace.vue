@@ -994,7 +994,10 @@
           </template>
         </div>
 
-        <CanvasMinimap :editor="editor" />
+        <CanvasMinimap
+          v-if="showCanvasThumbnails"
+          :editor="editor"
+        />
 
         <div
           v-if="editor.filePickerDialog.visible"
@@ -1833,6 +1836,7 @@ const hoveredEdgeId = ref("")
 const sortDropdownOpen = ref(false)
 const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
+const settingsRevision = ref(0)
 let dragExpandTimer: ReturnType<typeof setTimeout> | null = null
 
 type InspectorTab = 'documents' | 'selection'
@@ -1843,6 +1847,23 @@ const totalInspectorIssueCount = computed(() => {
   const warnings = editor.state.issues.warnings.length
   const conflict = editor.state.conflict ? 1 : 0
   return errors + warnings + conflict
+})
+
+const showCanvasThumbnails = computed(() => {
+  settingsRevision.value
+  return editor.getPluginSettings().showCanvasThumbnails
+})
+
+function handleCanvasSettingsChanged() {
+  settingsRevision.value += 1
+}
+
+onMounted(() => {
+  window.addEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
 })
 
 // 选区/边变更时若用户尚停留在文档 tab，自动切到选区 tab，避免反复手动切换

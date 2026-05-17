@@ -144,6 +144,9 @@ function createEditorMock(node = createTextNode()) {
       kind: "file",
       imageSrc: "",
     })),
+    getPluginSettings: vi.fn(() => ({
+      showCanvasThumbnails: false,
+    })),
     getNodeStyle: vi.fn(() => ({
       height: "180px",
       left: "0px",
@@ -276,9 +279,19 @@ function createEditorMock(node = createTextNode()) {
   })
 }
 
-function createPluginMock() {
+function createPluginMock(settings: Record<string, unknown> = {}) {
+  const canvasSettings = {
+    showCanvasThumbnails: false,
+    ...settings,
+  }
+
   return {
+    getCanvasSettings: vi.fn(() => canvasSettings),
     i18n: zhCN,
+    updateCanvasSettings: vi.fn(async (nextSettings: Record<string, unknown>) => {
+      Object.assign(canvasSettings, nextSettings)
+      window.dispatchEvent(new CustomEvent("siyuan-canvas-settings-changed"))
+    }),
   }
 }
 
@@ -905,41 +918,8 @@ describe("CanvasWorkspace", () => {
     expect(currentEditor.handleWheelZoom).not.toHaveBeenCalled()
   })
 
-  it("renders a canvas thumbnail preview for nested canvas file cards", () => {
-    currentEditor = createEditorMock({
-      id: "file-canvas-1",
-      file: "/data/storage/siyuan-canvas/road.canvas",
-      type: "file",
-    })
-    currentEditor.getFileNodePreview = vi.fn(() => ({
-      badge: "Canvas",
-      detail: "/data/storage/siyuan-canvas/road.canvas",
-      headline: "road.canvas",
-      helper: "Opens nested canvas",
-      kind: "canvas",
-      thumbnail: {
-        edges: [{
-          fromX: 40,
-          fromY: 50,
-          toX: 180,
-          toY: 140,
-        }],
-        nodes: [
-          {
-            height: 72,
-            width: 120,
-            x: 0,
-            y: 0,
-          },
-          {
-            height: 72,
-            width: 120,
-            x: 140,
-            y: 104,
-          },
-        ],
-      },
-    }))
+  it("hides the canvas minimap by default", () => {
+    currentEditor = createEditorMock()
 
     const wrapper = mount(CanvasWorkspace, {
       props: {
@@ -949,9 +929,45 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    expect(wrapper.find(".file-card__canvas-preview").exists()).toBe(true)
-    expect(wrapper.findAll(".file-card__thumbnail-node")).toHaveLength(2)
-    expect(wrapper.findAll(".file-card__thumbnail-edge")).toHaveLength(1)
+    expect(wrapper.find("[data-testid='canvas-minimap']").exists()).toBe(false)
+  })
+
+  it("renders the canvas minimap when enabled", () => {
+    currentEditor = createEditorMock()
+    currentEditor.getPluginSettings = vi.fn(() => ({
+      showCanvasThumbnails: true,
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock({ showCanvasThumbnails: true }),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='canvas-minimap']").exists()).toBe(true)
+  })
+
+  it("updates canvas minimap visibility after settings change", async () => {
+    const plugin = createPluginMock({ showCanvasThumbnails: true })
+    currentEditor = createEditorMock()
+    currentEditor.getPluginSettings = plugin.getCanvasSettings
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin,
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='canvas-minimap']").exists()).toBe(true)
+
+    await plugin.updateCanvasSettings({ showCanvasThumbnails: false })
+    await nextTick()
+
+    expect(wrapper.find("[data-testid='canvas-minimap']").exists()).toBe(false)
   })
 
   it("falls back to an alternate asset path when an image file preview fails to load", async () => {
@@ -985,7 +1001,6 @@ describe("CanvasWorkspace", () => {
 
     expect(wrapper.find(".file-card__image").attributes("src")).toBe("/assets/road.png")
   })
-
   it("renders the create-edge dialog when requested", () => {
     currentEditor = createEditorMock()
     currentEditor.createEdgeDialog.visible = true
@@ -1001,7 +1016,7 @@ describe("CanvasWorkspace", () => {
     const wrapper = mount(CanvasWorkspace, {
       props: {
         bootstrap: {},
-        plugin: createPluginMock(),
+        plugin: createPluginMock({ showCanvasThumbnails: true }),
         setTitle: vi.fn(),
       },
     })

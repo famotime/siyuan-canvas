@@ -16,6 +16,7 @@ describe("canvas plugin data", () => {
 
     expect(data.settings.detectExternalChanges).toBe(true)
     expect(data.settings.recentFilesLimit).toBe(8)
+    expect(data.settings.showCanvasThumbnails).toBe(false)
     expect(data.recentFiles).toEqual([])
     expect(data.ui.inspectorSections).toEqual({
       createEdge: true,
@@ -92,5 +93,6 @@ describe("canvas plugin data", () => {
       recent: true,
       selection: true,
     })
+    expect(data.settings.showCanvasThumbnails).toBe(false)
   })
 })

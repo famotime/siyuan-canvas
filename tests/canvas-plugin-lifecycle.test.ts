@@ -345,10 +345,12 @@ describe("canvas plugin lifecycle", () => {
     const defaultDirectoryInput = setting.items[0].createActionElement() as HTMLInputElement
     const recentFilesLimitInput = setting.items[1].createActionElement() as HTMLInputElement
     const detectExternalChangesInput = setting.items[2].createActionElement() as HTMLInputElement
+    const showCanvasThumbnailsInput = setting.items[3].createActionElement() as HTMLInputElement
 
     expect(defaultDirectoryInput.value).toBe("/data/storage/petal/siyuan-canvas")
     expect(recentFilesLimitInput.value).toBe("8")
     expect(detectExternalChangesInput.checked).toBe(true)
+    expect(showCanvasThumbnailsInput.checked).toBe(false)
 
     recentFilesLimitInput.value = "1"
     recentFilesLimitInput.dispatchEvent(new Event("change"))
@@ -358,11 +360,16 @@ describe("canvas plugin lifecycle", () => {
     detectExternalChangesInput.dispatchEvent(new Event("change"))
     await Promise.resolve()
 
+    showCanvasThumbnailsInput.checked = true
+    showCanvasThumbnailsInput.dispatchEvent(new Event("change"))
+    await Promise.resolve()
+
     expect(plugin.getCanvasSettings()).toEqual({
       defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
       enableDebugLog: false,
       recentFilesLimit: 1,
+      showCanvasThumbnails: true,
     })
   })
 
@@ -400,6 +407,7 @@ describe("canvas plugin lifecycle", () => {
       detectExternalChanges: false,
       enableDebugLog: false,
       recentFilesLimit: 3,
+      showCanvasThumbnails: false,
     })
     expect(plugin.getRecentCanvasFiles()).toEqual([
       expect.objectContaining({

@@ -1311,6 +1311,7 @@ export function useCanvasEditor(
       getFileNodeDescription,
       getFileNodeKind,
       getFileNodePreview,
+      getPluginSettings,
       getNodeStyle,
       getNodeTitle,
       importCanvas,

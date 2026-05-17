@@ -5,6 +5,7 @@ import type { CanvasI18nTranslator } from "@/canvas/use-canvas-editor-shared"
 interface CanvasPluginSettingsPanelOptions {
   createSetting: (options: { width: string }) => Setting
   getSettings: () => CanvasPluginSettings
+  onSettingsChanged?: () => void
   pluginName: string
   saveSettings: (settings: CanvasPluginSettings) => Promise<void>
   t: CanvasI18nTranslator
@@ -14,6 +15,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
   const {
     createSetting,
     getSettings,
+    onSettingsChanged,
     pluginName,
     saveSettings,
     t,
@@ -27,6 +29,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     await saveSettings({
       ...draft,
     })
+    onSettingsChanged?.()
   }
 
   setting.addItem({
@@ -69,6 +72,20 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
       input.checked = draft.detectExternalChanges
       input.addEventListener("change", () => {
         draft.detectExternalChanges = input.checked
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
+    title: t("settingsShowCanvasThumbnailsTitle"),
+    description: t("settingsShowCanvasThumbnailsDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.type = "checkbox"
+      input.checked = draft.showCanvasThumbnails
+      input.addEventListener("change", () => {
+        draft.showCanvasThumbnails = input.checked
         void saveDraft()
       })
       return input

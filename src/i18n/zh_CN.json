@@ -147,6 +147,8 @@
   "settingsRecentCanvasFileLimitDescription": "控制编辑器中显示多少条最近打开的 Canvas 路径。",
   "settingsDetectExternalFileChangesTitle": "检测外部文件变更",
   "settingsDetectExternalFileChangesDescription": "如果底层 Canvas 文件在磁盘上发生变化，保存前给出提醒。",
+  "settingsShowCanvasThumbnailsTitle": "显示画布缩略图",
+  "settingsShowCanvasThumbnailsDescription": "开启后在画布右下角显示整个画布的缩略导航图。默认关闭。",
   "settingsEnableDebugLogTitle": "启用调试日志",
   "settingsEnableDebugLogDescription": "开启后在浏览器控制台输出 Canvas 保存流程的调试信息。",
   "messageSelectTargetNodeFirst": "请先选择目标节点。",
