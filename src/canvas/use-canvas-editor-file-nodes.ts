@@ -45,6 +45,68 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
 
   let fileNodeResolveVersion = 0
 
+  const resolveLookups = {
+    resolveBlockById: async (blockId: string) => {
+      const block = await findSiyuanBlockById(blockId)
+      return block
+        ? {
+            ...block,
+            kind: 'block' as const,
+          }
+        : null
+    },
+    resolveCanvasByPath: async (path: string) => (
+      path.trim().endsWith('.canvas')
+        ? {
+            kind: 'canvas' as const,
+            path,
+            title: path.replace(/\\/g, '/').split('/').at(-1) || path,
+          }
+        : null
+    ),
+    resolveDocumentByBlockId: async (blockId: string) => {
+      const document = await findSiyuanDocumentByBlockId(blockId)
+      return document
+        ? {
+            ...document,
+            kind: 'document' as const,
+          }
+        : null
+    },
+    resolveDocumentByPath: async (path: string) => {
+      const document = await findSiyuanDocumentByPath(path)
+      return document
+        ? {
+            ...document,
+            kind: 'document' as const,
+          }
+        : null
+    },
+    resolveImageByBlockId: async (blockId: string) => {
+      const image = await findSiyuanImageAssetByBlockId(blockId)
+      return image
+        ? {
+            kind: 'image' as const,
+            openPath: image.openPath,
+            path: image.path,
+            title: image.title || image.name,
+          }
+        : null
+    },
+    resolveImageByPath: async (path: string) => {
+      const image = await findSiyuanAssetByPath(path)
+      return image
+        ? {
+            blockId: image.blockId,
+            kind: 'image' as const,
+            openPath: image.openPath,
+            path: image.path,
+            title: image.title || image.name,
+          }
+        : null
+    },
+  }
+
   function extractImageSourceFromPreviewHtml(previewHtml: string): string | undefined {
     return previewHtml.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1]
   }
@@ -109,104 +171,63 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
     }
   }
 
-  async function refreshFileNodeMetadata() {
-    const version = ++fileNodeResolveVersion
-    const fileNodes = state.document.nodes.filter((node): node is Extract<CanvasNode, { type: "file" }> => node.type === "file")
-    const nextEntries = await Promise.all(fileNodes.map(async (node) => {
-      const resolved = await resolveCanvasFileTarget(node.file, {
-        resolveBlockById: async (blockId) => {
-          const block = await findSiyuanBlockById(blockId)
-          return block
-            ? {
-                ...block,
-                kind: "block" as const,
-              }
-            : null
-        },
-        resolveCanvasByPath: async (path) => (
-          path.trim().endsWith(".canvas")
-            ? {
-                kind: "canvas" as const,
-                path,
-                title: path.replace(/\\/g, "/").split("/").at(-1) || path,
-              }
-            : null
-        ),
-        resolveDocumentByBlockId: async (blockId) => {
-          const document = await findSiyuanDocumentByBlockId(blockId)
-          return document
-            ? {
-                ...document,
-                kind: "document" as const,
-              }
-            : null
-        },
-        resolveDocumentByPath: async (path) => {
-          const document = await findSiyuanDocumentByPath(path)
-          return document
-            ? {
-                ...document,
-                kind: "document" as const,
-              }
-            : null
-        },
-        resolveImageByBlockId: async (blockId) => {
-          const image = await findSiyuanImageAssetByBlockId(blockId)
-          return image
-            ? {
-                kind: "image" as const,
-                openPath: image.openPath,
-                path: image.path,
-                title: image.title || image.name,
-              }
-            : null
-        },
-        resolveImageByPath: async (path) => {
-          const image = await findSiyuanAssetByPath(path)
-          return image
-            ? {
-                blockId: image.blockId,
-                kind: "image" as const,
-                openPath: image.openPath,
-                path: image.path,
-                title: image.title || image.name,
-              }
-            : null
-        },
-      })
+  async function resolveFileNodeMetadata(node: Extract<CanvasNode, { type: 'file' }>) {
+    const resolved = await resolveCanvasFileTarget(node.file, resolveLookups)
 
-      let enriched: ResolvedCanvasFileTarget & { detail: string, excerptHtml?: string, imageSrc?: string } = {
+    let enriched: ResolvedCanvasFileTarget & {
+      detail: string
+      excerptHtml?: string
+      imageSrc?: string
+      thumbnail?: CanvasFileTargetPreview['thumbnail']
+    } = {
+      ...resolved,
+      detail: resolved.path,
+    }
+
+    if (resolved.kind === 'block') {
+      enriched = await withBlockPreview(resolved)
+    }
+
+    if (resolved.kind === 'document') {
+      enriched = await withDocumentPreview(resolved)
+    }
+
+    if (resolved.kind === 'canvas') {
+      const canvasPreview = await loadCanvasTargetPreview(resolved, {
+        readCanvasText: readWorkspaceCanvasText,
+      })
+      enriched = {
         ...resolved,
         detail: resolved.path,
+        thumbnail: canvasPreview.thumbnail,
       }
+    }
 
-      if (resolved.kind === "block") {
-        enriched = await withBlockPreview(resolved)
-      }
+    return enriched
+  }
 
-      if (resolved.kind === "document") {
-        enriched = await withDocumentPreview(resolved)
-      }
-
-      if (resolved.kind === "canvas") {
-        const canvasPreview = await loadCanvasTargetPreview(resolved, {
-          readCanvasText: readWorkspaceCanvasText,
-        })
-        enriched = {
-          ...resolved,
-          detail: resolved.path,
-          thumbnail: canvasPreview.thumbnail,
-        }
-      }
-
-      return [node.id, enriched] as const
+  async function refreshFileNodeMetadata(nodeIds?: string[]) {
+    const version = ++fileNodeResolveVersion
+    const fileNodes = state.document.nodes.filter((node): node is Extract<CanvasNode, { type: 'file' }> => (
+      node.type === 'file' && (!nodeIds || nodeIds.includes(node.id))
+    ))
+    const nextEntries = await Promise.all(fileNodes.map(async (node) => {
+      return [node.id, await resolveFileNodeMetadata(node)] as const
     }))
 
     if (version !== fileNodeResolveVersion) {
       return
     }
 
-    fileNodeMeta.value = Object.fromEntries(nextEntries)
+    if (!nodeIds) {
+      fileNodeMeta.value = Object.fromEntries(nextEntries)
+      return
+    }
+
+    fileNodeMeta.value = {
+      ...fileNodeMeta.value,
+      ...Object.fromEntries(nextEntries),
+    }
   }
 
   function getNodeTitle(node: CanvasNode): string {

@@ -79,6 +79,7 @@ function createEditorMock(node = createTextNode()) {
     },
     bottomToolbarVisible: false,
     canDelete: false,
+    canRefreshSelectedSiyuanNode: false,
     centerSelectionInViewport: vi.fn(),
     centerEdgeInViewport: vi.fn(),
     closeCreateEdgeDialog: vi.fn(),
@@ -182,6 +183,7 @@ function createEditorMock(node = createTextNode()) {
     openWorkspacePath: vi.fn(),
     overwriteConflictVersion: vi.fn(),
     recentFiles: [],
+    refreshSelectedSiyuanNode: vi.fn(),
     resetViewport: vi.fn(),
     save: vi.fn(),
     selectedEdgeHandlePositions: null,
@@ -1094,6 +1096,50 @@ describe("CanvasWorkspace", () => {
     await wrapper.find("[data-testid='selection-toolbar-color']").trigger("click")
 
     expect(currentEditor.toggleSelectionPopover).toHaveBeenCalledWith("color")
+  })
+
+  it("shows a refresh button for a single selected Siyuan document node and triggers refresh", async () => {
+    const node = {
+      id: "file-1",
+      type: "file",
+      file: "/data/roadmap.sy",
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 180,
+    }
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.state.selectedNodeIds = [node.id]
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Document",
+      detail: "/Projects/Roadmap",
+      headline: "Roadmap",
+      helper: "Opens in SiYuan",
+      kind: "document",
+    }))
+    currentEditor.canRefreshSelectedSiyuanNode = true
+    currentEditor.refreshSelectedSiyuanNode = vi.fn()
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='selection-toolbar-refresh']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='selection-toolbar-refresh']").attributes("data-tooltip")).toBe("刷新")
+
+    await wrapper.find("[data-testid='selection-toolbar-refresh']").trigger("click")
+
+    expect(currentEditor.refreshSelectedSiyuanNode).toHaveBeenCalled()
   })
 
   it("updates the floating toolbar theme class when the canvas theme mode changes", async () => {

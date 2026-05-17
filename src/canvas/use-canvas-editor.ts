@@ -225,6 +225,14 @@ export function useCanvasEditor(
     () => state.document.nodes.find((node) => node.id === state.selectedNodeId) || null,
   )
   const selectedNodeCount = computed(() => state.selectedNodeIds.length)
+  const canRefreshSelectedSiyuanNode = computed(() => {
+    if (selectedNodeCount.value !== 1 || selectedNode.value?.type !== 'file') {
+      return false
+    }
+
+    const kind = getResolvedFileNode(selectedNode.value).kind
+    return kind === 'block' || kind === 'document'
+  })
   const selectedEdge = computed(
     () => state.document.edges.find((edge) => edge.id === state.selectedEdgeId) || null,
   )
@@ -746,6 +754,18 @@ export function useCanvasEditor(
     })
   }
 
+  async function refreshSelectedSiyuanNode() {
+    if (!canRefreshSelectedSiyuanNode.value || selectedNode.value?.type !== 'file') {
+      return
+    }
+
+    try {
+      await refreshFileNodeMetadata([selectedNode.value.id])
+    } catch {
+      showMessage(t('messageUnableRefreshSiyuanNode'), 4000, 'error')
+    }
+  }
+
   watch(
     () => [state.filePath, state.isDirty, suggestedFilename.value],
     () => {
@@ -1253,6 +1273,7 @@ export function useCanvasEditor(
       board,
       bottomToolbarVisible,
       canDelete,
+      canRefreshSelectedSiyuanNode,
       centerEdgeInViewport,
       centerSelectionInViewport,
       closeCreateEdgeDialog,
@@ -1367,6 +1388,7 @@ export function useCanvasEditor(
       openWorkspacePath,
       overwriteConflictVersion,
       recentFiles,
+      refreshSelectedSiyuanNode,
       expandAllFolders,
       collapseAllFolders,
       allFoldersExpanded,

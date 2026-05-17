@@ -782,6 +782,42 @@ Preview body
     wrapper.unmount()
   })
 
+  it("refreshes the selected Siyuan document node preview with the latest content", async () => {
+    fileNodeLookupMock.findSiyuanDocumentByPath.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      title: "Roadmap",
+    })
+    fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue(`# Roadmap
+
+Old body`)
+
+    const { editor, wrapper } = await mountEditor()
+
+    await editor.selectFilePickerResult({
+      kind: "document",
+      path: "/data/roadmap.sy",
+      subtitle: "/Projects/Roadmap",
+      title: "Roadmap",
+    })
+    await flushEditor()
+
+    expect(editor.canRefreshSelectedSiyuanNode).toBe(true)
+    expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>Old body</p>")
+
+    fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue(`# Roadmap
+
+New body`)
+
+    await editor.refreshSelectedSiyuanNode()
+    await flushEditor()
+
+    expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>New body</p>")
+
+    wrapper.unmount()
+  })
+
   it("opens a block node by opening its document and jumping to the block", async () => {
     const { editor, plugin, wrapper } = await mountEditor()
 
@@ -839,6 +875,9 @@ Preview body
     await flushEditor()
     editor.updateNodeField("file", "assets/diagram.png")
     await flushEditor()
+
+    expect(fileNodeLookupMock.findSiyuanAssetByPath).toHaveBeenCalledWith("assets/diagram.png")
+    expect(editor.getFileNodePreview(editor.selectedNode).kind).toBe("image")
 
     editor.activateNode(editor.selectedNode)
     await flushEditor()

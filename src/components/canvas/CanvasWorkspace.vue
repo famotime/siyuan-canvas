@@ -908,6 +908,20 @@
             />
           </button>
           <button
+            v-if="editor.canRefreshSelectedSiyuanNode"
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-refresh"
+            :aria-label="SELECTION_TOOLBAR_TOOLTIPS.refresh"
+            :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.refresh"
+            type="button"
+            @click.stop="editor.refreshSelectedSiyuanNode"
+          >
+            <CanvasIcon
+              class="selection-toolbar__icon"
+              name="refresh"
+            />
+          </button>
+          <button
             v-if="editor.selectedNodeCount === 1 && editor.selectedNode"
             class="selection-toolbar__button"
             data-testid="selection-toolbar-edit"

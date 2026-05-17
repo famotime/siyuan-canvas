@@ -316,9 +316,6 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
 
   function updateNode(node: CanvasNode) {
     commitDocument(upsertCanvasNode(state.document, node))
-    if (node.type === 'file') {
-      void fileFieldRefresh()
-    }
   }
 
   function updateTextNodeContent(nodeId: string, text: string) {
