@@ -186,6 +186,7 @@ function createEditorMock(node = createTextNode()) {
     openWorkspacePath: vi.fn(),
     overwriteConflictVersion: vi.fn(),
     recentFiles: [],
+    searchDecorations: [],
     refreshSelectedSiyuanNode: vi.fn(),
     resetViewport: vi.fn(),
     save: vi.fn(),
@@ -930,6 +931,27 @@ describe("CanvasWorkspace", () => {
     })
 
     expect(wrapper.find("[data-testid='canvas-minimap']").exists()).toBe(false)
+  })
+
+  it("renders inline search marks for group label decorations", () => {
+    const node = createGroupNode({ label: "Alpha Beta Alpha" })
+    currentEditor = createEditorMock(node)
+    currentEditor.searchDecorations = [
+      { current: false, start: 0, end: 5, targetId: "node:group-1:label" },
+      { current: true, start: 11, end: 16, targetId: "node:group-1:label" },
+    ]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const marks = wrapper.findAll(".canvas-search-mark")
+    expect(marks.map(mark => mark.text())).toEqual(["Alpha", "Alpha"])
+    expect(marks[1]?.classes()).toContain("canvas-search-mark--current")
   })
 
   it("renders the canvas minimap when enabled", () => {

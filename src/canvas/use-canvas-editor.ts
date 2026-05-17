@@ -91,6 +91,14 @@ import {
   resolveEdgeToolbarPosition,
   resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
+import {
+  collectCanvasSearchTargets,
+  createCanvasSearchRevision,
+  parseCanvasTargetId,
+  registerCanvasSearchHost,
+  replaceCanvasTextTargetRanges,
+  type CanvasSearchDecoration,
+} from "@/canvas/search-bridge"
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
 const DEFAULT_SELECTION_TOOLBAR_SIZE = {
@@ -125,7 +133,10 @@ export function useCanvasEditor(
   }>>({})
   const fileSource = ref<CanvasEditorFileSource>(bootstrap.path ? "workspace" : "unsaved")
   const stageRef = ref<HTMLElement>()
+  const searchDecorations = ref<CanvasSearchDecoration[]>([])
   const recentFiles = ref<CanvasRecentFile[]>([])
+  const searchListeners = new Set<() => void>()
+  let unregisterCanvasSearchHost: (() => void) | null = null
   type WorkspaceTreeNode = {
     type: 'file'
     path: string
@@ -443,6 +454,10 @@ export function useCanvasEditor(
 
   function refreshRecentFiles() {
     recentFiles.value = plugin.getRecentCanvasFiles?.() ?? []
+  }
+
+  function notifyCanvasSearchChanged() {
+    searchListeners.forEach(listener => listener())
   }
 
   function activateCanvasSurface() {
@@ -866,6 +881,7 @@ export function useCanvasEditor(
     historyVersion.value++
     state.patchDocument(nextDocument)
     state.issues = validateCanvasDocument(nextDocument)
+    notifyCanvasSearchChanged()
   }
 
   function applyHistorySnapshot(snapshot: ReturnType<typeof cloneCanvasDocument> extends infer _T ? import("@/canvas/canvas-history").CanvasHistorySnapshot : never) {
@@ -1216,6 +1232,94 @@ export function useCanvasEditor(
     zoomToFit,
   })
 
+  function getCanvasSearchTitle() {
+    return getFileName(state.filePath) || suggestedFilename.value || t("untitledCanvas")
+  }
+
+  function getFileNodeSearchTextById() {
+    const textById = new Map<string, string>()
+    for (const node of state.document.nodes) {
+      if (node.type !== "file") {
+        continue
+      }
+
+      const resolved = getResolvedFileNode(node)
+      textById.set(node.id, [
+        resolved.title,
+        resolved.path,
+        resolved.detail,
+        resolved.excerptHtml?.replace(/<[^>]+>/g, " "),
+      ].filter(Boolean).join("\n"))
+    }
+
+    return textById
+  }
+
+  function createCanvasSearchHost(root: HTMLElement) {
+    return {
+      version: 1 as const,
+      root,
+      getContext: () => ({
+        filePath: state.filePath,
+        id: `canvas:${state.filePath || getCanvasSearchTitle()}`,
+        readonly: Boolean(state.conflict),
+        title: getCanvasSearchTitle(),
+      }),
+      getSnapshot: async () => ({
+        revision: createCanvasSearchRevision(
+          state.filePath || getCanvasSearchTitle(),
+          state.document.nodes.length,
+          JSON.stringify(state.document),
+        ),
+        targets: collectCanvasSearchTargets({
+          document: state.document,
+          fileNodeTextById: getFileNodeSearchTextById(),
+        }),
+      }),
+      replaceTextRanges: async (
+        targetId: string,
+        ranges: Array<{ end: number, start: number, text: string }>,
+      ) => {
+        const result = replaceCanvasTextTargetRanges({
+          document: state.document,
+          ranges,
+          targetId,
+        })
+        if (result.appliedCount > 0) {
+          commitDocument(result.document)
+        }
+
+        return {
+          appliedCount: result.appliedCount,
+          revision: createCanvasSearchRevision(
+            state.filePath || getCanvasSearchTitle(),
+            result.document.nodes.length,
+            JSON.stringify(result.document),
+          ),
+        }
+      },
+      reveal: async (targetId: string) => {
+        const parsed = parseCanvasTargetId(targetId)
+        if (!parsed || parsed.type !== "node") {
+          return false
+        }
+
+        state.selectNode(parsed.id)
+        centerSelectionInViewport()
+        return true
+      },
+      subscribe: (listener: () => void) => {
+        searchListeners.add(listener)
+        return () => {
+          searchListeners.delete(listener)
+        }
+      },
+      syncDecorations: (decorations: CanvasSearchDecoration[]) => {
+        searchDecorations.value = decorations
+      },
+    }
+  }
+
   onMounted(async () => {
     await initializeCanvasEditor({
       bootstrap,
@@ -1232,9 +1336,16 @@ export function useCanvasEditor(
       t,
     })
     window.addEventListener("keydown", handleKeydown)
+    const hostRoot = stageRef.value?.closest<HTMLElement>(".siyuan-canvas__tab")
+      ?? stageRef.value
+    if (hostRoot) {
+      unregisterCanvasSearchHost = registerCanvasSearchHost(createCanvasSearchHost(hostRoot))
+    }
   })
 
   onBeforeUnmount(() => {
+    unregisterCanvasSearchHost?.()
+    unregisterCanvasSearchHost = null
     window.removeEventListener("keydown", handleKeydown)
   })
 
@@ -1389,6 +1500,7 @@ export function useCanvasEditor(
       openWorkspacePath,
       overwriteConflictVersion,
       recentFiles,
+      searchDecorations,
       refreshSelectedSiyuanNode,
       expandAllFolders,
       collapseAllFolders,

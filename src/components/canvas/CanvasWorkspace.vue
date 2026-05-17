@@ -374,9 +374,15 @@
             v-for="node in editor.displayNodes"
             :key="node.id"
             class="canvas-node"
+            :data-canvas-node-id="node.id"
+            :data-canvas-node-type="node.type"
             :class="[
               `canvas-node--${node.type}`,
-              { 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id) },
+              {
+                'canvas-node--search-current': hasCanvasCurrentSearchMatch(node.id),
+                'canvas-node--search-match': hasCanvasSearchMatch(node.id),
+                'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id),
+              },
             ]"
             :style="getCanvasNodeStyle(node)"
             @pointerdown.stop="handleNodePointerDown(node, $event)"
@@ -421,22 +427,25 @@
                 <div
                   v-else
                   class="canvas-node__content markdown-preview"
+                  data-canvas-field="text"
                   v-html="editor.getRenderedMarkdown(node.text)"
                 />
               </template>
               <template v-else-if="node.type === 'file'">
-                <CanvasFileCard
-                  :canvas-thumbnail-view-box="getCanvasThumbnailViewBox(editor.getFileNodePreview(node).thumbnail)"
-                  :document-preview-html="getFileCardDocumentPreviewHtml(node)"
-                  :image-src="getFileCardImageSource(node)"
-                  :node="node"
-                  :preview="editor.getFileNodePreview(node)"
-                  :show-detail="shouldShowFileCardDetail(node)"
-                  :show-headline="shouldShowFileCardHeadline(node)"
-                  :tooltip="getFileCardTooltip(node)"
-                  @image-error="handleFileCardImageError"
-                  @preview-image-error="handleFileCardPreviewImageError"
-                />
+                <div data-canvas-field="note">
+                  <CanvasFileCard
+                    :canvas-thumbnail-view-box="getCanvasThumbnailViewBox(editor.getFileNodePreview(node).thumbnail)"
+                    :document-preview-html="getFileCardDocumentPreviewHtml(node)"
+                    :image-src="getFileCardImageSource(node)"
+                    :node="node"
+                    :preview="editor.getFileNodePreview(node)"
+                    :show-detail="shouldShowFileCardDetail(node)"
+                    :show-headline="shouldShowFileCardHeadline(node)"
+                    :tooltip="getFileCardTooltip(node)"
+                    @image-error="handleFileCardImageError"
+                    @preview-image-error="handleFileCardPreviewImageError"
+                  />
+                </div>
               </template>
               <template v-else-if="node.type === 'link'">
                 <textarea
@@ -480,10 +489,10 @@
               <div
                 v-else
                 class="canvas-node__group-label"
+                data-canvas-field="label"
                 :style="getCanvasNodeContentStyle(node)"
-              >
-                {{ node.label || t("nodeDefaultGroupLabel") }}
-              </div>
+                v-html="renderCanvasGroupLabel(node)"
+              />
             </template>
             <button
               v-for="side in editor.sides"
@@ -1799,6 +1808,10 @@ import type {
   CanvasSide,
 } from "@/canvas/types"
 import {
+  renderCanvasSearchMarkedText,
+  type CanvasSearchDecoration,
+} from "@/canvas/search-bridge"
+import {
   applyFilePreviewImageOverrides,
   getFilePreviewImageCandidates,
   getNextFilePreviewImageSource,
@@ -2135,6 +2148,27 @@ function getCanvasNodeStyle(node: CanvasNode) {
 
 function getCanvasNodeContentStyle(node: CanvasNode) {
   return resolveCanvasNodeContentStyle(node)
+}
+
+function hasCanvasSearchMatch(nodeId: string) {
+  return (editor.searchDecorations ?? []).some(decoration => decoration.targetId.startsWith(`node:${nodeId}:`))
+}
+
+function hasCanvasCurrentSearchMatch(nodeId: string) {
+  return (editor.searchDecorations ?? []).some(decoration =>
+    decoration.current && decoration.targetId.startsWith(`node:${nodeId}:`),
+  )
+}
+
+function getCanvasTargetDecorations(targetId: string): CanvasSearchDecoration[] {
+  return (editor.searchDecorations ?? []).filter(decoration => decoration.targetId === targetId)
+}
+
+function renderCanvasGroupLabel(node: CanvasNode) {
+  const label = node.type === "group"
+    ? node.label || t("nodeDefaultGroupLabel")
+    : ""
+  return renderCanvasSearchMarkedText(label, getCanvasTargetDecorations(`node:${node.id}:label`))
 }
 
 /**
@@ -3188,6 +3222,27 @@ watch(
 .canvas-node--selected {
   z-index: 3;
   box-shadow: 0 0 0 2px var(--canvas-selection-border), var(--canvas-shadow-strong);
+}
+
+.canvas-node--search-match {
+  box-shadow: 0 0 0 2px var(--b3-theme-primary-light), var(--canvas-shadow);
+}
+
+.canvas-node--search-current {
+  z-index: 4;
+  box-shadow: 0 0 0 3px var(--b3-theme-primary), var(--canvas-shadow-strong);
+}
+
+.canvas-search-mark {
+  border-radius: 3px;
+  background: var(--b3-theme-primary-light);
+  color: inherit;
+  padding: 0 1px;
+}
+
+.canvas-search-mark--current {
+  background: var(--b3-theme-primary);
+  color: var(--b3-theme-on-primary, #fff);
 }
 
 .canvas-node:hover {
