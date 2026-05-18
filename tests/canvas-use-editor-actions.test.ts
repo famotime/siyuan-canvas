@@ -972,6 +972,141 @@ New body`)
     wrapper.unmount()
   })
 
+  it("creates a mind-map child node with Tab and keeps focus on the current node", async () => {
+    const currentNode = {
+      height: 100,
+      id: "current",
+      text: "Current",
+      type: "text",
+      width: 100,
+      x: 0,
+      y: 0,
+    }
+    const obstacleNode = {
+      height: 100,
+      id: "obstacle",
+      text: "Obstacle",
+      type: "text",
+      width: 100,
+      x: 180,
+      y: 0,
+    }
+    const { editor, wrapper } = await mountEditor({
+      raw: JSON.stringify({
+        edges: [],
+        nodes: [currentNode, obstacleNode],
+      }),
+    })
+    editor.selectNode("current")
+    await flushEditor()
+
+    window.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Tab",
+    }))
+    await flushEditor()
+
+    const createdNode = editor.state.document.nodes.find((node) => node.id !== "current" && node.id !== "obstacle")
+    expect(createdNode).toMatchObject({
+      text: "New note",
+      type: "text",
+      x: 180,
+      width: 320,
+      height: 180,
+    })
+    expect(createdNode!.y).toBeGreaterThanOrEqual(140)
+    expect(editor.state.document.edges).toHaveLength(1)
+    expect(editor.state.document.edges[0]).toMatchObject({
+      endArrow: true,
+      fromNode: "current",
+      fromSide: "right",
+      startArrow: false,
+      toNode: createdNode!.id,
+      toSide: "left",
+    })
+    expect(editor.state.selectedNodeId).toBe("current")
+    expect(editor.state.selectedNodeIds).toEqual(["current"])
+
+    wrapper.unmount()
+  })
+
+  it("creates a mind-map sibling node with Enter and links it from the same parent", async () => {
+    const parentNode = {
+      height: 100,
+      id: "parent",
+      text: "Parent",
+      type: "text",
+      width: 100,
+      x: 0,
+      y: 0,
+    }
+    const currentNode = {
+      height: 100,
+      id: "current",
+      text: "Current",
+      type: "text",
+      width: 100,
+      x: 180,
+      y: 0,
+    }
+    const obstacleNode = {
+      height: 100,
+      id: "obstacle",
+      text: "Obstacle",
+      type: "text",
+      width: 100,
+      x: 180,
+      y: 140,
+    }
+    const { editor, wrapper } = await mountEditor({
+      raw: JSON.stringify({
+        edges: [{
+          endArrow: true,
+          fromNode: "parent",
+          fromSide: "right",
+          id: "parent-current",
+          startArrow: false,
+          toNode: "current",
+          toSide: "left",
+        }],
+        nodes: [parentNode, currentNode, obstacleNode],
+      }),
+    })
+    editor.selectNode("current")
+    await flushEditor()
+
+    window.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+    }))
+    await flushEditor()
+
+    const createdNode = editor.state.document.nodes.find((node) => !["parent", "current", "obstacle"].includes(node.id))
+    expect(createdNode).toMatchObject({
+      text: "New note",
+      type: "text",
+      x: 180,
+      width: 320,
+      height: 180,
+    })
+    expect(createdNode!.y).toBeGreaterThanOrEqual(280)
+    expect(editor.state.document.edges).toHaveLength(2)
+    expect(editor.state.document.edges.at(-1)).toMatchObject({
+      endArrow: true,
+      fromNode: "parent",
+      fromSide: "right",
+      startArrow: false,
+      toNode: createdNode!.id,
+      toSide: "left",
+    })
+    expect(editor.state.selectedNodeId).toBe("current")
+    expect(editor.state.selectedNodeIds).toEqual(["current"])
+
+    wrapper.unmount()
+  })
+
   it("filters create-edge source and target node options by keyword and excludes self-connections", async () => {
     const { editor, wrapper } = await mountEditor()
 

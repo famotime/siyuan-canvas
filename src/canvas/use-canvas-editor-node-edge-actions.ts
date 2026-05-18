@@ -35,6 +35,9 @@ import { isWebUrl } from '@/canvas/url-detection'
 import { centerViewportOnBounds } from '@/canvas/selection-toolbar'
 import { clampViewportScale } from '@/canvas/viewport'
 
+const MIND_MAP_HORIZONTAL_GAP = 80
+const MIND_MAP_VERTICAL_GAP = 40
+
 interface CanvasEditorNodeEdgeActionsOptions {
   activateCanvasSurface: () => void
   board: ComputedRef<CanvasBoardMetrics>
@@ -123,6 +126,103 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
     commitDocument(upsertCanvasNode(state.document, node))
     state.selectNode(node.id)
+  }
+
+  function doNodesOverlap(first: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>, second: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>): boolean {
+    return first.x < second.x + second.width
+      && first.x + first.width > second.x
+      && first.y < second.y + second.height
+      && first.y + first.height > second.y
+  }
+
+  function findNonOverlappingTextNodePosition(
+    initialPosition: { x: number, y: number },
+    existingNodes: CanvasNode[],
+    stepY: number,
+  ): { x: number, y: number } {
+    const candidate = createCanvasNode('text')
+    candidate.x = initialPosition.x
+    candidate.y = initialPosition.y
+
+    let attempts = 0
+    while (
+      attempts < 100
+      && existingNodes.some((node) => doNodesOverlap(candidate, node))
+    ) {
+      candidate.y += stepY
+      attempts += 1
+    }
+
+    return {
+      x: candidate.x,
+      y: candidate.y,
+    }
+  }
+
+  function createMindMapChildNode() {
+    const currentNode = selectedNode.value
+    if (!currentNode || state.selectedNodeIds.length !== 1) {
+      return
+    }
+
+    const childNode = createCanvasNode('text')
+    const position = findNonOverlappingTextNodePosition(
+      {
+        x: currentNode.x + currentNode.width + MIND_MAP_HORIZONTAL_GAP,
+        y: currentNode.y,
+      },
+      state.document.nodes,
+      currentNode.height + MIND_MAP_VERTICAL_GAP,
+    )
+    childNode.x = position.x
+    childNode.y = position.y
+
+    const edge = createCanvasEdge(currentNode.id, childNode.id)
+    edge.fromSide = 'right'
+    edge.toSide = 'left'
+
+    commitDocument({
+      ...state.document,
+      edges: [...state.document.edges, edge],
+      nodes: [...state.document.nodes, childNode],
+    })
+  }
+
+  function createMindMapSiblingNode() {
+    const currentNode = selectedNode.value
+    if (!currentNode || state.selectedNodeIds.length !== 1) {
+      return
+    }
+
+    const siblingNode = createCanvasNode('text')
+    const position = findNonOverlappingTextNodePosition(
+      {
+        x: currentNode.x,
+        y: currentNode.y + currentNode.height + MIND_MAP_VERTICAL_GAP,
+      },
+      state.document.nodes,
+      currentNode.height + MIND_MAP_VERTICAL_GAP,
+    )
+    siblingNode.x = position.x
+    siblingNode.y = position.y
+
+    const parentEdge = state.document.edges.find((edge) => (
+      edge.toNode === currentNode.id && edge.toSide === 'left'
+    ))
+    const siblingEdge = parentEdge
+      ? {
+          ...createCanvasEdge(parentEdge.fromNode, siblingNode.id),
+          color: parentEdge.color,
+          fromSide: parentEdge.fromSide,
+          toSide: 'left' as const,
+        }
+      : null
+
+    commitDocument({
+      ...state.document,
+      edges: siblingEdge ? [...state.document.edges, siblingEdge] : state.document.edges,
+      nodes: [...state.document.nodes, siblingNode],
+    })
   }
 
   function deleteSelection() {
@@ -524,6 +624,8 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     closeCreateEdgeDialog,
     createEdgeFromSelection,
     createGroupFromSelection,
+    createMindMapChildNode,
+    createMindMapSiblingNode,
     deleteSelection,
     editingEdgeLabelId,
     getRenderedMarkdown,

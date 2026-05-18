@@ -5,6 +5,8 @@ interface CanvasEditorKeyboardHandlerOptions {
   closeSelectionPopover: () => void
   deleteSelection: () => void
   duplicateSelection?: () => void
+  createMindMapChildNode?: () => void
+  createMindMapSiblingNode?: () => void
   getEdgeToolbarPopover: () => 'closed' | 'color' | 'direction'
   getEditingEdgeLabelId: () => string
   getSelectionToolbarPopover: () => 'closed' | 'color' | 'layout'
@@ -36,6 +38,8 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     closeSelectionPopover,
     deleteSelection,
     duplicateSelection,
+    createMindMapChildNode,
+    createMindMapSiblingNode,
     getEdgeToolbarPopover,
     getEditingEdgeLabelId,
     getSelectionToolbarPopover,
@@ -58,6 +62,22 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
 
     const key = event.key.toLowerCase()
     const isAccelerator = event.ctrlKey || event.metaKey
+
+    if (!isAccelerator && !event.shiftKey && !event.altKey && event.key === 'Tab') {
+      if (createMindMapChildNode) {
+        event.preventDefault()
+        createMindMapChildNode()
+      }
+      return
+    }
+
+    if (!isAccelerator && !event.shiftKey && !event.altKey && event.key === 'Enter') {
+      if (createMindMapSiblingNode) {
+        event.preventDefault()
+        createMindMapSiblingNode()
+      }
+      return
+    }
 
     if ((event.key === 'Delete' || event.key === 'Backspace') && canDelete()) {
       event.preventDefault()
