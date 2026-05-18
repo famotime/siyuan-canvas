@@ -1,3 +1,8 @@
+# Agent Instructions
+
+1. 除非用户特别指定，否则请默认使用简体中文回复所有对话。
+2. 提交代码时使用中文简要描述修改点，并使用 `feat:`, `fix:`, `docs:`, `refactor:` 等前缀进行标记。
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
