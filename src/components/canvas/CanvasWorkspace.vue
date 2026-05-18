@@ -91,6 +91,7 @@
           <CanvasIcon
             class="toolbar__icon"
             name="undo"
+            :size="18"
           />
         </button>
         <button
@@ -106,6 +107,7 @@
           <CanvasIcon
             class="toolbar__icon"
             name="redo"
+            :size="18"
           />
         </button>
       </div>
@@ -952,7 +954,7 @@
           >
             <CanvasIcon
               class="selection-toolbar__icon"
-              name="expand-all"
+              name="decompose"
             />
           </button>
           <button
