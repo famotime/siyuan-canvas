@@ -1,107 +1,144 @@
 <template>
-  <div
-    v-if="visible"
-    class="canvas-dialog-backdrop"
-    data-testid="png-export-dialog"
-    @click.self="$emit('close')"
-  >
+  <Transition name="png-dialog">
     <div
-      class="canvas-dialog"
-      @wheel.passive.stop
+      v-if="visible"
+      class="png-export-backdrop"
+      data-testid="png-export-dialog"
+      @click.self="!loading && $emit('close')"
     >
-      <div class="canvas-dialog__header">
-        <h2>{{ t("pngExportDialogTitle") }}</h2>
-      </div>
-      <div class="canvas-dialog__grid">
-        <fieldset class="canvas-dialog__fieldset">
-          <legend>{{ t("pngExportRange") }}</legend>
-          <label class="canvas-dialog__option canvas-dialog__option--card">
-            <input
-              v-model="pngExportRange"
-              data-testid="png-export-range-full"
-              name="png-export-range"
-              type="radio"
-              value="full"
-            >
-            <span>{{ t("pngExportRangeFull") }}</span>
-          </label>
-          <label class="canvas-dialog__option canvas-dialog__option--card">
-            <input
-              v-model="pngExportRange"
-              data-testid="png-export-range-viewport"
-              name="png-export-range"
-              type="radio"
-              value="viewport"
-            >
-            <span>{{ t("pngExportRangeViewport") }}</span>
-          </label>
-        </fieldset>
-        <fieldset class="canvas-dialog__fieldset">
-          <legend>{{ t("pngExportBackground") }}</legend>
-          <div class="canvas-dialog__choice-grid">
-            <label class="canvas-dialog__option canvas-dialog__option--card">
-              <input
-                v-model="pngExportBackgroundMode"
-                data-testid="png-export-background-white"
-                name="png-export-background"
-                type="radio"
-                value="white"
+      <div class="png-export-dialog" @wheel.passive.stop>
+        <div class="png-export-dialog__header">
+          <span class="png-export-dialog__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><path d="M24 6V30" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 20L24 30L34 20" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 34V40C8 41.1046 8.89543 42 10 42H38C39.1046 42 40 41.1046 40 40V34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <h2>{{ t("pngExportDialogTitle") }}</h2>
+        </div>
+
+        <div class="png-export-dialog__body">
+          <fieldset class="png-export-fieldset" :disabled="loading">
+            <legend class="png-export-fieldset__legend">{{ t("pngExportRange") }}</legend>
+            <div class="png-export-options">
+              <label
+                class="png-export-option"
+                :class="{ 'png-export-option--active': pngExportRange === 'full' }"
               >
-              <span>{{ t("pngExportBackgroundWhite") }}</span>
-            </label>
-            <label class="canvas-dialog__option canvas-dialog__option--card">
-              <input
-                v-model="pngExportBackgroundMode"
-                data-testid="png-export-background-transparent"
-                name="png-export-background"
-                type="radio"
-                value="transparent"
+                <input
+                  v-model="pngExportRange"
+                  data-testid="png-export-range-full"
+                  name="png-export-range"
+                  type="radio"
+                  value="full"
+                >
+                <span class="png-export-option__preview png-export-option__preview--full" aria-hidden="true">
+                  <span class="png-export-option__preview-inner" />
+                </span>
+                <span class="png-export-option__label">{{ t("pngExportRangeFull") }}</span>
+              </label>
+              <label
+                class="png-export-option"
+                :class="{ 'png-export-option--active': pngExportRange === 'viewport' }"
               >
-              <span>{{ t("pngExportBackgroundTransparent") }}</span>
-            </label>
-            <label class="canvas-dialog__option canvas-dialog__option--card">
-              <input
-                v-model="pngExportBackgroundMode"
-                data-testid="png-export-background-custom"
-                name="png-export-background"
-                type="radio"
-                value="custom"
+                <input
+                  v-model="pngExportRange"
+                  data-testid="png-export-range-viewport"
+                  name="png-export-range"
+                  type="radio"
+                  value="viewport"
+                >
+                <span class="png-export-option__preview png-export-option__preview--viewport" aria-hidden="true">
+                  <span class="png-export-option__preview-inner" />
+                </span>
+                <span class="png-export-option__label">{{ t("pngExportRangeViewport") }}</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="png-export-fieldset" :disabled="loading">
+            <legend class="png-export-fieldset__legend">{{ t("pngExportBackground") }}</legend>
+            <div class="png-export-options png-export-options--3col">
+              <label
+                class="png-export-option"
+                :class="{ 'png-export-option--active': pngExportBackgroundMode === 'white' }"
               >
-              <span>{{ t("pngExportBackgroundCustom") }}</span>
-            </label>
-          </div>
-          <label class="canvas-dialog__field canvas-dialog__field--compact">
-            <span>{{ t("pngExportCustomColor") }}</span>
-            <input
-              v-model="pngExportCustomColor"
-              class="canvas-dialog__control canvas-dialog__control--color"
-              data-testid="png-export-custom-color"
-              type="color"
-              :disabled="pngExportBackgroundMode !== 'custom'"
-            >
-          </label>
-        </fieldset>
-      </div>
-      <div class="canvas-dialog__actions">
-        <button
-          class="b3-button b3-button--outline"
-          data-testid="png-export-cancel"
-          type="button"
-          @click="$emit('close')"
-        >
-          {{ t("dialogCancel") }}
-        </button>
-        <button
-          class="b3-button"
-          data-testid="png-export-confirm"
-          type="button"
-          @click="$emit('confirm')"
-        >
-          {{ t("pngExportConfirm") }}
-        </button>
+                <input
+                  v-model="pngExportBackgroundMode"
+                  data-testid="png-export-background-white"
+                  name="png-export-background"
+                  type="radio"
+                  value="white"
+                >
+                <span class="png-export-option__swatch png-export-option__swatch--white" aria-hidden="true" />
+                <span class="png-export-option__label">{{ t("pngExportBackgroundWhite") }}</span>
+              </label>
+              <label
+                class="png-export-option"
+                :class="{ 'png-export-option--active': pngExportBackgroundMode === 'transparent' }"
+              >
+                <input
+                  v-model="pngExportBackgroundMode"
+                  data-testid="png-export-background-transparent"
+                  name="png-export-background"
+                  type="radio"
+                  value="transparent"
+                >
+                <span class="png-export-option__swatch png-export-option__swatch--checker" aria-hidden="true" />
+                <span class="png-export-option__label">{{ t("pngExportBackgroundTransparent") }}</span>
+              </label>
+              <label
+                class="png-export-option"
+                :class="{ 'png-export-option--active': pngExportBackgroundMode === 'custom' }"
+              >
+                <input
+                  v-model="pngExportBackgroundMode"
+                  data-testid="png-export-background-custom"
+                  name="png-export-background"
+                  type="radio"
+                  value="custom"
+                >
+                <span
+                  class="png-export-option__swatch png-export-option__swatch--custom"
+                  :style="{ backgroundColor: pngExportCustomColor }"
+                  aria-hidden="true"
+                />
+                <span class="png-export-option__label">{{ t("pngExportBackgroundCustom") }}</span>
+              </label>
+            </div>
+            <div v-if="pngExportBackgroundMode === 'custom'" class="png-export-color-row">
+              <label class="png-export-color-row__label">{{ t("pngExportCustomColor") }}</label>
+              <input
+                v-model="pngExportCustomColor"
+                class="png-export-color-row__input"
+                data-testid="png-export-custom-color"
+                type="color"
+              >
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="png-export-dialog__actions">
+          <button
+            class="png-export-btn png-export-btn--cancel"
+            data-testid="png-export-cancel"
+            type="button"
+            :disabled="loading"
+            @click="$emit('close')"
+          >
+            {{ t("dialogCancel") }}
+          </button>
+          <button
+            class="png-export-btn png-export-btn--confirm"
+            data-testid="png-export-confirm"
+            type="button"
+            :disabled="loading"
+            @click="$emit('confirm')"
+          >
+            <span v-if="loading" class="png-export-btn__spinner" aria-hidden="true" />
+            <span>{{ loading ? t("pngExportExporting") : t("pngExportConfirm") }}</span>
+          </button>
+        </div>
       </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script lang="ts">
@@ -117,6 +154,7 @@ import type {
 
 const props = defineProps<{
   visible: boolean
+  loading: boolean
   t: (key: string) => string
   pngExportRange: CanvasPngExportRange
   pngExportBackgroundMode: CanvasPngExportBackgroundMode
@@ -131,8 +169,6 @@ const emit = defineEmits<{
   (e: 'update:pngExportCustomColor', value: string): void
 }>()
 
-const t = props.t
-
 const pngExportRange = computed({
   get: () => props.pngExportRange,
   set: (val) => emit('update:pngExportRange', val),
@@ -146,3 +182,292 @@ const pngExportCustomColor = computed({
   set: (val) => emit('update:pngExportCustomColor', val),
 })
 </script>
+
+<style scoped>
+.png-export-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 30%);
+  backdrop-filter: blur(2px);
+}
+
+.png-export-dialog {
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  background: var(--canvas-surface-elevated, #fff);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 12%), 0 2px 8px rgb(0 0 0 / 6%);
+  overflow: hidden;
+}
+
+.png-export-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 24px 0;
+}
+
+.png-export-dialog__icon {
+  display: flex;
+  color: var(--b3-theme-primary, #3575f0);
+  flex-shrink: 0;
+}
+
+.png-export-dialog__header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--b3-theme-on-surface, #1a1a1a);
+}
+
+.png-export-dialog__body {
+  padding: 20px 24px;
+}
+
+.png-export-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.png-export-fieldset:last-child {
+  margin-bottom: 0;
+}
+
+.png-export-fieldset__legend {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--b3-theme-on-surface-variant, #5a5a5a);
+}
+
+.png-export-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.png-export-options--3col {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.png-export-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px 10px;
+  border: 2px solid var(--canvas-border, #e0e0e0);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+  user-select: none;
+}
+
+.png-export-option:hover {
+  border-color: var(--b3-theme-primary-light, #a0c4ff);
+}
+
+.png-export-option--active {
+  border-color: var(--b3-theme-primary, #3575f0);
+  background: var(--b3-theme-primary-lightest, #ebf2ff);
+}
+
+.png-export-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.png-export-option__preview {
+  width: 100%;
+  height: 40px;
+  border-radius: 4px;
+  border: 1px dashed var(--canvas-border, #d0d0d0);
+  background: var(--canvas-surface, #fafafa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.png-export-option__preview-inner {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--canvas-border, #d0d0d0) 0,
+    var(--canvas-border, #d0d0d0) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+  border-radius: 2px;
+}
+
+.png-export-option__preview--full .png-export-option__preview-inner {
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+}
+
+.png-export-option__preview--viewport .png-export-option__preview-inner {
+  width: calc(100% - 20px);
+  height: calc(100% - 14px);
+}
+
+.png-export-option__swatch {
+  width: 40px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--canvas-border, #d0d0d0);
+}
+
+.png-export-option__swatch--white {
+  background: #fff;
+}
+
+.png-export-option__swatch--checker {
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+}
+
+.png-export-option__swatch--custom {
+  border-color: var(--canvas-border, #d0d0d0);
+}
+
+.png-export-option__label {
+  font-size: 12px;
+  color: var(--b3-theme-on-surface, #333);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.png-export-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.png-export-color-row__label {
+  font-size: 13px;
+  color: var(--b3-theme-on-surface-variant, #5a5a5a);
+  flex-shrink: 0;
+}
+
+.png-export-color-row__input {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--canvas-border, #d0d0d0);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.png-export-color-row__input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.png-export-color-row__input::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.png-export-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--canvas-border, #eee);
+}
+
+.png-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.png-export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.png-export-btn--cancel {
+  color: var(--b3-theme-on-surface, #333);
+  background: var(--canvas-surface, #f5f5f5);
+}
+
+.png-export-btn--cancel:hover:not(:disabled) {
+  background: var(--canvas-border, #e0e0e0);
+}
+
+.png-export-btn--confirm {
+  color: #fff;
+  background: var(--b3-theme-primary, #3575f0);
+  min-width: 100px;
+  justify-content: center;
+}
+
+.png-export-btn--confirm:hover:not(:disabled) {
+  background: var(--b3-theme-primary-hover, #2a62d4);
+}
+
+.png-export-btn__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(255 255 255 / 30%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: png-spin 0.6s linear infinite;
+}
+
+@keyframes png-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Transition */
+.png-dialog-enter-active {
+  transition: opacity 0.2s ease;
+}
+.png-dialog-enter-active .png-export-dialog {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.png-dialog-leave-active {
+  transition: opacity 0.15s ease;
+}
+.png-dialog-leave-active .png-export-dialog {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.png-dialog-enter-from {
+  opacity: 0;
+}
+.png-dialog-enter-from .png-export-dialog {
+  transform: scale(0.95);
+  opacity: 0;
+}
+.png-dialog-leave-to {
+  opacity: 0;
+}
+.png-dialog-leave-to .png-export-dialog {
+  transform: scale(0.95);
+  opacity: 0;
+}
+</style>

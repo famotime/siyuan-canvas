@@ -42,6 +42,7 @@
   "pngExportBackgroundCustom": "Custom color",
   "pngExportCustomColor": "Custom background color",
   "pngExportConfirm": "Export",
+  "pngExportExporting": "Exporting…",
   "messageCanvasPngExportFailed": "Unable to export PNG image",
   "bottomToolbarText": "Card",
   "bottomToolbarFile": "Note",

@@ -42,6 +42,7 @@
   "pngExportBackgroundCustom": "自定义颜色",
   "pngExportCustomColor": "自定义背景色",
   "pngExportConfirm": "导出",
+  "pngExportExporting": "导出中…",
   "messageCanvasPngExportFailed": "导出 PNG 图片失败",
   "bottomToolbarText": "卡片",
   "bottomToolbarFile": "笔记",

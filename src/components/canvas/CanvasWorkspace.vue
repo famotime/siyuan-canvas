@@ -1069,6 +1069,7 @@
 
         <CanvasPngExportDialog
           :visible="pngExportDialogVisible"
+          :loading="pngExportLoading"
           v-model:png-export-range="pngExportRange"
           v-model:png-export-background-mode="pngExportBackgroundMode"
           v-model:png-export-custom-color="pngExportCustomColor"
@@ -1516,6 +1517,7 @@ const hoveredEdgeId = ref("")
 const pngExportBackgroundMode = ref<CanvasPngExportBackgroundMode>("white")
 const pngExportCustomColor = ref("#ffffff")
 const pngExportDialogVisible = ref(false)
+const pngExportLoading = ref(false)
 const pngExportRange = ref<CanvasPngExportRange>("full")
 const sortDropdownOpen = ref(false)
 const dragSourcePath = ref<string | null>(null)
@@ -1633,14 +1635,19 @@ function closePngExportDialog() {
 }
 
 async function confirmPngExport() {
-  await editor.exportCanvasPng({
-    background: {
-      color: pngExportCustomColor.value,
-      mode: pngExportBackgroundMode.value,
-    },
-    range: pngExportRange.value,
-  })
-  closePngExportDialog()
+  pngExportLoading.value = true
+  try {
+    await editor.exportCanvasPng({
+      background: {
+        color: pngExportCustomColor.value,
+        mode: pngExportBackgroundMode.value,
+      },
+      range: pngExportRange.value,
+    })
+  } finally {
+    pngExportLoading.value = false
+    closePngExportDialog()
+  }
 }
 
 onBeforeUnmount(() => {
