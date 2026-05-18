@@ -34,8 +34,7 @@ import {
   readDir,
   removeFile,
 } from "@/api"
-import { openConfirmDialog } from "@/canvas/confirm-dialog"
-import { openTextInputDialog } from "@/canvas/text-input-dialog"
+import { createCanvasEditorWorkspaceTree } from "@/canvas/use-canvas-editor-workspace-tree"
 import {
   createCanvasBoardMetrics,
   toBoardX,
@@ -141,25 +140,18 @@ export function useCanvasEditor(
   const recentFiles = ref<CanvasRecentFile[]>([])
   const searchListeners = new Set<() => void>()
   let unregisterCanvasSearchHost: (() => void) | null = null
-  type WorkspaceTreeNode = {
-    type: 'file'
-    path: string
-    name: string
-    updated?: number
-    created?: number
-  } | {
-    type: 'folder'
-    path: string
-    name: string
-    children: WorkspaceTreeNode[]
-  }
-  type WorkspaceSortField = 'name' | 'updated' | 'created'
-  type WorkspaceSortDirection = 'asc' | 'desc'
 
-  const workspaceDocuments = ref<WorkspaceTreeNode[]>([])
-  const expandedFolders = ref<Set<string>>(new Set())
-  const workspaceSortField = ref<WorkspaceSortField>('updated')
-  const workspaceSortDirection = ref<WorkspaceSortDirection>('desc')
+  const workspaceTree = createCanvasEditorWorkspaceTree({
+    readDir: (path) => readDir(path) as Promise<Array<{ name: string, isDir: boolean, updated?: number }>>,
+    putFile,
+    removeFile,
+    showMessage,
+    getSettings: getPluginSettings,
+    plugin,
+    refreshRecentFiles,
+    onFilePathUpdate: (path) => { state.filePath = path },
+  })
+
   const suggestedFilename = ref(bootstrap.title || t("untitledCanvas"))
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
   const edgeToolbarPopover = ref<"closed" | "color" | "direction">("closed")
@@ -479,130 +471,6 @@ export function useCanvasEditor(
     bottomToolbarVisible.value = false
   }
 
-  async function readDirectoryTree(dirPath: string): Promise<WorkspaceTreeNode[]> {
-    let entries: Array<{ isDir: boolean; name: string; updated?: number; created?: number }>
-    try {
-      entries = (await readDir(dirPath) as typeof entries) ?? []
-    } catch {
-      return []
-    }
-
-    const nodes: WorkspaceTreeNode[] = []
-    for (const entry of entries) {
-      const fullPath = `${dirPath}/${entry.name}`
-      if (entry.isDir) {
-        const children = await readDirectoryTree(fullPath)
-        nodes.push({ type: 'folder', path: fullPath, name: entry.name, children })
-      } else if (entry.name.endsWith('.canvas')) {
-        nodes.push({
-          type: 'file',
-          path: fullPath,
-          name: entry.name,
-          updated: entry.updated,
-          created: entry.created,
-        })
-      }
-    }
-    return nodes
-  }
-
-  function sortWorkspaceTree(nodes: WorkspaceTreeNode[]): WorkspaceTreeNode[] {
-    const sorted = [...nodes].sort((a, b) => {
-      if (a.type === 'folder' && b.type !== 'folder') return -1
-      if (a.type !== 'folder' && b.type === 'folder') return 1
-
-      const field = workspaceSortField.value
-      const dir = workspaceSortDirection.value === 'asc' ? 1 : -1
-
-      if (field === 'name') {
-        return dir * a.name.localeCompare(b.name, 'zh-CN')
-      }
-
-      const aVal = a.type === 'file' ? (a[field] ?? 0) : 0
-      const bVal = b.type === 'file' ? (b[field] ?? 0) : 0
-      return dir * (bVal - aVal)
-    })
-
-    return sorted.map((node) =>
-      node.type === 'folder'
-        ? { ...node, children: sortWorkspaceTree(node.children) }
-        : node,
-    )
-  }
-
-  async function refreshWorkspaceDocuments() {
-    const directory = getPluginSettings().defaultCanvasDirectory
-
-    try {
-      const tree = await readDirectoryTree(directory)
-      workspaceDocuments.value = sortWorkspaceTree(tree)
-    } catch {
-      workspaceDocuments.value = []
-    }
-  }
-
-  async function createWorkspaceFolder() {
-    const directory = getPluginSettings().defaultCanvasDirectory
-    const folderName = await openTextInputDialog({
-      cancelLabel: t("dialogCancel"),
-      confirmLabel: t("dialogConfirm"),
-      initialValue: "",
-      title: t("inspectorFolderNamePrompt"),
-    })
-    if (!folderName || !folderName.trim()) return
-    const folderPath = `${directory}/${folderName.trim()}`
-    try {
-      await putFile(folderPath, true, new Blob([]))
-      await refreshWorkspaceDocuments()
-      showMessage(t("inspectorNewFolder") + ": " + folderName.trim())
-    } catch {
-      showMessage(t("messageUnableSaveCanvas"), 4000, "error")
-    }
-  }
-
-  function collectFolderPaths(nodes: WorkspaceTreeNode[]): string[] {
-    const paths: string[] = []
-    for (const node of nodes) {
-      if (node.type === 'folder') {
-        paths.push(node.path)
-        paths.push(...collectFolderPaths(node.children))
-      }
-    }
-    return paths
-  }
-
-  function setWorkspaceSortField(field: WorkspaceSortField) {
-    workspaceSortField.value = field
-    refreshWorkspaceDocuments()
-  }
-
-  function setWorkspaceSortDirection(direction: WorkspaceSortDirection) {
-    workspaceSortDirection.value = direction
-    refreshWorkspaceDocuments()
-  }
-
-  function toggleFolderExpand(path: string) {
-    if (expandedFolders.value.has(path)) {
-      expandedFolders.value.delete(path)
-    } else {
-      expandedFolders.value.add(path)
-    }
-    expandedFolders.value = new Set(expandedFolders.value)
-  }
-
-  function expandAllFolders() {
-    expandedFolders.value = new Set(collectFolderPaths(workspaceDocuments.value))
-  }
-
-  function collapseAllFolders() {
-    expandedFolders.value = new Set()
-  }
-
-  const allFoldersExpanded = computed(() => {
-    const allPaths = collectFolderPaths(workspaceDocuments.value)
-    return allPaths.length > 0 && allPaths.every(p => expandedFolders.value.has(p))
-  })
-
   async function expandAllInspectorSections() {
     const allKeys = Object.keys(inspectorSectionState) as Array<keyof typeof inspectorSectionState>
     for (const key of allKeys) {
@@ -618,144 +486,15 @@ export function useCanvasEditor(
         selection: true,
       },
     })
-    if (allFoldersExpanded.value) {
-      collapseAllFolders()
+    if (workspaceTree.allFoldersExpanded.value) {
+      workspaceTree.collapseAllFolders()
     } else {
-      expandAllFolders()
+      workspaceTree.expandAllFolders()
     }
   }
 
-  async function deleteWorkspaceDocument(path: string) {
-    const confirmed = await openConfirmDialog(
-      t("confirmDeleteCanvasTitle"),
-      t("confirmDeleteCanvasDescription", { path }),
-    )
-    if (!confirmed) return
-    try {
-      await removeFile(path)
-    } catch {
-      // file may already be absent on disk
-    }
-    await plugin.removeRecentCanvasFile?.(path)
-    refreshRecentFiles()
-    await refreshWorkspaceDocuments()
-  }
-
-  async function moveWorkspaceFile(sourcePath: string, targetFolderPath: string): Promise<boolean> {
-    const fileName = sourcePath.substring(sourcePath.lastIndexOf('/') + 1)
-    const targetFilePath = `${targetFolderPath}/${fileName}`
-    const sourceDir = sourcePath.substring(0, sourcePath.lastIndexOf('/'))
-
-    if (sourceDir === targetFolderPath) return false
-
-    try {
-      const entries = await readDir(targetFolderPath) as Array<{ name: string }> | null
-      if (Array.isArray(entries) && entries.some((e) => e.name === fileName)) {
-        showMessage(t("messageFileAlreadyExists"), 4000, "error")
-        return false
-      }
-    } catch {
-      // directory may not exist or be unreadable
-    }
-
-    try {
-      const response = await fetch("/api/file/getFile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: sourcePath }),
-      })
-      if (!response.ok) {
-        showMessage(t("messageUnableMoveFile"), 4000, "error")
-        return false
-      }
-      const content = await response.text()
-      const blob = new Blob([content], { type: "application/json" })
-      await putFile(targetFilePath, false, blob)
-    } catch {
-      showMessage(t("messageUnableMoveFile"), 4000, "error")
-      return false
-    }
-
-    try {
-      await removeFile(sourcePath)
-    } catch {
-      try { await removeFile(targetFilePath) } catch { /* cleanup best-effort */ }
-      showMessage(t("messageUnableMoveFile"), 4000, "error")
-      return false
-    }
-
-    if (state.filePath === sourcePath) {
-      state.filePath = targetFilePath
-    }
-    await plugin.removeRecentCanvasFile?.(sourcePath)
-    refreshRecentFiles()
-    await refreshWorkspaceDocuments()
-    showMessage(t("messageFileMoved", { name: fileName, folder: targetFolderPath }))
-    return true
-  }
-
-  async function renameWorkspaceDocument(oldPath: string) {
-    const dir = oldPath.substring(0, oldPath.lastIndexOf('/'))
-    const currentFullName = oldPath.substring(oldPath.lastIndexOf('/') + 1)
-    const currentBaseName = currentFullName.replace(/\.canvas$/i, '')
-
-    const newName = await openTextInputDialog({
-      cancelLabel: t("dialogCancel"),
-      confirmLabel: t("dialogConfirm"),
-      initialValue: currentBaseName,
-      title: t("inspectorRenamePrompt"),
-    })
-    if (!newName || !newName.trim()) return
-
-    const sanitized = newName.trim()
-      .replace(/[\\/:*?"'<>|]/g, "_")
-      .replace(/[~[\]()!&{}=#%;$]/g, "")
-      .replace(/[\x00-\x1f]/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/\.+$/, "")
-    if (!sanitized || sanitized === currentBaseName) return
-
-    const newPath = `${dir}/${sanitized}.canvas`
-
-    try {
-      const response = await fetch("/api/file/getFile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: oldPath }),
-      })
-      if (!response.ok) {
-        showMessage(t("messageUnableRenameFile"), 4000, "error")
-        return
-      }
-      const content = await response.text()
-      const blob = new Blob([content], { type: "application/json" })
-      await putFile(newPath, false, blob)
-    } catch {
-      showMessage(t("messageUnableRenameFile"), 4000, "error")
-      return
-    }
-
-    try {
-      await removeFile(oldPath)
-    } catch {
-      try { await removeFile(newPath) } catch { /* cleanup best-effort */ }
-      showMessage(t("messageUnableRenameFile"), 4000, "error")
-      return
-    }
-
-    if (state.filePath === oldPath) {
-      state.filePath = newPath
-    }
-    await plugin.removeRecentCanvasFile?.(oldPath)
-    refreshRecentFiles()
-    await refreshWorkspaceDocuments()
-    showMessage(t("messageFileRenamed", { name: sanitized }))
-  }
-
-  async function removeRecentFileRecord(path: string) {
-    await plugin.removeRecentCanvasFile?.(path)
-    refreshRecentFiles()
+  function removeRecentFileRecord(path: string) {
+    return workspaceTree.removeRecentFileRecord(path)
   }
 
   async function openDocumentAtBlock(blockId: string, documentId?: string) {
@@ -1125,7 +864,7 @@ export function useCanvasEditor(
     getPluginSettings,
     plugin,
     refreshRecentFiles,
-    refreshWorkspaceDocuments,
+    refreshWorkspaceDocuments: workspaceTree.refreshWorkspaceDocuments,
     resetViewport,
     stageRef,
     state,
@@ -1260,7 +999,7 @@ export function useCanvasEditor(
     state,
     t,
     viewport,
-    workspaceDocuments,
+    workspaceDocuments: workspaceTree.workspaceDocuments,
   })
 
   const {
@@ -1447,7 +1186,7 @@ export function useCanvasEditor(
       newCanvas,
       refreshFileNodeMetadata,
       refreshRecentFiles,
-      refreshWorkspaceDocuments,
+      refreshWorkspaceDocuments: workspaceTree.refreshWorkspaceDocuments,
       rememberRecentPath,
       resetViewport,
       state,
@@ -1515,10 +1254,10 @@ export function useCanvasEditor(
       filePickerDialog,
       displayNodes,
       deactivateCanvasSurface,
-      createWorkspaceFolder,
-      deleteWorkspaceDocument,
-      moveWorkspaceFile,
-      renameWorkspaceDocument,
+      createWorkspaceFolder: workspaceTree.createWorkspaceFolder,
+      deleteWorkspaceDocument: workspaceTree.deleteWorkspaceDocument,
+      moveWorkspaceFile: workspaceTree.moveWorkspaceFile,
+      renameWorkspaceDocument: workspaceTree.renameWorkspaceDocument,
       expandAllInspectorSections,
       removeRecentFileRecord,
       connectionDraft,
@@ -1624,16 +1363,16 @@ export function useCanvasEditor(
       searchDecorations,
       refreshSelectedSiyuanNode,
       decomposeSelectedDocument,
-      expandAllFolders,
-      collapseAllFolders,
-      allFoldersExpanded,
-      expandedFolders,
-      setWorkspaceSortDirection,
-      setWorkspaceSortField,
-      toggleFolderExpand,
-      workspaceDocuments,
-      workspaceSortDirection,
-      workspaceSortField,
+      expandAllFolders: workspaceTree.expandAllFolders,
+      collapseAllFolders: workspaceTree.collapseAllFolders,
+      allFoldersExpanded: workspaceTree.allFoldersExpanded,
+      expandedFolders: workspaceTree.expandedFolders,
+      setWorkspaceSortDirection: workspaceTree.setWorkspaceSortDirection,
+      setWorkspaceSortField: workspaceTree.setWorkspaceSortField,
+      toggleFolderExpand: workspaceTree.toggleFolderExpand,
+      workspaceDocuments: workspaceTree.workspaceDocuments,
+      workspaceSortDirection: workspaceTree.workspaceSortDirection,
+      workspaceSortField: workspaceTree.workspaceSortField,
       selectionColors,
       selectionLayoutActions,
       selectionToolbar,

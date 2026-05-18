@@ -1067,109 +1067,15 @@
           :editor="editor"
         />
 
-        <div
-          v-if="pngExportDialogVisible"
-          class="canvas-dialog-backdrop"
-          data-testid="png-export-dialog"
-          @click.self="closePngExportDialog"
-        >
-          <div
-            class="canvas-dialog"
-            @wheel.passive.stop
-          >
-            <div class="canvas-dialog__header">
-              <h2>{{ t("pngExportDialogTitle") }}</h2>
-            </div>
-            <div class="canvas-dialog__grid">
-              <fieldset class="canvas-dialog__fieldset">
-                <legend>{{ t("pngExportRange") }}</legend>
-                <label class="canvas-dialog__option canvas-dialog__option--card">
-                  <input
-                    v-model="pngExportRange"
-                    data-testid="png-export-range-full"
-                    name="png-export-range"
-                    type="radio"
-                    value="full"
-                  >
-                  <span>{{ t("pngExportRangeFull") }}</span>
-                </label>
-                <label class="canvas-dialog__option canvas-dialog__option--card">
-                  <input
-                    v-model="pngExportRange"
-                    data-testid="png-export-range-viewport"
-                    name="png-export-range"
-                    type="radio"
-                    value="viewport"
-                  >
-                  <span>{{ t("pngExportRangeViewport") }}</span>
-                </label>
-              </fieldset>
-              <fieldset class="canvas-dialog__fieldset">
-                <legend>{{ t("pngExportBackground") }}</legend>
-                <div class="canvas-dialog__choice-grid">
-                  <label class="canvas-dialog__option canvas-dialog__option--card">
-                    <input
-                      v-model="pngExportBackgroundMode"
-                      data-testid="png-export-background-white"
-                      name="png-export-background"
-                      type="radio"
-                      value="white"
-                    >
-                    <span>{{ t("pngExportBackgroundWhite") }}</span>
-                  </label>
-                  <label class="canvas-dialog__option canvas-dialog__option--card">
-                    <input
-                      v-model="pngExportBackgroundMode"
-                      data-testid="png-export-background-transparent"
-                      name="png-export-background"
-                      type="radio"
-                      value="transparent"
-                    >
-                    <span>{{ t("pngExportBackgroundTransparent") }}</span>
-                  </label>
-                  <label class="canvas-dialog__option canvas-dialog__option--card">
-                    <input
-                      v-model="pngExportBackgroundMode"
-                      data-testid="png-export-background-custom"
-                      name="png-export-background"
-                      type="radio"
-                      value="custom"
-                    >
-                    <span>{{ t("pngExportBackgroundCustom") }}</span>
-                  </label>
-                </div>
-                <label class="canvas-dialog__field canvas-dialog__field--compact">
-                  <span>{{ t("pngExportCustomColor") }}</span>
-                  <input
-                    v-model="pngExportCustomColor"
-                    class="canvas-dialog__control canvas-dialog__control--color"
-                    data-testid="png-export-custom-color"
-                    type="color"
-                    :disabled="pngExportBackgroundMode !== 'custom'"
-                  >
-                </label>
-              </fieldset>
-            </div>
-            <div class="canvas-dialog__actions">
-              <button
-                class="b3-button b3-button--outline"
-                data-testid="png-export-cancel"
-                type="button"
-                @click="closePngExportDialog"
-              >
-                {{ t("dialogCancel") }}
-              </button>
-              <button
-                class="b3-button"
-                data-testid="png-export-confirm"
-                type="button"
-                @click="confirmPngExport"
-              >
-                {{ t("pngExportConfirm") }}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CanvasPngExportDialog
+          :visible="pngExportDialogVisible"
+          v-model:png-export-range="pngExportRange"
+          v-model:png-export-background-mode="pngExportBackgroundMode"
+          v-model:png-export-custom-color="pngExportCustomColor"
+          :t="t"
+          @close="closePngExportDialog"
+          @confirm="confirmPngExport"
+        />
 
         <div
           v-if="editor.filePickerDialog.visible"
@@ -1367,186 +1273,25 @@
             >
               <p>{{ editor.state.filePath || t("inspectorUnsavedWorkspacePath") }}</p>
               <p>{{ editor.state.isDirty ? t("inspectorPendingSave") : t("inspectorInSync") }}</p>
-              <div
+              <CanvasWorkspaceTree
                 v-if="editor.workspaceDocuments.length"
-                class="workspace-tree"
-                @dragover.prevent
-                @drop.prevent="onRootDrop"
-              >
-                <template
-                  v-for="node in editor.workspaceDocuments"
-                  :key="node.path"
-                >
-                  <div
-                    v-if="node.type === 'folder'"
-                    class="workspace-tree__folder"
-                  >
-                    <button
-                      :class="['workspace-tree__folder-header', { 'workspace-tree__folder-header--drop-target': dragOverFolderPath === node.path }]"
-                      type="button"
-                      :title="node.path"
-                      :aria-expanded="editor.expandedFolders.has(node.path)"
-                      @click="editor.toggleFolderExpand(node.path)"
-                      @dragover.prevent="onFolderDragOver"
-                      @dragenter.prevent="onFolderDragEnter($event, node.path)"
-                      @dragleave="onFolderDragLeave($event, node.path)"
-                      @drop.prevent="onFolderDrop($event, node.path)"
-                    >
-                      <CanvasIcon
-                        class="workspace-tree__chevron"
-                        :class="{ 'workspace-tree__chevron--expanded': editor.expandedFolders.has(node.path) }"
-                        name="chevron-right"
-                        :size="12"
-                      />
-                      <CanvasIcon
-                        class="workspace-tree__folder-icon"
-                        :name="editor.expandedFolders.has(node.path) ? 'folder-open' : 'folder'"
-                        :size="14"
-                      />
-                      <span class="workspace-tree__name">{{ node.name }}</span>
-                    </button>
-                    <div
-                      v-if="editor.expandedFolders.has(node.path)"
-                      class="workspace-tree__folder-children"
-                    >
-                      <template
-                        v-for="child in node.children"
-                        :key="child.path"
-                      >
-                        <div
-                          v-if="child.type === 'file'"
-                          :class="['workspace-tree__file', { 'workspace-tree__file--active': child.path === editor.state.filePath }]"
-                          draggable="true"
-                          :title="child.path"
-                          @contextmenu.prevent="editor.renameWorkspaceDocument(child.path)"
-                          @dragstart="onFileDragStart($event, child.path)"
-                          @dragend="onDragEnd"
-                        >
-                          <button
-                            class="workspace-tree__file-open"
-                            type="button"
-                            @click="editor.openWorkspacePath(child.path)"
-                          >
-                            <CanvasIcon
-                              class="workspace-tree__file-icon"
-                              name="canvas-file"
-                              :size="14"
-                            />
-                            <span class="workspace-tree__name">{{ child.name }}</span>
-                          </button>
-                          <button
-                            class="workspace-tree__file-delete"
-                            :title="t('selectionToolbarDelete')"
-                            type="button"
-                            @click.stop="editor.deleteWorkspaceDocument(child.path)"
-                          >
-                            <CanvasIcon name="close" :size="12" />
-                          </button>
-                        </div>
-                        <div
-                          v-else-if="child.type === 'folder'"
-                          class="workspace-tree__folder workspace-tree__folder--nested"
-                        >
-                          <button
-                            :class="['workspace-tree__folder-header', { 'workspace-tree__folder-header--drop-target': dragOverFolderPath === child.path }]"
-                            type="button"
-                            :title="child.path"
-                            :aria-expanded="editor.expandedFolders.has(child.path)"
-                            @click="editor.toggleFolderExpand(child.path)"
-                            @dragover.prevent="onFolderDragOver"
-                            @dragenter.prevent="onFolderDragEnter($event, child.path)"
-                            @dragleave="onFolderDragLeave($event, child.path)"
-                            @drop.prevent="onFolderDrop($event, child.path)"
-                          >
-                            <CanvasIcon
-                              class="workspace-tree__chevron"
-                              :class="{ 'workspace-tree__chevron--expanded': editor.expandedFolders.has(child.path) }"
-                              name="chevron-right"
-                              :size="12"
-                            />
-                            <CanvasIcon
-                              class="workspace-tree__folder-icon"
-                              :name="editor.expandedFolders.has(child.path) ? 'folder-open' : 'folder'"
-                              :size="14"
-                            />
-                            <span class="workspace-tree__name">{{ child.name }}</span>
-                          </button>
-                          <div
-                            v-if="editor.expandedFolders.has(child.path)"
-                            class="workspace-tree__folder-children"
-                          >
-                            <template
-                              v-for="grandchild in child.children"
-                              :key="grandchild.path"
-                            >
-                              <div
-                                v-if="grandchild.type === 'file'"
-                                :class="['workspace-tree__file', { 'workspace-tree__file--active': grandchild.path === editor.state.filePath }]"
-                                draggable="true"
-                                :title="grandchild.path"
-                                @contextmenu.prevent="editor.renameWorkspaceDocument(grandchild.path)"
-                                @dragstart="onFileDragStart($event, grandchild.path)"
-                                @dragend="onDragEnd"
-                              >
-                                <button
-                                  class="workspace-tree__file-open"
-                                  type="button"
-                                  @click="editor.openWorkspacePath(grandchild.path)"
-                                >
-                                  <CanvasIcon
-                                    class="workspace-tree__file-icon"
-                                    name="canvas-file"
-                                    :size="14"
-                                  />
-                                  <span class="workspace-tree__name">{{ grandchild.name }}</span>
-                                </button>
-                                <button
-                                  class="workspace-tree__file-delete"
-                                  :title="t('selectionToolbarDelete')"
-                                  type="button"
-                                  @click.stop="editor.deleteWorkspaceDocument(grandchild.path)"
-                                >
-                                  <CanvasIcon name="close" :size="12" />
-                                </button>
-                              </div>
-                            </template>
-                          </div>
-                        </div>
-                      </template>
-                    </div>
-                  </div>
-                  <div
-                    v-else-if="node.type === 'file'"
-                    :class="['workspace-tree__file', { 'workspace-tree__file--active': node.path === editor.state.filePath }]"
-                    draggable="true"
-                    :title="node.path"
-                    @contextmenu.prevent="editor.renameWorkspaceDocument(node.path)"
-                    @dragstart="onFileDragStart($event, node.path)"
-                    @dragend="onDragEnd"
-                  >
-                    <button
-                      class="workspace-tree__file-open"
-                      type="button"
-                      @click="editor.openWorkspacePath(node.path)"
-                    >
-                      <CanvasIcon
-                        class="workspace-tree__file-icon"
-                        name="canvas-file"
-                        :size="14"
-                      />
-                      <span class="workspace-tree__name">{{ node.name }}</span>
-                    </button>
-                    <button
-                      class="workspace-tree__file-delete"
-                      :title="t('selectionToolbarDelete')"
-                      type="button"
-                      @click.stop="editor.deleteWorkspaceDocument(node.path)"
-                    >
-                      <CanvasIcon name="close" :size="12" />
-                    </button>
-                  </div>
-                </template>
-              </div>
+                :workspace-documents="editor.workspaceDocuments"
+                :expanded-folders="editor.expandedFolders"
+                :current-file-path="editor.state.filePath"
+                :drag-over-folder-path="dragOverFolderPath"
+                :delete-title="t('selectionToolbarDelete')"
+                @toggle-folder="editor.toggleFolderExpand"
+                @open-file="editor.openWorkspacePath"
+                @delete-document="editor.deleteWorkspaceDocument"
+                @rename-document="editor.renameWorkspaceDocument"
+                @root-drop="onRootDrop"
+                @folder-drag-over="onFolderDragOver"
+                @folder-drag-enter="onFolderDragEnter"
+                @folder-drag-leave="onFolderDragLeave"
+                @folder-drop="onFolderDrop"
+                @file-drag-start="onFileDragStart"
+                @drag-end="onDragEnd"
+              />
               <p v-else class="workspace-tree__empty">
                 {{ t("inspectorNoWorkspaceCanvasFiles") }}<br>
                 <code>{{ editor.defaultCanvasDirectory }}/</code>
@@ -1646,260 +1391,12 @@
           </section>
           </template>
 
-          <template v-if="activeInspectorTab === 'selection'">
-          <section
-            v-if="editor.selectedNodeCount > 1"
-            class="inspector__section"
-          >
-            <button
-              class="inspector__section-toggle"
-              :title="getInspectorSectionToggleTitle('selection')"
-              type="button"
-              @click="editor.toggleInspectorSection('selection')"
-            >
-              <h2>{{ t("inspectorSelection") }}</h2>
-              <span>{{ getInspectorSectionChevron('selection') }}</span>
-            </button>
-            <div v-if="editor.inspectorSectionState.selection">
-              <p>{{ t("selectionCount", { count: editor.selectedNodeCount }) }}</p>
-              <button
-                class="toolbar__button"
-                @click="editor.deleteSelection"
-              >
-                {{ t("inspectorDeleteSelectedNodes") }}
-              </button>
-            </div>
-          </section>
-
-          <section
-            v-if="editor.selectedNode && editor.selectedNodeCount === 1"
-            class="inspector__section"
-          >
-            <button
-              class="inspector__section-toggle"
-              :title="getInspectorSectionToggleTitle('node')"
-              type="button"
-              @click="editor.toggleInspectorSection('node')"
-            >
-              <h2>{{ t("inspectorNode") }}</h2>
-              <span>{{ getInspectorSectionChevron('node') }}</span>
-            </button>
-            <div v-if="editor.inspectorSectionState.node">
-              <label>
-                {{ t("fieldX") }}
-                <input
-                  :value="editor.selectedNode.x"
-                  type="number"
-                  @input="editor.updateNumericNodeField('x', valueFromEvent($event))"
-                />
-              </label>
-              <label>
-                {{ t("fieldY") }}
-                <input
-                  :value="editor.selectedNode.y"
-                  type="number"
-                  @input="editor.updateNumericNodeField('y', valueFromEvent($event))"
-                />
-              </label>
-              <label>
-                {{ t("fieldWidth") }}
-                <input
-                  :value="editor.selectedNode.width"
-                  type="number"
-                  @input="editor.updateNumericNodeField('width', valueFromEvent($event))"
-                />
-              </label>
-              <label>
-                {{ t("fieldHeight") }}
-                <input
-                  :value="editor.selectedNode.height"
-                  type="number"
-                  @input="editor.updateNumericNodeField('height', valueFromEvent($event))"
-                />
-              </label>
-              <label v-if="'color' in editor.selectedNode">
-                {{ t("fieldColor") }}
-                <input
-                  :value="editor.selectedNode.color || ''"
-                  @input="editor.updateNodeField('color', valueFromEvent($event))"
-                />
-              </label>
-              <label v-if="editor.selectedNode.type === 'text'">
-                {{ t("fieldText") }}
-                <textarea
-                  :value="editor.selectedNode.text"
-                  @input="editor.updateNodeField('text', valueFromEvent($event))"
-                />
-              </label>
-              <label v-if="editor.selectedNode.type === 'file'">
-                {{ t("fieldFilePath") }}
-                <input
-                  :value="editor.selectedNode.file"
-                  @input="editor.updateNodeField('file', valueFromEvent($event))"
-                />
-              </label>
-              <label v-if="editor.selectedNode.type === 'link'">
-                {{ t("fieldUrl") }}
-                <input
-                  :value="editor.selectedNode.url"
-                  @input="editor.updateNodeField('url', valueFromEvent($event))"
-                />
-              </label>
-              <label v-if="editor.selectedNode.type === 'group'">
-                {{ t("fieldLabel") }}
-                <input
-                  :value="editor.selectedNode.label || ''"
-                  @input="editor.updateNodeField('label', valueFromEvent($event))"
-                />
-              </label>
-            </div>
-          </section>
-
-          <section
-            v-if="editor.selectedNode && editor.selectedNodeCount === 1"
-            class="inspector__section"
-          >
-            <button
-              class="inspector__section-toggle"
-              :title="getInspectorSectionToggleTitle('createEdge')"
-              type="button"
-              @click="editor.toggleInspectorSection('createEdge')"
-            >
-              <h2>{{ t("inspectorCreateEdge") }}</h2>
-              <span>{{ getInspectorSectionChevron('createEdge') }}</span>
-            </button>
-            <div v-if="editor.inspectorSectionState.createEdge">
-              <label>
-                {{ t("fieldSourceNode") }}
-                <input
-                  v-model="editor.newEdgeSourceQuery"
-                  class="inspector__control"
-                >
-                <select
-                  :value="editor.newEdgeSourceId"
-                  class="inspector__control"
-                  @change="editor.setNewEdgeSourceId(valueFromEvent($event))"
-                >
-                  <option value="">{{ t("fieldSelectSourceNode") }}</option>
-                  <option
-                    v-for="node in editor.edgeSources"
-                    :key="node.id"
-                    :value="node.id"
-                  >
-                    {{ editor.getNodeTitle(node) }}
-                  </option>
-                </select>
-              </label>
-              <label>
-                {{ t("fieldTarget") }}
-                <input
-                  v-model="editor.newEdgeTargetQuery"
-                  class="inspector__control"
-                >
-                <select
-                  :value="editor.newEdgeTargetId"
-                  class="inspector__control"
-                  @change="editor.setNewEdgeTargetId(valueFromEvent($event))"
-                >
-                  <option value="">{{ t("fieldSelectTargetNode") }}</option>
-                  <option
-                    v-for="node in editor.edgeTargets"
-                    :key="node.id"
-                    :value="node.id"
-                  >
-                    {{ editor.getNodeTitle(node) }}
-                  </option>
-                </select>
-              </label>
-              <label>
-                {{ t("fieldEdgeLabel") }}
-                <input v-model="editor.newEdgeLabel" />
-              </label>
-              <label>
-                {{ t("fieldFromSide") }}
-                <select v-model="editor.newEdgeFromSide">
-                  <option
-                    v-for="side in editor.sides"
-                    :key="side"
-                    :value="side"
-                  >{{ getSideLabel(side) }}</option>
-                </select>
-              </label>
-              <label>
-                {{ t("fieldToSide") }}
-                <select v-model="editor.newEdgeToSide">
-                  <option
-                    v-for="side in editor.sides"
-                    :key="side"
-                    :value="side"
-                  >{{ getSideLabel(side) }}</option>
-                </select>
-              </label>
-              <button
-                class="toolbar__button toolbar__button--primary"
-                @click="editor.createEdgeFromSelection"
-              >
-                {{ t("inspectorCreateEdgeAction") }}
-              </button>
-            </div>
-          </section>
-
-          <section
-            v-if="editor.selectedEdge"
-            class="inspector__section"
-          >
-            <button
-              class="inspector__section-toggle"
-              :title="getInspectorSectionToggleTitle('edge')"
-              type="button"
-              @click="editor.toggleInspectorSection('edge')"
-            >
-              <h2>{{ t("inspectorEdge") }}</h2>
-              <span>{{ getInspectorSectionChevron('edge') }}</span>
-            </button>
-            <div v-if="editor.inspectorSectionState.edge">
-              <label>
-                {{ t("fieldEdgeLabel") }}
-                <input
-                  :value="editor.selectedEdge.label || ''"
-                  @input="editor.updateEdgeField('label', valueFromEvent($event))"
-                />
-              </label>
-              <label>
-                {{ t("fieldFromSide") }}
-                <select
-                  :value="editor.selectedEdge.fromSide"
-                  @change="editor.updateEdgeSide('fromSide', valueFromEvent($event))"
-                >
-                  <option
-                    v-for="side in editor.sides"
-                    :key="side"
-                    :value="side"
-                  >{{ getSideLabel(side) }}</option>
-                </select>
-              </label>
-              <label>
-                {{ t("fieldToSide") }}
-                <select
-                  :value="editor.selectedEdge.toSide"
-                  @change="editor.updateEdgeSide('toSide', valueFromEvent($event))"
-                >
-                  <option
-                    v-for="side in editor.sides"
-                    :key="side"
-                    :value="side"
-                  >{{ getSideLabel(side) }}</option>
-                </select>
-              </label>
-              <button
-                class="toolbar__button"
-                @click="editor.deleteSelection"
-              >
-                {{ t("inspectorDeleteEdge") }}
-              </button>
-            </div>
-          </section>
-          </template>
+          <CanvasInspector
+            v-if="activeInspectorTab === 'selection'"
+            :editor="(editor as Record<string, unknown>)"
+            :get-side-label="getSideLabel"
+            :t="t"
+          />
 
         </div>
       </aside>
@@ -1960,6 +1457,9 @@ import CanvasCommandPalette from "@/components/canvas/CanvasCommandPalette.vue"
 import { openHelpDialog } from "@/canvas/help-dialog"
 import CanvasFileCard from "@/components/canvas/CanvasFileCard.vue"
 import CanvasMinimap from "@/components/canvas/CanvasMinimap.vue"
+import CanvasWorkspaceTree from "@/components/canvas/CanvasWorkspaceTree.vue"
+import CanvasInspector from "@/components/canvas/CanvasInspector.vue"
+import CanvasPngExportDialog from "@/components/canvas/CanvasPngExportDialog.vue"
 import {
   CLEAR_SELECTION_COLOR,
   getCanvasNodeContentStyle as resolveCanvasNodeContentStyle,
