@@ -131,6 +131,7 @@ function createEditorMock(node = createTextNode()) {
     edgeTargets: [],
     edgeSources: [node],
     exportCanvas: vi.fn(),
+    exportCanvasPng: vi.fn(),
     fileInputRef: ref<HTMLInputElement>(),
     getConnectionDraftPath: vi.fn(() => ""),
     getEdgeReconnectDraftPath: vi.fn(() => ""),
@@ -341,6 +342,7 @@ describe("CanvasWorkspace", () => {
       "top-toolbar-new",
       "top-toolbar-open",
       "top-toolbar-save",
+      "top-toolbar-export",
       "top-toolbar-undo",
       "top-toolbar-redo",
       "top-toolbar-zoom-out",
@@ -501,8 +503,11 @@ describe("CanvasWorkspace", () => {
 
     expect(marker.exists()).toBe(true)
     expect(marker.attributes("viewBox")).toBe("0 0 14 14")
-    expect(marker.find("path").attributes("fill")).toBe("context-stroke")
+    expect(marker.find("path").attributes("fill")).toBe("currentColor")
+    expect(wrapper.find(".stage__edge").attributes("fill")).toBe("none")
+    expect(wrapper.find(".stage__edge").attributes("stroke")).toBe("#6b7280")
     expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow-end)")
+    expect(wrapper.find(".stage__edges--interactive").attributes("data-canvas-png-export-ignore")).toBe("true")
   })
 
   it("provides a hoverable edge hit area above groups so the edge can be selected", async () => {
@@ -613,15 +618,18 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-export']").attributes("data-tooltip")).toBe("导出")
     expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
     expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("aria-label")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("aria-label")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-export']").attributes("aria-label")).toBe("导出")
     expect(wrapper.find("[data-testid='top-toolbar-new'] .toolbar__icon").exists()).toBe(true)
     expect(wrapper.find("[data-testid='top-toolbar-open'] .toolbar__icon").exists()).toBe(true)
     expect(wrapper.find("[data-testid='top-toolbar-save'] .toolbar__icon").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='top-toolbar-export'] .toolbar__icon").exists()).toBe(true)
     expect(wrapper.find("[data-testid='top-toolbar-zoom-out'] .toolbar__icon").exists()).toBe(true)
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport'] .toolbar__icon").exists()).toBe(true)
     expect(wrapper.find("[data-testid='top-toolbar-zoom-in'] .toolbar__icon").exists()).toBe(true)
@@ -629,6 +637,7 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-new']").text()).toBe("")
     expect(wrapper.find("[data-testid='top-toolbar-open']").text()).toBe("")
     expect(wrapper.find("[data-testid='top-toolbar-save']").text()).toBe("")
+    expect(wrapper.find("[data-testid='top-toolbar-export']").text()).toBe("")
     expect(toolbarText).not.toContain("新建")
     expect(toolbarText).not.toContain("打开")
     expect(toolbarText).not.toContain("导出")
@@ -641,6 +650,38 @@ describe("CanvasWorkspace", () => {
     expect(toolbarText).not.toContain("/data/storage/petal/siyuan-canvas/project.canvas")
     expect(toolbarText).not.toContain("project.canvas")
     expect(wrapper.find(".toolbar__meta-name").exists()).toBe(false)
+  })
+
+  it("opens the png export dialog from the top toolbar and confirms options", async () => {
+    currentEditor = createEditorMock()
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='top-toolbar-export']").trigger("click")
+
+    expect(wrapper.find("[data-testid='png-export-dialog']").exists()).toBe(true)
+    expect((wrapper.find("[data-testid='png-export-range-full']").element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find("[data-testid='png-export-background-white']").element as HTMLInputElement).checked).toBe(true)
+
+    await wrapper.find("[data-testid='png-export-range-viewport']").setValue(true)
+    await wrapper.find("[data-testid='png-export-background-custom']").setValue(true)
+    await wrapper.find("[data-testid='png-export-custom-color']").setValue("#123456")
+    await wrapper.find("[data-testid='png-export-confirm']").trigger("click")
+
+    expect(currentEditor.exportCanvasPng).toHaveBeenCalledWith({
+      background: {
+        color: "#123456",
+        mode: "custom",
+      },
+      range: "viewport",
+    })
+    expect(wrapper.find("[data-testid='png-export-dialog']").exists()).toBe(false)
   })
 
   it("passes the new right-click canvas and document tree rename tips into the help dialog", async () => {
@@ -1679,6 +1720,8 @@ describe("CanvasWorkspace", () => {
 
     expect(wrapper.find(".stage__edge").attributes("marker-start")).toBe("url(#canvas-edge-arrow-start)")
     expect(wrapper.find(".stage__edge").attributes("marker-end")).toBe("url(#canvas-edge-arrow-end)")
+    expect(wrapper.find(".stage__edge").attributes("fill")).toBe("none")
+    expect(wrapper.find(".stage__edge").attributes("stroke")).toBe("#6b7280")
     expect(wrapper.find("[data-testid='edge-label-editor']").exists()).toBe(true)
 
     await wrapper.find("[data-testid='edge-label-editor']").setValue("updated")

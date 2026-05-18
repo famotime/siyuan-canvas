@@ -1105,6 +1105,7 @@ export function useCanvasEditor(
   const {
     ensureCanvasPath,
     exportCanvas,
+    exportCanvasPng,
     importCanvas,
     loadConflictVersion,
     newCanvas,
@@ -1118,6 +1119,7 @@ export function useCanvasEditor(
     save: saveImpl,
     triggerImport,
   } = createCanvasEditorFileActions({
+    board,
     fileInputRef,
     fileSource,
     getPluginSettings,
@@ -1125,9 +1127,11 @@ export function useCanvasEditor(
     refreshRecentFiles,
     refreshWorkspaceDocuments,
     resetViewport,
+    stageRef,
     state,
     suggestedFilename,
     t,
+    viewport,
   })
 
   /**
@@ -1528,6 +1532,7 @@ export function useCanvasEditor(
       edgeTargets,
       editingEdgeLabelId,
       exportCanvas,
+      exportCanvasPng,
       fileInputRef,
       finishConnectionDrag,
       getEdgeLabelPosition,

@@ -75,6 +75,20 @@
             aria-hidden="true"
           />
         </button>
+        <button
+          class="toolbar__button toolbar__button--icon"
+          data-testid="top-toolbar-export"
+          :aria-label="t('toolbarExport')"
+          :data-tooltip="t('toolbarExport')"
+          :title="t('toolbarExport')"
+          type="button"
+          @click="pngExportDialogVisible = true"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="export"
+          />
+        </button>
       </div>
       <span class="toolbar__divider" aria-hidden="true" />
       <div class="toolbar__group" :aria-label="t('toolbarGroupHistory')">
@@ -304,7 +318,7 @@
               >
                 <path
                   d="M 1.5 1.5 L 12 7 L 1.5 12.5 L 4.75 7 z"
-                  fill="context-stroke"
+                  fill="currentColor"
                 />
               </marker>
               <marker
@@ -319,7 +333,7 @@
               >
                 <path
                   d="M 1.5 1.5 L 12 7 L 1.5 12.5 L 4.75 7 z"
-                  fill="context-stroke"
+                  fill="currentColor"
                 />
               </marker>
               <marker
@@ -334,7 +348,7 @@
               >
                 <path
                   d="M 1.5 1.5 L 12 7 L 1.5 12.5 L 4.75 7 z"
-                  fill="context-stroke"
+                  fill="currentColor"
                 />
               </marker>
             </defs>
@@ -346,8 +360,13 @@
                 class="stage__edge"
                 :class="{ 'stage__edge--selected': editor.state.selectedEdgeId === edge.id }"
                 :d="editor.getEdgePath(edge)"
+                fill="none"
                 :marker-start="resolveEdgeStartMarker(edge.startArrow ?? false)"
                 :marker-end="resolveEdgeEndMarker(edge.endArrow ?? true)"
+                stroke="#6b7280"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.5"
                 :style="getEdgeStrokeStyle(edge)"
                 @click.stop="editor.selectEdge(edge.id)"
               />
@@ -356,15 +375,25 @@
               v-if="editor.connectionDraft.visible"
               class="stage__edge stage__edge--draft"
               :d="editor.getConnectionDraftPath()"
+              fill="none"
               marker-end="url(#canvas-edge-arrow)"
+              stroke="#3b82f6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.5"
             />
             <path
               v-if="editor.edgeReconnectDraft.visible"
               class="stage__edge stage__edge--draft"
               data-testid="edge-reconnect-draft"
               :d="editor.getEdgeReconnectDraftPath()"
+              fill="none"
               :marker-start="editor.edgeReconnectDraft.endpoint === 'from' ? 'url(#canvas-edge-arrow-start)' : undefined"
               :marker-end="editor.edgeReconnectDraft.endpoint === 'to' ? 'url(#canvas-edge-arrow-end)' : undefined"
+              stroke="#3b82f6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.5"
             />
             <g
               v-for="edge in editor.state.document.edges"
@@ -538,6 +567,7 @@
 
           <svg
             class="stage__edges stage__edges--interactive"
+            data-canvas-png-export-ignore="true"
             :height="editor.board.height"
             :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
             :width="editor.board.width"
@@ -554,6 +584,7 @@
                   'stage__edge--visible': hoveredEdgeId === edge.id || editor.state.selectedEdgeId === edge.id,
                 }"
                 :d="editor.getEdgePath(edge)"
+                fill="none"
                 :marker-start="resolveEdgeStartMarker(edge.startArrow ?? false)"
                 :marker-end="resolveEdgeEndMarker(edge.endArrow ?? true)"
                 :style="getEdgeStrokeStyle(edge)"
@@ -562,6 +593,7 @@
               <path
                 class="stage__edge stage__edge--hit-area"
                 :d="editor.getEdgePath(edge)"
+                fill="none"
                 :data-testid="`edge-hit-area-${edge.id}`"
                 @mouseenter="setHoveredEdge(edge.id)"
                 @mouseleave="clearHoveredEdge(edge.id)"
@@ -1034,6 +1066,110 @@
           v-if="showCanvasThumbnails"
           :editor="editor"
         />
+
+        <div
+          v-if="pngExportDialogVisible"
+          class="canvas-dialog-backdrop"
+          data-testid="png-export-dialog"
+          @click.self="closePngExportDialog"
+        >
+          <div
+            class="canvas-dialog"
+            @wheel.passive.stop
+          >
+            <div class="canvas-dialog__header">
+              <h2>{{ t("pngExportDialogTitle") }}</h2>
+            </div>
+            <div class="canvas-dialog__grid">
+              <fieldset class="canvas-dialog__fieldset">
+                <legend>{{ t("pngExportRange") }}</legend>
+                <label class="canvas-dialog__option canvas-dialog__option--card">
+                  <input
+                    v-model="pngExportRange"
+                    data-testid="png-export-range-full"
+                    name="png-export-range"
+                    type="radio"
+                    value="full"
+                  >
+                  <span>{{ t("pngExportRangeFull") }}</span>
+                </label>
+                <label class="canvas-dialog__option canvas-dialog__option--card">
+                  <input
+                    v-model="pngExportRange"
+                    data-testid="png-export-range-viewport"
+                    name="png-export-range"
+                    type="radio"
+                    value="viewport"
+                  >
+                  <span>{{ t("pngExportRangeViewport") }}</span>
+                </label>
+              </fieldset>
+              <fieldset class="canvas-dialog__fieldset">
+                <legend>{{ t("pngExportBackground") }}</legend>
+                <div class="canvas-dialog__choice-grid">
+                  <label class="canvas-dialog__option canvas-dialog__option--card">
+                    <input
+                      v-model="pngExportBackgroundMode"
+                      data-testid="png-export-background-white"
+                      name="png-export-background"
+                      type="radio"
+                      value="white"
+                    >
+                    <span>{{ t("pngExportBackgroundWhite") }}</span>
+                  </label>
+                  <label class="canvas-dialog__option canvas-dialog__option--card">
+                    <input
+                      v-model="pngExportBackgroundMode"
+                      data-testid="png-export-background-transparent"
+                      name="png-export-background"
+                      type="radio"
+                      value="transparent"
+                    >
+                    <span>{{ t("pngExportBackgroundTransparent") }}</span>
+                  </label>
+                  <label class="canvas-dialog__option canvas-dialog__option--card">
+                    <input
+                      v-model="pngExportBackgroundMode"
+                      data-testid="png-export-background-custom"
+                      name="png-export-background"
+                      type="radio"
+                      value="custom"
+                    >
+                    <span>{{ t("pngExportBackgroundCustom") }}</span>
+                  </label>
+                </div>
+                <label class="canvas-dialog__field canvas-dialog__field--compact">
+                  <span>{{ t("pngExportCustomColor") }}</span>
+                  <input
+                    v-model="pngExportCustomColor"
+                    class="canvas-dialog__control canvas-dialog__control--color"
+                    data-testid="png-export-custom-color"
+                    type="color"
+                    :disabled="pngExportBackgroundMode !== 'custom'"
+                  >
+                </label>
+              </fieldset>
+            </div>
+            <div class="canvas-dialog__actions">
+              <button
+                class="b3-button b3-button--outline"
+                data-testid="png-export-cancel"
+                type="button"
+                @click="closePngExportDialog"
+              >
+                {{ t("dialogCancel") }}
+              </button>
+              <button
+                class="b3-button"
+                data-testid="png-export-confirm"
+                type="button"
+                @click="confirmPngExport"
+              >
+                {{ t("pngExportConfirm") }}
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div
           v-if="editor.filePickerDialog.visible"
@@ -1795,6 +1931,10 @@
 
 <script setup lang="ts">
 import type { Plugin } from "siyuan"
+import type {
+  CanvasPngExportBackgroundMode,
+  CanvasPngExportRange,
+} from "@/canvas/png-export"
 
 import {
   computed,
@@ -1873,6 +2013,10 @@ const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
 const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>>({})
 const hoveredEdgeId = ref("")
+const pngExportBackgroundMode = ref<CanvasPngExportBackgroundMode>("white")
+const pngExportCustomColor = ref("#ffffff")
+const pngExportDialogVisible = ref(false)
+const pngExportRange = ref<CanvasPngExportRange>("full")
 const sortDropdownOpen = ref(false)
 const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
@@ -1982,6 +2126,21 @@ function onDragEnd() {
     clearTimeout(dragExpandTimer)
     dragExpandTimer = null
   }
+}
+
+function closePngExportDialog() {
+  pngExportDialogVisible.value = false
+}
+
+async function confirmPngExport() {
+  await editor.exportCanvasPng({
+    background: {
+      color: pngExportCustomColor.value,
+      mode: pngExportBackgroundMode.value,
+    },
+    range: pngExportRange.value,
+  })
+  closePngExportDialog()
 }
 
 onBeforeUnmount(() => {
@@ -2159,7 +2318,7 @@ function resolveEdgeEndMarker(enabled?: boolean) {
 
 function getEdgeStrokeStyle(edge: CanvasEdge) {
   const colorStyle = edge.color ? selectionColorStyles[edge.color] : undefined
-  return colorStyle ? { stroke: colorStyle.border } : undefined
+  return colorStyle ? { color: colorStyle.border, stroke: colorStyle.border } : undefined
 }
 
 function getEdgeLabelStyle(edge: CanvasEdge) {
@@ -4105,6 +4264,63 @@ watch(
   color: var(--canvas-text-muted);
 }
 
+.canvas-dialog__field--compact {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.canvas-dialog__fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 14px;
+}
+
+.canvas-dialog__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.canvas-dialog__choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.canvas-dialog__fieldset legend {
+  padding: 0 4px;
+  color: var(--canvas-text-muted);
+  font-size: 12px;
+}
+
+.canvas-dialog__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 12px;
+  background: var(--canvas-floating-button-bg);
+  color: var(--canvas-text);
+  font-size: 13px;
+}
+
+.canvas-dialog__option:hover {
+  background: var(--canvas-floating-button-bg-hover);
+}
+
+.canvas-dialog__option input {
+  margin: 0;
+}
+
+.canvas-dialog__option--card {
+  justify-content: flex-start;
+}
+
 .canvas-dialog__control {
   width: 100%;
   min-width: 0;
@@ -4115,6 +4331,12 @@ watch(
   padding: 9px 10px;
   font: inherit;
   color: var(--canvas-text);
+}
+
+.canvas-dialog__control--color {
+  width: 64px;
+  height: 36px;
+  padding: 4px;
 }
 
 .canvas-node-picker {

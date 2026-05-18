@@ -28,8 +28,21 @@ import {
 } from "@/canvas/local-file-system"
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
+import {
+  type CanvasBoardMetrics,
+  toBoardX,
+  toBoardY,
+} from "@/canvas/board"
+import {
+  createCanvasPngExportFilename,
+  exportCanvasWorldToPng,
+  resolveCanvasPngExportBackground,
+  resolveCanvasPngExportBounds,
+  type CanvasPngExportOptions,
+} from "@/canvas/png-export"
 
 interface CanvasEditorFileActionOptions {
+  board: Ref<CanvasBoardMetrics>
   fileInputRef: Ref<HTMLInputElement | undefined>
   fileSource: Ref<CanvasEditorFileSource>
   getPluginSettings: () => CanvasPluginSettings
@@ -37,9 +50,15 @@ interface CanvasEditorFileActionOptions {
   refreshRecentFiles: () => void
   refreshWorkspaceDocuments: () => Promise<void>
   resetViewport: () => void
+  stageRef: Ref<HTMLElement | undefined>
   state: CanvasEditorState
   suggestedFilename: Ref<string>
   t: CanvasI18nTranslator
+  viewport: {
+    scale: number
+    x: number
+    y: number
+  }
 }
 
 interface ResolvedSaveTarget {
@@ -81,6 +100,7 @@ async function workspacePathExists(path: string): Promise<boolean> {
 
 export function createCanvasEditorFileActions(options: CanvasEditorFileActionOptions) {
   const {
+    board,
     fileInputRef,
     fileSource,
     getPluginSettings,
@@ -88,9 +108,11 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     refreshRecentFiles,
     refreshWorkspaceDocuments,
     resetViewport,
+    stageRef,
     state,
     suggestedFilename,
     t,
+    viewport,
   } = options
 
   function debugLog(...args: unknown[]) {
@@ -404,9 +426,52 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     URL.revokeObjectURL(url)
   }
 
+  async function exportCanvasPng(options: CanvasPngExportOptions) {
+    const stage = stageRef.value
+    const world = stage?.querySelector<HTMLElement>(".stage__world")
+    if (!stage || !world) {
+      showMessage(t("messageCanvasPngExportFailed"), 4000, "error")
+      return
+    }
+
+    const bounds = resolveCanvasPngExportBounds({
+      nodes: state.document.nodes,
+      padding: 48,
+      range: options.range,
+      stageSize: {
+        height: stage.clientHeight,
+        width: stage.clientWidth,
+      },
+      viewport: {
+        scale: viewport.scale,
+        x: viewport.x,
+        y: viewport.y,
+      },
+    })
+    const exportBounds = options.range === "full"
+      ? {
+          ...bounds,
+          x: toBoardX(board.value, bounds.x),
+          y: toBoardY(board.value, bounds.y),
+        }
+      : bounds
+
+    try {
+      await exportCanvasWorldToPng({
+        backgroundColor: resolveCanvasPngExportBackground(options.background),
+        bounds: exportBounds,
+        filename: createCanvasPngExportFilename(suggestedFilename.value || state.filePath),
+        world,
+      })
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : t("messageCanvasPngExportFailed"), 4000, "error")
+    }
+  }
+
   return {
     ensureCanvasPath,
     exportCanvas,
+    exportCanvasPng,
     importCanvas,
     loadConflictVersion,
     newCanvas,
