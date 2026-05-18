@@ -15,6 +15,7 @@
           data-testid="top-toolbar-new"
           :aria-label="t('toolbarNew')"
           :data-tooltip="t('toolbarNew')"
+          :title="t('toolbarNew')"
           type="button"
           @click="editor.newCanvas"
         >
@@ -28,6 +29,7 @@
           data-testid="top-toolbar-open"
           :aria-label="t('toolbarOpen')"
           :data-tooltip="t('toolbarOpen')"
+          :title="t('toolbarOpen')"
           type="button"
           @click="editor.triggerImport"
         >
@@ -45,6 +47,7 @@
           data-testid="top-toolbar-save"
           :aria-label="editor.isSaving ? t('toolbarSaving') : t('toolbarSave')"
           :data-tooltip="editor.isSaving ? t('toolbarSaving') : t('toolbarSave')"
+          :title="editor.isSaving ? t('toolbarSaving') : t('toolbarSave')"
           :disabled="editor.isSaving"
           type="button"
           @click="editor.save"
@@ -80,6 +83,7 @@
           data-testid="top-toolbar-undo"
           :aria-label="t('toolbarUndo')"
           :data-tooltip="t('toolbarUndo')"
+          :title="t('toolbarUndo')"
           :disabled="!editor.canUndo"
           type="button"
           @click="editor.undo"
@@ -94,6 +98,7 @@
           data-testid="top-toolbar-redo"
           :aria-label="t('toolbarRedo')"
           :data-tooltip="t('toolbarRedo')"
+          :title="t('toolbarRedo')"
           :disabled="!editor.canRedo"
           type="button"
           @click="editor.redo"
@@ -111,6 +116,7 @@
           data-testid="top-toolbar-zoom-out"
           :aria-label="t('toolbarZoomOut')"
           :data-tooltip="t('toolbarZoomOut')"
+          :title="t('toolbarZoomOut')"
           type="button"
           @click="editor.zoomOut"
         >
@@ -124,6 +130,7 @@
           data-testid="top-toolbar-scale-value"
           :aria-label="t('toolbarZoomActual')"
           :data-tooltip="t('toolbarZoomActual')"
+          :title="t('toolbarZoomActual')"
           type="button"
           @click="editor.zoomToActualSize"
         >
@@ -134,6 +141,7 @@
           data-testid="top-toolbar-zoom-in"
           :aria-label="t('toolbarZoomIn')"
           :data-tooltip="t('toolbarZoomIn')"
+          :title="t('toolbarZoomIn')"
           type="button"
           @click="editor.zoomIn"
         >
@@ -147,6 +155,7 @@
           data-testid="top-toolbar-reset-viewport"
           :aria-label="t('toolbarZoomFit')"
           :data-tooltip="t('toolbarZoomFit')"
+          :title="t('toolbarZoomFit')"
           type="button"
           @click="editor.resetViewport"
         >
@@ -186,6 +195,7 @@
           data-testid="top-toolbar-command-palette"
           :aria-label="t('commandPaletteOpen')"
           :data-tooltip="t('commandPaletteOpen')"
+          :title="t('commandPaletteOpen')"
           type="button"
           @click="commandPaletteOpen = true"
         >
@@ -199,6 +209,7 @@
           data-testid="top-toolbar-help"
           :aria-label="t('helpDialogTitle')"
           :data-tooltip="t('helpDialogTitle')"
+          :title="t('helpDialogTitle')"
           type="button"
           @click="showHelpDialog"
         >
@@ -2188,10 +2199,11 @@ function getNodeHeaderIconName(node: CanvasNode): CanvasIconName {
 function getNodeHeaderTitle(node: CanvasNode): string {
   if (node.type === "text") {
     const firstLine = (node.text || "").split("\n").find((line) => line.trim().length > 0) ?? ""
-    return firstLine.trim().slice(0, 60) || t("nodeKindText")
+    const title = firstLine.trim().replace(/^#{1,6}\s+/, "").trim()
+    return title.slice(0, 60) || t("nodeKindText")
   }
   if (node.type === "file") {
-    return editor.getFileNodeDescription?.(node)
+    return editor.getNodeTitle?.(node)
       || (node.file ? node.file.split("/").pop() || node.file : t("toolbarFile"))
   }
   if (node.type === "link") {
@@ -3042,6 +3054,7 @@ watch(
 }
 
 .toolbar__button[data-tooltip]::after,
+.toolbar__stat[data-tooltip]::after,
 .bottom-toolbar__button[data-tooltip]::after,
 .selection-toolbar__button::after,
 .selection-toolbar__menu-button::after {
@@ -3069,6 +3082,8 @@ watch(
 
 .toolbar__button[data-tooltip]:hover::after,
 .toolbar__button[data-tooltip]:focus-visible::after,
+.toolbar__stat[data-tooltip]:hover::after,
+.toolbar__stat[data-tooltip]:focus-visible::after,
 .bottom-toolbar__button[data-tooltip]:hover::after,
 .bottom-toolbar__button[data-tooltip]:focus-visible::after,
 .selection-toolbar__button:hover::after,
@@ -3076,6 +3091,20 @@ watch(
 .selection-toolbar__menu-button:hover::after,
 .selection-toolbar__menu-button:focus-visible::after {
   opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.canvas-toolbar .toolbar__button[data-tooltip]::after,
+.canvas-toolbar .toolbar__stat[data-tooltip]::after {
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform: translate(-50%, -4px);
+}
+
+.canvas-toolbar .toolbar__button[data-tooltip]:hover::after,
+.canvas-toolbar .toolbar__button[data-tooltip]:focus-visible::after,
+.canvas-toolbar .toolbar__stat[data-tooltip]:hover::after,
+.canvas-toolbar .toolbar__stat[data-tooltip]:focus-visible::after {
   transform: translate(-50%, 0);
 }
 
@@ -3626,6 +3655,7 @@ watch(
 
   /* 触屏没有 hover 显示 tooltip 的语义，干脆禁用 ::after 的 tooltip 浮层避免 tap 抖动 */
   .toolbar__button[data-tooltip]::after,
+  .toolbar__stat[data-tooltip]::after,
   .bottom-toolbar__button[data-tooltip]::after,
   .selection-toolbar__button::after,
   .selection-toolbar__menu-button::after {

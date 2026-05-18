@@ -326,6 +326,37 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar']").classes()).not.toContain("toolbar")
   })
 
+  it("provides title tooltips for every top toolbar control", () => {
+    currentEditor = createEditorMock()
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const controls = [
+      "top-toolbar-new",
+      "top-toolbar-open",
+      "top-toolbar-save",
+      "top-toolbar-undo",
+      "top-toolbar-redo",
+      "top-toolbar-zoom-out",
+      "top-toolbar-scale-value",
+      "top-toolbar-zoom-in",
+      "top-toolbar-reset-viewport",
+      "top-toolbar-command-palette",
+      "top-toolbar-help",
+    ]
+
+    for (const testId of controls) {
+      const control = wrapper.find(`[data-testid='${testId}']`)
+      expect(control.attributes("title"), testId).toBe(control.attributes("data-tooltip"))
+    }
+  })
+
   it("renders text cards with a drag-handle header above the body", () => {
     currentEditor = createEditorMock()
 
@@ -343,6 +374,56 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".markdown-preview").exists()).toBe(true)
     // body 区被标记为可选中，drag 不能从这里发起
     expect(wrapper.find(".canvas-node--text .canvas-node__body--selectable").exists()).toBe(true)
+  })
+
+  it("renders text card header titles without markdown heading markers", () => {
+    currentEditor = createEditorMock(createTextNode({
+      text: "### 定义\n\n- 从有限的例子中找出规律",
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find(".canvas-node--text .canvas-node__header-title").text()).toBe("定义")
+  })
+
+  it("renders linked SiYuan document file card header titles without path information", () => {
+    const node = {
+      id: "file-1",
+      file: "/data/20260412094047-ihhbskn.sy",
+      type: "file",
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 180,
+    }
+    currentEditor = createEditorMock(node)
+    currentEditor.getFileNodeDescription = vi.fn(() => "/Projects/Canvas/Spec")
+    currentEditor.getNodeTitle = vi.fn(() => "Spec")
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Document",
+      clampMode: "viewport",
+      detail: "/Projects/Canvas/Spec",
+      headline: "Spec",
+      helper: "Opens in SiYuan",
+      kind: "document",
+      previewHtml: "<p>Preview</p>",
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find(".canvas-node--file .canvas-node__header-title").text()).toBe("Spec")
   })
 
   it("lets a text card enter inline markdown editing and saves on blur", async () => {
