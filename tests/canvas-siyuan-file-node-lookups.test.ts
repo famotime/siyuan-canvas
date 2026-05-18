@@ -179,6 +179,7 @@ describe("siyuan file node lookups", () => {
       path: "/20260408/root/20260409-note.sy",
       rootId: "20260408235000-root",
       title: "第一项",
+      type: "l",
     })
   })
 
@@ -216,6 +217,7 @@ describe("siyuan file node lookups", () => {
       path: "/20260408/root/20260409-note.sy",
       rootId: "20260408235000-root",
       title: "图片说明",
+      type: "p",
     }])
   })
 

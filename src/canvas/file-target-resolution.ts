@@ -12,6 +12,7 @@ export interface ResolvedCanvasBlockTarget {
   kind: "block"
   path: string
   rootId: string
+  type?: string
   title: string
 }
 

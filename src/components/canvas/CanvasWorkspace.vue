@@ -942,6 +942,20 @@
             />
           </button>
           <button
+            v-if="editor.canDecomposeSelectedDocument"
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-decompose"
+            :aria-label="SELECTION_TOOLBAR_TOOLTIPS.decompose"
+            :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.decompose"
+            type="button"
+            @click.stop="editor.decomposeSelectedDocument"
+          >
+            <CanvasIcon
+              class="selection-toolbar__icon"
+              name="expand-all"
+            />
+          </button>
+          <button
             v-if="editor.selectedNodeCount === 1 && editor.selectedNode"
             class="selection-toolbar__button"
             data-testid="selection-toolbar-edit"

@@ -11,6 +11,7 @@ export interface SiyuanResolvedBlock {
   id: string
   path: string
   rootId: string
+  type?: string
   title: string
 }
 export interface SiyuanSearchBlockResult extends SiyuanResolvedBlock {}
@@ -97,6 +98,7 @@ function createResolvedBlock(row: any, rootRow: any): SiyuanResolvedBlock {
     id: row.id,
     path: rootRow?.path || row.path,
     rootId: row.root_id || rootRow?.id || row.id,
+    type: row.type || undefined,
     title: row.content || getFileName(rootRow?.path || row.path),
   }
 }

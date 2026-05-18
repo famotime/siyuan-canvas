@@ -42,6 +42,8 @@ import {
   toBoardY,
 } from "@/canvas/board"
 import {
+  createCanvasEdge,
+  createCanvasNode,
   getCanvasSelectionBounds,
   setCanvasEdgeEndpoint,
   upsertCanvasEdge,
@@ -78,10 +80,12 @@ import {
   findSiyuanDocumentsByQuery,
   findSiyuanImageAssetByBlockId,
   findSiyuanImageAssetsByQuery,
+  getSiyuanDocumentMarkdown,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
 import {
   validateCanvasDocument,
 } from "@/canvas/format"
+import { extractMarkdownHeadingBlocks } from "@/canvas/markdown-preview"
 import { createCanvasI18n } from "@/i18n/canvas"
 import { getCanvasNodeAnchor } from "@/canvas/node-interaction"
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
@@ -243,6 +247,13 @@ export function useCanvasEditor(
 
     const kind = getResolvedFileNode(selectedNode.value).kind
     return kind === 'block' || kind === 'document'
+  })
+  const canDecomposeSelectedDocument = computed(() => {
+    if (selectedNodeCount.value !== 1 || selectedNode.value?.type !== 'file') {
+      return false
+    }
+
+    return getResolvedFileNode(selectedNode.value).kind === 'document'
   })
   const selectedEdge = computed(
     () => state.document.edges.find((edge) => edge.id === state.selectedEdgeId) || null,
@@ -779,6 +790,106 @@ export function useCanvasEditor(
     } catch {
       showMessage(t('messageUnableRefreshSiyuanNode'), 4000, 'error')
     }
+  }
+
+  function doNodesOverlap(first: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>, second: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>): boolean {
+    return first.x < second.x + second.width
+      && first.x + first.width > second.x
+      && first.y < second.y + second.height
+      && first.y + first.height > second.y
+  }
+
+  function findNonOverlappingNodePosition(
+    node: CanvasNode,
+    existingNodes: CanvasNode[],
+    stepY: number,
+  ): { x: number, y: number } {
+    let attempts = 0
+    while (
+      attempts < 100
+      && existingNodes.some((existingNode) => doNodesOverlap(node, existingNode))
+    ) {
+      node.y += stepY
+      attempts += 1
+    }
+
+    return {
+      x: node.x,
+      y: node.y,
+    }
+  }
+
+  async function decomposeSelectedDocument() {
+    if (!canDecomposeSelectedDocument.value || selectedNode.value?.type !== 'file') {
+      return
+    }
+
+    const sourceNode = selectedNode.value
+    const sourceNodeId = sourceNode.id
+    const resolved = getResolvedFileNode(sourceNode)
+    if (resolved.kind !== 'document') {
+      return
+    }
+
+    const markdown = await getSiyuanDocumentMarkdown(resolved.id)
+    const headings = extractMarkdownHeadingBlocks(markdown).filter((heading) => heading.id !== resolved.id)
+    if (!headings.length) {
+      return
+    }
+
+    const minLevel = Math.min(...headings.map((heading) => heading.level))
+    const headingNodes: CanvasNode[] = []
+    const parentById = new Map<string, string>()
+    const stack: Array<{ id: string, level: number }> = [{
+      id: sourceNodeId,
+      level: minLevel - 1,
+    }]
+    const columnCounts = new Map<number, number>()
+    const existingNodes = [...state.document.nodes]
+    const horizontalGap = 120
+    const verticalGap = 40
+
+    for (const heading of headings) {
+      while (stack.length > 0 && stack[stack.length - 1]!.level >= heading.level) {
+        stack.pop()
+      }
+
+      const parent = stack[stack.length - 1] ?? { id: sourceNodeId, level: minLevel - 1 }
+      const depth = Math.max(1, heading.level - minLevel + 1)
+      const row = columnCounts.get(depth) ?? 0
+      columnCounts.set(depth, row + 1)
+
+      const node = createCanvasNode('file')
+      node.file = heading.id
+      node.x = sourceNode.x + depth * (sourceNode.width + horizontalGap)
+      node.y = sourceNode.y + row * (node.height + verticalGap)
+      const position = findNonOverlappingNodePosition(node, existingNodes, node.height + verticalGap)
+      node.x = position.x
+      node.y = position.y
+
+      headingNodes.push(node)
+      parentById.set(node.id, parent.id)
+      existingNodes.push(node)
+      stack.push({
+        id: node.id,
+        level: heading.level,
+      })
+    }
+
+    const headingEdges = headingNodes.map((node) => {
+      const edge = createCanvasEdge(parentById.get(node.id) || sourceNodeId, node.id)
+      edge.fromSide = 'right'
+      edge.toSide = 'left'
+      return edge
+    })
+
+    commitDocument({
+      ...state.document,
+      edges: [...state.document.edges, ...headingEdges],
+      nodes: [...state.document.nodes, ...headingNodes],
+    })
+    state.selectNode(sourceNodeId)
+    await refreshFileNodeMetadata(headingNodes.map((node) => node.id))
   }
 
   watch(
@@ -1388,6 +1499,7 @@ export function useCanvasEditor(
       board,
       bottomToolbarVisible,
       canDelete,
+      canDecomposeSelectedDocument,
       canRefreshSelectedSiyuanNode,
       centerEdgeInViewport,
       centerSelectionInViewport,
@@ -1506,6 +1618,7 @@ export function useCanvasEditor(
       recentFiles,
       searchDecorations,
       refreshSelectedSiyuanNode,
+      decomposeSelectedDocument,
       expandAllFolders,
       collapseAllFolders,
       allFoldersExpanded,

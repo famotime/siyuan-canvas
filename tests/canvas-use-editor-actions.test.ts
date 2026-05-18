@@ -53,6 +53,7 @@ const fileNodeLookupMock = {
   findSiyuanImageAssetByBlockId: vi.fn(async () => null),
   findSiyuanImageAssetsByQuery: vi.fn(async () => []),
   getSiyuanBlockMarkdown: vi.fn(async () => ""),
+  getSiyuanHeadingBlockMarkdown: vi.fn(async () => ""),
   getSiyuanDocumentMarkdown: vi.fn(async () => ""),
 }
 type DialogAction = "cancel" | "confirm"
@@ -475,6 +476,8 @@ beforeEach(() => {
   fileNodeLookupMock.findSiyuanImageAssetsByQuery.mockResolvedValue([])
   fileNodeLookupMock.getSiyuanBlockMarkdown.mockReset()
   fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue("")
+  fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockReset()
+  fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockResolvedValue("")
   fileNodeLookupMock.getSiyuanDocumentMarkdown.mockReset()
   fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue("")
   vi.stubGlobal("fetch", fetchMock)
@@ -748,6 +751,64 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
+  it("renders a heading block preview with following paragraph content until the next heading", async () => {
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "阶段目标",
+      type: "h",
+    })
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockImplementation(async (id: string) => (
+      id === "20260412094047-ihhbskn"
+        ? `## 阶段目标
+{: id="20260412094047-ihhbskn"}`
+        : ""
+    ))
+    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
+      id === "20260412094047-ihhbskn"
+        ? `## 阶段目标
+{: id="20260412094047-ihhbskn"}
+
+第一段说明
+{: id="20260412094047-p000001"}
+
+第二段说明
+{: id="20260412094047-p000002"}
+
+## 下一阶段
+{: id="20260412094047-next001"}
+
+不应显示`
+        : ""
+    ))
+
+    const { editor, wrapper } = await mountEditor()
+
+    await editor.selectFilePickerResult({
+      blockId: "20260412094047-ihhbskn",
+      kind: "block",
+      path: "20260412094047-ihhbskn",
+      subtitle: "/Projects/Roadmap",
+      title: "阶段目标",
+    } as any)
+    await flushEditor()
+
+    const preview = editor.getFileNodePreview(editor.selectedNode)
+    expect(fileNodeLookupMock.getSiyuanBlockMarkdown).toHaveBeenCalledWith("20260412094047-ihhbskn")
+    expect(fileNodeLookupMock.getSiyuanHeadingBlockMarkdown).toHaveBeenCalledWith("20260412094047-ihhbskn")
+    expect(preview.kind).toBe("block")
+    expect(preview.previewHtml).toContain("<h2>阶段目标</h2>")
+    expect(preview.previewHtml).toContain("<p>第一段说明</p>")
+    expect(preview.previewHtml).toContain("<p>第二段说明</p>")
+    expect(preview.previewHtml).not.toContain("下一阶段")
+    expect(preview.previewHtml).not.toContain("不应显示")
+    expect(preview.previewHtml).not.toContain("{:")
+
+    wrapper.unmount()
+  })
+
   it("renders a real markdown preview for a resolved document file node", async () => {
     fileNodeLookupMock.findSiyuanDocumentByPath.mockResolvedValue({
       hpath: "/Projects/Roadmap",
@@ -778,6 +839,113 @@ Preview body
     expect(preview.previewHtml).not.toContain("{:")
     expect(preview.previewHtml).not.toContain("updated=")
     expect(preview.previewHtml).not.toContain("20260412094047-ihhbskn")
+
+    wrapper.unmount()
+  })
+
+  it("decomposes a selected Siyuan document file node into hierarchical heading file nodes", async () => {
+    const documentNode = {
+      file: "/data/roadmap.sy",
+      height: 180,
+      id: "doc-node",
+      type: "file",
+      width: 320,
+      x: 0,
+      y: 0,
+    }
+    const markdown = `# Roadmap
+{: id="20260412000000-root001"}
+
+## Phase A
+{: id="20260412000000-phasea1"}
+
+### Task A1
+{: id="20260412000000-taska01"}
+
+### Task A2
+{: id="20260412000000-taska02"}
+
+### Task A3
+{: id="20260412000000-taska03"}
+
+## Phase B
+{: id="20260412000000-phaseb1"}
+
+### Task B1
+{: id="20260412000000-taskb01"}
+
+### Task B2
+{: id="20260412000000-taskb02"}
+
+### Task B3
+{: id="20260412000000-taskb03"}`
+    fileNodeLookupMock.findSiyuanDocumentByPath.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412000000-root001",
+      path: "/data/roadmap.sy",
+      title: "Roadmap",
+    })
+    fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue(markdown)
+
+    const { editor, wrapper } = await mountEditor({
+      raw: JSON.stringify({
+        edges: [],
+        nodes: [documentNode],
+      }),
+    })
+    editor.selectNode("doc-node")
+    await flushEditor()
+
+    await editor.decomposeSelectedDocument()
+    await flushEditor()
+
+    const createdNodes = editor.state.document.nodes.filter((node) => node.id !== "doc-node")
+    expect(createdNodes).toHaveLength(8)
+    expect(createdNodes.map((node: any) => node.file)).toEqual([
+      "20260412000000-phasea1",
+      "20260412000000-taska01",
+      "20260412000000-taska02",
+      "20260412000000-taska03",
+      "20260412000000-phaseb1",
+      "20260412000000-taskb01",
+      "20260412000000-taskb02",
+      "20260412000000-taskb03",
+    ])
+
+    const phaseA = createdNodes.find((node: any) => node.file === "20260412000000-phasea1")!
+    const phaseB = createdNodes.find((node: any) => node.file === "20260412000000-phaseb1")!
+    const taskA1 = createdNodes.find((node: any) => node.file === "20260412000000-taska01")!
+    expect(phaseA.x).toBe(documentNode.x + documentNode.width + 120)
+    expect(phaseB.x).toBe(phaseA.x)
+    expect(taskA1.x).toBe(phaseA.x + phaseA.width + 120)
+    expect(phaseB.y).toBeGreaterThan(phaseA.y)
+
+    expect(editor.state.document.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        endArrow: true,
+        fromNode: "doc-node",
+        fromSide: "right",
+        toNode: phaseA.id,
+        toSide: "left",
+      }),
+      expect.objectContaining({
+        endArrow: true,
+        fromNode: "doc-node",
+        fromSide: "right",
+        toNode: phaseB.id,
+        toSide: "left",
+      }),
+      expect.objectContaining({
+        endArrow: true,
+        fromNode: phaseA.id,
+        fromSide: "right",
+        toNode: taskA1.id,
+        toSide: "left",
+      }),
+    ]))
+    expect(editor.state.document.edges).toHaveLength(8)
+    expect(editor.state.selectedNodeId).toBe("doc-node")
+    expect(editor.state.selectedNodeIds).toEqual(["doc-node"])
 
     wrapper.unmount()
   })

@@ -13,8 +13,13 @@ import {
   findSiyuanImageAssetByBlockId,
   getSiyuanBlockMarkdown,
   getSiyuanDocumentMarkdown,
+  getSiyuanHeadingBlockMarkdown,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
-import { renderMarkdownPreview } from "@/canvas/markdown-preview"
+import {
+  extractHeadingSectionMarkdown,
+  renderMarkdownPreview,
+  truncateMarkdownPreviewSource,
+} from "@/canvas/markdown-preview"
 import {
   createCanvasFileTargetPreview,
   loadCanvasTargetPreview,
@@ -156,13 +161,20 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
     return {
       ...target,
       detail: target.hpath || target.path,
-      excerptHtml: renderMarkdownPreview(markdown),
+      excerptHtml: renderMarkdownPreview(truncateMarkdownPreviewSource(markdown)),
     }
   }
 
   async function withBlockPreview(target: ResolvedCanvasBlockTarget) {
-    const markdown = await getSiyuanBlockMarkdown(target.id)
-    const excerptHtml = renderMarkdownPreview(markdown)
+    const blockMarkdown = await getSiyuanBlockMarkdown(target.id)
+    const isHeadingBlock = target.type === "h" || /^#{1,6}\s+/.test(blockMarkdown.trimStart())
+    const markdown = isHeadingBlock
+      ? await getSiyuanHeadingBlockMarkdown(target.id) || blockMarkdown
+      : blockMarkdown
+    const previewMarkdown = isHeadingBlock
+      ? extractHeadingSectionMarkdown(markdown)
+      : truncateMarkdownPreviewSource(markdown)
+    const excerptHtml = renderMarkdownPreview(previewMarkdown)
     return {
       ...target,
       detail: target.hpath || target.path,

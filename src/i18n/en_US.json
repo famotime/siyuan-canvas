@@ -43,6 +43,7 @@
   "selectionToolbarAlign": "Align",
   "selectionToolbarCenter": "Center",
   "selectionToolbarColor": "Color",
+  "selectionToolbarDecompose": "Decompose",
   "selectionToolbarCreateGroup": "Create group",
   "selectionToolbarDelete": "Delete",
   "selectionToolbarEdit": "Edit",

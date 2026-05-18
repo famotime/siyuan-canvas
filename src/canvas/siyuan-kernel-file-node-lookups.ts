@@ -68,6 +68,26 @@ export async function getSiyuanBlockMarkdown(blockId: string): Promise<string> {
   return response.code === 0 ? String(response.data?.kramdown || "") : ""
 }
 
+export async function getSiyuanHeadingBlockMarkdown(blockId: string): Promise<string> {
+  const response = await fetchSyncPost("/api/block/getChildBlocks", {
+    id: blockId,
+  }) as IWebSocketData
+
+  const childBlocks = response.code === 0 && Array.isArray(response.data)
+    ? response.data as Array<{ id?: string, type?: string }>
+    : []
+  const childMarkdown = await Promise.all(
+    childBlocks
+      .filter((block) => block.id && block.type !== "h")
+      .map((block) => getSiyuanBlockMarkdown(String(block.id))),
+  )
+
+  return [
+    await getSiyuanBlockMarkdown(blockId),
+    ...childMarkdown,
+  ].filter(Boolean).join("\n\n")
+}
+
 export async function getSiyuanDocumentMarkdown(documentId: string): Promise<string> {
   return getSiyuanBlockMarkdown(documentId)
 }

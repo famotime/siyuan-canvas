@@ -27,6 +27,9 @@ const KRAMDOWN_INLINE_ATTRIBUTE_PATTERN = /\s*\{\:\s*[^}]*\}\s*$/i
 const KRAMDOWN_ATTRIBUTE_LINE_PATTERN = /^\s*\{\:\s*[^}]*\}\s*$/i
 const KRAMDOWN_LEADING_ATTRIBUTE_PATTERN = /^(\s*)\{\:\s*[^}]*\}\s*/
 const KRAMDOWN_LIST_ITEM_ATTRIBUTE_PATTERN = /^(\s*(?:[-+*]|\d+\.)\s+)\{\:\s*[^}]*\}\s*/
+const HEADING_PATTERN = /^(#{1,6})\s+/
+
+export const MARKDOWN_PREVIEW_TEXT_LIMIT = 1200
 
 function restorePlaceholders(value: string, prefix: string, placeholders: string[]): string {
   return placeholders.reduce(
@@ -97,6 +100,73 @@ function sanitizeMarkdownPreviewSource(markdown: string): string {
   }
 
   return sanitized.join("\n").trim()
+}
+
+export function truncateMarkdownPreviewSource(markdown: string, limit = MARKDOWN_PREVIEW_TEXT_LIMIT): string {
+  const normalized = sanitizeMarkdownPreviewSource(markdown)
+  if (normalized.length <= limit) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, limit).trimEnd()}…`
+}
+
+export function extractHeadingSectionMarkdown(markdown: string, limit = MARKDOWN_PREVIEW_TEXT_LIMIT): string {
+  const normalized = sanitizeMarkdownPreviewSource(markdown)
+  if (!normalized) {
+    return ""
+  }
+
+  const lines = normalized.split("\n")
+  const firstHeadingIndex = lines.findIndex((line) => HEADING_PATTERN.test(line.trim()))
+  if (firstHeadingIndex < 0) {
+    return truncateMarkdownPreviewSource(normalized, limit)
+  }
+
+  const headingLevel = lines[firstHeadingIndex]!.trim().match(HEADING_PATTERN)?.[1].length ?? 6
+  const sectionLines = [lines[firstHeadingIndex]!]
+
+  for (let index = firstHeadingIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index]!
+    const headingMatch = line.trim().match(HEADING_PATTERN)
+    if (headingMatch && headingMatch[1].length <= headingLevel) {
+      break
+    }
+    sectionLines.push(line)
+  }
+
+  return truncateMarkdownPreviewSource(sectionLines.join("\n"), limit)
+}
+
+export interface MarkdownHeadingBlock {
+  id: string
+  level: number
+  title: string
+}
+
+export function extractMarkdownHeadingBlocks(markdown: string): MarkdownHeadingBlock[] {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
+  const headings: MarkdownHeadingBlock[] = []
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const headingMatch = lines[index]!.trim().match(/^(#{1,6})\s+(.+)$/)
+    if (!headingMatch) {
+      continue
+    }
+
+    const id = lines[index + 1]?.match(/\{\:\s*[^}]*\bid="(\d{14}-[a-z0-9]{7})"[^}]*\}/i)?.[1]
+    if (!id) {
+      continue
+    }
+
+    headings.push({
+      id,
+      level: headingMatch[1]!.length,
+      title: headingMatch[2]!.trim(),
+    })
+  }
+
+  return headings
 }
 
 function sanitizeColorValue(value: string): string | null {
