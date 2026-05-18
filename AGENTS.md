@@ -8,7 +8,24 @@
 ## Project Structure & Module Organization
 `src/` contains the plugin source. Keep core canvas logic in `src/canvas/`, shared UI in `src/components/`, locale files in `src/i18n/`, and ambient typings in `src/types/`. Entry points live in `src/index.ts`, `src/main.ts`, and `src/App.vue`.
 
-`tests/` holds Vitest coverage for the canvas modules; mirror production names when adding specs, for example `src/canvas/viewport.ts` -> `tests/canvas-viewport.test.ts`. Use `docs/` for design notes and JSON Canvas references, `developer_docs/` for bundled SiYuan API documentation, `asset/` for static assets, and `sample_canvas/` for example files. Build output goes to `dist/`.
+`src/canvas/` key modules after refactoring:
+- `use-canvas-editor.ts` — main editor composable (~1420 lines), delegates to sub-modules
+- `use-canvas-editor-workspace-tree.ts` — workspace document tree: directory reading, sorting, expand/collapse, CRUD, drag-move
+- `document.ts` — node/edge CRUD (314 lines), barrel re-exports layout and group APIs
+- `document-layout.ts` — alignment, arrangement, distribution layout algorithms
+- `document-group.ts` — node grouping and group-member lookup
+- `markdown-sanitize.ts` — HTML escaping, color validation, kramdown stripping, img/span/font allowlist parsing
+- `markdown-preview.ts` — truncation, heading extraction, Markdown→HTML rendering (260 lines)
+
+`src/components/canvas/` key components:
+- `CanvasWorkspace.vue` — main workspace shell with stage, toolbars, and sidebar
+- `CanvasWorkspaceTree.vue` — recursive workspace document tree (folder/file nodes, drag-drop)
+- `CanvasInspector.vue` — selection inspector: node/edge field editors, create-edge form
+- `CanvasPngExportDialog.vue` — PNG export dialog: range, background color options
+- `canvas-icon.ts` — `CanvasIcon` Vue component + SVG stroke-fill hardening (83 lines)
+- `canvas-icon-registry.ts` — `CanvasIconName` type (48 icons) + SVG markup dictionary
+
+`tests/` holds Vitest coverage for the canvas modules; mirror production names when adding specs, for example `src/canvas/viewport.ts` -> `tests/canvas-viewport.test.ts`. New modules require companion tests. Use `docs/` for design notes and JSON Canvas references, `developer_docs/` for bundled SiYuan API documentation, `asset/` for static assets, and `sample_canvas/` for example files. Build output goes to `dist/`.
 
 - `plugin-sample-vite-vue/` - 官方思源插件开发样板项目
 - `developer_docs/` - 思源插件开发 API 参考文档

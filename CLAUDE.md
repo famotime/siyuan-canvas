@@ -24,20 +24,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 编辑器组合式函数
 
-`src/canvas/use-canvas-editor.ts` 是核心组合入口（~935 行），组装响应式状态并委托给多个子模块：
+`src/canvas/use-canvas-editor.ts` 是核心组合入口（~1420 行），组装响应式状态并委托给多个子模块：
 
-- `use-canvas-editor-gestures.ts` - 指针手势：平移、框选、拖拽、连线创建、缩放、边重连
-- `use-canvas-editor-file-actions.ts` - 工作区路径、导入/导出、保存/冲突处理
-- `use-canvas-editor-node-edge-actions.ts` - 节点/边编辑命令
-- `use-canvas-editor-shortcuts.ts` - 键盘快捷键
-- `use-canvas-editor-lifecycle.ts` - 编辑器初始化
-- `use-canvas-editor-file-nodes.ts` - 文件节点元数据刷新
-- `use-canvas-editor-node-activation.ts` - 双击激活节点
-- `use-canvas-editor-file-picker.ts` - 文件选择器
+- `use-canvas-editor-gestures.ts` — 指针手势：平移、框选、拖拽、连线创建、缩放、边重连
+- `use-canvas-editor-file-actions.ts` — 工作区路径、导入/导出、保存/冲突处理
+- `use-canvas-editor-node-edge-actions.ts` — 节点/边编辑命令
+- `use-canvas-editor-shortcuts.ts` — 键盘快捷键
+- `use-canvas-editor-lifecycle.ts` — 编辑器初始化
+- `use-canvas-editor-file-nodes.ts` — 文件节点元数据刷新
+- `use-canvas-editor-node-activation.ts` — 双击激活节点
+- `use-canvas-editor-file-picker.ts` — 文件选择器
+- `use-canvas-editor-stage-drop.ts` — 拖放创建文件节点
+- `use-canvas-editor-workspace-tree.ts` — 工作区文档树：目录读取、排序、展开折叠、CRUD、拖拽移动
 
 ### 数据流
 
 Canvas 文件通过 `format.ts`（JSON Canvas 规范）解析为 `CanvasDocument`（nodes + edges）。`CanvasEditorState` 管理活动文档、选区、脏状态和冲突。`CanvasFileService` 通过 `CanvasTextGateway` 抽象层处理读写。解析/保存须保留未知 JSON Canvas 字段（与上游 `obsidianmd/jsoncanvas` 兼容）。
+
+### 文档变换
+
+`document.ts`（314 行）提供节点/边 CRUD 纯函数（创建、增删、几何变换、颜色），通过 barrel re-export 暴露分层模块的公共 API：
+
+- `document-layout.ts` — `applyCanvasNodeLayout`：左/右/上/下对齐、水平/垂直居中、行/列/网格排列、分布、拉伸
+- `document-group.ts` — `createCanvasGroupForNodes`、`findCanvasNodesInGroup`
+
+### Markdown 预览与安全
+
+`markdown-sanitize.ts`（~220 行）集中管理 XSS 防护：HTML 转义、CSS 颜色值验证（hex/rgb/named）、kramdown `{: }` 属性剥离、`<img>/<span>/<font>` 白名单解析。`markdown-preview.ts`（260 行）负责截断、标题提取和 Markdown→HTML 块渲染。渲染层单向依赖 sanitize 层，无循环引用。
+
+### 图标系统
+
+`canvas-icon-registry.ts`（~110 行）定义 `CanvasIconName` 联合类型（48 个图标名）和 `CANVAS_ICON_MARKUP` SVG 字典。`canvas-icon.ts`（83 行）提供 `CanvasIcon` Vue 渲染组件和 `hardenStrokeOnlySvgFill`（stroke-only shape fill="none" 自动修正），通过 re-export 向后兼容。
 
 ### 文件预览管线
 
@@ -49,16 +66,16 @@ Vite library mode（CJS 输出），`siyuan` 和 `process` 为外部依赖，输
 
 ## 目录结构约定
 
-- `src/canvas/` - 核心画布逻辑、类型、格式解析、编辑器状态
-- `src/components/canvas/` - 画布 Vue 组件（CanvasWorkspace、CanvasFileCard 等）
-- `src/components/SiyuanTheme/` - 思源风格 UI 组件（SyButton、SyInput 等）
-- `src/i18n/` - 国际化（en_US/zh_CN，zh_CN 为回退语言）
-- `src/types/` - 思源 API 类型声明
-- `src/api.ts` - 思源 kernel API 封装
-- `tests/` - Vitest 测试文件，命名与源码对应
-- `docs/` - 设计文档、重构计划、JSON Canvas 规范
-- `plugin-sample-vite-vue/` - 官方思源插件开发样板项目（参考用，勿改）
-- `developer_docs/` - 思源插件开发 API 参考文档
+- `src/canvas/` — 核心画布逻辑、类型、格式解析、编辑器状态、文档变换、Markdown 安全
+- `src/components/canvas/` — 画布 Vue 组件（CanvasWorkspace、CanvasWorkspaceTree、CanvasInspector、CanvasPngExportDialog、CanvasFileCard 等）
+- `src/components/SiyuanTheme/` — 思源风格 UI 组件（SyButton、SyInput 等）
+- `src/i18n/` — 国际化（en_US/zh_CN，zh_CN 为回退语言）
+- `src/types/` — 思源 API 类型声明
+- `src/api.ts` — 思源 kernel API 封装
+- `tests/` — Vitest 测试文件，命名与源码对应（新模块需配套测试）
+- `docs/` — 设计文档、重构计划、JSON Canvas 规范
+- `plugin-sample-vite-vue/` — 官方思源插件开发样板项目（参考用，勿改）
+- `developer_docs/` — 思源插件开发 API 参考文档
 
 ## 编码规范
 
