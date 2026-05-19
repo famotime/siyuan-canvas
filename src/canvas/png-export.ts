@@ -157,6 +157,10 @@ export async function exportCanvasWorldToPng(options: ExportCanvasWorldToPngOpti
     width: Math.ceil(options.bounds.width),
   }
 
+  if (toPngOptions.width <= 0 || toPngOptions.height <= 0) {
+    throw new Error(`Invalid export bounds: ${toPngOptions.width}x${toPngOptions.height}`)
+  }
+
   console.log("[Canvas PNG Export] toPng options", toPngOptions)
 
   try {
