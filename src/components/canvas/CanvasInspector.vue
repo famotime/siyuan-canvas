@@ -278,3 +278,98 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
     : props.t("inspectorExpandSection")
 }
 </script>
+
+<style scoped>
+.inspector__section {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 16px;
+  background: var(--canvas-inspector-section-bg);
+}
+
+.inspector__section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inspector__section h2 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--canvas-text-muted);
+}
+
+.inspector__section label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--canvas-text-muted);
+}
+
+.inspector__control {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.inspector__section input,
+.inspector__section select,
+.inspector__section textarea {
+  width: 100%;
+  border: 1px solid var(--canvas-border);
+  border-radius: 12px;
+  background: var(--canvas-surface);
+  padding: 9px 10px;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+}
+
+.inspector__section textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.toolbar__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 12px;
+  background: var(--canvas-floating-button-bg);
+  color: var(--canvas-text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.toolbar__button:hover {
+  background: var(--canvas-floating-button-bg-hover);
+}
+
+.toolbar__button--primary {
+  background: var(--canvas-accent);
+  border-color: var(--canvas-accent);
+  color: #fff;
+}
+
+.toolbar__button--primary:hover {
+  background: var(--canvas-accent-hover, var(--canvas-accent));
+}
+</style>

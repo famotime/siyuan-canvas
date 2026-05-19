@@ -210,3 +210,172 @@ defineEmits<{
   (e: 'drag-end'): void
 }>()
 </script>
+
+<style scoped>
+.workspace-tree {
+  display: grid;
+  gap: 1px;
+}
+
+.workspace-tree__folder-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--canvas-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-align: left;
+}
+
+.workspace-tree__folder-header:hover {
+  background: var(--canvas-floating-button-bg);
+}
+
+.workspace-tree__folder-header--drop-target {
+  background: var(--canvas-accent-soft);
+  box-shadow: inset 2px 0 0 var(--canvas-accent);
+}
+
+.workspace-tree__file[draggable="true"] {
+  cursor: grab;
+}
+
+.workspace-tree__file[draggable="true"]:active {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.workspace-tree__chevron {
+  flex-shrink: 0;
+  color: var(--canvas-text-muted);
+  transition: transform 0.15s ease;
+}
+
+.workspace-tree__chevron--expanded {
+  transform: rotate(90deg);
+}
+
+.workspace-tree__folder-icon,
+.workspace-tree__file-icon {
+  flex-shrink: 0;
+  color: var(--canvas-text-muted);
+}
+
+.workspace-tree__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.workspace-tree__folder-children {
+  display: grid;
+  gap: 1px;
+  padding-left: 16px;
+  position: relative;
+}
+
+.workspace-tree__folder-children::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--canvas-border);
+}
+
+.workspace-tree__file {
+  display: flex;
+  align-items: stretch;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: background 0.15s ease;
+}
+
+.workspace-tree__file:hover {
+  background: var(--canvas-floating-button-bg);
+}
+
+.workspace-tree__file--active {
+  background: var(--canvas-accent-soft);
+  box-shadow: inset 2px 0 0 var(--canvas-accent);
+}
+
+.workspace-tree__file--active .workspace-tree__file-icon,
+.workspace-tree__file--active .workspace-tree__name {
+  color: var(--canvas-accent);
+}
+
+.workspace-tree__file--active .workspace-tree__name {
+  font-weight: 600;
+}
+
+.workspace-tree__file-open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--canvas-text);
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+  font: inherit;
+}
+
+.workspace-tree__file-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: auto 4px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--canvas-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.workspace-tree__file:hover .workspace-tree__file-delete,
+.workspace-tree__file--active .workspace-tree__file-delete,
+.workspace-tree__file-delete:focus-visible {
+  opacity: 1;
+}
+
+.workspace-tree__file-delete:hover {
+  background: var(--canvas-danger-soft);
+  color: var(--canvas-danger);
+}
+
+.workspace-tree__empty {
+  margin: 0;
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--canvas-text-muted);
+  line-height: 1.6;
+}
+
+.workspace-tree__empty code {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--canvas-code-bg);
+  font-size: 11px;
+}
+</style>

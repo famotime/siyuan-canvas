@@ -8,9 +8,6 @@
     >
       <div class="png-export-dialog" @wheel.passive.stop>
         <div class="png-export-dialog__header">
-          <span class="png-export-dialog__icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><path d="M24 6V30" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 20L24 30L34 20" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 34V40C8 41.1046 8.89543 42 10 42H38C39.1046 42 40 41.1046 40 40V34" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
           <h2>{{ t("pngExportDialogTitle") }}</h2>
         </div>
 
@@ -29,9 +26,13 @@
                   type="radio"
                   value="full"
                 >
-                <span class="png-export-option__preview png-export-option__preview--full" aria-hidden="true">
-                  <span class="png-export-option__preview-inner" />
-                </span>
+                <!-- full canvas: large rectangle filling the card -->
+                <svg class="png-export-option__preview-icon" viewBox="0 0 48 32" fill="none">
+                  <rect x="2" y="2" width="44" height="28" rx="3" stroke="currentColor" stroke-width="2" fill="var(--canvas-surface, #fafafa)"/>
+                  <rect x="8" y="8" width="10" height="6" rx="1" fill="currentColor" opacity="0.15"/>
+                  <rect x="22" y="10" width="8" height="4" rx="1" fill="currentColor" opacity="0.15"/>
+                  <rect x="12" y="18" width="14" height="6" rx="1" fill="currentColor" opacity="0.15"/>
+                </svg>
                 <span class="png-export-option__label">{{ t("pngExportRangeFull") }}</span>
               </label>
               <label
@@ -45,9 +46,14 @@
                   type="radio"
                   value="viewport"
                 >
-                <span class="png-export-option__preview png-export-option__preview--viewport" aria-hidden="true">
-                  <span class="png-export-option__preview-inner" />
-                </span>
+                <!-- viewport: framed crop of the canvas -->
+                <svg class="png-export-option__preview-icon" viewBox="0 0 48 32" fill="none">
+                  <rect x="2" y="2" width="44" height="28" rx="3" stroke="currentColor" stroke-width="2" fill="var(--canvas-surface, #fafafa)"/>
+                  <rect x="8" y="8" width="10" height="6" rx="1" fill="currentColor" opacity="0.1"/>
+                  <rect x="22" y="10" width="8" height="4" rx="1" fill="currentColor" opacity="0.1"/>
+                  <rect x="12" y="18" width="14" height="6" rx="1" fill="currentColor" opacity="0.1"/>
+                  <rect x="14" y="4" width="20" height="24" rx="2" stroke="currentColor" stroke-width="2.5" fill="none"/>
+                </svg>
                 <span class="png-export-option__label">{{ t("pngExportRangeViewport") }}</span>
               </label>
             </div>
@@ -85,8 +91,10 @@
                 <span class="png-export-option__label">{{ t("pngExportBackgroundTransparent") }}</span>
               </label>
               <label
+                ref="customColorLabelRef"
                 class="png-export-option"
                 :class="{ 'png-export-option--active': pngExportBackgroundMode === 'custom' }"
+                @click="onCustomColorClick"
               >
                 <input
                   v-model="pngExportBackgroundMode"
@@ -101,16 +109,14 @@
                   aria-hidden="true"
                 />
                 <span class="png-export-option__label">{{ t("pngExportBackgroundCustom") }}</span>
+                <input
+                  ref="colorInputRef"
+                  v-model="pngExportCustomColor"
+                  class="png-export-color-input-hidden"
+                  data-testid="png-export-custom-color"
+                  type="color"
+                >
               </label>
-            </div>
-            <div v-if="pngExportBackgroundMode === 'custom'" class="png-export-color-row">
-              <label class="png-export-color-row__label">{{ t("pngExportCustomColor") }}</label>
-              <input
-                v-model="pngExportCustomColor"
-                class="png-export-color-row__input"
-                data-testid="png-export-custom-color"
-                type="color"
-              >
             </div>
           </fieldset>
         </div>
@@ -146,7 +152,7 @@ export default { name: "CanvasPngExportDialog" }
 </script>
 
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
 import type {
   CanvasPngExportBackgroundMode,
   CanvasPngExportRange,
@@ -169,6 +175,9 @@ const emit = defineEmits<{
   (e: 'update:pngExportCustomColor', value: string): void
 }>()
 
+const colorInputRef = ref<HTMLInputElement>()
+const customColorLabelRef = ref<HTMLElement>()
+
 const pngExportRange = computed({
   get: () => props.pngExportRange,
   set: (val) => emit('update:pngExportRange', val),
@@ -181,6 +190,17 @@ const pngExportCustomColor = computed({
   get: () => props.pngExportCustomColor,
   set: (val) => emit('update:pngExportCustomColor', val),
 })
+
+// 选择自定义颜色时自动弹出取色器
+function onCustomColorClick() {
+  if (pngExportBackgroundMode.value === 'custom') {
+    // 已经选中，直接弹取色器
+    nextTick(() => colorInputRef.value?.click())
+  } else {
+    pngExportBackgroundMode.value = 'custom'
+    nextTick(() => colorInputRef.value?.click())
+  }
+}
 </script>
 
 <style scoped>
@@ -285,38 +305,14 @@ const pngExportCustomColor = computed({
   pointer-events: none;
 }
 
-.png-export-option__preview {
+.png-export-option__preview-icon {
   width: 100%;
-  height: 40px;
-  border-radius: 4px;
-  border: 1px dashed var(--canvas-border, #d0d0d0);
-  background: var(--canvas-surface, #fafafa);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
+  height: 36px;
+  color: var(--b3-theme-on-surface-variant, #5a5a5a);
 }
 
-.png-export-option__preview-inner {
-  background: repeating-linear-gradient(
-    45deg,
-    var(--canvas-border, #d0d0d0) 0,
-    var(--canvas-border, #d0d0d0) 1px,
-    transparent 1px,
-    transparent 8px
-  );
-  border-radius: 2px;
-}
-
-.png-export-option__preview--full .png-export-option__preview-inner {
-  width: calc(100% - 12px);
-  height: calc(100% - 12px);
-}
-
-.png-export-option__preview--viewport .png-export-option__preview-inner {
-  width: calc(100% - 20px);
-  height: calc(100% - 14px);
+.png-export-option--active .png-export-option__preview-icon {
+  color: var(--b3-theme-primary, #3575f0);
 }
 
 .png-export-option__swatch {
@@ -353,35 +349,12 @@ const pngExportCustomColor = computed({
   max-width: 100%;
 }
 
-.png-export-color-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.png-export-color-row__label {
-  font-size: 13px;
-  color: var(--b3-theme-on-surface-variant, #5a5a5a);
-  flex-shrink: 0;
-}
-
-.png-export-color-row__input {
-  width: 32px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--canvas-border, #d0d0d0);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.png-export-color-row__input::-webkit-color-swatch-wrapper {
-  padding: 2px;
-}
-
-.png-export-color-row__input::-webkit-color-swatch {
-  border: none;
-  border-radius: 2px;
+.png-export-color-input-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
 }
 
 .png-export-dialog__actions {

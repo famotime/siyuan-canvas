@@ -148,9 +148,17 @@ export default defineConfig(({
               ]),
         ],
 
-        // make sure to externalize deps that shouldn't be bundled
-        // into your library
-        external: ["siyuan", "process"],
+        // 使用函数以精确控制外部依赖：
+        // siyuan/process 为思源运行时注入，须 external
+        // html-to-image 等 npm 包须打包进产物（Vite library mode 默认 external 全部 dependencies）
+        external: (id) => {
+          if (id === "siyuan" || id === "process") return true
+          if (id.includes("html-to-image")) return false
+          if (id.startsWith("siyuan/") || id.startsWith("process/")) return true
+          // node builtins
+          if (id.startsWith("node:")) return true
+          return false
+        },
 
         output: {
           entryFileNames: "[name].js",
