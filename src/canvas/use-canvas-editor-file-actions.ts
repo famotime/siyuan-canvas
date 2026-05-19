@@ -430,6 +430,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     const stage = stageRef.value
     const world = stage?.querySelector<HTMLElement>(".stage__world")
     if (!stage || !world) {
+      console.error("[Canvas PNG Export] stage or world element not found", { stage: !!stage, world: !!world })
       showMessage(t("messageCanvasPngExportFailed"), 4000, "error")
       return
     }
@@ -456,6 +457,15 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
         }
       : bounds
 
+    console.log("[Canvas PNG Export] starting export", {
+      background: options.background,
+      bounds: exportBounds,
+      filename: createCanvasPngExportFilename(suggestedFilename.value || state.filePath),
+      nodeCount: state.document.nodes.length,
+      range: options.range,
+      worldSize: { h: world.offsetHeight, w: world.offsetWidth },
+    })
+
     try {
       await exportCanvasWorldToPng({
         backgroundColor: resolveCanvasPngExportBackground(options.background),
@@ -463,8 +473,11 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
         filename: createCanvasPngExportFilename(suggestedFilename.value || state.filePath),
         world,
       })
+      console.log("[Canvas PNG Export] completed successfully")
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : t("messageCanvasPngExportFailed"), 4000, "error")
+      console.error("[Canvas PNG Export] failed", error)
+      const message = error instanceof Error ? error.message : String(error)
+      showMessage(message || t("messageCanvasPngExportFailed"), 4000, "error")
     }
   }
 

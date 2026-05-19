@@ -108,10 +108,14 @@ export function createCanvasPngExportFilename(name: string): string {
 }
 
 export function downloadDataUrl(dataUrl: string, filename: string) {
+  console.log("[Canvas PNG Export] downloadDataUrl", { filename, dataUrlLen: dataUrl.length })
   const anchor = document.createElement("a")
   anchor.href = dataUrl
   anchor.download = filename
+  document.body.appendChild(anchor)
   anchor.click()
+  document.body.removeChild(anchor)
+  console.log("[Canvas PNG Export] anchor click dispatched")
 }
 
 export function shouldIncludeCanvasPngExportNode(node: Node): boolean {
@@ -137,23 +141,27 @@ export async function exportCanvasWorldToPng(options: ExportCanvasWorldToPngOpti
   `
   options.world.appendChild(scrollbarStyle)
 
-  try {
-    const dataUrl = await toPng(options.world, {
-      backgroundColor: options.backgroundColor,
-      cacheBust: true,
-      filter: shouldIncludeCanvasPngExportNode,
-      height: Math.ceil(options.bounds.height),
-      pixelRatio: 2,
-      skipFonts: true,
-      style: {
-        height: `${options.world.offsetHeight}px`,
-        transform: `translate(${-options.bounds.x}px, ${-options.bounds.y}px)`,
-        transformOrigin: "top left",
-        width: `${options.world.offsetWidth}px`,
-      },
-      width: Math.ceil(options.bounds.width),
-    })
+  const toPngOptions = {
+    backgroundColor: options.backgroundColor,
+    cacheBust: true,
+    filter: shouldIncludeCanvasPngExportNode,
+    height: Math.ceil(options.bounds.height),
+    pixelRatio: 2,
+    skipFonts: true,
+    style: {
+      height: `${options.world.offsetHeight}px`,
+      transform: `translate(${-options.bounds.x}px, ${-options.bounds.y}px)`,
+      transformOrigin: "top left",
+      width: `${options.world.offsetWidth}px`,
+    },
+    width: Math.ceil(options.bounds.width),
+  }
 
+  console.log("[Canvas PNG Export] toPng options", toPngOptions)
+
+  try {
+    const dataUrl = await toPng(options.world, toPngOptions)
+    console.log("[Canvas PNG Export] toPng succeeded, dataUrl length:", dataUrl.length)
     downloadDataUrl(dataUrl, options.filename)
   } finally {
     scrollbarStyle.remove()
