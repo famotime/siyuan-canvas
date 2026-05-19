@@ -106,4 +106,11 @@ describe("canvas png export", () => {
     expect(shouldIncludeCanvasPngExportNode(ignored)).toBe(false)
     expect(shouldIncludeCanvasPngExportNode(ignoredChild)).toBe(false)
   })
+
+  it("excludes iframes from png export to avoid cross-origin clone failures", () => {
+    const iframe = document.createElement("iframe")
+    iframe.src = "https://example.com"
+
+    expect(shouldIncludeCanvasPngExportNode(iframe)).toBe(false)
+  })
 })

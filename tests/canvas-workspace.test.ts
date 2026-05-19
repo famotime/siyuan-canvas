@@ -684,6 +684,37 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='png-export-dialog']").exists()).toBe(false)
   })
 
+  it("does not recursively reopen the custom png background color picker", async () => {
+    currentEditor = createEditorMock()
+    let colorInputProgrammaticClicks = 0
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (this: HTMLInputElement) {
+      if (this.type !== "color") return
+
+      colorInputProgrammaticClicks += 1
+      if (colorInputProgrammaticClicks > 1) {
+        throw new Error("color input click recursed")
+      }
+
+      this.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))
+    })
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='top-toolbar-export']").trigger("click")
+    await wrapper.find("[data-testid='png-export-background-custom']").trigger("click")
+    await nextTick()
+    await nextTick()
+
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+    expect((wrapper.find("[data-testid='png-export-background-custom']").element as HTMLInputElement).checked).toBe(true)
+  })
+
   it("passes the new right-click canvas and document tree rename tips into the help dialog", async () => {
     currentEditor = createEditorMock()
     vi.mocked(openHelpDialog).mockClear()

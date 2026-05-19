@@ -456,15 +456,23 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
           y: toBoardY(board.value, bounds.y),
         }
       : bounds
+    const iframeCount = world.querySelectorAll("iframe").length
 
     console.log("[Canvas PNG Export] starting export", {
       background: options.background,
       bounds: exportBounds,
       filename: createCanvasPngExportFilename(suggestedFilename.value || state.filePath),
+      iframeCount,
       nodeCount: state.document.nodes.length,
       range: options.range,
       worldSize: { h: world.offsetHeight, w: world.offsetWidth },
     })
+
+    if (iframeCount > 0) {
+      console.warn("[Canvas PNG Export] world contains iframe nodes; they will be excluded from export", {
+        iframeCount,
+      })
+    }
 
     try {
       await exportCanvasWorldToPng({

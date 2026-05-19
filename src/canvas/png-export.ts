@@ -123,6 +123,10 @@ export function shouldIncludeCanvasPngExportNode(node: Node): boolean {
     return true
   }
 
+  if (node.tagName === "IFRAME") {
+    return false
+  }
+
   return !node.closest(PNG_EXPORT_IGNORE_SELECTOR)
 }
 

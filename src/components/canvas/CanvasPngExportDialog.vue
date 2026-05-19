@@ -91,7 +91,6 @@
                 <span class="png-export-option__label">{{ t("pngExportBackgroundTransparent") }}</span>
               </label>
               <label
-                ref="customColorLabelRef"
                 class="png-export-option"
                 :class="{ 'png-export-option--active': pngExportBackgroundMode === 'custom' }"
                 @click="onCustomColorClick"
@@ -115,6 +114,7 @@
                   class="png-export-color-input-hidden"
                   data-testid="png-export-custom-color"
                   type="color"
+                  @click.stop
                 >
               </label>
             </div>
@@ -152,7 +152,7 @@ export default { name: "CanvasPngExportDialog" }
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue"
+import { computed, nextTick, ref } from "vue"
 import type {
   CanvasPngExportBackgroundMode,
   CanvasPngExportRange,
@@ -176,8 +176,6 @@ const emit = defineEmits<{
 }>()
 
 const colorInputRef = ref<HTMLInputElement>()
-const customColorLabelRef = ref<HTMLElement>()
-
 const pngExportRange = computed({
   get: () => props.pngExportRange,
   set: (val) => emit('update:pngExportRange', val),
