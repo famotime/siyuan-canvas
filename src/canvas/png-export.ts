@@ -123,21 +123,39 @@ export function shouldIncludeCanvasPngExportNode(node: Node): boolean {
 }
 
 export async function exportCanvasWorldToPng(options: ExportCanvasWorldToPngOptions) {
-  const dataUrl = await toPng(options.world, {
-    backgroundColor: options.backgroundColor,
-    cacheBust: true,
-    filter: shouldIncludeCanvasPngExportNode,
-    height: Math.ceil(options.bounds.height),
-    pixelRatio: 2,
-    skipFonts: true,
-    style: {
-      height: `${options.world.offsetHeight}px`,
-      transform: `translate(${-options.bounds.x}px, ${-options.bounds.y}px)`,
-      transformOrigin: "top left",
-      width: `${options.world.offsetWidth}px`,
-    },
-    width: Math.ceil(options.bounds.width),
-  })
+  const scrollbarStyle = document.createElement("style")
+  scrollbarStyle.textContent = `
+    .canvas-node__body,
+    .canvas-node__body * {
+      scrollbar-width: none !important;
+      overflow: hidden !important;
+    }
+    .canvas-node__body::-webkit-scrollbar,
+    .canvas-node__body *::-webkit-scrollbar {
+      display: none !important;
+    }
+  `
+  options.world.appendChild(scrollbarStyle)
 
-  downloadDataUrl(dataUrl, options.filename)
+  try {
+    const dataUrl = await toPng(options.world, {
+      backgroundColor: options.backgroundColor,
+      cacheBust: true,
+      filter: shouldIncludeCanvasPngExportNode,
+      height: Math.ceil(options.bounds.height),
+      pixelRatio: 2,
+      skipFonts: true,
+      style: {
+        height: `${options.world.offsetHeight}px`,
+        transform: `translate(${-options.bounds.x}px, ${-options.bounds.y}px)`,
+        transformOrigin: "top left",
+        width: `${options.world.offsetWidth}px`,
+      },
+      width: Math.ceil(options.bounds.width),
+    })
+
+    downloadDataUrl(dataUrl, options.filename)
+  } finally {
+    scrollbarStyle.remove()
+  }
 }
