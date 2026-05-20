@@ -975,6 +975,8 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".file-card__document-preview").html()).toContain("第一项")
     expect(fileCard.text()).not.toContain("Road block")
     expect(fileCard.text()).not.toContain("/Projects/Roadmap")
+    expect(fileCard.text()).not.toContain("Opens block in SiYuan")
+    expect(wrapper.find(".file-card__helper").exists()).toBe(false)
   })
 
   it("renders a document preview card with the title and content while moving the path to a tooltip", () => {
@@ -1006,7 +1008,41 @@ describe("CanvasWorkspace", () => {
     expect(fileCard.attributes("title")).toBe("/Projects/Canvas/Spec")
     expect(fileCard.text()).toContain("Spec")
     expect(fileCard.text()).not.toContain("/Projects/Canvas/Spec")
+    expect(fileCard.text()).not.toContain("Opens in SiYuan")
+    expect(wrapper.find(".file-card__helper").exists()).toBe(false)
     expect(wrapper.find(".file-card__document-preview").html()).toContain("Document preview")
+  })
+
+  it("renders an image preview card without path, filename, or helper text", () => {
+    currentEditor = createEditorMock({
+      id: "file-image-1",
+      file: "assets/road.png",
+      type: "file",
+    })
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Image",
+      detail: "assets/road.png",
+      headline: "road.png",
+      helper: "Image file",
+      imageSrc: "/data/assets/road.png",
+      kind: "image",
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const fileCard = wrapper.find(".file-card")
+
+    expect(wrapper.find(".file-card__image").exists()).toBe(true)
+    expect(fileCard.text()).not.toContain("road.png")
+    expect(fileCard.text()).not.toContain("assets/road.png")
+    expect(fileCard.text()).not.toContain("Image file")
+    expect(wrapper.find(".file-card__helper").exists()).toBe(false)
   })
 
   it("falls back to an alternate asset path when a document preview image fails to load", async () => {

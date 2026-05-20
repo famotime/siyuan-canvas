@@ -1,7 +1,8 @@
 <template>
   <section
-    v-if="editor.selectedNodeCount > 1"
+    v-if="editor.selectedNode"
     class="inspector__section"
+    data-testid="inspector-node"
   >
     <button
       class="inspector__section-toggle"
@@ -9,69 +10,56 @@
       type="button"
       @click="editor.toggleInspectorSection('selection')"
     >
-      <h2>{{ t("inspectorSelection") }}</h2>
+      <h2>{{ t("inspectorNode") }}</h2>
       <span>{{ getSectionChevron('selection') }}</span>
     </button>
     <div v-if="editor.inspectorSectionState.selection">
-      <p>{{ t("selectionCount", { count: editor.selectedNodeCount }) }}</p>
-      <button
-        class="toolbar__button"
-        @click="editor.deleteSelection"
+      <p
+        v-if="editor.selectedNodeCount > 1"
+        data-testid="inspector-selection-count"
       >
-        {{ t("inspectorDeleteSelectedNodes") }}
-      </button>
-    </div>
-  </section>
-
-  <section
-    v-if="editor.selectedNode && editor.selectedNodeCount === 1"
-    class="inspector__section"
-  >
-    <button
-      class="inspector__section-toggle"
-      :title="getSectionToggleTitle('node')"
-      type="button"
-      @click="editor.toggleInspectorSection('node')"
-    >
-      <h2>{{ t("inspectorNode") }}</h2>
-      <span>{{ getSectionChevron('node') }}</span>
-    </button>
-    <div v-if="editor.inspectorSectionState.node">
+        {{ t("selectionCount", { count: editor.selectedNodeCount }) }}
+      </p>
       <label>
         {{ t("fieldX") }}
         <input
-          :value="editor.selectedNode.x"
+          data-testid="inspector-node-x"
+          :value="getDraftValue('x')"
           type="number"
-          @input="editor.updateNumericNodeField('x', valueFromEvent($event))"
+          @input="handleNumberInput('x', $event)"
         />
       </label>
       <label>
         {{ t("fieldY") }}
         <input
-          :value="editor.selectedNode.y"
+          data-testid="inspector-node-y"
+          :value="getDraftValue('y')"
           type="number"
-          @input="editor.updateNumericNodeField('y', valueFromEvent($event))"
+          @input="handleNumberInput('y', $event)"
         />
       </label>
       <label>
         {{ t("fieldWidth") }}
         <input
-          :value="editor.selectedNode.width"
+          data-testid="inspector-node-width"
+          :value="getDraftValue('width')"
           type="number"
-          @input="editor.updateNumericNodeField('width', valueFromEvent($event))"
+          @input="handleNumberInput('width', $event)"
         />
       </label>
       <label>
         {{ t("fieldHeight") }}
         <input
-          :value="editor.selectedNode.height"
+          data-testid="inspector-node-height"
+          :value="getDraftValue('height')"
           type="number"
-          @input="editor.updateNumericNodeField('height', valueFromEvent($event))"
+          @input="handleNumberInput('height', $event)"
         />
       </label>
       <label v-if="'color' in editor.selectedNode">
         {{ t("fieldColor") }}
         <input
+          data-testid="inspector-node-color"
           :value="editor.selectedNode.color || ''"
           @input="editor.updateNodeField('color', valueFromEvent($event))"
         />
@@ -79,36 +67,49 @@
       <label v-if="editor.selectedNode.type === 'text'">
         {{ t("fieldText") }}
         <textarea
-          :value="editor.selectedNode.text"
-          @input="editor.updateNodeField('text', valueFromEvent($event))"
+          data-testid="inspector-node-text"
+          :value="getDraftText()"
+          @input="handleTextInput($event)"
         />
       </label>
       <label v-if="editor.selectedNode.type === 'file'">
         {{ t("fieldFilePath") }}
         <input
-          :value="editor.selectedNode.file"
-          @input="editor.updateNodeField('file', valueFromEvent($event))"
+          data-testid="inspector-node-file"
+          :value="getDraftText()"
+          @input="handleTextInput($event)"
         />
       </label>
       <label v-if="editor.selectedNode.type === 'link'">
         {{ t("fieldUrl") }}
         <input
-          :value="editor.selectedNode.url"
-          @input="editor.updateNodeField('url', valueFromEvent($event))"
+          data-testid="inspector-node-url"
+          :value="getDraftText()"
+          @input="handleTextInput($event)"
         />
       </label>
       <label v-if="editor.selectedNode.type === 'group'">
         {{ t("fieldLabel") }}
         <input
-          :value="editor.selectedNode.label || ''"
-          @input="editor.updateNodeField('label', valueFromEvent($event))"
+          data-testid="inspector-node-label"
+          :value="getDraftText()"
+          @input="handleTextInput($event)"
         />
       </label>
+      <button
+        v-if="isMultiNodeSelection"
+        class="toolbar__button toolbar__button--primary"
+        data-testid="inspector-node-apply"
+        type="button"
+        @click="applyDraft"
+      >
+        {{ t("dialogConfirm") }}
+      </button>
     </div>
   </section>
 
   <section
-    v-if="editor.selectedNode && editor.selectedNodeCount === 1"
+    v-if="editor.selectedNodeCount === 1"
     class="inspector__section"
   >
     <button
@@ -258,14 +259,112 @@ export default { name: "CanvasInspector" }
 </script>
 
 <script setup lang="ts">
+import {
+  computed,
+  reactive,
+  watch,
+} from 'vue'
+
 const props = defineProps<{
-  editor: Record<string, unknown>
+  editor: Record<string, any>
   getSideLabel: (side: string) => string
-  t: (key: string) => string
+  t: (key: string, args?: Record<string, unknown>) => string
 }>()
+
+const multiNodeDraft = reactive({
+  height: 0,
+  text: '',
+  width: 0,
+  x: 0,
+  y: 0,
+})
+
+const isMultiNodeSelection = computed(() => props.editor.selectedNodeCount > 1)
+
+watch(
+  () => props.editor.selectedNode,
+  (node) => {
+    if (!node) {
+      return
+    }
+
+    multiNodeDraft.x = node.x
+    multiNodeDraft.y = node.y
+    multiNodeDraft.width = node.width
+    multiNodeDraft.height = node.height
+    multiNodeDraft.text = node.type === 'group'
+      ? (node.label || '')
+      : node.type === 'file'
+        ? node.file
+        : node.type === 'link'
+          ? node.url
+          : node.text
+  },
+  { immediate: true },
+)
 
 function valueFromEvent(event: Event): string {
   return (event.target as HTMLInputElement).value
+}
+
+function getDraftValue(field: 'height' | 'width' | 'x' | 'y'): number {
+  return isMultiNodeSelection.value
+    ? multiNodeDraft[field]
+    : props.editor.selectedNode[field]
+}
+
+function getDraftText(): string {
+  if (isMultiNodeSelection.value) {
+    return multiNodeDraft.text
+  }
+
+  const node = props.editor.selectedNode
+  if (node.type === 'group') {
+    return node.label || ''
+  }
+  if (node.type === 'file') {
+    return node.file
+  }
+  if (node.type === 'link') {
+    return node.url
+  }
+  return node.text
+}
+
+function handleNumberInput(field: 'height' | 'width' | 'x' | 'y', event: Event): void {
+  const value = valueFromEvent(event)
+  if (isMultiNodeSelection.value) {
+    const numeric = Number.parseFloat(value)
+    if (!Number.isNaN(numeric)) {
+      multiNodeDraft[field] = numeric
+    }
+    return
+  }
+
+  props.editor.updateNumericNodeField(field, value)
+}
+
+function handleTextInput(event: Event): void {
+  const value = valueFromEvent(event)
+  if (isMultiNodeSelection.value) {
+    multiNodeDraft.text = value
+    return
+  }
+
+  const node = props.editor.selectedNode
+  if (node.type === 'text') {
+    props.editor.updateNodeField('text', value)
+  } else if (node.type === 'file') {
+    props.editor.updateNodeField('file', value)
+  } else if (node.type === 'link') {
+    props.editor.updateNodeField('url', value)
+  } else if (node.type === 'group') {
+    props.editor.updateNodeField('label', value)
+  }
+}
+
+function applyDraft(): void {
+  props.editor.applySelectedNodeChanges({ ...multiNodeDraft })
 }
 
 function getSectionChevron(section: keyof typeof props.editor.inspectorSectionState): string {
@@ -319,57 +418,20 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   color: var(--canvas-text-muted);
 }
 
-.inspector__control {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-
 .inspector__section input,
 .inspector__section select,
 .inspector__section textarea {
   width: 100%;
+  padding: 8px 10px;
   border: 1px solid var(--canvas-border);
-  border-radius: 12px;
-  background: var(--canvas-surface);
-  padding: 9px 10px;
+  border-radius: 10px;
+  background: var(--canvas-input-bg);
+  color: var(--canvas-text);
   font: inherit;
-  color: inherit;
-  box-sizing: border-box;
 }
 
 .inspector__section textarea {
-  min-height: 96px;
+  min-height: 120px;
   resize: vertical;
-}
-
-.toolbar__button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border: 1px solid var(--canvas-border);
-  border-radius: 12px;
-  background: var(--canvas-floating-button-bg);
-  color: var(--canvas-text);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.toolbar__button:hover {
-  background: var(--canvas-floating-button-bg-hover);
-}
-
-.toolbar__button--primary {
-  background: var(--canvas-accent);
-  border-color: var(--canvas-accent);
-  color: #fff;
-}
-
-.toolbar__button--primary:hover {
-  background: var(--canvas-accent-hover, var(--canvas-accent));
 }
 </style>

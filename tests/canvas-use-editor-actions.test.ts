@@ -1028,17 +1028,20 @@ B intro`,
     await flushEditor()
 
     const createdNodes = editor.state.document.nodes.filter((node) => node.id !== "text-node")
-    expect(createdNodes).toHaveLength(3)
+    expect(createdNodes).toHaveLength(4)
     expect(createdNodes.map((node: any) => node.text)).toEqual([
+      "# Roadmap",
       "## Phase A\n\nA intro",
       "### Task A1\n\nA1 details",
       "## Phase B\n\nB intro",
     ])
 
+    const roadmap = createdNodes.find((node: any) => node.text.startsWith("# Roadmap"))!
     const phaseA = createdNodes.find((node: any) => node.text.startsWith("## Phase A"))!
     const phaseB = createdNodes.find((node: any) => node.text.startsWith("## Phase B"))!
     const taskA1 = createdNodes.find((node: any) => node.text.startsWith("### Task A1"))!
-    expect(phaseA.x).toBe(textNode.x + textNode.width + 120)
+    expect(roadmap.x).toBe(textNode.x + textNode.width + 120)
+    expect(phaseA.x).toBe(roadmap.x + roadmap.width + 120)
     expect(phaseB.x).toBe(phaseA.x)
     expect(taskA1.x).toBe(phaseA.x + phaseA.width + 120)
 
@@ -1047,12 +1050,19 @@ B intro`,
         endArrow: true,
         fromNode: "text-node",
         fromSide: "right",
+        toNode: roadmap.id,
+        toSide: "left",
+      }),
+      expect.objectContaining({
+        endArrow: true,
+        fromNode: roadmap.id,
+        fromSide: "right",
         toNode: phaseA.id,
         toSide: "left",
       }),
       expect.objectContaining({
         endArrow: true,
-        fromNode: "text-node",
+        fromNode: roadmap.id,
         fromSide: "right",
         toNode: phaseB.id,
         toSide: "left",

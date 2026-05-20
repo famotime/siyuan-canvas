@@ -58,7 +58,10 @@
       v-html="documentPreviewHtml"
       @error.capture="emit('preview-image-error', node, $event)"
     />
-    <div class="file-card__helper">
+    <div
+      v-if="showHelper"
+      class="file-card__helper"
+    >
       {{ preview.helper }}
     </div>
   </div>
@@ -68,16 +71,19 @@
 import type { CanvasFileTargetPreview } from '@/canvas/file-target-preview'
 import type { CanvasFileNode } from '@/canvas/types'
 
-defineProps<{
+withDefaults(defineProps<{
   canvasThumbnailViewBox?: string
   documentPreviewHtml: string
   imageSrc?: string
   node: CanvasFileNode
   preview: CanvasFileTargetPreview
   showDetail: boolean
+  showHelper?: boolean
   showHeadline: boolean
   tooltip?: string
-}>()
+}>(), {
+  showHelper: true,
+})
 
 const emit = defineEmits<{
   'image-error': [node: CanvasFileNode]

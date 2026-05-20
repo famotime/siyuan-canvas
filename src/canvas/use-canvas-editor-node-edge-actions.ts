@@ -503,6 +503,48 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     })
   }
 
+  function applySelectedNodeChanges(fields: {
+    height: number
+    text: string
+    width: number
+    x: number
+    y: number
+  }) {
+    if (!state.selectedNodeIds.length) {
+      return
+    }
+
+    const selectedIds = new Set(state.selectedNodeIds)
+    commitDocument({
+      ...state.document,
+      nodes: state.document.nodes.map((node) => {
+        if (!selectedIds.has(node.id)) {
+          return node
+        }
+
+        const nextNode: typeof node = {
+          ...node,
+          height: fields.height,
+          width: fields.width,
+          x: fields.x,
+          y: fields.y,
+        }
+
+        if (node.type === 'text') {
+          nextNode.text = fields.text
+        } else if (node.type === 'group') {
+          nextNode.label = fields.text
+        } else if (node.type === 'link') {
+          nextNode.url = fields.text
+        } else if (node.type === 'file') {
+          nextNode.file = fields.text
+        }
+
+        return nextNode
+      }),
+    }, { coalesceKey: 'selection-node-draft' })
+  }
+
   function updateEdge(edge: CanvasEdge) {
     commitDocument(upsertCanvasEdge(state.document, edge))
   }
@@ -644,6 +686,7 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     updateEditingEdgeLabel,
     updateNodeField,
     updateNumericNodeField,
+    applySelectedNodeChanges,
     updateSelectedEdgeDirection,
     updateTextNodeContent,
     zoomIn,

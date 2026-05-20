@@ -482,6 +482,7 @@
                     :node="node"
                     :preview="editor.getFileNodePreview(node)"
                     :show-detail="shouldShowFileCardDetail(node)"
+                    :show-helper="shouldShowFileCardHelper(node)"
                     :show-headline="shouldShowFileCardHeadline(node)"
                     :tooltip="getFileCardTooltip(node)"
                     @image-error="handleFileCardImageError"
@@ -1919,7 +1920,7 @@ function shouldShowFileCardHeadline(node: CanvasNode) {
     return false
   }
 
-  return editor.getFileNodePreview(node).kind !== "block"
+  return !["block", "image"].includes(editor.getFileNodePreview(node).kind)
 }
 
 function shouldShowFileCardDetail(node: CanvasNode) {
@@ -1928,7 +1929,15 @@ function shouldShowFileCardDetail(node: CanvasNode) {
   }
 
   const kind = editor.getFileNodePreview(node).kind
-  return kind !== "block" && kind !== "document"
+  return !["block", "document", "image"].includes(kind)
+}
+
+function shouldShowFileCardHelper(node: CanvasNode) {
+  if (node.type !== "file") {
+    return false
+  }
+
+  return !["block", "document", "image"].includes(editor.getFileNodePreview(node).kind)
 }
 
 function getFileCardTooltip(node: CanvasNode): string | undefined {

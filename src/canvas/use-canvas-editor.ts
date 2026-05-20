@@ -596,7 +596,7 @@ export function useCanvasEditor(
       const sections = extractMarkdownHeadingSections(sourceNode.text)
       if (sections.length > 1) {
         decomposedHeadings.push(
-          ...sections.slice(1).map((section) => ({
+          ...sections.map((section) => ({
             level: section.level,
             text: section.text,
           })),
@@ -978,6 +978,7 @@ export function useCanvasEditor(
     toggleSelectionPopover,
     updateEdgeField,
     updateEdgeSide,
+    applySelectedNodeChanges,
     updateEditingEdgeLabel,
     updateNodeField,
     updateNumericNodeField,
@@ -1368,6 +1369,7 @@ export function useCanvasEditor(
       convertLinkToText,
       updateEdgeField,
       updateEdgeSide,
+      applySelectedNodeChanges,
       updateNodeField,
       updateNumericNodeField,
       viewport,
