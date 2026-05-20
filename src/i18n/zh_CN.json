@@ -79,6 +79,7 @@
   "layoutDistributeVertical": "垂直分布",
   "layoutStretchHorizontal": "水平拉伸",
   "layoutStretchVertical": "垂直拉伸",
+  "messageNoValidChapterInfo": "未发现有效章节信息，请检查文档内容。",
   "messageUnableRefreshSiyuanNode": "无法刷新思源内容",
   "nodeLinkHelper": "双击打开",
   "nodeDefaultGroupLabel": "分组",

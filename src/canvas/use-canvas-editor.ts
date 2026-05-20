@@ -84,7 +84,10 @@ import {
 import {
   validateCanvasDocument,
 } from "@/canvas/format"
-import { extractMarkdownHeadingBlocks } from "@/canvas/markdown-preview"
+import {
+  extractMarkdownHeadingBlocks,
+  extractMarkdownHeadingSections,
+} from "@/canvas/markdown-preview"
 import { createCanvasI18n } from "@/i18n/canvas"
 import { getCanvasNodeAnchor } from "@/canvas/node-interaction"
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
@@ -241,11 +244,19 @@ export function useCanvasEditor(
     return kind === 'block' || kind === 'document'
   })
   const canDecomposeSelectedDocument = computed(() => {
-    if (selectedNodeCount.value !== 1 || selectedNode.value?.type !== 'file') {
+    if (selectedNodeCount.value !== 1) {
       return false
     }
 
-    return getResolvedFileNode(selectedNode.value).kind === 'document'
+    if (selectedNode.value?.type === 'text') {
+      return true
+    }
+
+    if (selectedNode.value?.type === 'file') {
+      return getResolvedFileNode(selectedNode.value).kind === 'document'
+    }
+
+    return false
   })
   const selectedEdge = computed(
     () => state.document.edges.find((edge) => edge.id === state.selectedEdgeId) || null,
@@ -559,24 +570,46 @@ export function useCanvasEditor(
   }
 
   async function decomposeSelectedDocument() {
-    if (!canDecomposeSelectedDocument.value || selectedNode.value?.type !== 'file') {
+    if (!canDecomposeSelectedDocument.value || !selectedNode.value) {
       return
     }
 
     const sourceNode = selectedNode.value
     const sourceNodeId = sourceNode.id
-    const resolved = getResolvedFileNode(sourceNode)
-    if (resolved.kind !== 'document') {
+    const decomposedHeadings: Array<{ file?: string, level: number, text?: string }> = []
+    if (sourceNode.type === 'file') {
+      const resolved = getResolvedFileNode(sourceNode)
+      if (resolved.kind !== 'document') {
+        return
+      }
+
+      const markdown = await getSiyuanDocumentMarkdown(resolved.id)
+      decomposedHeadings.push(
+        ...extractMarkdownHeadingBlocks(markdown)
+          .filter((heading) => heading.id !== resolved.id)
+          .map((heading) => ({
+            file: heading.id,
+            level: heading.level,
+          })),
+      )
+    } else if (sourceNode.type === 'text') {
+      const sections = extractMarkdownHeadingSections(sourceNode.text)
+      if (sections.length > 1) {
+        decomposedHeadings.push(
+          ...sections.slice(1).map((section) => ({
+            level: section.level,
+            text: section.text,
+          })),
+        )
+      }
+    }
+
+    if (!decomposedHeadings.length) {
+      showMessage(t('messageNoValidChapterInfo'), 4000, 'warning')
       return
     }
 
-    const markdown = await getSiyuanDocumentMarkdown(resolved.id)
-    const headings = extractMarkdownHeadingBlocks(markdown).filter((heading) => heading.id !== resolved.id)
-    if (!headings.length) {
-      return
-    }
-
-    const minLevel = Math.min(...headings.map((heading) => heading.level))
+    const minLevel = Math.min(...decomposedHeadings.map((heading) => heading.level))
     const headingNodes: CanvasNode[] = []
     const parentById = new Map<string, string>()
     const stack: Array<{ id: string, level: number }> = [{
@@ -588,7 +621,7 @@ export function useCanvasEditor(
     const horizontalGap = 120
     const verticalGap = 40
 
-    for (const heading of headings) {
+    for (const heading of decomposedHeadings) {
       while (stack.length > 0 && stack[stack.length - 1]!.level >= heading.level) {
         stack.pop()
       }
@@ -598,8 +631,12 @@ export function useCanvasEditor(
       const row = columnCounts.get(depth) ?? 0
       columnCounts.set(depth, row + 1)
 
-      const node = createCanvasNode('file')
-      node.file = heading.id
+      const node = createCanvasNode(sourceNode.type)
+      if (node.type === 'file') {
+        node.file = heading.file || ''
+      } else if (node.type === 'text') {
+        node.text = heading.text || ''
+      }
       node.x = sourceNode.x + depth * (sourceNode.width + horizontalGap)
       node.y = sourceNode.y + row * (node.height + verticalGap)
       const position = findNonOverlappingNodePosition(node, existingNodes, node.height + verticalGap)
@@ -628,7 +665,9 @@ export function useCanvasEditor(
       nodes: [...state.document.nodes, ...headingNodes],
     })
     state.selectNode(sourceNodeId)
-    await refreshFileNodeMetadata(headingNodes.map((node) => node.id))
+    if (sourceNode.type === 'file') {
+      await refreshFileNodeMetadata(headingNodes.map((node) => node.id))
+    }
   }
 
   watch(

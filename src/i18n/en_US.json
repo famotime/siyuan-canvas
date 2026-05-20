@@ -79,6 +79,7 @@
   "layoutDistributeVertical": "Distribute vertically",
   "layoutStretchHorizontal": "Stretch horizontally",
   "layoutStretchVertical": "Stretch vertically",
+  "messageNoValidChapterInfo": "No valid chapter information found. Please check the document content.",
   "messageUnableRefreshSiyuanNode": "Unable to refresh SiYuan content",
   "nodeLinkHelper": "Double click to open",
   "nodeDefaultGroupLabel": "Group",

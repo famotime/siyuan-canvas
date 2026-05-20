@@ -950,6 +950,157 @@ Preview body
     wrapper.unmount()
   })
 
+  it("shows a message when a selected Siyuan document has no valid chapter headings", async () => {
+    const documentNode = {
+      file: "/data/roadmap.sy",
+      height: 180,
+      id: "doc-node",
+      type: "file",
+      width: 320,
+      x: 0,
+      y: 0,
+    }
+    fileNodeLookupMock.findSiyuanDocumentByPath.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412000000-root001",
+      path: "/data/roadmap.sy",
+      title: "Roadmap",
+    })
+    fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue(`# Roadmap
+{: id="20260412000000-root001"}
+
+Only an intro.`)
+
+    const { editor, wrapper } = await mountEditor({
+      raw: JSON.stringify({
+        edges: [],
+        nodes: [documentNode],
+      }),
+    })
+    editor.selectNode("doc-node")
+    await flushEditor()
+
+    await editor.decomposeSelectedDocument()
+    await flushEditor()
+
+    expect(editor.state.document.nodes).toHaveLength(1)
+    expect(editor.state.document.edges).toHaveLength(0)
+    expect(showMessage).toHaveBeenCalledWith("未发现有效章节信息，请检查文档内容。", 4000, "warning")
+
+    wrapper.unmount()
+  })
+
+  it("decomposes a selected text node into hierarchical heading text nodes", async () => {
+    const textNode = {
+      height: 180,
+      id: "text-node",
+      text: `# Roadmap
+
+## Phase A
+
+A intro
+
+### Task A1
+
+A1 details
+
+## Phase B
+
+B intro`,
+      type: "text",
+      width: 320,
+      x: 0,
+      y: 0,
+    }
+
+    const { editor, wrapper } = await mountEditor({
+      raw: JSON.stringify({
+        edges: [],
+        nodes: [textNode],
+      }),
+    })
+    editor.selectNode("text-node")
+    await flushEditor()
+
+    expect(editor.canDecomposeSelectedDocument).toBe(true)
+
+    await editor.decomposeSelectedDocument()
+    await flushEditor()
+
+    const createdNodes = editor.state.document.nodes.filter((node) => node.id !== "text-node")
+    expect(createdNodes).toHaveLength(3)
+    expect(createdNodes.map((node: any) => node.text)).toEqual([
+      "## Phase A\n\nA intro",
+      "### Task A1\n\nA1 details",
+      "## Phase B\n\nB intro",
+    ])
+
+    const phaseA = createdNodes.find((node: any) => node.text.startsWith("## Phase A"))!
+    const phaseB = createdNodes.find((node: any) => node.text.startsWith("## Phase B"))!
+    const taskA1 = createdNodes.find((node: any) => node.text.startsWith("### Task A1"))!
+    expect(phaseA.x).toBe(textNode.x + textNode.width + 120)
+    expect(phaseB.x).toBe(phaseA.x)
+    expect(taskA1.x).toBe(phaseA.x + phaseA.width + 120)
+
+    expect(editor.state.document.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        endArrow: true,
+        fromNode: "text-node",
+        fromSide: "right",
+        toNode: phaseA.id,
+        toSide: "left",
+      }),
+      expect.objectContaining({
+        endArrow: true,
+        fromNode: "text-node",
+        fromSide: "right",
+        toNode: phaseB.id,
+        toSide: "left",
+      }),
+      expect.objectContaining({
+        endArrow: true,
+        fromNode: phaseA.id,
+        fromSide: "right",
+        toNode: taskA1.id,
+        toSide: "left",
+      }),
+    ]))
+
+    wrapper.unmount()
+  })
+
+  it("shows a message when a selected text node has no valid chapter headings", async () => {
+    const textNode = {
+      height: 180,
+      id: "text-node",
+      text: `# Roadmap
+
+Only an intro.`,
+      type: "text",
+      width: 320,
+      x: 0,
+      y: 0,
+    }
+
+    const { editor, wrapper } = await mountEditor({
+      raw: JSON.stringify({
+        edges: [],
+        nodes: [textNode],
+      }),
+    })
+    editor.selectNode("text-node")
+    await flushEditor()
+
+    await editor.decomposeSelectedDocument()
+    await flushEditor()
+
+    expect(editor.state.document.nodes).toHaveLength(1)
+    expect(editor.state.document.edges).toHaveLength(0)
+    expect(showMessage).toHaveBeenCalledWith("未发现有效章节信息，请检查文档内容。", 4000, "warning")
+
+    wrapper.unmount()
+  })
+
   it("refreshes the selected Siyuan document node preview with the latest content", async () => {
     fileNodeLookupMock.findSiyuanDocumentByPath.mockResolvedValue({
       hpath: "/Projects/Roadmap",

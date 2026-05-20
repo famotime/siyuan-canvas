@@ -74,6 +74,12 @@ export interface MarkdownHeadingBlock {
   title: string
 }
 
+export interface MarkdownHeadingSection {
+  level: number
+  text: string
+  title: string
+}
+
 export function extractMarkdownHeadingBlocks(markdown: string): MarkdownHeadingBlock[] {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
   const headings: MarkdownHeadingBlock[] = []
@@ -97,6 +103,34 @@ export function extractMarkdownHeadingBlocks(markdown: string): MarkdownHeadingB
   }
 
   return headings
+}
+
+export function extractMarkdownHeadingSections(markdown: string): MarkdownHeadingSection[] {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
+  const headingIndexes: Array<{ index: number, level: number, title: string }> = []
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const headingMatch = lines[index]!.trim().match(/^(#{1,6})\s+(.+)$/)
+    if (!headingMatch) {
+      continue
+    }
+
+    headingIndexes.push({
+      index,
+      level: headingMatch[1]!.length,
+      title: headingMatch[2]!.trim(),
+    })
+  }
+
+  return headingIndexes.map((heading, index) => {
+    const nextHeading = headingIndexes[index + 1]
+    const sectionLines = lines.slice(heading.index, nextHeading?.index ?? lines.length)
+    return {
+      level: heading.level,
+      text: sectionLines.join("\n").trim(),
+      title: heading.title,
+    }
+  })
 }
 
 function extractAllowedInlineHtml(value: string): { placeholders: string[], text: string } {
