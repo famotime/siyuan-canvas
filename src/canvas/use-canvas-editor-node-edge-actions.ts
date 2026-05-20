@@ -8,6 +8,7 @@ import type {
   CanvasBounds,
   CanvasDocument,
   CanvasEdge,
+  CanvasGeometryPatch,
   CanvasNode,
   CanvasNodeLayoutAction,
   CanvasSide,
@@ -503,13 +504,7 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     })
   }
 
-  function applySelectedNodeChanges(fields: {
-    height: number
-    text: string
-    width: number
-    x: number
-    y: number
-  }) {
+  function applySelectedNodeChanges(fields: CanvasGeometryPatch & { text?: string }) {
     if (!state.selectedNodeIds.length) {
       return
     }
@@ -524,20 +519,22 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
 
         const nextNode: typeof node = {
           ...node,
-          height: fields.height,
-          width: fields.width,
-          x: fields.x,
-          y: fields.y,
+          ...(fields.width != null && { width: fields.width }),
+          ...(fields.height != null && { height: fields.height }),
+          ...(fields.x != null && { x: fields.x }),
+          ...(fields.y != null && { y: fields.y }),
         }
 
-        if (node.type === 'text') {
-          nextNode.text = fields.text
-        } else if (node.type === 'group') {
-          nextNode.label = fields.text
-        } else if (node.type === 'link') {
-          nextNode.url = fields.text
-        } else if (node.type === 'file') {
-          nextNode.file = fields.text
+        if (fields.text != null) {
+          if (node.type === 'text') {
+            nextNode.text = fields.text
+          } else if (node.type === 'group') {
+            nextNode.label = fields.text
+          } else if (node.type === 'link') {
+            nextNode.url = fields.text
+          } else if (node.type === 'file') {
+            nextNode.file = fields.text
+          }
         }
 
         return nextNode

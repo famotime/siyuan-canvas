@@ -24,7 +24,8 @@
         {{ t("fieldX") }}
         <input
           data-testid="inspector-node-x"
-          :value="getDraftValue('x')"
+          :value="isNaN(getDraftValue('x')) ? '' : getDraftValue('x')"
+          :placeholder="isNaN(getDraftValue('x')) ? '--' : ''"
           type="number"
           @input="handleNumberInput('x', $event)"
         />
@@ -33,7 +34,8 @@
         {{ t("fieldY") }}
         <input
           data-testid="inspector-node-y"
-          :value="getDraftValue('y')"
+          :value="isNaN(getDraftValue('y')) ? '' : getDraftValue('y')"
+          :placeholder="isNaN(getDraftValue('y')) ? '--' : ''"
           type="number"
           @input="handleNumberInput('y', $event)"
         />
@@ -42,7 +44,8 @@
         {{ t("fieldWidth") }}
         <input
           data-testid="inspector-node-width"
-          :value="getDraftValue('width')"
+          :value="isNaN(getDraftValue('width')) ? '' : getDraftValue('width')"
+          :placeholder="isNaN(getDraftValue('width')) ? '--' : ''"
           type="number"
           @input="handleNumberInput('width', $event)"
         />
@@ -51,7 +54,8 @@
         {{ t("fieldHeight") }}
         <input
           data-testid="inspector-node-height"
-          :value="getDraftValue('height')"
+          :value="isNaN(getDraftValue('height')) ? '' : getDraftValue('height')"
+          :placeholder="isNaN(getDraftValue('height')) ? '--' : ''"
           type="number"
           @input="handleNumberInput('height', $event)"
         />
@@ -69,6 +73,7 @@
         <textarea
           data-testid="inspector-node-text"
           :value="getDraftText()"
+          :placeholder="isTextMixed() ? '--' : ''"
           @input="handleTextInput($event)"
         />
       </label>
@@ -77,6 +82,7 @@
         <input
           data-testid="inspector-node-file"
           :value="getDraftText()"
+          :placeholder="isTextMixed() ? '--' : ''"
           @input="handleTextInput($event)"
         />
       </label>
@@ -85,6 +91,7 @@
         <input
           data-testid="inspector-node-url"
           :value="getDraftText()"
+          :placeholder="isTextMixed() ? '--' : ''"
           @input="handleTextInput($event)"
         />
       </label>
@@ -93,12 +100,13 @@
         <input
           data-testid="inspector-node-label"
           :value="getDraftText()"
+          :placeholder="isTextMixed() ? '--' : ''"
           @input="handleTextInput($event)"
         />
       </label>
       <button
         v-if="isMultiNodeSelection"
-        class="toolbar__button toolbar__button--primary"
+        class="inspector__action-button"
         data-testid="inspector-node-apply"
         type="button"
         @click="applyDraft"
@@ -189,7 +197,7 @@
         </select>
       </label>
       <button
-        class="toolbar__button toolbar__button--primary"
+        class="inspector__action-button"
         @click="editor.createEdgeFromSelection"
       >
         {{ t("inspectorCreateEdgeAction") }}
@@ -279,7 +287,38 @@ const multiNodeDraft = reactive({
   y: 0,
 })
 
+const draftEditedFields = reactive(new Set<string>())
+
 const isMultiNodeSelection = computed(() => props.editor.selectedNodeCount > 1)
+
+const allSelectedNodes = computed(() => {
+  const ids = new Set(props.editor.state.selectedNodeIds)
+  return props.editor.state.document.nodes.filter((n: any) => ids.has(n.id))
+})
+
+function getNodeTextField(node: any): string {
+  if (node.type === 'group') return node.label || ''
+  if (node.type === 'file') return node.file
+  if (node.type === 'link') return node.url
+  return node.text
+}
+
+const mixedFields = computed(() => {
+  if (!isMultiNodeSelection.value) return {} as Record<string, boolean>
+  const nodes = allSelectedNodes.value
+  if (nodes.length < 2) return {} as Record<string, boolean>
+
+  const result: Record<string, boolean> = {}
+  for (const field of ['x', 'y', 'width', 'height'] as const) {
+    const firstVal = nodes[0][field]
+    result[field] = !nodes.every((n: any) => n[field] === firstVal)
+  }
+
+  const firstText = getNodeTextField(nodes[0])
+  result.text = !nodes.every((n: any) => getNodeTextField(n) === firstText)
+
+  return result
+})
 
 watch(
   () => props.editor.selectedNode,
@@ -288,6 +327,7 @@ watch(
       return
     }
 
+    draftEditedFields.clear()
     multiNodeDraft.x = node.x
     multiNodeDraft.y = node.y
     multiNodeDraft.width = node.width
@@ -308,13 +348,20 @@ function valueFromEvent(event: Event): string {
 }
 
 function getDraftValue(field: 'height' | 'width' | 'x' | 'y'): number {
-  return isMultiNodeSelection.value
-    ? multiNodeDraft[field]
-    : props.editor.selectedNode[field]
+  if (!isMultiNodeSelection.value) {
+    return props.editor.selectedNode[field]
+  }
+  if (mixedFields.value[field] && !draftEditedFields.has(field)) {
+    return NaN
+  }
+  return multiNodeDraft[field]
 }
 
 function getDraftText(): string {
   if (isMultiNodeSelection.value) {
+    if (mixedFields.value.text && !draftEditedFields.has('text')) {
+      return ''
+    }
     return multiNodeDraft.text
   }
 
@@ -331,12 +378,17 @@ function getDraftText(): string {
   return node.text
 }
 
+function isTextMixed(): boolean {
+  return !!mixedFields.value.text && !draftEditedFields.has('text')
+}
+
 function handleNumberInput(field: 'height' | 'width' | 'x' | 'y', event: Event): void {
   const value = valueFromEvent(event)
   if (isMultiNodeSelection.value) {
     const numeric = Number.parseFloat(value)
     if (!Number.isNaN(numeric)) {
       multiNodeDraft[field] = numeric
+      draftEditedFields.add(field)
     }
     return
   }
@@ -348,6 +400,7 @@ function handleTextInput(event: Event): void {
   const value = valueFromEvent(event)
   if (isMultiNodeSelection.value) {
     multiNodeDraft.text = value
+    draftEditedFields.add('text')
     return
   }
 
@@ -364,7 +417,11 @@ function handleTextInput(event: Event): void {
 }
 
 function applyDraft(): void {
-  props.editor.applySelectedNodeChanges({ ...multiNodeDraft })
+  const fields: Record<string, unknown> = {}
+  for (const key of draftEditedFields) {
+    fields[key] = (multiNodeDraft as Record<string, unknown>)[key]
+  }
+  props.editor.applySelectedNodeChanges(fields)
 }
 
 function getSectionChevron(section: keyof typeof props.editor.inspectorSectionState): string {
@@ -381,12 +438,55 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 <style scoped>
 .inspector__section {
   display: grid;
-  gap: 10px;
-  margin-bottom: 18px;
-  padding: 14px;
+  gap: 12px;
+  margin-bottom: 0;
+  padding: 16px;
   border: 1px solid var(--canvas-border);
   border-radius: 16px;
   background: var(--canvas-inspector-section-bg);
+}
+
+.inspector__action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 4px;
+  border: 1px solid var(--canvas-accent-soft);
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    var(--canvas-accent-soft),
+    color-mix(in srgb, var(--canvas-accent) 18%, transparent)
+  );
+  color: var(--canvas-accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 120ms ease;
+  backdrop-filter: blur(8px);
+}
+
+.inspector__action-button:hover {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--canvas-accent) 24%, transparent),
+    color-mix(in srgb, var(--canvas-accent) 14%, transparent)
+  );
+  border-color: var(--canvas-accent);
+  box-shadow: 0 2px 8px var(--canvas-accent-soft);
+  transform: translateY(-1px);
+}
+
+.inspector__action-button:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .inspector__section-toggle {
@@ -422,6 +522,8 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .inspector__section select,
 .inspector__section textarea {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 1px solid var(--canvas-border);
   border-radius: 10px;

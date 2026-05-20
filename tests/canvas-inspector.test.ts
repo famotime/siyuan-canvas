@@ -29,6 +29,15 @@ function createEditorMock() {
       y: 200,
     },
     selectedNodeCount: 2,
+    state: {
+      document: {
+        nodes: [
+          { height: 120, id: 'n1', text: 'Alpha', type: 'text', width: 240, x: 100, y: 200 },
+          { height: 120, id: 'n2', text: 'Gamma', type: 'text', width: 240, x: 300, y: 400 },
+        ],
+      },
+      selectedNodeIds: ['n1', 'n2'],
+    },
     updateNodeField: vi.fn(),
     updateNumericNodeField: vi.fn(),
   })
@@ -56,13 +65,34 @@ describe('CanvasInspector', () => {
 
     await wrapper.find('[data-testid="inspector-node-apply"]').trigger('click')
 
-    expect(editor.applySelectedNodeChanges).toHaveBeenCalledWith(expect.objectContaining({
-      height: 120,
+    expect(editor.applySelectedNodeChanges).toHaveBeenCalledWith({
       text: 'Beta',
-      width: 240,
       x: 320,
-      y: 200,
-    }))
+    })
+
+    wrapper.unmount()
+  })
+
+  it('only sends edited fields to applySelectedNodeChanges, preserving unedited geometry', async () => {
+    const editor = createEditorMock()
+    const wrapper = mount(CanvasInspector, {
+      props: {
+        editor,
+        getSideLabel: (side: string) => side,
+        t,
+      },
+    })
+
+    await wrapper.find('[data-testid="inspector-node-width"]').setValue('400')
+    await wrapper.find('[data-testid="inspector-node-apply"]').trigger('click')
+
+    expect(editor.applySelectedNodeChanges).toHaveBeenCalledWith({ width: 400 })
+    expect(editor.applySelectedNodeChanges).not.toHaveBeenCalledWith(
+      expect.objectContaining({ x: expect.anything() }),
+    )
+    expect(editor.applySelectedNodeChanges).not.toHaveBeenCalledWith(
+      expect.objectContaining({ y: expect.anything() }),
+    )
 
     wrapper.unmount()
   })

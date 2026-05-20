@@ -2566,6 +2566,8 @@ watch(
   background: var(--selection-toolbar-bg);
   box-shadow: var(--selection-toolbar-shadow);
   backdrop-filter: blur(14px);
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
 }
 
 .edge-toolbar {
@@ -2690,16 +2692,20 @@ watch(
 
 .selection-toolbar__popover {
   position: absolute;
-  left: 0;
+  left: auto;
+  right: 0;
   top: calc(100% + 10px);
   display: grid;
   gap: 8px;
   min-width: 160px;
+  max-height: 50vh;
   padding: 10px;
   border: 1px solid var(--selection-toolbar-border);
   border-radius: 14px;
   background: var(--selection-toolbar-bg);
   box-shadow: var(--selection-toolbar-shadow);
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .selection-toolbar__popover--colors {
@@ -3460,7 +3466,7 @@ watch(
 
 .inspector__content {
   display: grid;
-  gap: 0;
+  gap: 12px;
 }
 
 .inspector__toolbar {
@@ -3557,9 +3563,9 @@ watch(
 
 .inspector__section {
   display: grid;
-  gap: 10px;
-  margin-bottom: 18px;
-  padding: 14px;
+  gap: 12px;
+  margin-bottom: 0;
+  padding: 16px;
   border: 1px solid var(--canvas-border);
   border-radius: 16px;
   background: var(--canvas-inspector-section-bg);
@@ -3604,6 +3610,7 @@ watch(
 .inspector__section select,
 .inspector__section textarea {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--canvas-border);
   border-radius: 12px;
   background: var(--canvas-surface);
@@ -3611,6 +3618,7 @@ watch(
   font: inherit;
   color: inherit;
   box-sizing: border-box;
+  text-overflow: ellipsis;
 }
 
 .inspector__section textarea {
