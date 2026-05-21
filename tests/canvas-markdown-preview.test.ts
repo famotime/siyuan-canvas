@@ -37,6 +37,13 @@ Paragraph with **bold**, \`code\`, and [link](https://example.com).
     expect(html).toContain('<span style="background: rgba(255, 77, 79, 0.5); color: #ffffff">highlight</span>')
   })
 
+  it("preserves whitelisted canvas search mark tags for highlighted matches", () => {
+    const html = renderMarkdownPreview(`<mark class="canvas-search-mark">Alpha</mark> <mark class="canvas-search-mark canvas-search-mark--current">Beta</mark>`)
+
+    expect(html).toContain('<mark class="canvas-search-mark">Alpha</mark>')
+    expect(html).toContain('<mark class="canvas-search-mark canvas-search-mark--current">Beta</mark>')
+  })
+
   it("renders allowed inline color html alongside markdown formatting", () => {
     const html = renderMarkdownPreview(`### Title
 

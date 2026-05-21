@@ -131,6 +131,31 @@ export function renderCanvasSearchMarkedText(text: string, decorations: CanvasSe
   return htmlParts.join("")
 }
 
+export function markCanvasSearchTextRanges(text: string, decorations: CanvasSearchDecoration[]) {
+  const ranges = decorations
+    .filter(decoration => isValidReplacementRange(text, decoration.start, decoration.end) && decoration.start < decoration.end)
+    .sort((left, right) => left.start - right.start)
+
+  const parts: string[] = []
+  let cursor = 0
+  for (const range of ranges) {
+    if (range.start < cursor) {
+      continue
+    }
+
+    parts.push(text.slice(cursor, range.start))
+    parts.push([
+      `<mark class="${range.current ? "canvas-search-mark canvas-search-mark--current" : "canvas-search-mark"}">`,
+      text.slice(range.start, range.end),
+      "</mark>",
+    ].join(""))
+    cursor = range.end
+  }
+
+  parts.push(text.slice(cursor))
+  return parts.join("")
+}
+
 function createNodeSearchTarget(node: CanvasNode, fileNodeTextById: Map<string, string>): CanvasSearchTarget | null {
   if (node.type === "text" && node.text.length > 0) {
     return {

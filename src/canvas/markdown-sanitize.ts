@@ -143,6 +143,20 @@ export function sanitizeInlineStyle(style: string): string | null {
 }
 
 export function parseAllowedInlineOpenTag(value: string): AllowedInlineOpenTag | null {
+  const markMatch = value.match(/^<mark\s+class\s*=\s*(?:"([^"]*)"|'([^']*)')\s*>/i)
+  if (markMatch) {
+    const sanitizedClassName = sanitizeSearchMarkClassName(markMatch[1] ?? markMatch[2] ?? "")
+    if (!sanitizedClassName) {
+      return null
+    }
+
+    return {
+      closeTag: "</mark>",
+      html: `<mark class="${sanitizedClassName}">`,
+      length: markMatch[0].length,
+    }
+  }
+
   const spanMatch = value.match(/^<span\s+style\s*=\s*(?:"([^"]*)"|'([^']*)')\s*>/i)
   if (spanMatch) {
     const sanitizedStyle = sanitizeInlineStyle(spanMatch[1] ?? spanMatch[2] ?? "")
@@ -172,6 +186,28 @@ export function parseAllowedInlineOpenTag(value: string): AllowedInlineOpenTag |
   }
 
   return null
+}
+
+function sanitizeSearchMarkClassName(value: string) {
+  const classNames = value.trim().split(/\s+/).filter(Boolean)
+  if (!classNames.length || classNames[0] !== "canvas-search-mark") {
+    return null
+  }
+
+  const allowed = new Set(["canvas-search-mark", "canvas-search-mark--current"])
+  if (classNames.some(className => !allowed.has(className))) {
+    return null
+  }
+
+  const uniqueClassNames = Array.from(new Set(classNames))
+  if (
+    uniqueClassNames.length > 2
+    || (uniqueClassNames.length === 2 && !uniqueClassNames.includes("canvas-search-mark--current"))
+  ) {
+    return null
+  }
+
+  return uniqueClassNames.join(" ")
 }
 
 export function parseAllowedImageTag(value: string): SanitizedImageTag | null {

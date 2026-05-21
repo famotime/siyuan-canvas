@@ -4,6 +4,7 @@ import {
   collectCanvasSearchTargets,
   createCanvasSearchRevision,
   getCanvasSearchRegistry,
+  markCanvasSearchTextRanges,
   renderCanvasSearchMarkedText,
   replaceCanvasTextTargetRanges,
   registerCanvasSearchHost,
@@ -91,6 +92,15 @@ describe("canvas search bridge", () => {
       { current: true, start: 10, end: 15, targetId: "node:t1:text" },
     ])).toBe(
       'A &lt;<mark class="canvas-search-mark">Alpha</mark>&gt; <mark class="canvas-search-mark canvas-search-mark--current">Alpha</mark>',
+    )
+  })
+
+  it("marks multiple text-node search ranges in source order for markdown rendering", () => {
+    expect(markCanvasSearchTextRanges("Alpha Beta Alpha", [
+      { current: true, start: 11, end: 16, targetId: "node:t1:text" },
+      { current: false, start: 0, end: 5, targetId: "node:t1:text" },
+    ])).toBe(
+      '<mark class="canvas-search-mark">Alpha</mark> Beta <mark class="canvas-search-mark canvas-search-mark--current">Alpha</mark>',
     )
   })
 })

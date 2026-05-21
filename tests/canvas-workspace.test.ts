@@ -1143,6 +1143,27 @@ describe("CanvasWorkspace", () => {
     expect(marks[1]?.classes()).toContain("canvas-search-mark--current")
   })
 
+  it("renders inline search marks for multiple text node decorations in source order", () => {
+    const node = createTextNode({ text: "Alpha Beta Alpha" })
+    currentEditor = createEditorMock(node)
+    currentEditor.searchDecorations = [
+      { current: false, start: 0, end: 5, targetId: "node:text-1:text" },
+      { current: true, start: 11, end: 16, targetId: "node:text-1:text" },
+    ]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const marks = wrapper.findAll(".canvas-node--text .canvas-search-mark")
+    expect(marks.map(mark => mark.text())).toEqual(["Alpha", "Alpha"])
+    expect(marks[1]?.classes()).toContain("canvas-search-mark--current")
+  })
+
   it("renders the canvas minimap when enabled", () => {
     currentEditor = createEditorMock()
     currentEditor.getPluginSettings = vi.fn(() => ({

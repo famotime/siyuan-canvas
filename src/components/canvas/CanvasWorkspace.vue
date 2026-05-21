@@ -470,7 +470,7 @@
                   v-else
                   class="canvas-node__content markdown-preview"
                   data-canvas-field="text"
-                  v-html="editor.getRenderedMarkdown(node.text)"
+                  v-html="renderCanvasTextNodeContent(node)"
                 />
               </template>
               <template v-else-if="node.type === 'file'">
@@ -1477,6 +1477,7 @@ import type {
   CanvasSide,
 } from "@/canvas/types"
 import {
+  markCanvasSearchTextRanges,
   renderCanvasSearchMarkedText,
   type CanvasSearchDecoration,
 } from "@/canvas/search-bridge"
@@ -1863,6 +1864,18 @@ function renderCanvasGroupLabel(node: CanvasNode) {
     ? node.label || t("nodeDefaultGroupLabel")
     : ""
   return renderCanvasSearchMarkedText(label, getCanvasTargetDecorations(`node:${node.id}:label`))
+}
+
+function renderCanvasTextNodeContent(node: CanvasNode) {
+  if (node.type !== "text") {
+    return ""
+  }
+
+  const decorations = getCanvasTargetDecorations(`node:${node.id}:text`)
+  const markdown = decorations.length
+    ? markCanvasSearchTextRanges(node.text, decorations)
+    : node.text
+  return editor.getRenderedMarkdown(markdown)
 }
 
 /**
