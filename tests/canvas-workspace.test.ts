@@ -1,5 +1,7 @@
 /* @vitest-environment jsdom */
 
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import {
   describe,
   expect,
@@ -1162,6 +1164,22 @@ describe("CanvasWorkspace", () => {
     const marks = wrapper.findAll(".canvas-node--text .canvas-search-mark")
     expect(marks.map(mark => mark.text())).toEqual(["Alpha", "Alpha"])
     expect(marks[1]?.classes()).toContain("canvas-search-mark--current")
+  })
+
+  it("uses deep selectors for inline search marks injected with v-html", () => {
+    const stylesheet = readFileSync(resolve(__dirname, "../src/components/canvas/CanvasWorkspace.vue"), "utf-8")
+
+    expect(stylesheet).toContain(":is(.markdown-preview, .canvas-node__group-label) :deep(.canvas-search-mark) {")
+    expect(stylesheet).toContain(":is(.markdown-preview, .canvas-node__group-label) :deep(.canvas-search-mark--current) {")
+    expect(stylesheet).toContain("--canvas-search-highlight-color: var(--sfsr-highlight-color, var(--b3-theme-primary));")
+    expect(stylesheet).toContain("background: color-mix(in srgb, var(--canvas-search-highlight-color) 22%, transparent);")
+    expect(stylesheet).toContain("background: color-mix(in srgb, var(--canvas-search-highlight-color) 42%, transparent);")
+    expect(stylesheet).not.toContain("color: var(--b3-theme-on-primary, #fff);")
+    expect(stylesheet).toContain("color: inherit;")
+    expect(stylesheet).toContain("text-decoration: underline;")
+    expect(stylesheet).toContain("text-decoration-color: color-mix(in srgb, var(--canvas-search-highlight-color) 68%, black 32%);")
+    expect(stylesheet).toContain("text-decoration-thickness: 3px;")
+    expect(stylesheet).toContain("text-decoration-skip-ink: none;")
   })
 
   it("renders the canvas minimap when enabled", () => {

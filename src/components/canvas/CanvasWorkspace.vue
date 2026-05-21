@@ -2174,6 +2174,7 @@ watch(
   --canvas-accent-contrast: var(--b3-theme-on-primary);
   --canvas-accent-soft: color-mix(in srgb, var(--b3-theme-primary) 14%, transparent);
   --canvas-accent-strong: color-mix(in srgb, var(--b3-theme-primary) 72%, transparent);
+  --canvas-search-highlight-color: var(--sfsr-highlight-color, var(--b3-theme-primary));
 
   /* 语义色 */
   --canvas-success: var(--b3-card-success-color, #2f7d4e);
@@ -2964,24 +2965,28 @@ watch(
 }
 
 .canvas-node--search-match {
-  box-shadow: 0 0 0 2px var(--b3-theme-primary-light), var(--canvas-shadow);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--canvas-search-highlight-color) 58%, transparent), var(--canvas-shadow);
 }
 
 .canvas-node--search-current {
   z-index: 4;
-  box-shadow: 0 0 0 3px var(--b3-theme-primary), var(--canvas-shadow-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--canvas-search-highlight-color) 84%, black 16%), var(--canvas-shadow-strong);
 }
 
-.canvas-search-mark {
+:is(.markdown-preview, .canvas-node__group-label) :deep(.canvas-search-mark) {
   border-radius: 3px;
-  background: var(--b3-theme-primary-light);
+  background: color-mix(in srgb, var(--canvas-search-highlight-color) 22%, transparent);
   color: inherit;
   padding: 0 1px;
 }
 
-.canvas-search-mark--current {
-  background: var(--b3-theme-primary);
-  color: var(--b3-theme-on-primary, #fff);
+:is(.markdown-preview, .canvas-node__group-label) :deep(.canvas-search-mark--current) {
+  background: color-mix(in srgb, var(--canvas-search-highlight-color) 42%, transparent);
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--canvas-search-highlight-color) 68%, black 32%);
+  text-decoration-thickness: 3px;
+  text-decoration-skip-ink: none;
 }
 
 .canvas-node:hover {
