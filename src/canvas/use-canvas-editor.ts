@@ -64,6 +64,8 @@ import { initializeCanvasEditor, syncCanvasEditorSelectionUi } from "@/canvas/us
 import { createCanvasEditorNodeActivationActions } from "@/canvas/use-canvas-editor-node-activation"
 import { createCanvasEditorNodeEdgeActions } from "@/canvas/use-canvas-editor-node-edge-actions"
 import { createCanvasEditorKeyboardHandler } from "@/canvas/use-canvas-editor-shortcuts"
+import { createCanvasBlockJumpHighlighter } from "@/canvas/block-jump-highlight"
+import { BLOCK_NAVIGATION_ACTIONS } from "@/canvas/protyle-navigation"
 import {
   getCanvasFileName,
 } from "@/canvas/use-canvas-editor-shared"
@@ -119,6 +121,7 @@ export function useCanvasEditor(
   setTitle: (title: string) => void,
 ) {
   const t = createCanvasI18n(plugin.i18n)
+  const blockJumpHighlighter = createCanvasBlockJumpHighlighter(plugin)
   const fileService = new CanvasFileService(new SiyuanCanvasTextGateway())
   const state = reactive(new CanvasEditorState(fileService))
   const history = new CanvasHistoryStack({ capacity: 100 })
@@ -509,25 +512,18 @@ export function useCanvasEditor(
   }
 
   async function openDocumentAtBlock(blockId: string, documentId?: string) {
-    const targetDocumentId = documentId || (await findSiyuanDocumentByBlockId(blockId))?.id
-
-    if (targetDocumentId) {
+    blockJumpHighlighter.requestBlockHighlight(blockId)
+    if (blockId) {
       await openTab({
         app: plugin.app,
         doc: {
-          id: targetDocumentId,
+          action: BLOCK_NAVIGATION_ACTIONS,
+          id: blockId,
         },
-        keepCursor: true,
+        keepCursor: false,
         openNewTab: true,
       })
     }
-
-    plugin.eventBus?.emit("open-siyuan-url-block", {
-      exist: false,
-      focus: true,
-      id: blockId,
-      url: `siyuan://blocks/${blockId}`,
-    })
   }
 
   async function refreshSelectedSiyuanNode() {
@@ -1245,6 +1241,7 @@ export function useCanvasEditor(
     unregisterCanvasSearchHost?.()
     unregisterCanvasSearchHost = null
     window.removeEventListener("keydown", handleKeydown)
+    blockJumpHighlighter.dispose()
   })
 
   watch(

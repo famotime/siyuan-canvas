@@ -45,7 +45,7 @@ export function createCanvasEditorNodeActivationActions(options: CanvasEditorNod
           doc: {
             id: resolved.id,
           },
-          keepCursor: true,
+          keepCursor: false,
           openNewTab: true,
         })
         showMessage(t('nodeActivated', { title: resolved.detail || resolved.title }), 2000, 'info')
@@ -70,7 +70,7 @@ export function createCanvasEditorNodeActivationActions(options: CanvasEditorNod
           asset: {
             path: resolved.openPath,
           },
-          keepCursor: true,
+          keepCursor: false,
           openNewTab: true,
         })
         showMessage(t('nodeActivated', { title: resolved.detail || resolved.title }), 2000, 'info')

@@ -43,6 +43,7 @@ import type { ModuleExports } from "vitest"
 const openTab = vi.fn()
 const showMessage = vi.fn()
 const confirm = vi.fn()
+const eventBusHandlers = new Map<string, Array<(event: any) => void>>()
 const fileNodeLookupMock = {
   findSiyuanAssetByPath: vi.fn(async () => null),
   findSiyuanBlockById: vi.fn(async () => null),
@@ -383,7 +384,24 @@ function createPluginMock() {
   return {
     app: {},
     eventBus: {
-      emit: vi.fn(),
+      emit: vi.fn((eventName: string, event: any) => {
+        for (const handler of eventBusHandlers.get(eventName) || []) {
+          handler(event)
+        }
+      }),
+      off: vi.fn((eventName: string, handler: (event: any) => void) => {
+        const handlers = eventBusHandlers.get(eventName)
+        if (!handlers) {
+          return
+        }
+
+        eventBusHandlers.set(eventName, handlers.filter(item => item !== handler))
+      }),
+      on: vi.fn((eventName: string, handler: (event: any) => void) => {
+        const handlers = eventBusHandlers.get(eventName) || []
+        handlers.push(handler)
+        eventBusHandlers.set(eventName, handlers)
+      }),
     },
     getCanvasSettings: vi.fn(() => ({
       ...pluginData.settings,
@@ -496,6 +514,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
+  eventBusHandlers.clear()
   vi.restoreAllMocks()
 })
 
@@ -1169,15 +1189,18 @@ New body`)
     expect(openTab).toHaveBeenCalledWith(expect.objectContaining({
       app: plugin.app,
       doc: {
-        id: "20260412094047-root001",
+        action: [
+          "cb-get-html",
+          "cb-get-hl",
+          "cb-get-focus",
+          "cb-get-unchangeid",
+          "cb-get-before",
+          "cb-get-append",
+        ],
+        id: "20260412094047-ihhbskn",
       },
-      keepCursor: true,
+      keepCursor: false,
       openNewTab: true,
-    }))
-    expect(plugin.eventBus.emit).toHaveBeenCalledWith("open-siyuan-url-block", expect.objectContaining({
-      focus: true,
-      id: "20260412094047-ihhbskn",
-      url: "siyuan://blocks/20260412094047-ihhbskn",
     }))
 
     wrapper.unmount()
@@ -1214,15 +1237,18 @@ New body`)
     expect(openTab).toHaveBeenCalledWith(expect.objectContaining({
       app: plugin.app,
       doc: {
-        id: "20260412094047-root001",
+        action: [
+          "cb-get-html",
+          "cb-get-hl",
+          "cb-get-focus",
+          "cb-get-unchangeid",
+          "cb-get-before",
+          "cb-get-append",
+        ],
+        id: "20260412094047-img001",
       },
-      keepCursor: true,
+      keepCursor: false,
       openNewTab: true,
-    }))
-    expect(plugin.eventBus.emit).toHaveBeenCalledWith("open-siyuan-url-block", expect.objectContaining({
-      focus: true,
-      id: "20260412094047-img001",
-      url: "siyuan://blocks/20260412094047-img001",
     }))
 
     wrapper.unmount()
