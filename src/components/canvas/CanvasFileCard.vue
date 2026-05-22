@@ -97,6 +97,16 @@ const emit = defineEmits<{
   gap: 8px;
 }
 
+.file-card:has(.file-card__image) {
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.file-card:has(.file-card__document-preview) {
+  height: 100%;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
 .file-card__badge {
   justify-self: start;
   border-radius: 999px;
@@ -111,7 +121,8 @@ const emit = defineEmits<{
 .file-card__image {
   display: block;
   width: 100%;
-  max-height: 132px;
+  height: 100%;
+  min-height: 0;
   object-fit: cover;
   border-radius: 12px;
   border: 1px solid var(--canvas-border);
@@ -148,8 +159,9 @@ const emit = defineEmits<{
 }
 
 .file-card__document-preview {
-  max-height: min(46vh, 320px);
-  overflow: hidden;
+  margin-top: 2px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .file-card__helper {

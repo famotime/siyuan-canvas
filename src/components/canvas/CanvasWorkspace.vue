@@ -3069,6 +3069,11 @@ watch(
   cursor: default;
 }
 
+.canvas-node--file .canvas-node__body > [data-canvas-field="note"] {
+  height: 100%;
+  min-height: 0;
+}
+
 .canvas-node__title {
   font-weight: 600;
   line-height: 1.5;
@@ -3201,6 +3206,16 @@ watch(
   gap: 8px;
 }
 
+.file-card:has(.file-card__image) {
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.file-card:has(.file-card__document-preview) {
+  height: 100%;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
 .file-card__badge {
   justify-self: start;
   border-radius: 999px;
@@ -3215,7 +3230,8 @@ watch(
 .file-card__image {
   display: block;
   width: 100%;
-  max-height: 132px;
+  height: 100%;
+  min-height: 0;
   object-fit: cover;
   border-radius: 12px;
   border: 1px solid var(--canvas-border);
@@ -3252,8 +3268,9 @@ watch(
 }
 
 .file-card__document-preview {
-  max-height: min(46vh, 320px);
-  overflow: hidden;
+  margin-top: 2px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .file-card__helper {

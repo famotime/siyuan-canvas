@@ -1,6 +1,12 @@
 /* @vitest-environment jsdom */
 
 import {
+  readFileSync,
+} from 'node:fs'
+import {
+  resolve,
+} from 'node:path'
+import {
   describe,
   expect,
   it,
@@ -98,5 +104,25 @@ describe('CanvasFileCard', () => {
     await wrapper.find('.file-card__image').trigger('error')
 
     expect(wrapper.emitted('image-error')).toEqual([[node]])
+  })
+
+  it('lets file previews grow with the resized card instead of clamping to a fixed preview height', () => {
+    const stylesheet = readFileSync(resolve(__dirname, '../src/components/canvas/CanvasFileCard.vue'), 'utf-8')
+    const workspaceStylesheet = readFileSync(resolve(__dirname, '../src/components/canvas/CanvasWorkspace.vue'), 'utf-8')
+
+    expect(stylesheet).toContain('.file-card:has(.file-card__image)')
+    expect(stylesheet).toContain('.file-card:has(.file-card__document-preview)')
+    expect(stylesheet).toContain('grid-template-rows: auto minmax(0, 1fr);')
+    expect(stylesheet).toContain('grid-template-rows: auto auto minmax(0, 1fr);')
+    expect(stylesheet).toContain('margin-top: 2px;')
+    expect(stylesheet).not.toContain('max-height: 132px;')
+    expect(stylesheet).not.toContain('max-height: min(46vh, 320px);')
+    expect(workspaceStylesheet).toContain('.file-card:has(.file-card__image)')
+    expect(workspaceStylesheet).toContain('.file-card:has(.file-card__document-preview)')
+    expect(workspaceStylesheet).toContain('grid-template-rows: auto auto minmax(0, 1fr);')
+    expect(workspaceStylesheet).toContain('margin-top: 2px;')
+    expect(workspaceStylesheet).toContain('.canvas-node--file .canvas-node__body > [data-canvas-field="note"]')
+    expect(workspaceStylesheet).not.toContain('max-height: 132px;')
+    expect(workspaceStylesheet).not.toContain('max-height: min(46vh, 320px);')
   })
 })
