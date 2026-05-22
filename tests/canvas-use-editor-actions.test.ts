@@ -1386,6 +1386,34 @@ New body`)
     wrapper.unmount()
   })
 
+  it("updates the URL field when editing link node content", async () => {
+    const { editor, wrapper } = await mountEditor({
+      raw: JSON.stringify({
+        edges: [],
+        nodes: [{
+          height: 180,
+          id: "link-1",
+          type: "link",
+          url: "https://example.com/old",
+          width: 320,
+          x: 0,
+          y: 0,
+        }],
+      }),
+    })
+
+    editor.updateTextNodeContent("link-1", "https://example.com/new")
+    await flushEditor()
+
+    expect(editor.state.document.nodes[0]).toMatchObject({
+      id: "link-1",
+      type: "link",
+      url: "https://example.com/new",
+    })
+
+    wrapper.unmount()
+  })
+
   it("creates a mind-map sibling node with Enter and links it from the same parent", async () => {
     const parentNode = {
       height: 100,

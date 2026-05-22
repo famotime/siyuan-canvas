@@ -438,6 +438,14 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
         ...node,
         label: text,
       })
+      return
+    }
+
+    if (node.type === 'link') {
+      updateNode({
+        ...node,
+        url: text,
+      })
     }
   }
 

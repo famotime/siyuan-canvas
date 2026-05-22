@@ -264,6 +264,8 @@ function createEditorMock(node = createTextNode()) {
     updateNodeField: vi.fn(),
     updateNumericNodeField: vi.fn(),
     updateTextNodeContent: vi.fn(),
+    convertTextToLink: vi.fn(),
+    convertLinkToText: vi.fn(),
     workspaceDocuments: [],
     viewport: {
       scale: 1,
@@ -455,6 +457,52 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".canvas-node__editor").exists()).toBe(false)
   })
 
+  it("converts a URL-only text card to a link when saving inline edits", async () => {
+    const node = createTextNode({
+      text: "https://example.com/old",
+    })
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find(".canvas-node").trigger("dblclick")
+
+    const textarea = wrapper.find(".canvas-node__editor")
+    await textarea.setValue("https://example.com/new")
+    await textarea.trigger("blur")
+
+    expect(currentEditor.convertTextToLink).toHaveBeenCalledWith(node.id, "https://example.com/new")
+    expect(currentEditor.updateTextNodeContent).not.toHaveBeenCalled()
+  })
+
+  it("converts a link card to text when saving inline edits without a URL", async () => {
+    const node = createLinkNode()
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find(".canvas-node").trigger("dblclick")
+
+    const textarea = wrapper.find(".canvas-node__editor")
+    await textarea.setValue("plain text")
+    await textarea.trigger("blur")
+
+    expect(currentEditor.convertLinkToText).toHaveBeenCalledWith(node.id, "plain text")
+    expect(currentEditor.updateTextNodeContent).not.toHaveBeenCalled()
+  })
+
   it("lets a group card enter label editing on double click and saves on blur", async () => {
     const node = createGroupNode()
     currentEditor = createEditorMock(node)
@@ -644,7 +692,7 @@ describe("CanvasWorkspace", () => {
     expect(toolbarText).not.toContain("打开")
     expect(toolbarText).not.toContain("导出")
     expect(toolbarText).not.toContain("设置")
-    expect(toolbarText).not.toContain("卡片")
+    expect(toolbarText).not.toContain("文本")
     expect(toolbarText).not.toContain("笔记")
     expect(toolbarText).not.toContain("链接")
     expect(toolbarText).not.toContain("分组")
@@ -1908,8 +1956,8 @@ describe("CanvasWorkspace", () => {
     expect(toolbarText).toContain("已保存")
     expect(toolbarText).not.toContain("未命名.canvas")
     expect(wrapper.find(".toolbar__meta-name").exists()).toBe(false)
-    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("aria-label")).toBe("卡片")
-    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("data-tooltip")).toBe("卡片")
+    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("aria-label")).toBe("文本")
+    expect(wrapper.find("[data-testid='bottom-toolbar-text']").attributes("data-tooltip")).toBe("文本")
     expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("aria-label")).toBe("笔记")
     expect(wrapper.find("[data-testid='bottom-toolbar-file']").attributes("data-tooltip")).toBe("笔记")
     expect(wrapper.find("[data-testid='bottom-toolbar-connect']").attributes("aria-label")).toBe("连线")
