@@ -243,8 +243,10 @@ export function useCanvasEditor(
       return false
     }
 
-    const kind = getResolvedFileNode(selectedNode.value).kind
-    return kind === 'block' || kind === 'document'
+    const resolved = getResolvedFileNode(selectedNode.value)
+    return resolved.kind === 'block'
+      || resolved.kind === 'document'
+      || (resolved.kind === 'image' && Boolean(resolved.blockId))
   })
   const canDecomposeSelectedDocument = computed(() => {
     if (selectedNodeCount.value !== 1) {

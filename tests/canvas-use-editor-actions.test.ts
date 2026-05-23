@@ -1167,6 +1167,86 @@ New body`)
     wrapper.unmount()
   })
 
+  it("refreshes a selected Siyuan paragraph block node preview with the latest block markdown", async () => {
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-pblock1",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "Paragraph",
+      type: "p",
+    })
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue("Old paragraph")
+
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", "20260412094047-pblock1")
+    await flushEditor()
+
+    expect(editor.canRefreshSelectedSiyuanNode).toBe(true)
+    expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>Old paragraph</p>")
+
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue("New paragraph")
+
+    await editor.refreshSelectedSiyuanNode()
+    await flushEditor()
+
+    expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>New paragraph</p>")
+
+    wrapper.unmount()
+  })
+
+  it("refreshes a selected Siyuan image block node preview with the latest asset", async () => {
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-imgroad",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "Diagram",
+      type: "I",
+    })
+    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
+      blockId: "20260412094047-imgroad",
+      name: "old.png",
+      openPath: "/data/assets/old.png",
+      path: "assets/old.png",
+      title: "Old diagram",
+    })
+
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", "20260412094047-imgroad")
+    await flushEditor()
+
+    expect(editor.getFileNodePreview(editor.selectedNode)).toMatchObject({
+      imageSrc: "/data/assets/old.png",
+      kind: "image",
+    })
+    expect(editor.canRefreshSelectedSiyuanNode).toBe(true)
+
+    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
+      blockId: "20260412094047-imgroad",
+      name: "new.png",
+      openPath: "/data/assets/new.png",
+      path: "assets/new.png",
+      title: "New diagram",
+    })
+
+    await editor.refreshSelectedSiyuanNode()
+    await flushEditor()
+
+    expect(editor.getFileNodePreview(editor.selectedNode)).toMatchObject({
+      imageSrc: "/data/assets/new.png",
+      kind: "image",
+    })
+
+    wrapper.unmount()
+  })
+
   it("opens a block node by opening its document and jumping to the block", async () => {
     const { editor, plugin, wrapper } = await mountEditor()
 
@@ -1261,9 +1341,15 @@ New body`)
       path: "/data/roadmap.sy",
       rootId: "20260412094047-root001",
       title: "Diagram",
+      type: "I",
     })
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue(`![Diagram](assets/diagram.png)
-{: id="20260412094047-ihhbskn"}`)
+    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
+      blockId: "20260412094047-ihhbskn",
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Diagram",
+    })
 
     const { editor, wrapper } = await mountEditor()
 
@@ -1273,7 +1359,7 @@ New body`)
     await flushEditor()
 
     const preview = editor.getFileNodePreview(editor.selectedNode)
-    expect(preview.kind).toBe("block")
+    expect(preview.kind).toBe("image")
     expect(preview.imageSrc).toBe("/data/assets/diagram.png")
 
     wrapper.unmount()
@@ -1286,9 +1372,15 @@ New body`)
       path: "/data/roadmap.sy",
       rootId: "20260412094047-root001",
       title: "Diagram",
+      type: "I",
     })
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue(`![Diagram](assets/diagram.png)
-{: id="20260412094047-ihhbskn"}`)
+    fileNodeLookupMock.findSiyuanImageAssetByBlockId.mockResolvedValue({
+      blockId: "20260412094047-ihhbskn",
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Diagram",
+    })
 
     const { editor, wrapper } = await mountEditor()
 
@@ -1299,7 +1391,7 @@ New body`)
     await flushEditor()
 
     const preview = editor.getFileNodePreview(editor.selectedNode)
-    expect(preview.kind).toBe("block")
+    expect(preview.kind).toBe("image")
     expect(preview.imageSrc).toBe("/data/assets/diagram.png")
     expect(preview.headline).toBe("Diagram")
 

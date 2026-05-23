@@ -102,8 +102,22 @@ export async function resolveCanvasFileTarget(
 
   const blockId = BLOCK_ID_PATTERN.test(trimmed) ? trimmed : extractEmbeddedBlockId(trimmed)
   if (blockId) {
+    const embeddedImagePath = extractEmbeddedImagePath(trimmed)
+    if (embeddedImagePath) {
+      const image = await lookups.resolveImageByBlockId(blockId)
+      if (image) {
+        return image
+      }
+    }
+
     const block = await lookups.resolveBlockById(blockId)
     if (block) {
+      if (block.type === 'I') {
+        const image = await lookups.resolveImageByBlockId(blockId)
+        if (image) {
+          return image
+        }
+      }
       return block
     }
 

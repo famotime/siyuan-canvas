@@ -1031,6 +1031,35 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".file-card__helper").exists()).toBe(false)
   })
 
+  it("does not render a duplicate standalone image for block previews that already contain an image", () => {
+    currentEditor = createEditorMock({
+      id: "file-block-image-1",
+      file: "20260412094047-imgroad",
+      type: "file",
+    })
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Block",
+      clampMode: "viewport",
+      detail: "/Projects/Roadmap",
+      headline: "Diagram",
+      helper: "Opens block in SiYuan",
+      imageSrc: "/data/assets/road.png",
+      kind: "block",
+      previewHtml: '<p><img src="/data/assets/road.png" alt="road"></p>',
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find(".file-card__image").exists()).toBe(false)
+    expect(wrapper.findAll(".file-card__document-preview img")).toHaveLength(1)
+  })
+
   it("renders a document preview card with the title and content while moving the path to a tooltip", () => {
     currentEditor = createEditorMock({
       id: "file-document-1",

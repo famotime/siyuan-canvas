@@ -24,6 +24,7 @@ function createStageDropHarness(options?: { fileSource?: string, filePath?: stri
   }))
   const viewport = { scale: 1, x: 0, y: 0 }
   const selectNode = vi.fn()
+  const refreshFileNodeMetadata = vi.fn(async () => {})
   const state = {
     document: createEmptyCanvasDocument(),
     filePath: options?.filePath ?? '/test.canvas',
@@ -33,14 +34,14 @@ function createStageDropHarness(options?: { fileSource?: string, filePath?: stri
     board,
     commitDocument: (doc: any) => committed.push(doc),
     fileSource: ref(options?.fileSource ?? 'workspace'),
-    refreshFileNodeMetadata: vi.fn(async () => {}),
+    refreshFileNodeMetadata,
     selectNode,
     state,
     t: ((key: string) => key) as any,
     viewport,
   })
 
-  return { committed, harness, selectNode }
+  return { committed, harness, refreshFileNodeMetadata, selectNode }
 }
 
 function createDropEvent(data: string, clientX = 100, clientY = 200): DragEvent {
@@ -153,5 +154,17 @@ describe('canvas editor stage drop', () => {
     const node = committed[0].nodes.find((n: any) => n.type === 'file')!
     expect(node.x).toBe(400)
     expect(node.y).toBe(300)
+  })
+
+  it('keeps dropped image block id as file source so metadata refresh can resolve it as an image', async () => {
+    const { committed, harness, refreshFileNodeMetadata } = createStageDropHarness()
+    const event = createDropEvent('20230613234017-zkw3pr0')
+
+    await harness.handleStageDrop(event)
+
+    expect(committed).toHaveLength(1)
+    const node = committed[0].nodes.find((n: any) => n.type === 'file')!
+    expect(node.file).toBe('20230613234017-zkw3pr0')
+    expect(refreshFileNodeMetadata).toHaveBeenCalledTimes(1)
   })
 })

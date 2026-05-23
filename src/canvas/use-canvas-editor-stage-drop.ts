@@ -5,10 +5,12 @@ import type { CanvasI18nTranslator } from '@/canvas/use-canvas-editor-shared'
 import type { CanvasEditorFileSource } from '@/canvas/use-canvas-editor-shared'
 
 import { showMessage } from 'siyuan'
-import { createCanvasNode, upsertCanvasNode } from '@/canvas/document'
+import { upsertCanvasNode } from '@/canvas/document'
 import { createFileNodeAtViewport } from '@/canvas/use-canvas-editor-file-picker'
 
 const SIYUAN_DROP_FILE = 'application/siyuan-file'
+const SIYUAN_DROP_GUTTER = 'application/siyuan-gutter'
+const ZWSP = '​'
 const SIYUAN_BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
 
 interface CanvasEditorStageDropOptions {
@@ -40,7 +42,12 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
 
   function handleStageDragOver(event: DragEvent) {
     const types = event.dataTransfer?.types
-    if (!types || !types.includes(SIYUAN_DROP_FILE))
+    if (!types)
+      return
+
+    const hasSiyuanDrop = types.includes(SIYUAN_DROP_FILE)
+      || types.some(t => t.startsWith(SIYUAN_DROP_GUTTER))
+    if (!hasSiyuanDrop)
       return
 
     event.preventDefault()
@@ -49,7 +56,16 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
   }
 
   async function handleStageDrop(event: DragEvent) {
-    const rawIds = event.dataTransfer?.getData(SIYUAN_DROP_FILE)
+    let rawIds = event.dataTransfer?.getData(SIYUAN_DROP_FILE) ?? ''
+
+    if (!rawIds) {
+      const gutterType = event.dataTransfer?.types.find(t => t.startsWith(SIYUAN_DROP_GUTTER))
+      if (gutterType) {
+        const parts = gutterType.split(ZWSP)
+        rawIds = parts[2] ?? ''
+      }
+    }
+
     if (!rawIds)
       return
 
@@ -73,12 +89,13 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
     const startY = stageY - ((ids.length - 1) * verticalGap) / 2
 
     for (let i = 0; i < ids.length; i++) {
+      const blockId = ids[i].trim()
       const node = createFileNodeAtViewport(
         board.value,
         viewport,
         { x: stageX, y: startY + i * verticalGap },
       )
-      node.file = ids[i].trim()
+      node.file = blockId
       commitDocument(upsertCanvasNode(state.document, node))
       if (i === ids.length - 1)
         selectNode(node.id)

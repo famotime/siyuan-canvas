@@ -1990,7 +1990,7 @@ function getFileCardImageSource(node: CanvasNode): string | undefined {
   }
 
   const preview = editor.getFileNodePreview(node)
-  if (!preview.imageSrc) {
+  if (preview.kind !== "image" || !preview.imageSrc) {
     return undefined
   }
 
