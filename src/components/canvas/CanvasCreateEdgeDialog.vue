@@ -20,7 +20,7 @@
             type="button"
             @click="toggleEdgeNodePicker('source')"
           >
-            <span class="canvas-node-picker__trigger-label">{{ getEdgeNodeTriggerLabel('source') }}</span>
+            <span class="canvas-node-picker__trigger-label" :title="getEdgeNodeTriggerLabel('source')">{{ getEdgeNodeTriggerLabel('source') }}</span>
             <span class="canvas-node-picker__trigger-chevron">{{ activeEdgeNodePicker === 'source' ? '▴' : '▾' }}</span>
           </button>
           <div
@@ -44,6 +44,7 @@
                 class="canvas-node-picker__option"
                 data-testid="create-edge-source-option"
                 type="button"
+                :title="editor.getNodeTitle(node)"
                 @click="selectEdgeNodeOption('source', node.id)"
               >
                 {{ editor.getNodeTitle(node) }}
@@ -70,7 +71,7 @@
             type="button"
             @click="toggleEdgeNodePicker('target')"
           >
-            <span class="canvas-node-picker__trigger-label">{{ getEdgeNodeTriggerLabel('target') }}</span>
+            <span class="canvas-node-picker__trigger-label" :title="getEdgeNodeTriggerLabel('target')">{{ getEdgeNodeTriggerLabel('target') }}</span>
             <span class="canvas-node-picker__trigger-chevron">{{ activeEdgeNodePicker === 'target' ? '▴' : '▾' }}</span>
           </button>
           <div
@@ -94,6 +95,7 @@
                 class="canvas-node-picker__option"
                 data-testid="create-edge-target-option"
                 type="button"
+                :title="editor.getNodeTitle(node)"
                 @click="selectEdgeNodeOption('target', node.id)"
               >
                 {{ editor.getNodeTitle(node) }}
@@ -325,18 +327,24 @@ watch(activeEdgeNodePicker, async (kind) => {
 
 .canvas-node-picker {
   position: relative;
+  min-width: 0;
 }
 
 .canvas-node-picker__trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   gap: 12px;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
   text-align: left;
   cursor: pointer;
 }
 
 .canvas-node-picker__trigger-label {
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -375,16 +383,20 @@ watch(activeEdgeNodePicker, async (kind) => {
 }
 
 .canvas-node-picker__option {
-  display: grid;
-  gap: 4px;
+  display: block;
   width: 100%;
+  min-width: 0;
   border: 0;
   border-radius: 10px;
   background: var(--canvas-floating-button-bg);
   padding: 8px 10px;
   color: var(--canvas-text);
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .canvas-node-picker__option:hover {

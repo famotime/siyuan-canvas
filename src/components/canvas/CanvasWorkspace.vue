@@ -3573,6 +3573,8 @@ watch(
 .inspector__content {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .inspector__toolbar {

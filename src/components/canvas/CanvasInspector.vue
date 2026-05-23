@@ -130,48 +130,108 @@
       <span>{{ getSectionChevron('createEdge') }}</span>
     </button>
     <div v-if="editor.inspectorSectionState.createEdge">
-      <label>
-        {{ t("fieldSourceNode") }}
-        <input
-          v-model="editor.newEdgeSourceQuery"
-          class="inspector__control"
+      <span class="inspector__field-label">{{ t("fieldSourceNode") }}</span>
+      <div
+        ref="inspSourcePickerRef"
+        class="insp-node-picker"
+      >
+        <button
+          ref="inspSourceTriggerRef"
+          class="insp-node-picker__trigger"
+          type="button"
+          @click="toggleInspPicker('source')"
         >
-        <select
-          :value="editor.newEdgeSourceId"
-          class="inspector__control"
-          @change="editor.setNewEdgeSourceId(valueFromEvent($event))"
+          <span
+            class="insp-node-picker__trigger-label"
+            :style="getInspPickerLabelStyle('source')"
+            :title="getInspPickerLabel('source')"
+          >{{ getInspPickerLabel('source') }}</span>
+          <span
+            ref="inspSourceChevronRef"
+            class="insp-node-picker__trigger-chevron"
+          >{{ activeInspPicker === 'source' ? '▴' : '▾' }}</span>
+        </button>
+        <div
+          v-if="activeInspPicker === 'source'"
+          class="insp-node-picker__panel"
         >
-          <option value="">{{ t("fieldSelectSourceNode") }}</option>
-          <option
-            v-for="node in editor.edgeSources"
-            :key="node.id"
-            :value="node.id"
+          <input
+            ref="inspSourceSearchRef"
+            v-model="editor.newEdgeSourceQuery"
+            class="insp-node-picker__search"
+            :placeholder="t('fieldSearchNodePlaceholder')"
           >
-            {{ editor.getNodeTitle(node) }}
-          </option>
-        </select>
-      </label>
-      <label>
-        {{ t("fieldTarget") }}
-        <input
-          v-model="editor.newEdgeTargetQuery"
-          class="inspector__control"
+          <div class="insp-node-picker__options">
+            <button
+              v-for="node in editor.edgeSources"
+              :key="node.id"
+              class="insp-node-picker__option"
+              type="button"
+              :title="editor.getNodeTitle(node)"
+              @click="selectInspNode('source', node.id)"
+            >
+              {{ editor.getNodeTitle(node) }}
+            </button>
+            <p
+              v-if="editor.edgeSources.length === 0"
+              class="insp-node-picker__empty"
+            >
+              {{ t('fieldNoMatchingNodes') }}
+            </p>
+          </div>
+        </div>
+      </div>
+      <span class="inspector__field-label">{{ t("fieldTarget") }}</span>
+      <div
+        ref="inspTargetPickerRef"
+        class="insp-node-picker"
+      >
+        <button
+          ref="inspTargetTriggerRef"
+          class="insp-node-picker__trigger"
+          type="button"
+          @click="toggleInspPicker('target')"
         >
-        <select
-          :value="editor.newEdgeTargetId"
-          class="inspector__control"
-          @change="editor.setNewEdgeTargetId(valueFromEvent($event))"
+          <span
+            class="insp-node-picker__trigger-label"
+            :style="getInspPickerLabelStyle('target')"
+            :title="getInspPickerLabel('target')"
+          >{{ getInspPickerLabel('target') }}</span>
+          <span
+            ref="inspTargetChevronRef"
+            class="insp-node-picker__trigger-chevron"
+          >{{ activeInspPicker === 'target' ? '▴' : '▾' }}</span>
+        </button>
+        <div
+          v-if="activeInspPicker === 'target'"
+          class="insp-node-picker__panel"
         >
-          <option value="">{{ t("fieldSelectTargetNode") }}</option>
-          <option
-            v-for="node in editor.edgeTargets"
-            :key="node.id"
-            :value="node.id"
+          <input
+            ref="inspTargetSearchRef"
+            v-model="editor.newEdgeTargetQuery"
+            class="insp-node-picker__search"
+            :placeholder="t('fieldSearchNodePlaceholder')"
           >
-            {{ editor.getNodeTitle(node) }}
-          </option>
-        </select>
-      </label>
+          <div class="insp-node-picker__options">
+            <button
+              v-for="node in editor.edgeTargets"
+              :key="node.id"
+              class="insp-node-picker__option"
+              type="button"
+              :title="editor.getNodeTitle(node)"
+              @click="selectInspNode('target', node.id)"
+            >
+              {{ editor.getNodeTitle(node) }}
+            </button>
+            <p
+              v-if="editor.edgeTargets.length === 0"
+              class="insp-node-picker__empty"
+            >
+              {{ t('fieldNoMatchingNodes') }}
+            </p>
+          </div>
+        </div>
+      </div>
       <label>
         {{ t("fieldEdgeLabel") }}
         <input v-model="editor.newEdgeLabel" />
@@ -269,7 +329,11 @@ export default { name: "CanvasInspector" }
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
   reactive,
+  ref,
   watch,
 } from 'vue'
 
@@ -278,6 +342,129 @@ const props = defineProps<{
   getSideLabel: (side: string) => string
   t: (key: string, args?: Record<string, unknown>) => string
 }>()
+
+type InspPickerKind = 'source' | 'target'
+
+const activeInspPicker = ref<InspPickerKind | null>(null)
+const inspSourcePickerRef = ref<HTMLElement>()
+const inspSourceSearchRef = ref<HTMLInputElement>()
+const inspSourceTriggerRef = ref<HTMLButtonElement>()
+const inspSourceChevronRef = ref<HTMLElement>()
+const inspTargetPickerRef = ref<HTMLElement>()
+const inspTargetSearchRef = ref<HTMLInputElement>()
+const inspTargetTriggerRef = ref<HTMLButtonElement>()
+const inspTargetChevronRef = ref<HTMLElement>()
+
+const inspPickerLabelMaxWidths = reactive<Record<InspPickerKind, number>>({
+  source: 0,
+  target: 0,
+})
+
+let inspPickerResizeObserver: ResizeObserver | undefined
+
+function getInspPickerLabel(kind: InspPickerKind): string {
+  const nodeId = kind === 'source' ? props.editor.newEdgeSourceId : props.editor.newEdgeTargetId
+  const fallbackLabel = kind === 'source' ? props.t('fieldSelectSourceNode') : props.t('fieldSelectTargetNode')
+  const nodes = kind === 'source' ? props.editor.edgeSources : props.editor.edgeTargets
+  const node = nodes.find((candidate: any) => candidate.id === nodeId)
+  return node ? props.editor.getNodeTitle(node) : fallbackLabel
+}
+
+function getInspPickerLabelStyle(kind: InspPickerKind): Record<string, string> {
+  const width = inspPickerLabelMaxWidths[kind]
+  return width > 0
+    ? { '--insp-node-picker-label-max-width': `${width}px` }
+    : {}
+}
+
+function getNumericStyleValue(styles: CSSStyleDeclaration, property: string): number {
+  const value = Number.parseFloat(styles.getPropertyValue(property))
+  return Number.isFinite(value) ? value : 0
+}
+
+function updateInspPickerLabelMaxWidth(kind: InspPickerKind): void {
+  const trigger = kind === 'source' ? inspSourceTriggerRef.value : inspTargetTriggerRef.value
+  if (!trigger) {
+    inspPickerLabelMaxWidths[kind] = 0
+    return
+  }
+
+  const chevron = kind === 'source' ? inspSourceChevronRef.value : inspTargetChevronRef.value
+  const styles = window.getComputedStyle(trigger)
+  const availableWidth = trigger.clientWidth
+    - getNumericStyleValue(styles, 'padding-left')
+    - getNumericStyleValue(styles, 'padding-right')
+    - getNumericStyleValue(styles, 'column-gap')
+    - (chevron?.offsetWidth ?? 0)
+
+  inspPickerLabelMaxWidths[kind] = Math.max(0, Math.floor(availableWidth))
+}
+
+function updateInspPickerLabelMaxWidths(): void {
+  updateInspPickerLabelMaxWidth('source')
+  updateInspPickerLabelMaxWidth('target')
+}
+
+function toggleInspPicker(kind: InspPickerKind) {
+  activeInspPicker.value = activeInspPicker.value === kind ? null : kind
+}
+
+function selectInspNode(kind: InspPickerKind, nodeId: string) {
+  if (kind === 'source') {
+    props.editor.setNewEdgeSourceId(nodeId)
+  } else {
+    props.editor.setNewEdgeTargetId(nodeId)
+  }
+  activeInspPicker.value = null
+}
+
+function handleInspPointerDown(event: PointerEvent) {
+  if (!(event.target instanceof HTMLElement)) {
+    activeInspPicker.value = null
+    return
+  }
+  if (
+    inspSourcePickerRef.value?.contains(event.target)
+    || inspTargetPickerRef.value?.contains(event.target)
+  ) {
+    return
+  }
+  activeInspPicker.value = null
+}
+
+onMounted(() => {
+  window.addEventListener('pointerdown', handleInspPointerDown)
+  nextTick(updateInspPickerLabelMaxWidths)
+  if (typeof ResizeObserver !== 'undefined') {
+    inspPickerResizeObserver = new ResizeObserver(updateInspPickerLabelMaxWidths)
+    if (inspSourceTriggerRef.value) {
+      inspPickerResizeObserver.observe(inspSourceTriggerRef.value)
+    }
+    if (inspTargetTriggerRef.value) {
+      inspPickerResizeObserver.observe(inspTargetTriggerRef.value)
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('pointerdown', handleInspPointerDown)
+  inspPickerResizeObserver?.disconnect()
+})
+
+watch(activeInspPicker, async (kind) => {
+  if (!kind) return
+  if (kind === 'source') {
+    props.editor.newEdgeSourceQuery = ''
+  } else {
+    props.editor.newEdgeTargetQuery = ''
+  }
+  await nextTick()
+  if (kind === 'source') {
+    inspSourceSearchRef.value?.focus()
+    return
+  }
+  inspTargetSearchRef.value?.focus()
+})
 
 const multiNodeDraft = reactive({
   height: 0,
@@ -444,6 +631,8 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   border: 1px solid var(--canvas-border);
   border-radius: 16px;
   background: var(--canvas-inspector-section-bg);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .inspector__action-button {
@@ -535,5 +724,113 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .inspector__section textarea {
   min-height: 120px;
   resize: vertical;
+}
+
+.inspector__field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--canvas-text-muted);
+}
+
+.insp-node-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.insp-node-picker__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 10px;
+  background: var(--canvas-input-bg);
+  color: var(--canvas-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.insp-node-picker__trigger-label {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: var(--insp-node-picker-label-max-width);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insp-node-picker__trigger-chevron {
+  flex: 0 0 auto;
+  color: var(--canvas-text-muted);
+}
+
+.insp-node-picker__panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 12px;
+  background: var(--canvas-surface);
+  box-shadow: var(--canvas-shadow);
+}
+
+.insp-node-picker__search {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 8px;
+  background: var(--canvas-input-bg);
+  color: var(--canvas-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.insp-node-picker__options {
+  display: grid;
+  gap: 4px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.insp-node-picker__option {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--canvas-floating-button-bg);
+  padding: 6px 8px;
+  color: var(--canvas-text);
+  font-size: 12px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.insp-node-picker__option:hover {
+  background: var(--canvas-floating-button-bg-hover);
+}
+
+.insp-node-picker__empty {
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--canvas-text-muted);
+  font-size: 12px;
 }
 </style>

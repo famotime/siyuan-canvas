@@ -1330,6 +1330,15 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='create-edge-target-trigger']").text()).toContain("关系——情况这么复杂")
   })
 
+  it("constrains inspector create-edge selected node labels with measured picker width", () => {
+    const stylesheet = readFileSync(resolve(__dirname, "../src/components/canvas/CanvasInspector.vue"), "utf-8")
+
+    expect(stylesheet).toContain(":style=\"getInspPickerLabelStyle('source')\"")
+    expect(stylesheet).toContain(":style=\"getInspPickerLabelStyle('target')\"")
+    expect(stylesheet).toContain("max-width: var(--insp-node-picker-label-max-width);")
+    expect(stylesheet).toContain("new ResizeObserver")
+  })
+
   it("opens the embedded source search field inside the dropdown panel", async () => {
     currentEditor = createEditorMock()
     currentEditor.createEdgeDialog.visible = true
