@@ -10,6 +10,7 @@ interface CanvasEditorKeyboardHandlerOptions {
   getEdgeToolbarPopover: () => 'closed' | 'color' | 'direction'
   getEditingEdgeLabelId: () => string
   getSelectionToolbarPopover: () => 'closed' | 'color' | 'layout'
+  openFilePickerDialog?: () => void
   redo?: () => void
   save: () => void | Promise<void>
   selectAllNodes: () => void
@@ -43,6 +44,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     getEdgeToolbarPopover,
     getEditingEdgeLabelId,
     getSelectionToolbarPopover,
+    openFilePickerDialog,
     redo,
     save,
     selectAllNodes,
@@ -54,6 +56,8 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     zoomToActualSize,
     zoomToFit,
   } = options
+
+  let lastBracketPressTime = 0
 
   function handleKeydown(event: KeyboardEvent) {
     if (isCanvasEditorEditingTarget(event.target)) {
@@ -174,6 +178,21 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       if (zoomToFit) {
         event.preventDefault()
         zoomToFit()
+      }
+    }
+
+    // [[ 或 【【：无选中内容时打开文件选择器
+    if (!isAccelerator && !event.shiftKey && !event.altKey
+      && (event.key === '[' || event.key === '【')
+      && !canDelete()
+      && openFilePickerDialog) {
+      const now = Date.now()
+      if (now - lastBracketPressTime < 500) {
+        event.preventDefault()
+        openFilePickerDialog()
+        lastBracketPressTime = 0
+      } else {
+        lastBracketPressTime = now
       }
     }
   }

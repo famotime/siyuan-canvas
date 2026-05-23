@@ -40,6 +40,7 @@ function createBaseHandlerOptions() {
     getEdgeToolbarPopover: () => 'closed' as const,
     getEditingEdgeLabelId: () => '',
     getSelectionToolbarPopover: () => 'closed' as const,
+    openFilePickerDialog: vi.fn(),
     redo: vi.fn(),
     save: vi.fn(),
     selectAllNodes: vi.fn(),
@@ -267,5 +268,69 @@ describe('canvas editor keyboard handler', () => {
 
     expect(zoomToActualSize).toHaveBeenCalledOnce()
     expect(zoomToFit).toHaveBeenCalledOnce()
+  })
+
+  it('opens file picker on double [ when nothing is selected', () => {
+    vi.useFakeTimers()
+    const openFilePickerDialog = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      openFilePickerDialog,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('['))
+    expect(openFilePickerDialog).not.toHaveBeenCalled()
+
+    handler.handleKeydown(createKeyboardEvent('['))
+    expect(openFilePickerDialog).toHaveBeenCalledOnce()
+
+    vi.useRealTimers()
+  })
+
+  it('opens file picker on double 【 when nothing is selected', () => {
+    vi.useFakeTimers()
+    const openFilePickerDialog = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      openFilePickerDialog,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('【'))
+    handler.handleKeydown(createKeyboardEvent('【'))
+
+    expect(openFilePickerDialog).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+  })
+
+  it('does not open file picker on [[ when something is selected', () => {
+    vi.useFakeTimers()
+    const openFilePickerDialog = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      canDelete: () => true,
+      openFilePickerDialog,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('['))
+    handler.handleKeydown(createKeyboardEvent('['))
+
+    expect(openFilePickerDialog).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it('does not open file picker when [ presses are more than 500ms apart', () => {
+    vi.useFakeTimers()
+    const openFilePickerDialog = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      openFilePickerDialog,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('['))
+    vi.advanceTimersByTime(600)
+    handler.handleKeydown(createKeyboardEvent('['))
+
+    expect(openFilePickerDialog).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 })

@@ -1114,6 +1114,7 @@ export function useCanvasEditor(
     getEdgeToolbarPopover: () => edgeToolbarPopover.value,
     getEditingEdgeLabelId: () => editingEdgeLabelId.value,
     getSelectionToolbarPopover: () => selectionToolbarPopover.value,
+    openFilePickerDialog,
     redo,
     save,
     selectAllNodes: () => state.selectAllNodes(),
