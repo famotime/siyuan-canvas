@@ -69,23 +69,26 @@ export async function getSiyuanBlockMarkdown(blockId: string): Promise<string> {
 }
 
 export async function getSiyuanHeadingBlockMarkdown(blockId: string): Promise<string> {
-  const response = await fetchSyncPost("/api/block/getChildBlocks", {
-    id: blockId,
-  }) as IWebSocketData
+  async function fetchBlockWithDescendants(id: string): Promise<string> {
+    const blockMarkdown = await getSiyuanBlockMarkdown(id)
 
-  const childBlocks = response.code === 0 && Array.isArray(response.data)
-    ? response.data as Array<{ id?: string, type?: string }>
-    : []
-  const childMarkdown = await Promise.all(
-    childBlocks
-      .filter((block) => block.id && block.type !== "h")
-      .map((block) => getSiyuanBlockMarkdown(String(block.id))),
-  )
+    const response = await fetchSyncPost("/api/block/getChildBlocks", {
+      id,
+    }) as IWebSocketData
 
-  return [
-    await getSiyuanBlockMarkdown(blockId),
-    ...childMarkdown,
-  ].filter(Boolean).join("\n\n")
+    const childBlocks = response.code === 0 && Array.isArray(response.data)
+      ? response.data as Array<{ id?: string }>
+      : []
+    const childMarkdown = await Promise.all(
+      childBlocks
+        .filter((block) => block.id)
+        .map((block) => fetchBlockWithDescendants(String(block.id))),
+    )
+
+    return [blockMarkdown, ...childMarkdown].filter(Boolean).join("\n\n")
+  }
+
+  return fetchBlockWithDescendants(blockId)
 }
 
 export async function getSiyuanDocumentMarkdown(documentId: string): Promise<string> {

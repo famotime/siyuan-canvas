@@ -795,12 +795,7 @@ describe("useCanvasEditor file lifecycle flows", () => {
 {: id="20260412094047-p000001"}
 
 第二段说明
-{: id="20260412094047-p000002"}
-
-## 下一阶段
-{: id="20260412094047-next001"}
-
-不应显示`
+{: id="20260412094047-p000002"}`
         : ""
     ))
 
@@ -1194,6 +1189,99 @@ New body`)
     await flushEditor()
 
     expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>New paragraph</p>")
+
+    wrapper.unmount()
+  })
+
+  it("refreshes a selected Siyuan heading block node preview with the latest section content", async () => {
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-hblock1",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "阶段目标",
+      type: "h",
+    })
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockImplementation(async (id: string) => (
+      id === "20260412094047-hblock1"
+        ? `## 阶段目标\n{: id="20260412094047-hblock1"}`
+        : ""
+    ))
+    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
+      id === "20260412094047-hblock1"
+        ? `## 阶段目标\n{: id="20260412094047-hblock1"}\n\n旧内容\n{: id="20260412094047-p000001"}`
+        : ""
+    ))
+
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", "20260412094047-hblock1")
+    await flushEditor()
+    await flushEditor()
+
+    expect(editor.canRefreshSelectedSiyuanNode).toBe(true)
+    expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>旧内容</p>")
+
+    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
+      id === "20260412094047-hblock1"
+        ? `## 阶段目标\n{: id="20260412094047-hblock1"}\n\n新内容\n{: id="20260412094047-p000001"}`
+        : ""
+    ))
+
+    await editor.refreshSelectedSiyuanNode()
+    await flushEditor()
+
+    expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>新内容</p>")
+
+    wrapper.unmount()
+  })
+
+  it("refreshes a heading block preview to include newly inserted sub-headings", async () => {
+    fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-hblock2",
+      path: "/data/roadmap.sy",
+      rootId: "20260412094047-root001",
+      title: "阶段目标",
+      type: "h",
+    })
+    fileNodeLookupMock.getSiyuanBlockMarkdown.mockImplementation(async (id: string) => (
+      id === "20260412094047-hblock2"
+        ? `## 阶段目标\n{: id="20260412094047-hblock2"}`
+        : ""
+    ))
+    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
+      id === "20260412094047-hblock2"
+        ? `## 阶段目标\n{: id="20260412094047-hblock2"}\n\n旧内容\n{: id="20260412094047-p000001"}`
+        : ""
+    ))
+
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", "20260412094047-hblock2")
+    await flushEditor()
+    await flushEditor()
+
+    expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>旧内容</p>")
+    expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).not.toContain("子章节")
+
+    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
+      id === "20260412094047-hblock2"
+        ? `## 阶段目标\n{: id="20260412094047-hblock2"}\n\n旧内容\n{: id="20260412094047-p000001"}\n\n### 子章节\n{: id="20260412094047-hblock3"}\n\n子章节内容\n{: id="20260412094047-p000002"}`
+        : ""
+    ))
+
+    await editor.refreshSelectedSiyuanNode()
+    await flushEditor()
+
+    const previewHtml = editor.getFileNodePreview(editor.selectedNode).previewHtml
+    expect(previewHtml).toContain("<p>旧内容</p>")
+    expect(previewHtml).toContain("<h3>子章节</h3>")
+    expect(previewHtml).toContain("<p>子章节内容</p>")
 
     wrapper.unmount()
   })

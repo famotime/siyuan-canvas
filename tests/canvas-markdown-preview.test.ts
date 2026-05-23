@@ -4,7 +4,9 @@ import {
   it,
 } from "vitest"
 
-import { renderMarkdownPreview } from "@/canvas/markdown-preview"
+import {
+  renderMarkdownPreview,
+} from "@/canvas/markdown-preview"
 
 describe("canvas markdown preview", () => {
   it("renders basic markdown blocks and inline styles", () => {
