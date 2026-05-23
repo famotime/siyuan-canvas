@@ -75,10 +75,12 @@ function createEditorMock(node = createTextNode()) {
     activateCanvasSurface: vi.fn(),
     applySelectionColor: vi.fn(),
     applySelectionLayout: vi.fn(),
-    board: {
-      height: 800,
-      width: 1200,
-    },
+    board: ref({
+      height: 4200,
+      left: -2800,
+      top: -2100,
+      width: 5600,
+    }),
     bottomToolbarVisible: false,
     canDelete: false,
     canRefreshSelectedSiyuanNode: false,

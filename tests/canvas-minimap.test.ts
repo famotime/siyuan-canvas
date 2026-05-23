@@ -6,11 +6,13 @@ import {
   it,
 } from "vitest"
 import { mount } from "@vue/test-utils"
-import { reactive, ref } from "vue"
+import { computed, reactive, ref } from "vue"
 
 import CanvasMinimap from "@/components/canvas/CanvasMinimap.vue"
+import { createCanvasBoardMetrics } from "@/canvas/board"
 
 interface MinimapEditor {
+  board: { value: { left: number, top: number, width: number, height: number } }
   state: { document: { nodes: any[] }, selectedNodeIds: string[] }
   viewport: { scale: number, x: number, y: number }
   stageRef: { value?: HTMLElement }
@@ -26,20 +28,23 @@ function makeStage(width = 1200, height = 800): { value: HTMLElement } {
 }
 
 function makeEditor(overrides: Partial<MinimapEditor> = {}): MinimapEditor {
-  return reactive({
-    state: {
-      document: {
-        nodes: [
-          { id: "n1", type: "text", text: "hi", x: 0, y: 0, width: 200, height: 100 },
-          { id: "n2", type: "text", text: "hi", x: 400, y: 200, width: 200, height: 100 },
-        ],
-      },
-      selectedNodeIds: [],
+  const state = reactive({
+    document: {
+      nodes: overrides.state?.document.nodes ?? [
+        { id: "n1", type: "text", text: "hi", x: 0, y: 0, width: 200, height: 100 },
+        { id: "n2", type: "text", text: "hi", x: 400, y: 200, width: 200, height: 100 },
+      ],
     },
-    viewport: { scale: 1, x: 0, y: 0 },
+    selectedNodeIds: overrides.state?.selectedNodeIds ?? [],
+  })
+  const board = computed(() => createCanvasBoardMetrics(state.document.nodes as any))
+  return {
+    board,
+    state,
+    viewport: reactive({ scale: 1, x: 0, y: 0 }),
     stageRef: makeStage(),
     ...overrides,
-  }) as MinimapEditor
+  } as MinimapEditor
 }
 
 describe("CanvasMinimap", () => {

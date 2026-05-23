@@ -44,7 +44,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, toRaw, watch } from "vue"
+import type { CanvasBoardMetrics } from "@/canvas/board"
 import type { CanvasNode } from "@/canvas/types"
 import type { CanvasEditorState } from "@/canvas/editor-state"
 
@@ -54,12 +55,18 @@ const PADDING = 4
 const NODE_PADDING = 120
 
 interface MinimapEditor {
+  board: { value: CanvasBoardMetrics }
   state: CanvasEditorState
   viewport: { scale: number, x: number, y: number }
   stageRef: { value?: HTMLElement } | HTMLElement | undefined
 }
 
 const props = defineProps<{ editor: MinimapEditor }>()
+
+function getBoard(): CanvasBoardMetrics {
+  const b = props.editor.board
+  return (b && 'value' in b ? b.value : toRaw(b as any)) as CanvasBoardMetrics
+}
 
 const totalNodes = computed(() => props.editor.state.document.nodes.length)
 
@@ -137,41 +144,46 @@ const offsetY = computed(() => {
 })
 
 /**
- * 视口矩形：把 stage 上可见区域换算成 board 坐标，再映射到 minimap 尺寸。
+ * 视口矩形：把 stage 上可见区域换算成节点坐标，再映射到 minimap 尺寸。
  *
  * stage 内某个 stage 像素 (sx, sy) 对应 board 坐标
  *   bx = (sx - viewport.x) / viewport.scale
  *   by = (sy - viewport.y) / viewport.scale
+ * board 坐标转节点坐标：
+ *   nodeX = bx + board.left
+ *   nodeY = by + board.top
  */
 const viewportRect = computed(() => {
   const { scale: vScale, x: vx, y: vy } = props.editor.viewport
   if (vScale <= 0) return null
-  const bxStart = -vx / vScale
-  const byStart = -vy / vScale
-  const bxEnd = (stageSize.value.width - vx) / vScale
-  const byEnd = (stageSize.value.height - vy) / vScale
+  const { left: bl, top: bt } = getBoard()
+  const nodeXStart = -vx / vScale + bl
+  const nodeYStart = -vy / vScale + bt
+  const nodeXEnd = (stageSize.value.width - vx) / vScale + bl
+  const nodeYEnd = (stageSize.value.height - vy) / vScale + bt
   const b = minimapBounds.value
 
   return {
-    x: (bxStart - b.left) * scale.value + offsetX.value,
-    y: (byStart - b.top) * scale.value + offsetY.value,
-    width: (bxEnd - bxStart) * scale.value,
-    height: (byEnd - byStart) * scale.value,
+    x: (nodeXStart - b.left) * scale.value + offsetX.value,
+    y: (nodeYStart - b.top) * scale.value + offsetY.value,
+    width: (nodeXEnd - nodeXStart) * scale.value,
+    height: (nodeYEnd - nodeYStart) * scale.value,
   }
 })
 
 /**
  * 将 minimap 内坐标 (mx, my) 视为新的视口中心点：
- *   stage 中心 (stageWidth/2, stageHeight/2) 应该正好显示这个 board 位置
- *   stageX = viewport.x + boardX * viewport.scale
- *   → viewport.x = stageX - boardX * viewport.scale
+ *   minimap → 节点坐标 → board 坐标 → viewport 偏移
  */
 function recenterViewportTo(mx: number, my: number) {
   const s = scale.value
   if (s <= 0) return
   const b = minimapBounds.value
-  const boardX = (mx - offsetX.value) / s + b.left
-  const boardY = (my - offsetY.value) / s + b.top
+  const { left: bl, top: bt } = getBoard()
+  const nodeX = (mx - offsetX.value) / s + b.left
+  const nodeY = (my - offsetY.value) / s + b.top
+  const boardX = nodeX - bl
+  const boardY = nodeY - bt
   const halfW = stageSize.value.width / 2
   const halfH = stageSize.value.height / 2
   props.editor.viewport.x = halfW - boardX * props.editor.viewport.scale
