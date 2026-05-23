@@ -11,7 +11,6 @@ import { reactive, ref } from "vue"
 import CanvasMinimap from "@/components/canvas/CanvasMinimap.vue"
 
 interface MinimapEditor {
-  board: { width: number, height: number, left: number, top: number }
   state: { document: { nodes: any[] }, selectedNodeIds: string[] }
   viewport: { scale: number, x: number, y: number }
   stageRef: { value?: HTMLElement }
@@ -28,7 +27,6 @@ function makeStage(width = 1200, height = 800): { value: HTMLElement } {
 
 function makeEditor(overrides: Partial<MinimapEditor> = {}): MinimapEditor {
   return reactive({
-    board: { width: 4000, height: 3000, left: -2000, top: -1500 },
     state: {
       document: {
         nodes: [
@@ -105,5 +103,42 @@ describe("CanvasMinimap", () => {
     // 视口被居中到点击点；具体值取决于 board / scale，但应该不为 0,0
     expect(editor.viewport.x).not.toBe(0)
     expect(editor.viewport.y).not.toBe(0)
+  })
+
+  it("uses node bounding box for bounds instead of fixed board", () => {
+    // 两个紧凑节点 (0,0)→(600,300)，缩略图应紧密贴合，不使用固定的大坐标空间
+    const editor = makeEditor()
+    const wrapper = mount(CanvasMinimap, { props: { editor } })
+
+    // 每个节点的 rect 应该在 SVG 内可见
+    const nodeRects = wrapper.findAll(".canvas-minimap__node")
+    expect(nodeRects.length).toBe(2)
+
+    // 节点尺寸应大于最小值 2px（因为缩略图范围紧凑，比例尺更大）
+    const w1 = Number(nodeRects[0].attributes("width"))
+    expect(w1).toBeGreaterThan(2)
+  })
+
+  it("adapts range when nodes are spread further apart", async () => {
+    const editor = makeEditor()
+    const wrapper = mount(CanvasMinimap, { props: { editor } })
+
+    // 记录初始第一个节点的宽度（宽度受缩放比例影响）
+    const getFirstNodeWidth = () => {
+      const rect = wrapper.findAll(".canvas-minimap__node")[0]
+      return Number(rect.attributes("width"))
+    }
+    const initialWidth = getFirstNodeWidth()
+
+    // 将第二个节点移动到更远的位置，扩大节点边界
+    editor.state.document.nodes = [
+      { id: "n1", type: "text", text: "hi", x: 0, y: 0, width: 200, height: 100 },
+      { id: "n2", type: "text", text: "hi", x: 4000, y: 3000, width: 200, height: 100 },
+    ]
+    await wrapper.vm.$nextTick()
+
+    // 边界变大后缩放比例变小，节点 rect 宽度应变小
+    const newWidth = getFirstNodeWidth()
+    expect(newWidth).toBeLessThan(initialWidth)
   })
 })
