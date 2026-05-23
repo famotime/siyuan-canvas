@@ -79,5 +79,4 @@
 
 - 先看 API 分类，再进入对应专题
 - 数据库功能请直接跳 `reference/04-database-av/`
-- 遇到接口失效，先看 `弃用接口迁移清单-2026H1.md`
 - 需要全量端点时，转到 `reference/07-official-index/官方API全量索引-按模块.md`

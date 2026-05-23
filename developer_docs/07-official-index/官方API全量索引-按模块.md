@@ -110,5 +110,4 @@
 ## 15. 与主文档映射
 
 - 调用规范与高频场景：`reference/03-kernel-api/公开API导航.md`
-- 迁移与弃用：`reference/03-kernel-api/弃用接口迁移清单-2026H1.md`
 - AV 实战：`reference/04-database-av/AV增删改查与参数模型.md`

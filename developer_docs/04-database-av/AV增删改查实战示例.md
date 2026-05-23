@@ -56,7 +56,7 @@ await requestApi("/api/av/batchSetAttributeViewBlockAttrs", {
   values: [
     {
       keyID: "20241017094451-jwfegvp",
-      rowID: "20240107212802-727hsjv",
+      itemID: "20240107212802-727hsjv",
       value: { text: { content: "Bound Title" } }
     }
   ]
@@ -89,18 +89,7 @@ const keys = await requestApi("/api/av/getAttributeViewKeysByAvID", {
 
 行 ID 可从 `renderAttributeView` 的行数据中解析，或通过映射接口获取。
 
-## 6. rowID 与 itemID 迁移
-
-```ts
-const map = await requestApi("/api/av/getAttributeViewItemIDsByBoundIDs", {
-  avID: "20241017094451-2urncs9",
-  boundIDs: ["20240107212802-727hsjv"]
-});
-```
-
-迁移期建议同时兼容 `rowID` 与 `itemID`。
-
-## 7. 删除行
+## 6. 删除行
 
 ```ts
 await requestApi("/api/av/removeAttributeViewBlocks", {
@@ -109,8 +98,7 @@ await requestApi("/api/av/removeAttributeViewBlocks", {
 });
 ```
 
-## 8. 本章如何使用
+## 7. 本章如何使用
 
-- 先选“绑定块”还是“非绑定块”，再设计数据写入流程。
+- 先选”绑定块”还是”非绑定块”，再设计数据写入流程。
 - 解析结果时统一做视图归一化，避免 UI 改动导致崩溃。
-- 迁移期统一在基础层兼容 `rowID` 与 `itemID`。

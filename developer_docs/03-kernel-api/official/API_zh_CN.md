@@ -1,4 +1,6 @@
-[English](https://github.com/siyuan-note/siyuan/blob/master/API.md)| [日本語](https://github.com/siyuan-note/siyuan/blob/master/API_ja_JP.md)
+[English](API.md)
+| **中文**
+| [日本語](API_ja_JP.md)
 
 * [规范](#规范)
     * [参数和返回值](#参数和返回值)
@@ -1090,6 +1092,9 @@
     ]
   }
   ```
+  
+
+注意：为保证数据安全，发布模式下禁止访问该接口。
 
 ### 提交事务
 
@@ -1127,7 +1132,7 @@
     "code": 0,
     "msg": "",
     "data": {
-      "content": "<div data-node-id=\"20220729234848-dlgsah7\" data-node-index=\"1\" data-type=\"NodeParagraph\" class=\"p\" updated=\"20220729234840\"><div contenteditable=\"true\" spellcheck=\"false\">foo</div><div class=\"protyle-attr\" contenteditable=\"false\">​</div></div>",
+      "content": "<div data-node-id=\"20220729234848-dlgsah7\" data-node-index=\"1\" data-type=\"NodeParagraph\" class=\"p\" updated=\"20220729234840\"><div contenteditable=\"true\" spellcheck=\"false\">foo</div><div class=\"protyle-attr\" contenteditable=\"false\"></div></div>",
       "path": "F:\\SiYuan\\data\\templates\\foo.md"
     }
   }
@@ -1568,4 +1573,3 @@
   ```
 
     * `data`: 精度为毫秒
-

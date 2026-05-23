@@ -666,7 +666,7 @@ Add i18n keys:
 ```json
 {
   "filePickerDialogTitle": "选择文件",
-  "filePickerSearchLabel": "搜索文档、画布或图片",
+  "filePickerSearchLabel": "搜索笔记、图片或画布",
   "messageUnablePasteImageWithoutWorkspaceCanvas": "请先将当前画布保存到工作空间后再粘贴图片。"
 }
 ```
