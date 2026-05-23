@@ -1095,21 +1095,24 @@
             <label class="canvas-dialog__field">
               <span>{{ t("filePickerSearchLabel") }}</span>
               <input
+                ref="filePickerInputRef"
                 :value="editor.filePickerDialog.query"
                 class="canvas-dialog__control"
                 @input="editor.updateFilePickerQuery(valueFromEvent($event))"
+                @keydown="onFilePickerKeyDown"
               >
             </label>
-            <div class="canvas-node-picker__options">
+            <div ref="filePickerOptionsRef" class="canvas-node-picker__options">
               <template v-for="group in getFilePickerGroups()" :key="group.kind">
                 <div class="canvas-node-picker__group-header">{{ getFilePickerGroupLabel(group.kind) }}</div>
                 <button
                   v-for="result in group.items"
                   :key="`file-picker-${result.kind}-${result.path}`"
-                  class="canvas-node-picker__option"
+                  :class="['canvas-node-picker__option', { 'canvas-node-picker__option--active': getFilePickerFlatIndex(result) === filePickerActiveIndex }]"
                   :data-testid="`file-picker-option-${result.kind}`"
                   type="button"
                   @click="editor.selectFilePickerResult(result)"
+                  @mouseenter="filePickerActiveIndex = getFilePickerFlatIndex(result)"
                 >
                   <span class="canvas-node-picker__option-kind">{{ getFilePickerKindLabel(result.kind) }}</span>
                   <strong v-html="highlightText(result.title, editor.filePickerDialog.query)" />
@@ -1486,6 +1489,7 @@ import {
   getFilePreviewImageCandidates,
   getNextFilePreviewImageSource,
 } from "@/canvas/file-preview-fallbacks"
+import type { CanvasFilePickerOption } from "@/canvas/file-picker-dialog"
 
 const props = defineProps<{
   bootstrap: CanvasTabBootstrap
@@ -1669,6 +1673,70 @@ function handleGlobalKeydown(event: KeyboardEvent) {
     commandPaletteOpen.value = true
   }
 }
+
+// 文件选择器键盘导航
+const filePickerInputRef = ref<HTMLInputElement>()
+const filePickerOptionsRef = ref<HTMLElement>()
+const filePickerActiveIndex = ref(0)
+
+function getFilePickerFlatResults() {
+  const groups = getFilePickerGroups()
+  return groups.flatMap((g) => g.items)
+}
+
+function getFilePickerFlatIndex(result: CanvasFilePickerOption): number {
+  return getFilePickerFlatResults().indexOf(result)
+}
+
+function filePickerScrollActiveIntoView() {
+  void nextTick(() => {
+    const container = filePickerOptionsRef.value
+    if (!container) return
+    const active = container.querySelector<HTMLElement>(".canvas-node-picker__option--active")
+    if (active && typeof active.scrollIntoView === "function") {
+      active.scrollIntoView({ block: "nearest" })
+    }
+  })
+}
+
+function onFilePickerKeyDown(event: KeyboardEvent) {
+  const total = getFilePickerFlatResults().length
+  if (event.key === "Escape") {
+    event.preventDefault()
+    editor.closeFilePickerDialog()
+    return
+  }
+  if (event.key === "ArrowDown") {
+    event.preventDefault()
+    filePickerActiveIndex.value = total > 0 ? (filePickerActiveIndex.value + 1) % total : 0
+    filePickerScrollActiveIntoView()
+    return
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault()
+    filePickerActiveIndex.value = total > 0 ? (filePickerActiveIndex.value - 1 + total) % total : 0
+    filePickerScrollActiveIntoView()
+    return
+  }
+  if (event.key === "Enter") {
+    event.preventDefault()
+    const target = getFilePickerFlatResults()[filePickerActiveIndex.value]
+    if (target) {
+      editor.selectFilePickerResult(target)
+    }
+  }
+}
+
+watch(() => editor.filePickerDialog.visible, (visible) => {
+  if (visible) {
+    filePickerActiveIndex.value = 0
+    void nextTick(() => filePickerInputRef.value?.focus())
+  }
+})
+
+watch(() => editor.filePickerDialog.query, () => {
+  filePickerActiveIndex.value = 0
+})
 
 onMounted(() => {
   window.addEventListener("keydown", handleGlobalKeydown, true)
@@ -3973,7 +4041,8 @@ watch(
   text-transform: uppercase;
 }
 
-.canvas-node-picker__option:hover {
+.canvas-node-picker__option:hover,
+.canvas-node-picker__option--active {
   background: var(--canvas-floating-button-bg-hover);
 }
 
