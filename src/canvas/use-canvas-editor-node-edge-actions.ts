@@ -129,6 +129,14 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     state.selectNode(node.id)
   }
 
+  function addNodeAtPosition(type: CanvasNode['type'], canvasX: number, canvasY: number) {
+    const node = createCanvasNode(type)
+    node.x = Math.round(canvasX)
+    node.y = Math.round(canvasY)
+    commitDocument(upsertCanvasNode(state.document, node))
+    state.selectNode(node.id)
+  }
+
   function doNodesOverlap(first: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>, second: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>): boolean {
     return first.x < second.x + second.width
       && first.x + first.width > second.x
@@ -659,6 +667,7 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
 
   return {
     addNode,
+    addNodeAtPosition,
     applyEdgeColor,
     applySelectedNodeAsEdgeSource,
     applySelectionColor,

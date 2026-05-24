@@ -950,6 +950,7 @@ export function useCanvasEditor(
   })
   const {
     addNode,
+    addNodeAtPosition,
     applyEdgeColor,
     applySelectedNodeAsEdgeSource,
     applySelectionColor,
@@ -1392,6 +1393,7 @@ export function useCanvasEditor(
       inspectorExpanded,
       inspectorSectionState,
       addNode,
+      addNodeAtPosition,
       createEdgeFromSelection,
       deleteSelection,
       activateNode,

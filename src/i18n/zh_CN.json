@@ -197,6 +197,8 @@
   "helpDialogTitle": "帮助 — 快捷键与操作",
   "helpShortcutDoubleClick": "双击卡片/分组节点",
   "helpActionDoubleClick": "编辑节点内容",
+  "helpShortcutDoubleClickStage": "双击空白区域",
+  "helpActionDoubleClickStage": "在该位置创建文本卡片",
   "helpShortcutEscape": "Esc",
   "helpActionEscape": "取消编辑 / 取消选择",
   "helpShortcutDelete": "Delete / Backspace",

@@ -197,6 +197,8 @@
   "helpDialogTitle": "Help — Shortcuts & Operations",
   "helpShortcutDoubleClick": "Double-click card/group node",
   "helpActionDoubleClick": "Edit node content",
+  "helpShortcutDoubleClickStage": "Double-click empty area",
+  "helpActionDoubleClickStage": "Create a text card at that position",
   "helpShortcutEscape": "Esc",
   "helpActionEscape": "Cancel edit / Deselect",
   "helpShortcutDelete": "Delete / Backspace",

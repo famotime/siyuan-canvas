@@ -257,6 +257,7 @@
         ref="stageRef"
         class="stage"
         @pointerdown="handleStagePointerDown"
+        @dblclick="handleStageDoubleClick"
         @paste="handleStagePaste"
         @wheel.passive="editor.handleWheelZoom"
         @contextmenu.prevent
@@ -1766,6 +1767,16 @@ function handleStagePointerDown(event: PointerEvent) {
   editor.startPan(event)
 }
 
+function handleStageDoubleClick(event: MouseEvent) {
+  const rect = stageRef.value?.getBoundingClientRect()
+  if (!rect) return
+  const stageX = event.clientX - rect.left
+  const stageY = event.clientY - rect.top
+  const canvasX = (stageX - editor.viewport.x) / editor.viewport.scale + editor.board.left
+  const canvasY = (stageY - editor.viewport.y) / editor.viewport.scale + editor.board.top
+  editor.addNodeAtPosition('text', canvasX, canvasY)
+}
+
 function handleStagePaste(event: ClipboardEvent) {
   const file = [...(event.clipboardData?.files || [])].find((candidate) => candidate.type.startsWith("image/"))
   if (!file) {
@@ -1834,6 +1845,7 @@ function clearHoveredEdge(edgeId: string) {
 function showHelpDialog() {
   const shortcuts = [
     { key: t("helpShortcutDoubleClick"), action: t("helpActionDoubleClick") },
+    { key: t("helpShortcutDoubleClickStage"), action: t("helpActionDoubleClickStage") },
     { key: t("helpShortcutEscape"), action: t("helpActionEscape") },
     { key: t("helpShortcutDelete"), action: t("helpActionDelete") },
     { key: t("helpShortcutCtrlA"), action: t("helpActionCtrlA") },
