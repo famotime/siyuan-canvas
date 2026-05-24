@@ -287,6 +287,22 @@
         />
       </label>
       <label>
+        {{ t("fieldSourceNode") }}
+        <input
+          :value="selectedEdgeFromNodeTitle"
+          readonly
+          class="inspector__readonly-field"
+        />
+      </label>
+      <label>
+        {{ t("fieldTarget") }}
+        <input
+          :value="selectedEdgeToNodeTitle"
+          readonly
+          class="inspector__readonly-field"
+        />
+      </label>
+      <label>
         {{ t("fieldFromSide") }}
         <select
           :value="editor.selectedEdge.fromSide"
@@ -312,12 +328,6 @@
           >{{ getSideLabel(side) }}</option>
         </select>
       </label>
-      <button
-        class="toolbar__button"
-        @click="editor.deleteSelection"
-      >
-        {{ t("inspectorDeleteEdge") }}
-      </button>
     </div>
   </section>
 </template>
@@ -342,6 +352,20 @@ const props = defineProps<{
   getSideLabel: (side: string) => string
   t: (key: string, args?: Record<string, unknown>) => string
 }>()
+
+const selectedEdgeFromNodeTitle = computed(() => {
+  const edge = props.editor.selectedEdge
+  if (!edge) return ''
+  const node = props.editor.state.document.nodes.find((n: any) => n.id === edge.fromNode)
+  return node ? props.editor.getNodeTitle(node) : edge.fromNode
+})
+
+const selectedEdgeToNodeTitle = computed(() => {
+  const edge = props.editor.selectedEdge
+  if (!edge) return ''
+  const node = props.editor.state.document.nodes.find((n: any) => n.id === edge.toNode)
+  return node ? props.editor.getNodeTitle(node) : edge.toNode
+})
 
 type InspPickerKind = 'source' | 'target'
 
@@ -724,6 +748,11 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .inspector__section textarea {
   min-height: 120px;
   resize: vertical;
+}
+
+.inspector__readonly-field {
+  cursor: default;
+  opacity: 0.7;
 }
 
 .inspector__field-label {

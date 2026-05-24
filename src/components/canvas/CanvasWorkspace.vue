@@ -730,7 +730,7 @@
               :data-tooltip="t('edgeToolbarDirection')"
               @click.stop="editor.toggleEdgePopover('direction')"
             >
-              <CanvasIcon class="selection-toolbar__icon" name="connect" />
+              <CanvasIcon class="selection-toolbar__icon" name="edge-direction" />
             </button>
             <div
               v-if="editor.edgeToolbarPopover === 'direction'"
