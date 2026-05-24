@@ -2,6 +2,7 @@ import type { CanvasPluginBridge } from "@/canvas/use-canvas-editor-shared"
 import type { CanvasPluginSettings } from "@/canvas/plugin-data"
 
 import {
+  fetchSyncPost,
   showMessage as siyuanShowMessage,
 } from "siyuan"
 import {
@@ -196,6 +197,69 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     await refreshWorkspaceDocuments()
   }
 
+  async function deleteWorkspaceFolder(folderPath: string) {
+    const folderName = folderPath.substring(folderPath.lastIndexOf('/') + 1)
+    const confirmed = await openConfirmDialog(
+      "Delete folder?",
+      `Delete "${folderName}" and all its contents?`,
+    )
+    if (!confirmed) return
+
+    // collect canvas file paths before deletion so we can clean recent records
+    async function collectCanvasFiles(dirPath: string): Promise<string[]> {
+      const entries = await deps.readDir(dirPath)
+      const files: string[] = []
+      for (const entry of entries ?? []) {
+        const full = `${dirPath}/${entry.name}`
+        if (entry.isDir) {
+          files.push(...await collectCanvasFiles(full))
+        } else if (entry.name.endsWith('.canvas')) {
+          files.push(full)
+        }
+      }
+      return files
+    }
+
+    try {
+      const files = await collectCanvasFiles(folderPath)
+      await deps.removeFile(folderPath)
+      for (const filePath of files) {
+        await deps.plugin.removeRecentCanvasFile?.(filePath)
+      }
+    } catch {
+      // folder may already be absent
+    }
+    deps.refreshRecentFiles()
+    await refreshWorkspaceDocuments()
+  }
+
+  async function openInExplorer(filePath: string) {
+    try {
+      const resp = await fetchSyncPost("/api/system/getConf", {})
+      const workspaceDir = resp?.data?.conf?.system?.workspaceDir
+      if (!workspaceDir) {
+        deps.showMessage("Unable to get workspace path", 4000, "error")
+        return
+      }
+
+      const dirToOpen = filePath.includes('/')
+        ? filePath.substring(0, filePath.lastIndexOf('/'))
+        : filePath
+      const absolutePath = `${workspaceDir.replace(/[/\\]+$/, '')}/${dirToOpen.replace(/^[/\\]+/, '')}`.replace(/\//g, '\\')
+
+      const remote = (window as any).require?.("@electron/remote")
+      const electronShell = remote?.require?.("electron")?.shell
+      if (electronShell?.openPath) {
+        const result = await electronShell.openPath(absolutePath)
+        if (result) deps.showMessage(result, 4000, "error")
+      } else {
+        deps.showMessage("Not available in browser mode", 4000, "error")
+      }
+    } catch {
+      deps.showMessage("Unable to open folder", 4000, "error")
+    }
+  }
+
   async function moveWorkspaceFile(sourcePath: string, targetFolderPath: string): Promise<boolean> {
     const fileName = sourcePath.substring(sourcePath.lastIndexOf('/') + 1)
     const targetFilePath = `${targetFolderPath}/${fileName}`
@@ -304,6 +368,126 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     deps.showMessage(`Renamed to ${sanitized}`)
   }
 
+  async function renameWorkspaceFolder(folderPath: string) {
+    const parentDir = folderPath.substring(0, folderPath.lastIndexOf('/'))
+    const currentName = folderPath.substring(folderPath.lastIndexOf('/') + 1)
+
+    const newName = await openTextInputDialog({
+      cancelLabel: "Cancel",
+      confirmLabel: "Confirm",
+      initialValue: currentName,
+      title: "Rename folder",
+    })
+    if (!newName || !newName.trim()) return
+
+    const sanitized = newName.trim()
+      .replace(/[\\/:*?"'<>|]/g, "_")
+      .replace(/[~[\]()!&{}=#%;$]/g, "")
+      .replace(/[\x00-\x1f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\.+$/, "")
+    if (!sanitized || sanitized === currentName) return
+
+    const newFolderPath = `${parentDir}/${sanitized}`
+
+    // recursively collect all file paths under the folder
+    async function collectFiles(dirPath: string): Promise<string[]> {
+      const entries = await deps.readDir(dirPath)
+      const files: string[] = []
+      for (const entry of entries ?? []) {
+        const full = `${dirPath}/${entry.name}`
+        if (entry.isDir) {
+          files.push(...await collectFiles(full))
+        } else if (entry.name.endsWith('.canvas')) {
+          files.push(full)
+        }
+      }
+      return files
+    }
+
+    try {
+      const files = await collectFiles(folderPath)
+      for (const filePath of files) {
+        const relativePath = filePath.substring(folderPath.length + 1)
+        const newFilePath = `${newFolderPath}/${relativePath}`
+
+        const response = await fetch("/api/file/getFile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: filePath }),
+        })
+        if (!response.ok) {
+          deps.showMessage("Unable to rename folder", 4000, "error")
+          return
+        }
+        const content = await response.text()
+        const blob = new Blob([content], { type: "application/json" })
+        await deps.putFile(newFilePath, false, blob)
+      }
+
+      await deps.removeFile(folderPath)
+
+      // update recent file records that were under the old folder
+      for (const filePath of files) {
+        const relativePath = filePath.substring(folderPath.length + 1)
+        const newFilePath = `${newFolderPath}/${relativePath}`
+        deps.onFilePathUpdate?.(newFilePath)
+        await deps.plugin.removeRecentCanvasFile?.(filePath)
+      }
+
+      deps.refreshRecentFiles()
+      await refreshWorkspaceDocuments()
+      deps.showMessage(`Renamed folder to ${sanitized}`)
+    } catch {
+      deps.showMessage("Unable to rename folder", 4000, "error")
+    }
+  }
+
+  async function copyWorkspaceDocument(sourcePath: string) {
+    const dir = sourcePath.substring(0, sourcePath.lastIndexOf('/'))
+    const fullName = sourcePath.substring(sourcePath.lastIndexOf('/') + 1)
+    const baseName = fullName.replace(/\.canvas$/i, '')
+
+    const newName = await openTextInputDialog({
+      cancelLabel: "Cancel",
+      confirmLabel: "Confirm",
+      initialValue: `${baseName} (copy)`,
+      title: "Copy",
+    })
+    if (!newName || !newName.trim()) return
+
+    const sanitized = newName.trim()
+      .replace(/[\\/:*?"'<>|]/g, "_")
+      .replace(/[~[\]()!&{}=#%;$]/g, "")
+      .replace(/[\x00-\x1f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\.+$/, "")
+    if (!sanitized) return
+
+    const newPath = `${dir}/${sanitized}.canvas`
+
+    try {
+      const response = await fetch("/api/file/getFile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: sourcePath }),
+      })
+      if (!response.ok) {
+        deps.showMessage("Unable to copy file", 4000, "error")
+        return
+      }
+      const content = await response.text()
+      const blob = new Blob([content], { type: "application/json" })
+      await deps.putFile(newPath, false, blob)
+      await refreshWorkspaceDocuments()
+      deps.showMessage(`Copied to ${sanitized}`)
+    } catch {
+      deps.showMessage("Unable to copy file", 4000, "error")
+    }
+  }
+
   async function removeRecentFileRecord(path: string) {
     await deps.plugin.removeRecentCanvasFile?.(path)
     deps.refreshRecentFiles()
@@ -325,8 +509,12 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     refreshWorkspaceDocuments,
     createWorkspaceFolder,
     deleteWorkspaceDocument,
+    deleteWorkspaceFolder,
+    openInExplorer,
     moveWorkspaceFile,
     renameWorkspaceDocument,
+    renameWorkspaceFolder,
+    copyWorkspaceDocument,
     removeRecentFileRecord,
     // expand/collapse
     setWorkspaceSortField,

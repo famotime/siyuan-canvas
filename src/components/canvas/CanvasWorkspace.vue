@@ -1189,7 +1189,7 @@
         <div
           v-if="editor.inspectorExpanded"
           class="inspector__content"
-          @click="sortDropdownOpen = false"
+          @click="sortDropdownOpen = false; closeContextMenu()"
         >
           <nav
             class="inspector__tabs"
@@ -1345,7 +1345,7 @@
                 @toggle-folder="editor.toggleFolderExpand"
                 @open-file="editor.openWorkspacePath"
                 @delete-document="editor.deleteWorkspaceDocument"
-                @rename-document="editor.renameWorkspaceDocument"
+                @context-menu="onContextMenu"
                 @root-drop="onRootDrop"
                 @folder-drag-over="onFolderDragOver"
                 @folder-drag-enter="onFolderDragEnter"
@@ -1463,6 +1463,62 @@
         </div>
       </aside>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="contextMenuVisible"
+        class="workspace-context-menu"
+        :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
+        @click.stop
+      >
+        <button
+          class="workspace-context-menu__item"
+          type="button"
+          @click="contextMenuRename"
+        >
+          {{ t('contextMenuRename') }}
+        </button>
+        <button
+          class="workspace-context-menu__item"
+          type="button"
+          @click="contextMenuOpenInExplorer"
+        >
+          {{ t('contextMenuOpenInExplorer') }}
+        </button>
+        <button
+          v-if="contextMenuType === 'file'"
+          class="workspace-context-menu__item"
+          type="button"
+          @click="contextMenuCopy"
+        >
+          {{ t('contextMenuCopy') }}
+        </button>
+        <template v-if="contextMenuType === 'folder'">
+          <button
+            class="workspace-context-menu__item"
+            type="button"
+            @click="contextMenuNewSubfolder"
+          >
+            {{ t('contextMenuNewSubfolder') }}
+          </button>
+          <button
+            class="workspace-context-menu__item"
+            type="button"
+            @click="contextMenuNewDocument"
+          >
+            {{ t('contextMenuNewDocument') }}
+          </button>
+        </template>
+        <div class="workspace-context-menu__divider" />
+        <button
+          class="workspace-context-menu__item workspace-context-menu__item--danger"
+          type="button"
+          @click="contextMenuDelete"
+        >
+          {{ t('contextMenuDelete') }}
+        </button>
+      </div>
+    </Teleport>
 
     <CanvasCreateEdgeDialog
       v-if="editor.createEdgeDialog.visible"
@@ -1584,6 +1640,11 @@ const pngExportDialogVisible = ref(false)
 const pngExportLoading = ref(false)
 const pngExportRange = ref<CanvasPngExportRange>("full")
 const sortDropdownOpen = ref(false)
+const contextMenuVisible = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const contextMenuPath = ref("")
+const contextMenuType = ref<'file' | 'folder'>('file')
 const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
 const settingsRevision = ref(0)
@@ -1664,8 +1725,14 @@ function handleCanvasSettingsChanged() {
   settingsRevision.value += 1
 }
 
+function onContextMenuKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeContextMenu()
+}
+
 onMounted(() => {
   window.addEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
+  document.addEventListener("click", closeContextMenu)
+  document.addEventListener("keydown", onContextMenuKeydown)
 })
 
 onBeforeUnmount(() => {
@@ -1673,6 +1740,8 @@ onBeforeUnmount(() => {
     URL.revokeObjectURL(blobUrl)
   }
   window.removeEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
+  document.removeEventListener("click", closeContextMenu)
+  document.removeEventListener("keydown", onContextMenuKeydown)
 })
 
 // 选区/边变更时若用户尚停留在文档 tab，自动切到选区 tab，避免反复手动切换
@@ -1750,6 +1819,56 @@ function onDragEnd() {
   if (dragExpandTimer) {
     clearTimeout(dragExpandTimer)
     dragExpandTimer = null
+  }
+}
+
+function onContextMenu(event: MouseEvent, path: string, type: 'file' | 'folder') {
+  contextMenuPath.value = path
+  contextMenuType.value = type
+  contextMenuX.value = event.clientX
+  contextMenuY.value = event.clientY
+  contextMenuVisible.value = true
+}
+
+function closeContextMenu() {
+  contextMenuVisible.value = false
+}
+
+function contextMenuRename() {
+  closeContextMenu()
+  if (contextMenuType.value === 'file') {
+    editor.renameWorkspaceDocument(contextMenuPath.value)
+  } else {
+    editor.renameWorkspaceFolder(contextMenuPath.value)
+  }
+}
+
+function contextMenuCopy() {
+  closeContextMenu()
+  editor.copyWorkspaceDocument(contextMenuPath.value)
+}
+
+function contextMenuOpenInExplorer() {
+  closeContextMenu()
+  editor.openInExplorer(contextMenuPath.value)
+}
+
+function contextMenuNewSubfolder() {
+  closeContextMenu()
+  editor.createWorkspaceFolder()
+}
+
+function contextMenuNewDocument() {
+  closeContextMenu()
+  editor.newCanvas()
+}
+
+function contextMenuDelete() {
+  closeContextMenu()
+  if (contextMenuType.value === 'file') {
+    editor.deleteWorkspaceDocument(contextMenuPath.value)
+  } else {
+    editor.deleteWorkspaceFolder(contextMenuPath.value)
   }
 }
 
@@ -4532,5 +4651,52 @@ watch(
 .workspace-tree__file-delete:hover {
   background: var(--canvas-danger-soft);
   color: var(--canvas-danger);
+}
+</style>
+
+<style lang="scss">
+.workspace-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 160px;
+  padding: 4px 0;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 8px;
+  background: var(--b3-theme-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+}
+
+.workspace-context-menu__item {
+  display: flex;
+  align-items: center;
+  width: calc(100% - 8px);
+  margin: 0 4px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+
+  &:hover {
+    background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+  }
+
+  &--danger {
+    color: var(--b3-card-error-color, #c04f2a);
+
+    &:hover {
+      background: color-mix(in srgb, var(--b3-card-error-color, #c04f2a) 12%, transparent);
+    }
+  }
+}
+
+.workspace-context-menu__divider {
+  height: 1px;
+  margin: 4px;
+  background: var(--b3-border-color);
 }
 </style>

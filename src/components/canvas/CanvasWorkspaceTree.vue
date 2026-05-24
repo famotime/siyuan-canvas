@@ -18,6 +18,7 @@
           :title="node.path"
           :aria-expanded="expandedFolders.has(node.path)"
           @click="$emit('toggle-folder', node.path)"
+          @contextmenu.prevent="$emit('context-menu', $event, node.path, 'folder')"
           @dragover.prevent="$emit('folder-drag-over', $event)"
           @dragenter.prevent="$emit('folder-drag-enter', $event, node.path)"
           @dragleave="$emit('folder-drag-leave', $event, node.path)"
@@ -49,7 +50,7 @@
               :class="['workspace-tree__file', { 'workspace-tree__file--active': child.path === currentFilePath }]"
               draggable="true"
               :title="child.path"
-              @contextmenu.prevent="$emit('rename-document', child.path)"
+              @contextmenu.prevent="$emit('context-menu', $event, child.path, 'file')"
               @dragstart="$emit('file-drag-start', $event, child.path)"
               @dragend="$emit('drag-end')"
             >
@@ -84,6 +85,7 @@
                 :title="child.path"
                 :aria-expanded="expandedFolders.has(child.path)"
                 @click="$emit('toggle-folder', child.path)"
+                @contextmenu.prevent="$emit('context-menu', $event, child.path, 'folder')"
                 @dragover.prevent="$emit('folder-drag-over', $event)"
                 @dragenter.prevent="$emit('folder-drag-enter', $event, child.path)"
                 @dragleave="$emit('folder-drag-leave', $event, child.path)"
@@ -115,7 +117,7 @@
                     :class="['workspace-tree__file', { 'workspace-tree__file--active': grandchild.path === currentFilePath }]"
                     draggable="true"
                     :title="grandchild.path"
-                    @contextmenu.prevent="$emit('rename-document', grandchild.path)"
+                    @contextmenu.prevent="$emit('context-menu', $event, grandchild.path, 'file')"
                     @dragstart="$emit('file-drag-start', $event, grandchild.path)"
                     @dragend="$emit('drag-end')"
                   >
@@ -151,7 +153,7 @@
         :class="['workspace-tree__file', { 'workspace-tree__file--active': node.path === currentFilePath }]"
         draggable="true"
         :title="node.path"
-        @contextmenu.prevent="$emit('rename-document', node.path)"
+        @contextmenu.prevent="$emit('context-menu', $event, node.path, 'file')"
         @dragstart="$emit('file-drag-start', $event, node.path)"
         @dragend="$emit('drag-end')"
       >
@@ -200,7 +202,7 @@ defineEmits<{
   (e: 'toggle-folder', path: string): void
   (e: 'open-file', path: string): void
   (e: 'delete-document', path: string): void
-  (e: 'rename-document', path: string): void
+  (e: 'context-menu', event: MouseEvent, path: string, type: 'file' | 'folder'): void
   (e: 'root-drop', event: DragEvent): void
   (e: 'folder-drag-over', event: DragEvent): void
   (e: 'folder-drag-enter', event: DragEvent, path: string): void
