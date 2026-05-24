@@ -368,6 +368,7 @@ describe("canvas plugin lifecycle", () => {
       defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
       enableDebugLog: false,
+      noteCreationDirectory: "",
       recentFilesLimit: 1,
       showCanvasThumbnails: true,
     })
@@ -406,6 +407,7 @@ describe("canvas plugin lifecycle", () => {
       defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
       enableDebugLog: false,
+      noteCreationDirectory: "",
       recentFilesLimit: 3,
       showCanvasThumbnails: false,
     })

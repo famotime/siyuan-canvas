@@ -105,6 +105,21 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
       return input
     },
   })
+  setting.addItem({
+    title: t("settingsNoteCreationDirectoryTitle"),
+    description: t("settingsNoteCreationDirectoryDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.className = "b3-text-field fn__flex-center"
+      input.type = "text"
+      input.value = draft.noteCreationDirectory
+      input.addEventListener("change", () => {
+        draft.noteCreationDirectory = input.value.trim()
+        void saveDraft()
+      })
+      return input
+    },
+  })
 
   setting.open(pluginName)
   return setting

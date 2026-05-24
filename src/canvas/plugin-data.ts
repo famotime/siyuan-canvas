@@ -7,6 +7,7 @@ export interface CanvasPluginSettings {
   detectExternalChanges: boolean
   enableDebugLog: boolean
   recentFilesLimit: number
+  noteCreationDirectory: string
   showCanvasThumbnails: boolean
 }
 
@@ -43,6 +44,7 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     detectExternalChanges: true,
     enableDebugLog: false,
     recentFilesLimit: 8,
+    noteCreationDirectory: "",
     showCanvasThumbnails: false,
   }
 }
@@ -125,6 +127,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
       && Number(candidate.settings?.recentFilesLimit) > 0
       ? Number(candidate.settings?.recentFilesLimit)
       : defaults.settings.recentFilesLimit,
+    noteCreationDirectory: typeof candidate.settings?.noteCreationDirectory === "string"
+      ? candidate.settings.noteCreationDirectory.trim()
+      : defaults.settings.noteCreationDirectory,
     showCanvasThumbnails: typeof candidate.settings?.showCanvasThumbnails === "boolean"
       ? candidate.settings.showCanvasThumbnails
       : defaults.settings.showCanvasThumbnails,

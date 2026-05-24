@@ -992,6 +992,20 @@
             />
           </button>
           <button
+            v-if="editor.canConvertSelectionToDocument && editor.selectedNodeCount === 1"
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-convert"
+            :aria-label="SELECTION_TOOLBAR_TOOLTIPS.convert"
+            :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.convert"
+            type="button"
+            @click.stop="editor.convertSelectionToDocument"
+          >
+            <CanvasIcon
+              class="selection-toolbar__icon"
+              name="convert"
+            />
+          </button>
+          <button
             v-if="editor.selectedNodeCount === 1 && editor.selectedNode"
             class="selection-toolbar__button"
             data-testid="selection-toolbar-edit"
@@ -1006,6 +1020,20 @@
             />
           </button>
           <template v-else-if="editor.selectedNodeCount > 1">
+            <button
+              v-if="editor.canConvertSelectionToDocument"
+              class="selection-toolbar__button"
+              data-testid="selection-toolbar-convert"
+              :aria-label="SELECTION_TOOLBAR_TOOLTIPS.convert"
+              :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.convert"
+              type="button"
+              @click.stop="editor.convertSelectionToDocument"
+            >
+              <CanvasIcon
+                class="selection-toolbar__icon"
+                name="convert"
+              />
+            </button>
             <button
               class="selection-toolbar__button"
               data-testid="selection-toolbar-create-group"

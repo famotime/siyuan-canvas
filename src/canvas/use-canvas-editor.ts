@@ -2,9 +2,11 @@ import type {
   CanvasBounds,
   CanvasDocument,
   CanvasEdge,
+  CanvasFileNode,
   CanvasNodeLayoutAction,
   CanvasNode,
   CanvasSide,
+  CanvasTextNode,
 } from "@/canvas/types"
 import type { CanvasTabBootstrap } from "@/main"
 import type {
@@ -30,9 +32,15 @@ import {
   watch,
 } from "vue"
 import {
+  createDocWithMd,
+  getBlockByID,
+  getNotebookConf,
+  lsNotebooks,
   putFile,
   readDir,
   removeFile,
+  renderSprig,
+  sql,
 } from "@/api"
 import { createCanvasEditorWorkspaceTree } from "@/canvas/use-canvas-editor-workspace-tree"
 import {
@@ -262,6 +270,13 @@ export function useCanvasEditor(
     }
 
     return false
+  })
+  const canConvertSelectionToDocument = computed(() => {
+    if (state.selectedNodeIds.length === 0) return false
+    return state.selectedNodeIds.every(id => {
+      const node = state.document.nodes.find(n => n.id === id)
+      return node?.type === 'text'
+    })
   })
   const selectedEdge = computed(
     () => state.document.edges.find((edge) => edge.id === state.selectedEdgeId) || null,
@@ -665,6 +680,195 @@ export function useCanvasEditor(
     state.selectNode(sourceNodeId)
     if (sourceNode.type === 'file') {
       await refreshFileNodeMetadata(headingNodes.map((node) => node.id))
+    }
+  }
+
+  function topologicalSortSelectedNodes(selectedIds: string[]): string[] {
+    const selectedSet = new Set(selectedIds)
+    const adjacency = new Map<string, string[]>()
+    const incomingCount = new Map<string, number>()
+    for (const id of selectedIds) {
+      adjacency.set(id, [])
+      incomingCount.set(id, 0)
+    }
+    for (const edge of state.document.edges) {
+      if (selectedSet.has(edge.fromNode) && selectedSet.has(edge.toNode)) {
+        adjacency.get(edge.fromNode)!.push(edge.toNode)
+        incomingCount.set(edge.toNode, (incomingCount.get(edge.toNode) || 0) + 1)
+      }
+    }
+    const queue: string[] = []
+    for (const id of selectedIds) {
+      if ((incomingCount.get(id) || 0) === 0) queue.push(id)
+    }
+    const sorted: string[] = []
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      sorted.push(current)
+      for (const neighbor of adjacency.get(current) || []) {
+        const count = (incomingCount.get(neighbor) || 1) - 1
+        incomingCount.set(neighbor, count)
+        if (count === 0) queue.push(neighbor)
+      }
+    }
+    for (const id of selectedIds) {
+      if (!sorted.includes(id)) sorted.push(id)
+    }
+    return sorted
+  }
+
+  function buildMergedMarkdown(nodes: CanvasTextNode[]): string {
+    const parts: string[] = []
+    let headingIndex = 0
+    for (const node of nodes) {
+      const text = node.text.trim()
+      if (!text) continue
+      const lines = text.split('\n')
+      const headingLevel = headingIndex === 0 ? 1 : Math.min(headingIndex + 1, 6)
+      const headingPrefix = '#'.repeat(headingLevel)
+      parts.push(`${headingPrefix} ${lines[0]}`)
+      if (lines.length > 1) {
+        parts.push(lines.slice(1).join('\n'))
+      }
+      parts.push('')
+      headingIndex++
+    }
+    return parts.join('\n')
+  }
+
+  async function findHeadingBlockIds(documentId: string, expectedCount: number): Promise<string[]> {
+    const blocks = await sql(
+      `SELECT id FROM blocks WHERE root_id = '${documentId}' AND type = 'h' ORDER BY sort ASC`,
+    )
+    if (blocks && blocks.length >= expectedCount) {
+      return blocks.slice(0, expectedCount).map((b: { id: string }) => b.id)
+    }
+    return (blocks || []).map((b: { id: string }) => b.id)
+  }
+
+  async function resolveNoteCreationDirectory(): Promise<{ notebook: string, parentPath: string } | null> {
+    const settings = getPluginSettings()
+    const notebooks = await lsNotebooks()
+    const notebook = notebooks?.notebooks?.find((n: { closed: boolean }) => !n.closed)
+    if (!notebook) return null
+
+    if (settings.noteCreationDirectory) {
+      const normalized = settings.noteCreationDirectory.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/$/, '')
+      return { notebook: notebook.id, parentPath: normalized || '/' }
+    }
+
+    const conf = await getNotebookConf(notebook.id)
+    const dailyNotePath = conf?.conf?.dailyNoteSavePath
+    if (!dailyNotePath) return { notebook: notebook.id, parentPath: '/' }
+
+    const resolved = await renderSprig(dailyNotePath)
+    const segments = resolved.replace(/\\/g, '/').replace(/\/+/g, '/').split('/').filter(Boolean)
+    segments.pop()
+    return { notebook: notebook.id, parentPath: '/' + segments.join('/') }
+  }
+
+  function extractDocumentTitle(node: CanvasTextNode): string {
+    const firstLine = node.text.split('\n')[0]?.trim() || ''
+    return firstLine || t('nodeKindText')
+  }
+
+  async function convertSelectionToDocument() {
+    if (!canConvertSelectionToDocument.value) return
+
+    const selectedIds = state.selectedNodeIds
+    const allTextNodes = selectedIds
+      .map(id => state.document.nodes.find(n => n.id === id))
+      .filter((n): n is CanvasTextNode => n?.type === 'text')
+
+    if (allTextNodes.length === 0) return
+
+    const dir = await resolveNoteCreationDirectory()
+    if (!dir) {
+      showMessage(t('messageNoNotebookAvailable'), 4000, 'warning')
+      return
+    }
+
+    try {
+      const orderedIds = selectedIds.length === 1
+        ? selectedIds
+        : topologicalSortSelectedNodes(selectedIds)
+
+      const orderedNodes = orderedIds
+        .map(id => allTextNodes.find(n => n.id === id))
+        .filter((n): n is CanvasTextNode => Boolean(n))
+
+      if (orderedNodes.length === 0) return
+
+      const firstNonEmpty = orderedNodes.find(n => n.text.trim())
+      if (!firstNonEmpty) return
+
+      const title = extractDocumentTitle(firstNonEmpty)
+      const markdown = buildMergedMarkdown(orderedNodes)
+      const docPath = dir.parentPath === '/' ? `/${title}` : `${dir.parentPath}/${title}`
+      const documentId = await createDocWithMd(dir.notebook, docPath, markdown)
+
+      const replacementNodes: Array<{ id: string, node: CanvasFileNode }> = []
+
+      if (orderedNodes.length === 1) {
+        const source = orderedNodes[0]
+        replacementNodes.push({
+          id: source.id,
+          node: {
+            id: source.id,
+            type: 'file',
+            file: documentId,
+            x: source.x,
+            y: source.y,
+            width: source.width,
+            height: source.height,
+            color: source.color,
+          },
+        })
+      } else {
+        const nonEmptyCount = orderedNodes.filter(n => n.text.trim()).length
+        const headingCount = Math.max(0, nonEmptyCount - 1)
+        const headingBlockIds = headingCount > 0
+          ? await findHeadingBlockIds(documentId, headingCount)
+          : []
+        let headingIndex = 0
+
+        for (let i = 0; i < orderedNodes.length; i++) {
+          const source = orderedNodes[i]
+          let fileId = documentId
+          if (i > 0 && source.text.trim()) {
+            fileId = headingBlockIds[headingIndex] || documentId
+            headingIndex++
+          }
+          const fileNode: CanvasFileNode = {
+            id: source.id,
+            type: 'file',
+            file: fileId,
+            x: source.x,
+            y: source.y,
+            width: source.width,
+            height: source.height,
+            color: source.color,
+          }
+          replacementNodes.push({ id: source.id, node: fileNode })
+        }
+      }
+
+      const replacementMap = new Map(replacementNodes.map(r => [r.id, r.node]))
+      const updatedNodes = state.document.nodes.map(node =>
+        replacementMap.get(node.id) ?? node,
+      )
+
+      commitDocument({
+        ...state.document,
+        nodes: updatedNodes,
+      })
+
+      await refreshFileNodeMetadata(replacementNodes.map(r => r.id))
+
+      showMessage(t('messageConvertToDocumentSuccess', { title }), 3000)
+    } catch (err) {
+      console.error('[siyuan-canvas] convertSelectionToDocument failed:', err)
+      showMessage(t('messageConvertToDocumentFailed'), 4000, 'error')
     }
   }
 
@@ -1284,6 +1488,7 @@ export function useCanvasEditor(
       bottomToolbarVisible,
       canDelete,
       canDecomposeSelectedDocument,
+      canConvertSelectionToDocument,
       canRefreshSelectedSiyuanNode,
       centerEdgeInViewport,
       centerSelectionInViewport,
@@ -1368,6 +1573,7 @@ export function useCanvasEditor(
       updateTextNodeContent,
       convertTextToLink,
       convertLinkToText,
+      convertSelectionToDocument,
       updateEdgeField,
       updateEdgeSide,
       applySelectedNodeChanges,
