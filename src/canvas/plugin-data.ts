@@ -16,6 +16,7 @@ export interface CanvasInspectorSectionsState {
   document: boolean
   edge: boolean
   node: boolean
+  nodeEdges: boolean
   recent: boolean
   selection: boolean
 }
@@ -56,6 +57,7 @@ export function createDefaultCanvasPluginUiState(): CanvasPluginUiState {
       document: true,
       edge: true,
       node: true,
+      nodeEdges: true,
       recent: true,
       selection: true,
     },
@@ -150,6 +152,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     node: typeof candidateInspectorSections?.node === "boolean"
       ? candidateInspectorSections.node
       : defaultInspectorSections.node,
+    nodeEdges: typeof candidateInspectorSections?.nodeEdges === "boolean"
+      ? candidateInspectorSections.nodeEdges
+      : defaultInspectorSections.nodeEdges,
     recent: typeof candidateInspectorSections?.recent === "boolean"
       ? candidateInspectorSections.recent
       : defaultInspectorSections.recent,

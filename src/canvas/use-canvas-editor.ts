@@ -525,6 +525,7 @@ export function useCanvasEditor(
         document: true,
         edge: true,
         node: true,
+        nodeEdges: true,
         recent: true,
         selection: true,
       },

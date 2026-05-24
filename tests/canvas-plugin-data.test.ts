@@ -23,6 +23,7 @@ describe("canvas plugin data", () => {
       document: true,
       edge: true,
       node: true,
+      nodeEdges: true,
       recent: true,
       selection: true,
     })
@@ -90,6 +91,7 @@ describe("canvas plugin data", () => {
       document: true,
       edge: true,
       node: true,
+      nodeEdges: true,
       recent: true,
       selection: true,
     })

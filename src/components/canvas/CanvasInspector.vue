@@ -117,6 +117,44 @@
   </section>
 
   <section
+    v-if="editor.selectedNodeCount === 1 && nodeEdges.length > 0"
+    class="inspector__section"
+  >
+    <button
+      class="inspector__section-toggle"
+      :title="getSectionToggleTitle('nodeEdges')"
+      type="button"
+      @click="editor.toggleInspectorSection('nodeEdges')"
+    >
+      <h2>{{ t("inspectorNodeEdges") }}</h2>
+      <span>{{ getSectionChevron('nodeEdges') }}</span>
+    </button>
+    <div v-if="editor.inspectorSectionState.nodeEdges">
+      <div
+        v-for="edgeInfo in nodeEdges"
+        :key="edgeInfo.edge.id"
+        class="node-edge-item"
+      >
+        <div class="node-edge-item__side">
+          {{ getSideLabel(edgeInfo.localSide) }}
+        </div>
+        <div class="node-edge-item__info">
+          <span class="node-edge-item__direction">{{ edgeInfo.direction === 'outgoing' ? '→' : '←' }}</span>
+          <span
+            class="node-edge-item__node"
+            :title="edgeInfo.connectedNodeTitle"
+          >{{ edgeInfo.connectedNodeTitle }}</span>
+          <span
+            v-if="edgeInfo.edge.label"
+            class="node-edge-item__label"
+            :title="edgeInfo.edge.label"
+          >{{ edgeInfo.edge.label }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section
     v-if="editor.selectedNodeCount === 1"
     class="inspector__section"
   >
@@ -365,6 +403,41 @@ const selectedEdgeToNodeTitle = computed(() => {
   if (!edge) return ''
   const node = props.editor.state.document.nodes.find((n: any) => n.id === edge.toNode)
   return node ? props.editor.getNodeTitle(node) : edge.toNode
+})
+
+interface NodeEdgeInfo {
+  edge: any
+  localSide: string
+  direction: 'incoming' | 'outgoing'
+  connectedNodeTitle: string
+}
+
+const nodeEdges = computed<NodeEdgeInfo[]>(() => {
+  const node = props.editor.selectedNode
+  if (!node) return []
+  const edges: any[] = props.editor.state.document.edges
+  const nodes: any[] = props.editor.state.document.nodes
+  const result: NodeEdgeInfo[] = []
+  for (const edge of edges) {
+    if (edge.fromNode === node.id) {
+      const connected = nodes.find((n: any) => n.id === edge.toNode)
+      result.push({
+        edge,
+        localSide: edge.fromSide,
+        direction: 'outgoing',
+        connectedNodeTitle: connected ? props.editor.getNodeTitle(connected) : edge.toNode,
+      })
+    } else if (edge.toNode === node.id) {
+      const connected = nodes.find((n: any) => n.id === edge.fromNode)
+      result.push({
+        edge,
+        localSide: edge.toSide,
+        direction: 'incoming',
+        connectedNodeTitle: connected ? props.editor.getNodeTitle(connected) : edge.fromNode,
+      })
+    }
+  }
+  return result
 })
 
 type InspPickerKind = 'source' | 'target'
@@ -861,5 +934,58 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   padding: 6px 8px;
   color: var(--canvas-text-muted);
   font-size: 12px;
+}
+
+.node-edge-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--canvas-border);
+}
+
+.node-edge-item:last-child {
+  border-bottom: 0;
+}
+
+.node-edge-item__side {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--canvas-text-muted);
+  white-space: nowrap;
+}
+
+.node-edge-item__info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.node-edge-item__direction {
+  flex: 0 0 auto;
+  color: var(--canvas-accent);
+  font-size: 12px;
+}
+
+.node-edge-item__node {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--canvas-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-edge-item__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--canvas-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
