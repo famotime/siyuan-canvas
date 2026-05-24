@@ -34,18 +34,21 @@ function createBaseHandlerOptions() {
     canDelete: () => false,
     cancelEdgeLabelEditing: vi.fn(),
     closeEdgePopover: vi.fn(),
+    closeFloatLayer: vi.fn(),
     closeSelectionPopover: vi.fn(),
     deleteSelection: vi.fn(),
     duplicateSelection: vi.fn(),
     getEdgeToolbarPopover: () => 'closed' as const,
     getEditingEdgeLabelId: () => '',
     getSelectionToolbarPopover: () => 'closed' as const,
+    hasFloatLayer: () => false,
     openFilePickerDialog: vi.fn(),
     redo: vi.fn(),
     save: vi.fn(),
     selectAllNodes: vi.fn(),
     selectEdge: vi.fn(),
     selectNode: vi.fn(),
+    showFloatLayerForSelection: vi.fn(),
     undo: vi.fn(),
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
@@ -332,5 +335,38 @@ describe('canvas editor keyboard handler', () => {
 
     expect(openFilePickerDialog).not.toHaveBeenCalled()
     vi.useRealTimers()
+  })
+
+  it('triggers float layer preview on space key', () => {
+    const showFloatLayerForSelection = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      showFloatLayerForSelection,
+    })
+    const event = createKeyboardEvent(' ')
+
+    handler.handleKeydown(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(showFloatLayerForSelection).toHaveBeenCalledOnce()
+  })
+
+  it('closes float layer on escape when float layer is active', () => {
+    const closeFloatLayer = vi.fn()
+    const selectNode = vi.fn()
+    const selectEdge = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      closeFloatLayer,
+      hasFloatLayer: () => true,
+      selectEdge,
+      selectNode,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('Escape'))
+
+    expect(closeFloatLayer).toHaveBeenCalledOnce()
+    expect(selectNode).not.toHaveBeenCalled()
+    expect(selectEdge).not.toHaveBeenCalled()
   })
 })

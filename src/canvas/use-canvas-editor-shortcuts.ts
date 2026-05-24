@@ -2,6 +2,7 @@ interface CanvasEditorKeyboardHandlerOptions {
   canDelete: () => boolean
   cancelEdgeLabelEditing: () => void
   closeEdgePopover: () => void
+  closeFloatLayer?: () => void
   closeSelectionPopover: () => void
   deleteSelection: () => void
   duplicateSelection?: () => void
@@ -10,12 +11,14 @@ interface CanvasEditorKeyboardHandlerOptions {
   getEdgeToolbarPopover: () => 'closed' | 'color' | 'direction'
   getEditingEdgeLabelId: () => string
   getSelectionToolbarPopover: () => 'closed' | 'color' | 'layout'
+  hasFloatLayer?: () => boolean
   openFilePickerDialog?: () => void
   redo?: () => void
   save: () => void | Promise<void>
   selectAllNodes: () => void
   selectEdge: () => void
   selectNode: () => void
+  showFloatLayerForSelection?: () => void
   undo?: () => void
   zoomIn?: () => void
   zoomOut?: () => void
@@ -36,6 +39,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     canDelete,
     cancelEdgeLabelEditing,
     closeEdgePopover,
+    closeFloatLayer,
     closeSelectionPopover,
     deleteSelection,
     duplicateSelection,
@@ -44,12 +48,14 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     getEdgeToolbarPopover,
     getEditingEdgeLabelId,
     getSelectionToolbarPopover,
+    hasFloatLayer,
     openFilePickerDialog,
     redo,
     save,
     selectAllNodes,
     selectEdge,
     selectNode,
+    showFloatLayerForSelection,
     undo,
     zoomIn,
     zoomOut,
@@ -89,7 +95,19 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       return
     }
 
+    // Space：浮窗预览选中的思源文档/块节点
+    if (event.key === ' ' && !isAccelerator && !event.shiftKey && !event.altKey) {
+      event.preventDefault()
+      showFloatLayerForSelection?.()
+      return
+    }
+
     if (event.key === 'Escape') {
+      if (hasFloatLayer?.()) {
+        closeFloatLayer?.()
+        return
+      }
+
       if (getEditingEdgeLabelId()) {
         cancelEdgeLabelEditing()
         return

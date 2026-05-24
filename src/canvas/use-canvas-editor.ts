@@ -173,6 +173,7 @@ export function useCanvasEditor(
   const suggestedFilename = ref(bootstrap.title || t("untitledCanvas"))
   const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
   const edgeToolbarPopover = ref<"closed" | "color" | "direction">("closed")
+  const floatLayerActive = ref(false)
   const bottomToolbarVisible = ref(false)
   const createEdgeDialog = reactive({
     visible: false,
@@ -1205,6 +1206,61 @@ export function useCanvasEditor(
     edgeToolbarPopover.value = "closed"
   }
 
+  function closeFloatLayer() {
+    const panels = (window as any).siyuan?.blockPanels
+    if (Array.isArray(panels)) {
+      for (const panel of [...panels]) {
+        panel.destroy?.()
+      }
+    }
+    floatLayerActive.value = false
+  }
+
+  function debugLog(...args: unknown[]) {
+    if (getPluginSettings().enableDebugLog) {
+      console.log('[Canvas]', ...args)
+    }
+  }
+
+  function showFloatLayerForSelection() {
+    const node = selectedNode.value
+    if (!node || node.type !== 'file') {
+      debugLog('float layer skipped: no file node selected')
+      return
+    }
+
+    const meta = fileNodeMeta.value[node.id]
+    if (!meta) {
+      debugLog('float layer skipped: no meta for node', node.id)
+      return
+    }
+
+    let refID: string | undefined
+    if (meta.kind === 'block') {
+      refID = meta.id
+    } else if (meta.kind === 'document') {
+      refID = meta.id
+    } else if (meta.kind === 'image' && meta.blockId) {
+      refID = meta.blockId
+    }
+    if (!refID) {
+      debugLog('float layer skipped: no refID for kind', meta.kind)
+      return
+    }
+
+    debugLog('showFloatLayer', { refID, kind: meta.kind })
+    closeFloatLayer()
+
+    const stage = stageRef.value
+    const targetElement = stage?.querySelector(`[data-canvas-node-id="${node.id}"]`) as HTMLElement | undefined
+    plugin.addFloatLayer({
+      refDefs: [{ refID }],
+      isBacklink: false,
+      ...(targetElement ? { targetElement } : {}),
+    })
+    floatLayerActive.value = true
+  }
+
   function setSelectionToolbarSize(size: { height: number, width: number }) {
     if (size.width > 0) {
       selectionToolbarSize.width = size.width
@@ -1456,6 +1512,7 @@ export function useCanvasEditor(
     canDelete: () => canDelete.value,
     cancelEdgeLabelEditing,
     closeEdgePopover,
+    closeFloatLayer,
     closeSelectionPopover,
     createMindMapChildNode,
     createMindMapSiblingNode,
@@ -1464,12 +1521,14 @@ export function useCanvasEditor(
     getEdgeToolbarPopover: () => edgeToolbarPopover.value,
     getEditingEdgeLabelId: () => editingEdgeLabelId.value,
     getSelectionToolbarPopover: () => selectionToolbarPopover.value,
+    hasFloatLayer: () => floatLayerActive.value,
     openFilePickerDialog,
     redo,
     save,
     selectAllNodes: () => state.selectAllNodes(),
     selectEdge: () => state.selectEdge(),
     selectNode: () => state.selectNode(),
+    showFloatLayerForSelection,
     undo,
     zoomIn,
     zoomOut,
@@ -1589,6 +1648,7 @@ export function useCanvasEditor(
   })
 
   onBeforeUnmount(() => {
+    closeFloatLayer()
     unregisterCanvasSearchHost?.()
     unregisterCanvasSearchHost = null
     window.removeEventListener("keydown", handleKeydown)
