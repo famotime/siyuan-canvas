@@ -62,6 +62,7 @@ import { createCanvasEditorFileActions } from "@/canvas/use-canvas-editor-file-a
 import { createCanvasEditorFilePickerActions } from "@/canvas/use-canvas-editor-file-picker"
 import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-file-nodes"
 import { createCanvasEditorStageDropActions } from "@/canvas/use-canvas-editor-stage-drop"
+import { buildWorkspaceImagePath } from "@/canvas/workspace-image-files"
 import {
   createCanvasEditorGestureHandlers,
   type CanvasEditorConnectionDraftState,
@@ -117,6 +118,7 @@ import {
   replaceCanvasTextTargetRanges,
   type CanvasSearchDecoration,
 } from "@/canvas/search-bridge"
+import { findSiyuanAssetByPath } from "@/canvas/siyuan-kernel-file-node-lookups"
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
 const DEFAULT_SELECTION_TOOLBAR_SIZE = {
@@ -888,8 +890,64 @@ export function useCanvasEditor(
       .trim()
   }
 
+  function escapeMarkdownImageAlt(value: string): string {
+    return value.replace(/\\/g, '\\\\').replace(/\]/g, '\\]')
+  }
+
+  async function readWorkspaceFileBlob(path: string): Promise<Blob> {
+    const response = await fetch('/api/file/getFile', {
+      body: JSON.stringify({ path }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    })
+
+    if (!response.ok) {
+      throw new Error(`Unable to read workspace file: ${path}`)
+    }
+
+    return response.blob()
+  }
+
+  function getImageFileName(resolved: Extract<ResolvedCanvasFileTarget, { kind: 'image' }>): string {
+    const source = resolved.path || resolved.openPath || resolved.title
+    return getCanvasFileName(source) || getCanvasFileName(resolved.openPath) || 'image.png'
+  }
+
+  async function copyImageTargetToWorkspaceCanvasAssets(
+    resolved: Extract<ResolvedCanvasFileTarget, { kind: 'image' }>,
+  ): Promise<string | null> {
+    if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
+      return null
+    }
+
+    const sourcePath = resolved.openPath || resolved.path
+    if (!sourcePath) {
+      return null
+    }
+
+    const file = await readWorkspaceFileBlob(sourcePath)
+    const targetPath = buildWorkspaceImagePath(state.filePath, getImageFileName(resolved))
+    await putFile(targetPath, false, file)
+    return targetPath
+  }
+
   async function fetchFileNodeContent(node: CanvasFileNode): Promise<string> {
-    const resolved = getResolvedFileNode(node)
+    let resolved = getResolvedFileNode(node)
+    if (resolved.kind !== 'image') {
+      const image = await findSiyuanAssetByPath(node.file)
+      if (image) {
+        resolved = {
+          blockId: image.blockId,
+          kind: 'image',
+          openPath: image.openPath,
+          path: image.path,
+          title: image.title || image.name,
+        }
+      }
+    }
+
     switch (resolved.kind) {
       case 'document': {
         const raw = await getSiyuanDocumentMarkdown(resolved.id)
@@ -904,8 +962,10 @@ export function useCanvasEditor(
         return stripKramdownBlockIds(raw)
       }
       case 'image': {
-        const imageSrc = resolved.openPath || resolved.path
-        return `![${resolved.title || ''}](${imageSrc})`
+        const imageSrc = await copyImageTargetToWorkspaceCanvasAssets(resolved)
+          || resolved.openPath
+          || resolved.path
+        return `![${escapeMarkdownImageAlt(resolved.title || '')}](${imageSrc})`
       }
       default:
         return resolved.title || node.file

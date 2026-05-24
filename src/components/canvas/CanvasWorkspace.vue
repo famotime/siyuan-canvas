@@ -1576,6 +1576,7 @@ const {
 const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
 const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>>({})
+const textMarkdownImageBlobUrls = ref<Record<string, string>>({})
 const hoveredEdgeId = ref("")
 const pngExportBackgroundMode = ref<CanvasPngExportBackgroundMode>("white")
 const pngExportCustomColor = ref("#ffffff")
@@ -1587,6 +1588,7 @@ const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
 const settingsRevision = ref(0)
 let dragExpandTimer: ReturnType<typeof setTimeout> | null = null
+const textMarkdownImageBlobUrlLoads = new Set<string>()
 
 type InspectorTab = 'documents' | 'selection'
 const activeInspectorTab = ref<InspectorTab>('documents')
@@ -1597,6 +1599,61 @@ const totalInspectorIssueCount = computed(() => {
   const conflict = editor.state.conflict ? 1 : 0
   return errors + warnings + conflict
 })
+
+function isWorkspaceStorageImageSource(source: string): boolean {
+  return /^\/data\/storage\/.+\.(?:avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(source.trim())
+}
+
+async function loadTextMarkdownImageBlobUrl(source: string) {
+  if (textMarkdownImageBlobUrls.value[source] || textMarkdownImageBlobUrlLoads.has(source)) {
+    return
+  }
+
+  textMarkdownImageBlobUrlLoads.add(source)
+  try {
+    const response = await fetch("/api/file/getFile", {
+      body: JSON.stringify({ path: source }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    })
+    if (!response.ok) {
+      return
+    }
+
+    const blobUrl = URL.createObjectURL(await response.blob())
+    textMarkdownImageBlobUrls.value = {
+      ...textMarkdownImageBlobUrls.value,
+      [source]: blobUrl,
+    }
+  } catch (error) {
+    console.warn("[siyuan-canvas] unable to load text markdown image:", source, error)
+  } finally {
+    textMarkdownImageBlobUrlLoads.delete(source)
+  }
+}
+
+function collectWorkspaceStorageImages(html: string): string[] {
+  const sources = new Set<string>()
+  html.replace(/<img\b[^>]*\bsrc=(["'])([^"']+)\1/gi, (_match, _quote: string, source: string) => {
+    if (isWorkspaceStorageImageSource(source)) {
+      sources.add(source)
+    }
+    return _match
+  })
+  return [...sources]
+}
+
+function applyTextMarkdownImageBlobUrls(html: string): string {
+  return html.replace(
+    /(<img\b[^>]*\bsrc=(["']))([^"']+)(\2)/gi,
+    (match, prefix: string, _quote: string, source: string, suffix: string) => {
+      const blobUrl = textMarkdownImageBlobUrls.value[source]
+      return blobUrl ? `${prefix}${blobUrl}${suffix}` : match
+    },
+  )
+}
 
 const showCanvasThumbnails = computed(() => {
   settingsRevision.value
@@ -1612,6 +1669,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  for (const blobUrl of Object.values(textMarkdownImageBlobUrls.value)) {
+    URL.revokeObjectURL(blobUrl)
+  }
   window.removeEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
 })
 
@@ -2014,7 +2074,11 @@ function renderCanvasTextNodeContent(node: CanvasNode) {
   const markdown = decorations.length
     ? markCanvasSearchTextRanges(node.text, decorations)
     : node.text
-  return editor.getRenderedMarkdown(markdown)
+  const html = editor.getRenderedMarkdown(markdown)
+  for (const source of collectWorkspaceStorageImages(html)) {
+    void loadTextMarkdownImageBlobUrl(source)
+  }
+  return applyTextMarkdownImageBlobUrls(html)
 }
 
 /**

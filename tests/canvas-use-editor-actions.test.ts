@@ -740,6 +740,45 @@ describe("useCanvasEditor file lifecycle flows", () => {
     wrapper.unmount()
   })
 
+  it("copies an image file node beside the workspace canvas when converting it to text", async () => {
+    const path = "/data/storage/maps/roadmap.canvas"
+    workspaceFiles.set(path, createCanvasRaw("workspace canvas"))
+    workspaceFiles.set("/data/assets/diagram.png", "png")
+    fileNodeLookupMock.findSiyuanAssetByPath.mockResolvedValue({
+      blockId: "20260412094047-img001",
+      name: "diagram.png",
+      openPath: "/data/assets/diagram.png",
+      path: "assets/diagram.png",
+      title: "Diagram",
+    })
+
+    const { editor, wrapper } = await mountEditor({ path })
+
+    editor.addNode("file")
+    await flushEditor()
+    editor.updateNodeField("file", "assets/diagram.png")
+    await flushEditor()
+
+    await editor.convertSelectionToText()
+    await flushEditor()
+
+    const convertedNode = editor.state.document.nodes.at(-1)
+    expect(convertedNode).toMatchObject({
+      id: editor.state.selectedNodeId,
+      type: "text",
+    })
+    const markdown = convertedNode?.type === "text" ? convertedNode.text : ""
+    const imagePath = markdown.match(/\]\(([^)]+)\)/)?.[1] || ""
+
+    expect(imagePath).toContain("/data/storage/maps/roadmap.assets/")
+    expect(imagePath).toMatch(/\.png$/)
+    expect(markdown).toBe(`![Diagram](${imagePath})`)
+    expect(apiMock.putFile).toHaveBeenCalledWith(imagePath, false, expect.anything())
+    expect(workspaceFiles.get(imagePath)).toBe("png")
+
+    wrapper.unmount()
+  })
+
   it("renders a block preview for a non-document block id and strips internal attrs", async () => {
     fileNodeLookupMock.findSiyuanBlockById.mockResolvedValue({
       hpath: "/Projects/Roadmap",

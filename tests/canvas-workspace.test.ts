@@ -400,6 +400,50 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".canvas-node--text .canvas-node__header-title").text()).toBe("定义")
   })
 
+  it("loads workspace storage images in text markdown through object URLs", async () => {
+    const imagePath = "/data/storage/petal/siyuan-canvas/未命名.assets/1779613060426.png"
+    const node = createTextNode({
+      text: `![DSC05027.PNG](${imagePath})`,
+    })
+    currentEditor = createEditorMock(node)
+    currentEditor.getRenderedMarkdown = vi.fn(() => `<p><img src="${imagePath}" alt="DSC05027.PNG"></p>`)
+    const fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+      blob: async () => new Blob(["png"], { type: "image/png" }),
+      ok: true,
+    } as Response)
+    const createObjectUrlSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:canvas-image")
+    const revokeObjectUrlSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
+
+    try {
+      const wrapper = mount(CanvasWorkspace, {
+        props: {
+          bootstrap: {},
+          plugin: {},
+          setTitle: vi.fn(),
+        },
+      })
+
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      await nextTick()
+
+      expect(fetchSpy).toHaveBeenCalledWith("/api/file/getFile", expect.objectContaining({
+        body: JSON.stringify({ path: imagePath }),
+        method: "POST",
+      }))
+      expect(createObjectUrlSpy).toHaveBeenCalled()
+      expect(wrapper.find(".canvas-node--text img").attributes("src")).toBe("blob:canvas-image")
+
+      wrapper.unmount()
+      expect(revokeObjectUrlSpy).toHaveBeenCalledWith("blob:canvas-image")
+    } finally {
+      fetchSpy.mockRestore()
+      createObjectUrlSpy.mockRestore()
+      revokeObjectUrlSpy.mockRestore()
+    }
+  })
+
   it("renders linked SiYuan document file card header titles without path information", () => {
     const node = {
       id: "file-1",
