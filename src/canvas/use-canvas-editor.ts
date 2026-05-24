@@ -89,7 +89,9 @@ import {
   findSiyuanDocumentsByQuery,
   findSiyuanImageAssetByBlockId,
   findSiyuanImageAssetsByQuery,
+  getSiyuanBlockMarkdown,
   getSiyuanDocumentMarkdown,
+  getSiyuanHeadingBlockMarkdown,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
 import {
   validateCanvasDocument,
@@ -276,6 +278,13 @@ export function useCanvasEditor(
     return state.selectedNodeIds.every(id => {
       const node = state.document.nodes.find(n => n.id === id)
       return node?.type === 'text'
+    })
+  })
+  const canConvertSelectionToText = computed(() => {
+    if (state.selectedNodeIds.length === 0) return false
+    return state.selectedNodeIds.every(id => {
+      const node = state.document.nodes.find(n => n.id === id)
+      return node?.type === 'file'
     })
   })
   const selectedEdge = computed(
@@ -869,6 +878,79 @@ export function useCanvasEditor(
     } catch (err) {
       console.error('[siyuan-canvas] convertSelectionToDocument failed:', err)
       showMessage(t('messageConvertToDocumentFailed'), 4000, 'error')
+    }
+  }
+
+  function stripKramdownBlockIds(markdown: string): string {
+    return markdown
+      .replace(/\{:[^}]*\}/g, '')
+      .replace(/\s*\n{3,}/g, '\n\n')
+      .trim()
+  }
+
+  async function fetchFileNodeContent(node: CanvasFileNode): Promise<string> {
+    const resolved = getResolvedFileNode(node)
+    switch (resolved.kind) {
+      case 'document': {
+        const raw = await getSiyuanDocumentMarkdown(resolved.id)
+        return stripKramdownBlockIds(raw)
+      }
+      case 'block': {
+        if (resolved.type === 'h') {
+          const raw = await getSiyuanHeadingBlockMarkdown(resolved.id)
+          return stripKramdownBlockIds(raw)
+        }
+        const raw = await getSiyuanBlockMarkdown(resolved.id)
+        return stripKramdownBlockIds(raw)
+      }
+      case 'image': {
+        return `![${resolved.title || ''}](${resolved.path})`
+      }
+      default:
+        return resolved.title || node.file
+    }
+  }
+
+  async function convertSelectionToText() {
+    if (!canConvertSelectionToText.value) return
+
+    const selectedIds = state.selectedNodeIds
+    const fileNodes = selectedIds
+      .map(id => state.document.nodes.find(n => n.id === id))
+      .filter((n): n is CanvasFileNode => n?.type === 'file')
+
+    if (fileNodes.length === 0) return
+
+    try {
+      const replacementEntries = await Promise.all(fileNodes.map(async (node) => {
+        const content = await fetchFileNodeContent(node)
+        const textNode: CanvasTextNode = {
+          id: node.id,
+          type: 'text',
+          text: content,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          color: node.color,
+        }
+        return { id: node.id, node: textNode as CanvasNode }
+      }))
+
+      const replacementMap = new Map(replacementEntries.map(r => [r.id, r.node]))
+      const updatedNodes = state.document.nodes.map(node =>
+        replacementMap.get(node.id) ?? node,
+      )
+
+      commitDocument({
+        ...state.document,
+        nodes: updatedNodes,
+      })
+
+      showMessage(t('messageConvertToTextSuccess'), 3000)
+    } catch (err) {
+      console.error('[siyuan-canvas] convertSelectionToText failed:', err)
+      showMessage(t('messageConvertToTextFailed'), 4000, 'error')
     }
   }
 
@@ -1489,6 +1571,7 @@ export function useCanvasEditor(
       canDelete,
       canDecomposeSelectedDocument,
       canConvertSelectionToDocument,
+      canConvertSelectionToText,
       canRefreshSelectedSiyuanNode,
       centerEdgeInViewport,
       centerSelectionInViewport,
@@ -1574,6 +1657,7 @@ export function useCanvasEditor(
       convertTextToLink,
       convertLinkToText,
       convertSelectionToDocument,
+      convertSelectionToText,
       updateEdgeField,
       updateEdgeSide,
       applySelectedNodeChanges,

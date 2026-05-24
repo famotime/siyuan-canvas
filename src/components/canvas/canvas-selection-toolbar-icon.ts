@@ -13,6 +13,7 @@ export function createSelectionToolbarTooltips(t: CanvasI18nTranslator) {
     center: t('selectionToolbarCenter'),
     color: t('selectionToolbarColor'),
     convert: t('selectionToolbarConvert'),
+    convertToText: t('selectionToolbarConvertToText'),
     decompose: t('selectionToolbarDecompose'),
     createGroup: t('selectionToolbarCreateGroup'),
     delete: t('selectionToolbarDelete'),
