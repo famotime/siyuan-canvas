@@ -42,7 +42,6 @@ import {
   renderSprig,
   sql,
 } from "@/api"
-import { buildWorkspaceImagePath } from "@/canvas/workspace-image-files"
 import { createCanvasEditorWorkspaceTree } from "@/canvas/use-canvas-editor-workspace-tree"
 import {
   createCanvasBoardMetrics,
@@ -905,19 +904,8 @@ export function useCanvasEditor(
         return stripKramdownBlockIds(raw)
       }
       case 'image': {
-        if (state.filePath && state.filePath.endsWith('.canvas') && resolved.openPath) {
-          try {
-            const response = await window.fetch(resolved.openPath)
-            const blob = await response.blob()
-            const fileName = resolved.name || resolved.path.split('/').pop() || 'image.png'
-            const assetPath = buildWorkspaceImagePath(state.filePath, fileName)
-            await putFile(assetPath, false, blob)
-            return `![${resolved.title || ''}](${assetPath})`
-          } catch {
-            return `![${resolved.title || ''}](${resolved.path})`
-          }
-        }
-        return `![${resolved.title || ''}](${resolved.path})`
+        const imageSrc = resolved.openPath || resolved.path
+        return `![${resolved.title || ''}](${imageSrc})`
       }
       default:
         return resolved.title || node.file
