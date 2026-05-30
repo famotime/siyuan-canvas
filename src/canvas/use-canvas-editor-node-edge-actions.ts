@@ -123,8 +123,15 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
 
   function addNode(type: CanvasNode['type']) {
     const node = createCanvasNode(type)
-    node.x = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
-    node.y = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
+    const initialX = Math.round((200 - viewport.x) / viewport.scale + board.value.left)
+    const initialY = Math.round((160 - viewport.y) / viewport.scale + board.value.top)
+    const position = findNonOverlappingTextNodePosition(
+      { x: initialX, y: initialY },
+      state.document.nodes,
+      node.height + 20,
+    )
+    node.x = position.x
+    node.y = position.y
     commitDocument(upsertCanvasNode(state.document, node))
     state.selectNode(node.id)
   }
