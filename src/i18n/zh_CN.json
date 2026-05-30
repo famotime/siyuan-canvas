@@ -179,7 +179,7 @@
   "settingsShowCanvasThumbnailsTitle": "显示画布缩略图",
   "settingsShowCanvasThumbnailsDescription": "开启后在画布右下角显示整个画布的缩略导航图。默认关闭。",
   "settingsEnableDebugLogTitle": "启用调试日志",
-  "settingsEnableDebugLogDescription": "开启后在浏览器控制台输出 Canvas 保存流程的调试信息。",
+  "settingsEnableDebugLogDescription": "开启后在浏览器控制台输出调试信息。",
   "settingsNoteCreationDirectoryTitle": "笔记创建目录",
   "settingsNoteCreationDirectoryDescription": "转换文本节点为文档时的创建目录。留空则使用当前笔记本的日记目录。",
   "messageSelectTargetNodeFirst": "请先选择目标节点。",
