@@ -32,13 +32,11 @@ export function createCanvasBoardMetrics(
     }
   }
 
-  const minNodeX = Math.min(...nodes.map((node) => node.x))
-  const minNodeY = Math.min(...nodes.map((node) => node.y))
+  const left = -minWidth / 2
+  const top = -minHeight / 2
   const maxNodeX = Math.max(...nodes.map((node) => node.x + node.width))
   const maxNodeY = Math.max(...nodes.map((node) => node.y + node.height))
 
-  const left = Math.min(-minWidth / 2, minNodeX - padding)
-  const top = Math.min(-minHeight / 2, minNodeY - padding)
   const right = Math.max(minWidth / 2, maxNodeX + padding)
   const bottom = Math.max(minHeight / 2, maxNodeY + padding)
 
