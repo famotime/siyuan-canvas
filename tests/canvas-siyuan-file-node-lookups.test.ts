@@ -8,6 +8,7 @@ import {
 import {
   createAssetPathCandidates,
   createDocumentPathCandidates,
+  escapeSqlString,
   resolveImageAssetByBlockId,
   resolveSiyuanBlockById,
   resolveSiyuanAssetByPath,
@@ -253,5 +254,33 @@ describe("siyuan file node lookups", () => {
     expect(result.blocks).toHaveLength(1)
     expect(result.images).toHaveLength(1)
     expect(result.canvases).toHaveLength(1)
+  })
+})
+
+describe("escapeSqlString", () => {
+  it("escapes single quotes by doubling them", () => {
+    expect(escapeSqlString("it's")).toBe("it''s")
+  })
+
+  it("escapes multiple single quotes", () => {
+    expect(escapeSqlString("a'b'c")).toBe("a''b''c")
+  })
+
+  it("passes through strings without quotes unchanged", () => {
+    expect(escapeSqlString("20260408120000-abc123")).toBe("20260408120000-abc123")
+  })
+
+  it("handles empty strings", () => {
+    expect(escapeSqlString("")).toBe("")
+  })
+
+  it("prevents SQL injection via embedded quotes", () => {
+    const malicious = "'; DROP TABLE blocks; --"
+    const escaped = escapeSqlString(malicious)
+    // The single quote is escaped to '', so the entire value is treated as a string literal
+    expect(escaped).toBe("''; DROP TABLE blocks; --")
+    // When embedded in SQL: WHERE root_id = '''; DROP TABLE blocks; --'
+    // The '' is an escaped quote inside the string, not a string terminator
+    expect(escaped).not.toMatch(/[^']'[^']/) // no unescaped single quotes
   })
 })

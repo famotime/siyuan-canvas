@@ -40,7 +40,7 @@ const IMAGE_PATH_PATTERN = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i
 const SIYUAN_ASSET_PATH_PATTERN = /^(?:\/?data\/)?assets\//i
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
 
-function escapeSqlString(value: string): string {
+export function escapeSqlString(value: string): string {
   return value.replace(/'/g, "''")
 }
 

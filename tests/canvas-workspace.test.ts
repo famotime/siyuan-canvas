@@ -1290,7 +1290,7 @@ describe("CanvasWorkspace", () => {
   })
 
   it("uses deep selectors for inline search marks injected with v-html", () => {
-    const stylesheet = readFileSync(resolve(__dirname, "../src/components/canvas/CanvasWorkspace.vue"), "utf-8")
+    const stylesheet = readFileSync(resolve(__dirname, "../src/components/canvas/canvas-workspace.scss"), "utf-8")
 
     expect(stylesheet).toContain(":is(.markdown-preview, .canvas-node__group-label) :deep(.canvas-search-mark) {")
     expect(stylesheet).toContain(":is(.markdown-preview, .canvas-node__group-label) :deep(.canvas-search-mark--current) {")

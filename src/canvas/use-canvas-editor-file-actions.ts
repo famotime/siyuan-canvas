@@ -28,6 +28,7 @@ import {
 } from "@/canvas/local-file-system"
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
+import { createDebugLog } from "@/canvas/debug-log"
 import {
   type CanvasBoardMetrics,
   toBoardX,
@@ -115,11 +116,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     viewport,
   } = options
 
-  function debugLog(...args: unknown[]) {
-    if (getPluginSettings().enableDebugLog) {
-      console.log("[Canvas]", ...args)
-    }
-  }
+  const debugLog = createDebugLog(getPluginSettings)
 
   function defaultDirectory(): string {
     return getPluginSettings().defaultCanvasDirectory

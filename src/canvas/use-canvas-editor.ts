@@ -32,15 +32,9 @@ import {
   watch,
 } from "vue"
 import {
-  createDocWithMd,
-  getBlockByID,
-  getNotebookConf,
-  lsNotebooks,
   putFile,
   readDir,
   removeFile,
-  renderSprig,
-  sql,
 } from "@/api"
 import { createCanvasEditorWorkspaceTree } from "@/canvas/use-canvas-editor-workspace-tree"
 import {
@@ -49,8 +43,6 @@ import {
   toBoardY,
 } from "@/canvas/board"
 import {
-  createCanvasEdge,
-  createCanvasNode,
   getCanvasSelectionBounds,
   setCanvasEdgeEndpoint,
   upsertCanvasEdge,
@@ -62,7 +54,7 @@ import { createCanvasEditorFileActions } from "@/canvas/use-canvas-editor-file-a
 import { createCanvasEditorFilePickerActions } from "@/canvas/use-canvas-editor-file-picker"
 import { createCanvasEditorFileNodeHelpers } from "@/canvas/use-canvas-editor-file-nodes"
 import { createCanvasEditorStageDropActions } from "@/canvas/use-canvas-editor-stage-drop"
-import { buildWorkspaceImagePath } from "@/canvas/workspace-image-files"
+
 import {
   createCanvasEditorGestureHandlers,
   type CanvasEditorConnectionDraftState,
@@ -73,6 +65,10 @@ import { initializeCanvasEditor, syncCanvasEditorSelectionUi } from "@/canvas/us
 import { createCanvasEditorNodeActivationActions } from "@/canvas/use-canvas-editor-node-activation"
 import { createCanvasEditorNodeEdgeActions } from "@/canvas/use-canvas-editor-node-edge-actions"
 import { createCanvasEditorKeyboardHandler } from "@/canvas/use-canvas-editor-shortcuts"
+import {
+  createCanvasEditorSelectionExport,
+} from "@/canvas/use-canvas-editor-selection-export"
+import { createDebugLog } from "@/canvas/debug-log"
 import { createCanvasBlockJumpHighlighter } from "@/canvas/block-jump-highlight"
 import { BLOCK_NAVIGATION_ACTIONS } from "@/canvas/protyle-navigation"
 import {
@@ -90,17 +86,11 @@ import {
   findSiyuanDocumentsByQuery,
   findSiyuanImageAssetByBlockId,
   findSiyuanImageAssetsByQuery,
-  getSiyuanBlockMarkdown,
-  getSiyuanDocumentMarkdown,
-  getSiyuanHeadingBlockMarkdown,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
 import {
   validateCanvasDocument,
 } from "@/canvas/format"
-import {
-  extractMarkdownHeadingBlocks,
-  extractMarkdownHeadingSections,
-} from "@/canvas/markdown-preview"
+
 import { createCanvasI18n } from "@/i18n/canvas"
 import { getCanvasNodeAnchor } from "@/canvas/node-interaction"
 import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
@@ -118,7 +108,7 @@ import {
   replaceCanvasTextTargetRanges,
   type CanvasSearchDecoration,
 } from "@/canvas/search-bridge"
-import { findSiyuanAssetByPath } from "@/canvas/siyuan-kernel-file-node-lookups"
+
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
 const DEFAULT_SELECTION_TOOLBAR_SIZE = {
@@ -568,455 +558,6 @@ export function useCanvasEditor(
     }
   }
 
-  function doNodesOverlap(first: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>, second: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>): boolean {
-    return first.x < second.x + second.width
-      && first.x + first.width > second.x
-      && first.y < second.y + second.height
-      && first.y + first.height > second.y
-  }
-
-  function findNonOverlappingNodePosition(
-    node: CanvasNode,
-    existingNodes: CanvasNode[],
-    stepY: number,
-  ): { x: number, y: number } {
-    let attempts = 0
-    while (
-      attempts < 100
-      && existingNodes.some((existingNode) => doNodesOverlap(node, existingNode))
-    ) {
-      node.y += stepY
-      attempts += 1
-    }
-
-    return {
-      x: node.x,
-      y: node.y,
-    }
-  }
-
-  async function decomposeSelectedDocument() {
-    if (!canDecomposeSelectedDocument.value || !selectedNode.value) {
-      return
-    }
-
-    const sourceNode = selectedNode.value
-    const sourceNodeId = sourceNode.id
-    const decomposedHeadings: Array<{ file?: string, level: number, text?: string }> = []
-    if (sourceNode.type === 'file') {
-      const resolved = getResolvedFileNode(sourceNode)
-      if (resolved.kind !== 'document') {
-        return
-      }
-
-      const markdown = await getSiyuanDocumentMarkdown(resolved.id)
-      decomposedHeadings.push(
-        ...extractMarkdownHeadingBlocks(markdown)
-          .filter((heading) => heading.id !== resolved.id)
-          .map((heading) => ({
-            file: heading.id,
-            level: heading.level,
-          })),
-      )
-    } else if (sourceNode.type === 'text') {
-      const sections = extractMarkdownHeadingSections(sourceNode.text)
-      if (sections.length > 1) {
-        decomposedHeadings.push(
-          ...sections.map((section) => ({
-            level: section.level,
-            text: section.text,
-          })),
-        )
-      }
-    }
-
-    if (!decomposedHeadings.length) {
-      showMessage(t('messageNoValidChapterInfo'), 4000, 'warning')
-      return
-    }
-
-    const minLevel = Math.min(...decomposedHeadings.map((heading) => heading.level))
-    const headingNodes: CanvasNode[] = []
-    const parentById = new Map<string, string>()
-    const stack: Array<{ id: string, level: number }> = [{
-      id: sourceNodeId,
-      level: minLevel - 1,
-    }]
-    const columnCounts = new Map<number, number>()
-    const existingNodes = [...state.document.nodes]
-    const horizontalGap = 120
-    const verticalGap = 40
-
-    for (const heading of decomposedHeadings) {
-      while (stack.length > 0 && stack[stack.length - 1]!.level >= heading.level) {
-        stack.pop()
-      }
-
-      const parent = stack[stack.length - 1] ?? { id: sourceNodeId, level: minLevel - 1 }
-      const depth = Math.max(1, heading.level - minLevel + 1)
-      const row = columnCounts.get(depth) ?? 0
-      columnCounts.set(depth, row + 1)
-
-      const node = createCanvasNode(sourceNode.type)
-      if (node.type === 'file') {
-        node.file = heading.file || ''
-      } else if (node.type === 'text') {
-        node.text = heading.text || ''
-      }
-      node.x = sourceNode.x + depth * (sourceNode.width + horizontalGap)
-      node.y = sourceNode.y + row * (node.height + verticalGap)
-      const position = findNonOverlappingNodePosition(node, existingNodes, node.height + verticalGap)
-      node.x = position.x
-      node.y = position.y
-
-      headingNodes.push(node)
-      parentById.set(node.id, parent.id)
-      existingNodes.push(node)
-      stack.push({
-        id: node.id,
-        level: heading.level,
-      })
-    }
-
-    const headingEdges = headingNodes.map((node) => {
-      const edge = createCanvasEdge(parentById.get(node.id) || sourceNodeId, node.id)
-      edge.fromSide = 'right'
-      edge.toSide = 'left'
-      return edge
-    })
-
-    commitDocument({
-      ...state.document,
-      edges: [...state.document.edges, ...headingEdges],
-      nodes: [...state.document.nodes, ...headingNodes],
-    })
-    state.selectNode(sourceNodeId)
-    if (sourceNode.type === 'file') {
-      await refreshFileNodeMetadata(headingNodes.map((node) => node.id))
-    }
-  }
-
-  function topologicalSortSelectedNodes(selectedIds: string[]): string[] {
-    const selectedSet = new Set(selectedIds)
-    const adjacency = new Map<string, string[]>()
-    const incomingCount = new Map<string, number>()
-    for (const id of selectedIds) {
-      adjacency.set(id, [])
-      incomingCount.set(id, 0)
-    }
-    for (const edge of state.document.edges) {
-      if (selectedSet.has(edge.fromNode) && selectedSet.has(edge.toNode)) {
-        adjacency.get(edge.fromNode)!.push(edge.toNode)
-        incomingCount.set(edge.toNode, (incomingCount.get(edge.toNode) || 0) + 1)
-      }
-    }
-    const queue: string[] = []
-    for (const id of selectedIds) {
-      if ((incomingCount.get(id) || 0) === 0) queue.push(id)
-    }
-    const sorted: string[] = []
-    while (queue.length > 0) {
-      const current = queue.shift()!
-      sorted.push(current)
-      for (const neighbor of adjacency.get(current) || []) {
-        const count = (incomingCount.get(neighbor) || 1) - 1
-        incomingCount.set(neighbor, count)
-        if (count === 0) queue.push(neighbor)
-      }
-    }
-    for (const id of selectedIds) {
-      if (!sorted.includes(id)) sorted.push(id)
-    }
-    return sorted
-  }
-
-  function buildMergedMarkdown(nodes: CanvasTextNode[]): string {
-    const parts: string[] = []
-    let headingIndex = 0
-    for (const node of nodes) {
-      const text = node.text.trim()
-      if (!text) continue
-      const lines = text.split('\n')
-      const headingLevel = headingIndex === 0 ? 1 : Math.min(headingIndex + 1, 6)
-      const headingPrefix = '#'.repeat(headingLevel)
-      parts.push(`${headingPrefix} ${lines[0]}`)
-      if (lines.length > 1) {
-        parts.push(lines.slice(1).join('\n'))
-      }
-      parts.push('')
-      headingIndex++
-    }
-    return parts.join('\n')
-  }
-
-  async function findHeadingBlockIds(documentId: string, expectedCount: number): Promise<string[]> {
-    const blocks = await sql(
-      `SELECT id FROM blocks WHERE root_id = '${documentId}' AND type = 'h' ORDER BY sort ASC`,
-    )
-    if (blocks && blocks.length >= expectedCount) {
-      return blocks.slice(0, expectedCount).map((b: { id: string }) => b.id)
-    }
-    return (blocks || []).map((b: { id: string }) => b.id)
-  }
-
-  async function resolveNoteCreationDirectory(): Promise<{ notebook: string, parentPath: string } | null> {
-    const settings = getPluginSettings()
-    const notebooks = await lsNotebooks()
-    const notebook = notebooks?.notebooks?.find((n: { closed: boolean }) => !n.closed)
-    if (!notebook) return null
-
-    if (settings.noteCreationDirectory) {
-      const normalized = settings.noteCreationDirectory.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/$/, '')
-      return { notebook: notebook.id, parentPath: normalized || '/' }
-    }
-
-    const conf = await getNotebookConf(notebook.id)
-    const dailyNotePath = conf?.conf?.dailyNoteSavePath
-    if (!dailyNotePath) return { notebook: notebook.id, parentPath: '/' }
-
-    const resolved = await renderSprig(dailyNotePath)
-    const segments = resolved.replace(/\\/g, '/').replace(/\/+/g, '/').split('/').filter(Boolean)
-    segments.pop()
-    return { notebook: notebook.id, parentPath: '/' + segments.join('/') }
-  }
-
-  function extractDocumentTitle(node: CanvasTextNode): string {
-    const firstLine = node.text.split('\n')[0]?.trim() || ''
-    return firstLine || t('nodeKindText')
-  }
-
-  async function convertSelectionToDocument() {
-    if (!canConvertSelectionToDocument.value) return
-
-    const selectedIds = state.selectedNodeIds
-    const allTextNodes = selectedIds
-      .map(id => state.document.nodes.find(n => n.id === id))
-      .filter((n): n is CanvasTextNode => n?.type === 'text')
-
-    if (allTextNodes.length === 0) return
-
-    const dir = await resolveNoteCreationDirectory()
-    if (!dir) {
-      showMessage(t('messageNoNotebookAvailable'), 4000, 'warning')
-      return
-    }
-
-    try {
-      const orderedIds = selectedIds.length === 1
-        ? selectedIds
-        : topologicalSortSelectedNodes(selectedIds)
-
-      const orderedNodes = orderedIds
-        .map(id => allTextNodes.find(n => n.id === id))
-        .filter((n): n is CanvasTextNode => Boolean(n))
-
-      if (orderedNodes.length === 0) return
-
-      const firstNonEmpty = orderedNodes.find(n => n.text.trim())
-      if (!firstNonEmpty) return
-
-      const title = extractDocumentTitle(firstNonEmpty)
-      const markdown = buildMergedMarkdown(orderedNodes)
-      const docPath = dir.parentPath === '/' ? `/${title}` : `${dir.parentPath}/${title}`
-      const documentId = await createDocWithMd(dir.notebook, docPath, markdown)
-
-      const replacementNodes: Array<{ id: string, node: CanvasFileNode }> = []
-
-      if (orderedNodes.length === 1) {
-        const source = orderedNodes[0]
-        replacementNodes.push({
-          id: source.id,
-          node: {
-            id: source.id,
-            type: 'file',
-            file: documentId,
-            x: source.x,
-            y: source.y,
-            width: source.width,
-            height: source.height,
-            color: source.color,
-          },
-        })
-      } else {
-        const nonEmptyCount = orderedNodes.filter(n => n.text.trim()).length
-        const headingCount = Math.max(0, nonEmptyCount - 1)
-        const headingBlockIds = headingCount > 0
-          ? await findHeadingBlockIds(documentId, headingCount)
-          : []
-        let headingIndex = 0
-
-        for (let i = 0; i < orderedNodes.length; i++) {
-          const source = orderedNodes[i]
-          let fileId = documentId
-          if (i > 0 && source.text.trim()) {
-            fileId = headingBlockIds[headingIndex] || documentId
-            headingIndex++
-          }
-          const fileNode: CanvasFileNode = {
-            id: source.id,
-            type: 'file',
-            file: fileId,
-            x: source.x,
-            y: source.y,
-            width: source.width,
-            height: source.height,
-            color: source.color,
-          }
-          replacementNodes.push({ id: source.id, node: fileNode })
-        }
-      }
-
-      const replacementMap = new Map(replacementNodes.map(r => [r.id, r.node]))
-      const updatedNodes = state.document.nodes.map(node =>
-        replacementMap.get(node.id) ?? node,
-      )
-
-      commitDocument({
-        ...state.document,
-        nodes: updatedNodes,
-      })
-
-      await refreshFileNodeMetadata(replacementNodes.map(r => r.id))
-
-      showMessage(t('messageConvertToDocumentSuccess', { title }), 3000)
-    } catch (err) {
-      console.error('[siyuan-canvas] convertSelectionToDocument failed:', err)
-      showMessage(t('messageConvertToDocumentFailed'), 4000, 'error')
-    }
-  }
-
-  function stripKramdownBlockIds(markdown: string): string {
-    return markdown
-      .replace(/\{:[^}]*\}/g, '')
-      .replace(/\s*\n{3,}/g, '\n\n')
-      .trim()
-  }
-
-  function escapeMarkdownImageAlt(value: string): string {
-    return value.replace(/\\/g, '\\\\').replace(/\]/g, '\\]')
-  }
-
-  async function readWorkspaceFileBlob(path: string): Promise<Blob> {
-    const response = await fetch('/api/file/getFile', {
-      body: JSON.stringify({ path }),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      method: 'POST',
-    })
-
-    if (!response.ok) {
-      throw new Error(`Unable to read workspace file: ${path}`)
-    }
-
-    return response.blob()
-  }
-
-  function getImageFileName(resolved: Extract<ResolvedCanvasFileTarget, { kind: 'image' }>): string {
-    const source = resolved.path || resolved.openPath || resolved.title
-    return getCanvasFileName(source) || getCanvasFileName(resolved.openPath) || 'image.png'
-  }
-
-  async function copyImageTargetToWorkspaceCanvasAssets(
-    resolved: Extract<ResolvedCanvasFileTarget, { kind: 'image' }>,
-  ): Promise<string | null> {
-    if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
-      return null
-    }
-
-    const sourcePath = resolved.openPath || resolved.path
-    if (!sourcePath) {
-      return null
-    }
-
-    const file = await readWorkspaceFileBlob(sourcePath)
-    const targetPath = buildWorkspaceImagePath(state.filePath, getImageFileName(resolved))
-    await putFile(targetPath, false, file)
-    return targetPath
-  }
-
-  async function fetchFileNodeContent(node: CanvasFileNode): Promise<string> {
-    let resolved = getResolvedFileNode(node)
-    if (resolved.kind !== 'image') {
-      const image = await findSiyuanAssetByPath(node.file)
-      if (image) {
-        resolved = {
-          blockId: image.blockId,
-          kind: 'image',
-          openPath: image.openPath,
-          path: image.path,
-          title: image.title || image.name,
-        }
-      }
-    }
-
-    switch (resolved.kind) {
-      case 'document': {
-        const raw = await getSiyuanDocumentMarkdown(resolved.id)
-        return stripKramdownBlockIds(raw)
-      }
-      case 'block': {
-        if (resolved.type === 'h') {
-          const raw = await getSiyuanHeadingBlockMarkdown(resolved.id)
-          return stripKramdownBlockIds(raw)
-        }
-        const raw = await getSiyuanBlockMarkdown(resolved.id)
-        return stripKramdownBlockIds(raw)
-      }
-      case 'image': {
-        const imageSrc = await copyImageTargetToWorkspaceCanvasAssets(resolved)
-          || resolved.openPath
-          || resolved.path
-        return `![${escapeMarkdownImageAlt(resolved.title || '')}](${imageSrc})`
-      }
-      default:
-        return resolved.title || node.file
-    }
-  }
-
-  async function convertSelectionToText() {
-    if (!canConvertSelectionToText.value) return
-
-    const selectedIds = state.selectedNodeIds
-    const fileNodes = selectedIds
-      .map(id => state.document.nodes.find(n => n.id === id))
-      .filter((n): n is CanvasFileNode => n?.type === 'file')
-
-    if (fileNodes.length === 0) return
-
-    try {
-      const replacementEntries = await Promise.all(fileNodes.map(async (node) => {
-        const content = await fetchFileNodeContent(node)
-        const textNode: CanvasTextNode = {
-          id: node.id,
-          type: 'text',
-          text: content,
-          x: node.x,
-          y: node.y,
-          width: node.width,
-          height: node.height,
-          color: node.color,
-        }
-        return { id: node.id, node: textNode as CanvasNode }
-      }))
-
-      const replacementMap = new Map(replacementEntries.map(r => [r.id, r.node]))
-      const updatedNodes = state.document.nodes.map(node =>
-        replacementMap.get(node.id) ?? node,
-      )
-
-      commitDocument({
-        ...state.document,
-        nodes: updatedNodes,
-      })
-
-      showMessage(t('messageConvertToTextSuccess'), 3000)
-    } catch (err) {
-      console.error('[siyuan-canvas] convertSelectionToText failed:', err)
-      showMessage(t('messageConvertToTextFailed'), 4000, 'error')
-    }
-  }
-
   watch(
     () => [state.filePath, state.isDirty, suggestedFilename.value],
     () => {
@@ -1038,6 +579,31 @@ export function useCanvasEditor(
     state,
     t,
   })
+
+  // 选区导出/合并逻辑已提取到 use-canvas-editor-selection-export.ts
+  const selectionExport = createCanvasEditorSelectionExport({
+    state,
+    commitDocument,
+    refreshFileNodeMetadata,
+    getResolvedFileNode,
+    getPluginSettings,
+    fileSource,
+    t,
+  })
+
+  async function decomposeSelectedDocument() {
+    return selectionExport.decomposeSelectedDocument(selectedNode.value, canDecomposeSelectedDocument.value)
+  }
+
+  async function convertSelectionToDocument() {
+    if (!canConvertSelectionToDocument.value) return
+    return selectionExport.convertSelectionToDocument(state.selectedNodeIds)
+  }
+
+  async function convertSelectionToText() {
+    if (!canConvertSelectionToText.value) return
+    return selectionExport.convertSelectionToText(state.selectedNodeIds)
+  }
 
   function getNodeStyle(node: CanvasNode) {
     return {
@@ -1217,11 +783,7 @@ export function useCanvasEditor(
     floatLayerActive.value = false
   }
 
-  function debugLog(...args: unknown[]) {
-    if (getPluginSettings().enableDebugLog) {
-      console.log('[Canvas]', ...args)
-    }
-  }
+  const debugLog = createDebugLog(getPluginSettings)
 
   function showFloatLayerForSelection() {
     const node = selectedNode.value

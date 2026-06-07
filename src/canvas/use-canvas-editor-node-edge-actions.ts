@@ -35,6 +35,7 @@ import { renderMarkdownPreview } from '@/canvas/markdown-preview'
 import { isWebUrl } from '@/canvas/url-detection'
 import { centerViewportOnBounds } from '@/canvas/selection-toolbar'
 import { clampViewportScale } from '@/canvas/viewport'
+import { findNonOverlappingPosition } from '@/canvas/node-overlap'
 
 const MIND_MAP_HORIZONTAL_GAP = 80
 const MIND_MAP_VERTICAL_GAP = 40
@@ -144,35 +145,17 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     state.selectNode(node.id)
   }
 
-  function doNodesOverlap(first: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>, second: Pick<CanvasNode, 'height' | 'width' | 'x' | 'y'>): boolean {
-    return first.x < second.x + second.width
-      && first.x + first.width > second.x
-      && first.y < second.y + second.height
-      && first.y + first.height > second.y
-  }
-
   function findNonOverlappingTextNodePosition(
     initialPosition: { x: number, y: number },
     existingNodes: CanvasNode[],
     stepY: number,
   ): { x: number, y: number } {
     const candidate = createCanvasNode('text')
-    candidate.x = initialPosition.x
-    candidate.y = initialPosition.y
-
-    let attempts = 0
-    while (
-      attempts < 100
-      && existingNodes.some((node) => doNodesOverlap(candidate, node))
-    ) {
-      candidate.y += stepY
-      attempts += 1
-    }
-
-    return {
-      x: candidate.x,
-      y: candidate.y,
-    }
+    return findNonOverlappingPosition(
+      initialPosition.x, initialPosition.y,
+      candidate.width, candidate.height,
+      existingNodes, stepY,
+    )
   }
 
   function createMindMapChildNode() {

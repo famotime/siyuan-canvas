@@ -55,6 +55,8 @@
   Shared tab registration and tab opening helpers.
 - `src/canvas/use-canvas-editor.ts`
   Main composition entry for the editor. Coordinates state, computed view models, node/edge actions, and keyboard shortcuts.
+- `src/canvas/use-canvas-editor-selection-export.ts`
+  Selection export and document merge logic: decompose, convert selection to document/text, topological sort, markdown merge. Pure helpers exported directly; impure functions via factory with injected dependencies.
 - `src/canvas/use-canvas-editor-file-actions.ts`
   Workspace path normalization, import/export, save/conflict flows, and recent-file refresh logic.
 - `src/canvas/use-canvas-editor-file-nodes.ts`
@@ -67,11 +69,17 @@
   Pure path candidate generation and query-order logic for SiYuan document/asset resolution.
 - `src/canvas/siyuan-kernel-file-node-lookups.ts`
   Runtime SiYuan SQL bridge that plugs kernel queries into the pure lookup helpers.
+- `src/canvas/node-overlap.ts`
+  Shared AABB overlap detection and non-overlapping position finder for node placement.
+- `src/canvas/debug-log.ts`
+  Shared conditional debug logging factory (`createDebugLog`).
 
 ## UI Layer
 
 - `src/components/canvas/CanvasWorkspace.vue`
-  Main canvas workspace composition view. Renders toolbar, stage, floating selection toolbar, file picker, and inspector while delegating file-card and create-edge dialog markup to child components.
+  Main canvas workspace composition view. Renders toolbar, stage, floating selection toolbar, file picker, and inspector while delegating file-card and create-edge dialog markup to child components. Scoped styles extracted to `canvas-workspace.scss`.
+- `src/components/canvas/canvas-workspace.scss`
+  Scoped styles for `CanvasWorkspace.vue` (~2178 lines). Extracted from SFC for reduced diff surface.
 - `src/components/canvas/CanvasFileCard.vue`
   Focused file-node card renderer for badges, canvas thumbnails, image previews, and document preview HTML.
 - `src/components/canvas/CanvasCreateEdgeDialog.vue`
@@ -111,4 +119,4 @@
 - `tests/canvas-siyuan-file-node-lookups.test.ts`
   Pure path-candidate and query-order coverage for SiYuan file-node lookup logic.
 - `tests/canvas-*.test.ts`
-  Remaining focused module tests for parsing, geometry, persistence, i18n, file-node resolution, and workspace helpers.
+  Remaining focused module tests for parsing, geometry, persistence, i18n, file-node resolution, workspace helpers, node overlap, and markdown sanitization.

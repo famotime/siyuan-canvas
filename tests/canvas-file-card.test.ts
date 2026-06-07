@@ -108,7 +108,7 @@ describe('CanvasFileCard', () => {
 
   it('lets file previews grow with the resized card instead of clamping to a fixed preview height', () => {
     const stylesheet = readFileSync(resolve(__dirname, '../src/components/canvas/CanvasFileCard.vue'), 'utf-8')
-    const workspaceStylesheet = readFileSync(resolve(__dirname, '../src/components/canvas/CanvasWorkspace.vue'), 'utf-8')
+    const workspaceStylesheet = readFileSync(resolve(__dirname, '../src/components/canvas/canvas-workspace.scss'), 'utf-8')
 
     expect(stylesheet).toContain('.file-card:has(.file-card__image)')
     expect(stylesheet).toContain('.file-card:has(.file-card__document-preview)')
