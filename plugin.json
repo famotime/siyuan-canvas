@@ -2,15 +2,14 @@
   "name": "siyuan-canvas",
   "author": "Quincy Zou",
   "url": "https://github.com/famotime/siyuan-canvas",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "minAppVersion": "2.10.14",
   "disabledInPublish": true,
   "backends": [
-    "windows"
+    "all"
   ],
   "frontends": [
-    "desktop",
-    "desktop-window"
+    "all"
   ],
   "displayName": {
     "default": "Canvas",
