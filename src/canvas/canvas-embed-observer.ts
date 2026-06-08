@@ -44,6 +44,10 @@ function findCanvasEmbedBlockId(element: HTMLElement): string {
   return element.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
 }
 
+function isElement(value: unknown): value is Element {
+  return value instanceof Element
+}
+
 function normalizeCanvasPath(path: string): string {
   if (!path) return ""
   return path.replace(/^\/\/data\//, "/data/")
@@ -72,10 +76,48 @@ function findClickedImageBlockId(target: EventTarget | null): string {
   return image.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
 }
 
-function findClickedCanvasEmbedPath(target: EventTarget | null): string {
-  const element = target && "closest" in target ? target as Element : null
-  const embed = element?.closest<HTMLElement>(`.${CANVAS_EMBED_CLASS}`)
-  return normalizeCanvasPath(embed?.dataset.canvasPath || "")
+function getEventElements(event: MouseEvent): Element[] {
+  const path = typeof event.composedPath === "function" ? event.composedPath() : []
+  const elements = path.filter(isElement)
+  const target = event.target instanceof Element ? event.target : null
+  if (target && !elements.includes(target)) {
+    elements.unshift(target)
+  }
+  return elements
+}
+
+function findCanvasEmbedPathFromElements(elements: Element[]): string {
+  for (const element of elements) {
+    if (element instanceof HTMLElement) {
+      const directPath = normalizeCanvasPath(element.dataset.canvasPath || "")
+      if (directPath) return directPath
+    }
+
+    const embed = element.closest?.<HTMLElement>(`.${CANVAS_EMBED_CLASS}[data-canvas-path]`)
+    const embedPath = normalizeCanvasPath(embed?.dataset.canvasPath || "")
+    if (embedPath) return embedPath
+  }
+  return ""
+}
+
+function findBlockIdFromElements(elements: Element[]): string {
+  for (const element of elements) {
+    const blockId = element.closest?.<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
+    if (blockId) return blockId
+  }
+  return ""
+}
+
+function summarizeElements(elements: Element[]): string[] {
+  return elements.slice(0, 8).map((element) => {
+    const id = element.id ? `#${element.id}` : ""
+    const classes = element.className && typeof element.className === "string"
+      ? `.${element.className.split(/\s+/).filter(Boolean).slice(0, 3).join(".")}`
+      : ""
+    const nodeId = element instanceof HTMLElement && element.dataset.nodeId ? `[data-node-id=${element.dataset.nodeId}]` : ""
+    const canvasPath = element instanceof HTMLElement && element.dataset.canvasPath ? "[data-canvas-path]" : ""
+    return `${element.tagName.toLowerCase()}${id}${classes}${nodeId}${canvasPath}`
+  })
 }
 
 function findCanvasEmbedPathInDocument(doc: Document): string {
@@ -109,19 +151,25 @@ function openCanvasFromPath(event: MouseEvent, canvasPath: string, plugin: Plugi
 }
 
 async function openCanvasFromClickedImage(event: MouseEvent, plugin: Plugin, pluginName: string) {
-  const blockId = findClickedImageBlockId(event.target)
+  const elements = getEventElements(event)
+  const blockId = findBlockIdFromElements(elements)
+  const canvasPath = findCanvasEmbedPathFromElements(elements)
+  if (blockId || canvasPath) {
+    debugCanvasEmbed("document canvas embed click candidate", {
+      blockId,
+      hasCanvasPath: Boolean(canvasPath),
+      path: summarizeElements(elements),
+    })
+  }
+
   if (blockId) {
     await openCanvasFromBlockId(event, blockId, plugin, pluginName)
     return
   }
 
-  const canvasPath = findClickedCanvasEmbedPath(event.target)
   if (canvasPath) {
     openCanvasFromPath(event, canvasPath, plugin, pluginName)
-    return
   }
-
-  debugCanvasEmbed("open canvas embed: missing block id")
 }
 
 async function ensureIframeClickOverlay(
@@ -178,8 +226,9 @@ function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, plu
       }
 
       const listener = (event: MouseEvent) => {
-        const target = event.target && "closest" in event.target ? event.target as Element : null
-        const canvasPath = findClickedCanvasEmbedPath(event.target) || documentCanvasPath
+        const elements = getEventElements(event)
+        const target = elements[0]
+        const canvasPath = findCanvasEmbedPathFromElements(elements) || documentCanvasPath
         debugCanvasEmbed("iframe document clicked", {
           blockId,
           hasCanvasPath: Boolean(canvasPath),
