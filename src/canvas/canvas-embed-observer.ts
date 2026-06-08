@@ -10,6 +10,12 @@ let observer: MutationObserver | null = null
 let refreshListener: ((event: Event) => void) | null = null
 let delegatedClickListener: ((event: MouseEvent) => void) | null = null
 const iframeClickListeners = new WeakMap<Document, (event: MouseEvent) => void>()
+const iframeLoadListeners = new WeakMap<HTMLIFrameElement, () => void>()
+const CANVAS_EMBED_IFRAME_OVERLAY_ATTR = "data-canvas-embed-iframe-overlay"
+
+function debugCanvasEmbed(message: string, data?: Record<string, unknown>) {
+  console.debug(`[siyuan-canvas] ${message}`, data || {})
+}
 
 function bindCanvasEmbedClick(element: HTMLElement, plugin: Plugin, pluginName: string) {
   if (element.getAttribute(CANVAS_EMBED_BOUND_ATTR) === "true") return
@@ -43,8 +49,13 @@ async function getCanvasPathFromBlockAttrs(blockId: string): Promise<string> {
 
   try {
     const attrs = await getBlockAttrs(blockId)
-    return attrs?.["custom-canvas-path"] || ""
+    const canvasPath = attrs?.["custom-canvas-path"] || ""
+    if (!canvasPath) {
+      debugCanvasEmbed("open canvas embed: missing custom canvas path", { attrs, blockId })
+    }
+    return canvasPath
   } catch {
+    debugCanvasEmbed("open canvas embed: failed to read block attrs", { blockId })
     return ""
   }
 }
@@ -57,9 +68,21 @@ function findClickedImageBlockId(target: EventTarget | null): string {
 }
 
 async function openCanvasFromBlockId(event: MouseEvent, blockId: string, plugin: Plugin, pluginName: string) {
-  if (!blockId) return
+  if (!blockId) {
+    debugCanvasEmbed("open canvas embed: missing block id")
+    return
+  }
 
   const canvasPath = await getCanvasPathFromBlockAttrs(blockId)
+  if (!canvasPath) return
+
+  debugCanvasEmbed("open canvas embed", { blockId, path: canvasPath })
+  event.preventDefault()
+  event.stopPropagation()
+  void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
+}
+
+function openCanvasFromPath(event: MouseEvent, canvasPath: string, plugin: Plugin, pluginName: string) {
   if (!canvasPath) return
 
   event.preventDefault()
@@ -71,24 +94,78 @@ async function openCanvasFromClickedImage(event: MouseEvent, plugin: Plugin, plu
   await openCanvasFromBlockId(event, findClickedImageBlockId(event.target), plugin, pluginName)
 }
 
+async function ensureIframeClickOverlay(iframe: HTMLIFrameElement, blockId: string, plugin: Plugin, pluginName: string) {
+  const block = iframe.closest<HTMLElement>("[data-node-id]")
+  const host = iframe.parentElement || block
+  if (!block || !host || !blockId || host.querySelector(`[${CANVAS_EMBED_IFRAME_OVERLAY_ATTR}="true"]`)) {
+    return
+  }
+
+  const canvasPath = await getCanvasPathFromBlockAttrs(blockId)
+  if (!canvasPath) return
+
+  if (!host.style.position) {
+    host.style.position = "relative"
+  }
+
+  const overlay = document.createElement("div")
+  overlay.setAttribute(CANVAS_EMBED_IFRAME_OVERLAY_ATTR, "true")
+  overlay.title = "Open Canvas"
+  overlay.style.position = "absolute"
+  overlay.style.inset = "0"
+  overlay.style.zIndex = "2"
+  overlay.style.cursor = "pointer"
+  overlay.style.background = "transparent"
+  overlay.addEventListener("click", (event) => {
+    debugCanvasEmbed("iframe canvas embed overlay clicked", { blockId, path: canvasPath })
+    openCanvasFromPath(event, canvasPath, plugin, pluginName)
+  }, true)
+  host.appendChild(overlay)
+  debugCanvasEmbed("created iframe canvas embed overlay", { blockId, path: canvasPath })
+}
+
 function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, pluginName: string) {
   const iframes = root.querySelectorAll<HTMLIFrameElement>("iframe")
   for (const iframe of iframes) {
     const blockId = iframe.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
-    const iframeDocument = iframe.contentDocument
-    if (!blockId || !iframeDocument || iframeClickListeners.has(iframeDocument)) {
-      continue
-    }
+    void ensureIframeClickOverlay(iframe, blockId, plugin, pluginName)
 
-    const listener = (event: MouseEvent) => {
-      const target = event.target && "closest" in event.target ? event.target as Element : null
-      if (!target?.closest("img")) {
+    const bindCurrentDocument = () => {
+      const iframeDocument = iframe.contentDocument
+      if (!blockId || !iframeDocument || iframeClickListeners.has(iframeDocument)) {
         return
       }
-      void openCanvasFromBlockId(event, blockId, plugin, pluginName)
+
+      const listener = (event: MouseEvent) => {
+        const target = event.target && "closest" in event.target ? event.target as Element : null
+        if (!target?.closest("img")) {
+          return
+        }
+        debugCanvasEmbed("iframe canvas embed image clicked", { blockId })
+        void openCanvasFromBlockId(event, blockId, plugin, pluginName)
+      }
+      iframeClickListeners.set(iframeDocument, listener)
+      iframeDocument.addEventListener("click", listener, true)
+      debugCanvasEmbed("bound iframe canvas embed clicks", { blockId })
     }
-    iframeClickListeners.set(iframeDocument, listener)
-    iframeDocument.addEventListener("click", listener, true)
+
+    bindCurrentDocument()
+
+    if (!iframeLoadListeners.has(iframe)) {
+      const loadListener = () => {
+        void ensureIframeClickOverlay(iframe, blockId, plugin, pluginName)
+        bindCurrentDocument()
+        window.setTimeout(bindCurrentDocument, 0)
+      }
+      iframeLoadListeners.set(iframe, loadListener)
+      iframe.addEventListener("load", loadListener)
+    }
+
+    window.setTimeout(bindCurrentDocument, 0)
+    window.setTimeout(bindCurrentDocument, 300)
+    window.setTimeout(() => {
+      void ensureIframeClickOverlay(iframe, blockId, plugin, pluginName)
+    }, 300)
   }
 }
 
@@ -131,7 +208,7 @@ async function refreshCanvasEmbedsForPath(path: string) {
   const attributeBlockIds = attributeBlockRefs.map(ref => ref.blockId)
   const blockIds = new Set([...domBlockIds, ...attributeBlockIds])
 
-  console.debug("[siyuan-canvas] refresh canvas embeds", {
+  debugCanvasEmbed("refresh canvas embeds", {
     attributeBlockIds,
     blockIds: [...blockIds],
     domBlockIds,
@@ -142,19 +219,19 @@ async function refreshCanvasEmbedsForPath(path: string) {
 
   const raw = await getFileText(path)
   if (!raw) {
-    console.debug("[siyuan-canvas] refresh canvas embeds: unable to read canvas", { path })
+    debugCanvasEmbed("refresh canvas embeds: unable to read canvas", { path })
     return
   }
 
   const result = parseCanvasDocument(raw)
   if (!result.document || result.errors.length > 0) {
-    console.debug("[siyuan-canvas] refresh canvas embeds: invalid canvas", { errors: result.errors, path })
+    debugCanvasEmbed("refresh canvas embeds: invalid canvas", { errors: result.errors, path })
     return
   }
 
   const dataUrl = generateCanvasEmbedDataUrl(result.document)
   if (!dataUrl) {
-    console.debug("[siyuan-canvas] refresh canvas embeds: empty preview", { path })
+    debugCanvasEmbed("refresh canvas embeds: empty preview", { path })
     return
   }
 
@@ -165,7 +242,7 @@ async function refreshCanvasEmbedsForPath(path: string) {
     }
 
     image.src = dataUrl
-    console.debug("[siyuan-canvas] refresh visible canvas embed image", {
+    debugCanvasEmbed("refresh visible canvas embed image", {
       blockId: findCanvasEmbedBlockId(element),
       path,
     })
@@ -219,4 +296,7 @@ export function stopCanvasEmbedObserver() {
     document.removeEventListener("click", delegatedClickListener, true)
     delegatedClickListener = null
   }
+  document.querySelectorAll(`[${CANVAS_EMBED_IFRAME_OVERLAY_ATTR}="true"]`).forEach((element) => {
+    element.remove()
+  })
 }

@@ -349,4 +349,42 @@ describe("canvas embed observer", () => {
       "Untitled.canvas",
     )
   })
+
+  it("opens a canvas from a reloaded HTML iframe overlay when iframe content events are unavailable", async () => {
+    document.body.innerHTML = `
+      <div data-node-id="embed-html-overlay">
+        <iframe></iframe>
+      </div>
+    `
+    fetchSyncPost.mockImplementation(async (url: string, data: { id?: string }) => {
+      if (url === "/api/attr/getBlockAttrs") {
+        return {
+          code: 0,
+          data: {
+            "custom-canvas-path": "/data/storage/petal/siyuan-canvas/a.canvas",
+          },
+        }
+      }
+      throw new Error(`Unexpected request ${url} ${JSON.stringify(data)}`)
+    })
+
+    embedObserver.startCanvasEmbedObserver({ app: "app" } as any, "siyuan-canvas")
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    document.querySelector<HTMLElement>('[data-canvas-embed-iframe-overlay="true"]')?.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/getBlockAttrs", {
+      id: "embed-html-overlay",
+    })
+    expect(openTab).toHaveBeenCalledWith(
+      { app: "app" },
+      "siyuan-canvas",
+      { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
+      "Untitled.canvas",
+    )
+  })
 })
