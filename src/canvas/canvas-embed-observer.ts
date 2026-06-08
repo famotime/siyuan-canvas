@@ -140,6 +140,30 @@ async function openCanvasFromBlockId(event: MouseEvent, blockId: string, plugin:
   void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
 }
 
+async function openCanvasFromBlockIdOrPath(
+  event: MouseEvent,
+  blockId: string,
+  fallbackCanvasPath: string,
+  plugin: Plugin,
+  pluginName: string,
+) {
+  const canvasPathFromBlock = blockId ? await getCanvasPathFromBlockAttrs(blockId) : ""
+  const canvasPath = canvasPathFromBlock || normalizeCanvasPath(fallbackCanvasPath)
+  if (!canvasPath) {
+    debugCanvasEmbed("open canvas embed: missing canvas path", { blockId, hasFallbackPath: Boolean(fallbackCanvasPath) })
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  debugCanvasEmbed("open canvas embed", {
+    blockId,
+    path: canvasPath,
+    source: canvasPathFromBlock ? "block-attrs" : "fallback-path",
+  })
+  void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
+}
+
 function openCanvasFromPath(event: MouseEvent, canvasPath: string, plugin: Plugin, pluginName: string) {
   const normalizedPath = normalizeCanvasPath(canvasPath)
   if (!normalizedPath) return
@@ -163,7 +187,7 @@ async function openCanvasFromClickedImage(event: MouseEvent, plugin: Plugin, plu
   }
 
   if (blockId) {
-    await openCanvasFromBlockId(event, blockId, plugin, pluginName)
+    await openCanvasFromBlockIdOrPath(event, blockId, canvasPath, plugin, pluginName)
     return
   }
 
@@ -237,7 +261,7 @@ function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, plu
         if (!canvasPath && !blockId) return
 
         if (blockId) {
-          void openCanvasFromBlockId(event, blockId, plugin, pluginName)
+          void openCanvasFromBlockIdOrPath(event, blockId, canvasPath, plugin, pluginName)
           return
         }
 

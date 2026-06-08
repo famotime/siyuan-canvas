@@ -307,6 +307,43 @@ describe("canvas embed observer", () => {
     )
   })
 
+  it("falls back to the preview data path when a clicked block has no custom canvas path attribute", async () => {
+    document.body.innerHTML = `
+      <div data-node-id="embed-without-attr">
+        <div class="canvas-embed-preview" data-canvas-path="//data/storage/petal/siyuan-canvas/a.canvas">
+          <img src="preview" alt="Canvas" />
+        </div>
+      </div>
+    `
+    fetchSyncPost.mockImplementation(async (url: string, data: { id?: string }) => {
+      if (url === "/api/attr/getBlockAttrs") {
+        return {
+          code: 0,
+          data: {},
+        }
+      }
+      throw new Error(`Unexpected request ${url} ${JSON.stringify(data)}`)
+    })
+
+    embedObserver.startCanvasEmbedObserver({ app: "app" } as any, "siyuan-canvas")
+
+    document.querySelector<HTMLImageElement>('[data-node-id="embed-without-attr"] img')?.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/getBlockAttrs", {
+      id: "embed-without-attr",
+    })
+    expect(openTab).toHaveBeenCalledWith(
+      { app: "app" },
+      "siyuan-canvas",
+      { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
+      "Untitled.canvas",
+    )
+  })
+
   it("opens a canvas from an HTML block iframe by reading the outer block custom canvas path attribute", async () => {
     document.body.innerHTML = `
       <div data-node-id="embed-html">
