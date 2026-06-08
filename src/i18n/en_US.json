@@ -118,6 +118,8 @@
   "inspectorNoRecentWorkspaceFiles": "No recent workspace files yet.",
   "contextMenuRename": "Rename",
   "contextMenuCopy": "Copy",
+  "contextMenuCopyPath": "Copy file path",
+  "contextMenuCopyPathSuccess": "File path copied to clipboard",
   "contextMenuDelete": "Delete",
   "contextMenuOpenInExplorer": "Open containing folder",
   "contextMenuNewSubfolder": "New subfolder",

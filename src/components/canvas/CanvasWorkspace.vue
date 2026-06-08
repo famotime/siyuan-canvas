@@ -1493,6 +1493,14 @@
         >
           {{ t('contextMenuCopy') }}
         </button>
+        <button
+          v-if="contextMenuType === 'file'"
+          class="workspace-context-menu__item"
+          type="button"
+          @click="contextMenuCopyPath"
+        >
+          {{ t('contextMenuCopyPath') }}
+        </button>
         <template v-if="contextMenuType === 'folder'">
           <button
             class="workspace-context-menu__item"
@@ -1546,6 +1554,7 @@
 
 <script setup lang="ts">
 import type { Plugin } from "siyuan"
+import { showMessage } from "siyuan"
 import type {
   CanvasPngExportBackgroundMode,
   CanvasPngExportRange,
@@ -1846,6 +1855,14 @@ function contextMenuRename() {
 function contextMenuCopy() {
   closeContextMenu()
   editor.copyWorkspaceDocument(contextMenuPath.value)
+}
+
+function contextMenuCopyPath() {
+  closeContextMenu()
+  const filePath = `/${contextMenuPath.value}`
+  navigator.clipboard.writeText(filePath).then(() => {
+    showMessage(t("contextMenuCopyPathSuccess"), 2000)
+  })
 }
 
 function contextMenuOpenInExplorer() {

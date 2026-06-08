@@ -9,6 +9,7 @@ import type {
 
 import type { CanvasTabBootstrap } from "@/main"
 import {
+  fetchSyncPost,
   getAllEditor,
   getFrontend,
   Plugin,
@@ -244,8 +245,26 @@ export default class SiyuanCanvasPlugin extends Plugin {
       initialValue: `${this.canvasData.settings.defaultCanvasDirectory}/`,
       title: this.t("insertCanvasEmbedPrompt"),
     })
-    const canvasPath = path.trim()
+    let canvasPath = path.trim().replace(/^["']|["']$/g, '')
     if (!canvasPath) return
+
+    // 支持绝对路径：自动剥离工作区目录前缀，转为工作区相对路径
+    if (/^[a-zA-Z]:[/\\]/.test(canvasPath)) {
+      try {
+        const resp = await fetchSyncPost('/api/system/getConf', {})
+        const workspaceDir: string | undefined = resp?.data?.conf?.system?.workspaceDir
+        if (workspaceDir) {
+          const normalizedWorkspace = workspaceDir.replace(/\\/g, '/').replace(/\/+$/, '')
+          const normalizedPath = canvasPath.replace(/\\/g, '/')
+          if (normalizedPath.toLowerCase().startsWith(normalizedWorkspace.toLowerCase())) {
+            canvasPath = normalizedPath.slice(normalizedWorkspace.length)
+            if (!canvasPath.startsWith('/')) canvasPath = `/${canvasPath}`
+          }
+        }
+      } catch {
+        // 获取工作区路径失败时保持原路径不变
+      }
+    }
 
     try {
       const rawStr = await getFileText(canvasPath)

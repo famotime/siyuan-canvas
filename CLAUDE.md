@@ -71,12 +71,12 @@ Vite library mode（CJS 输出），`siyuan` 和 `process` 为外部依赖，输
 - `src/canvas/` — 核心画布逻辑、类型、格式解析、编辑器状态、文档变换、Markdown 安全
 - `src/components/canvas/` — 画布 Vue 组件（CanvasWorkspace、CanvasWorkspaceTree、CanvasInspector、CanvasPngExportDialog、CanvasFileCard 等）
 - `src/components/SiyuanTheme/` — 思源风格 UI 组件（SyButton、SyInput 等）
-- `src/i18n/` — 国际化（en_US/zh_CN，zh_CN 为回退语言），`canvas.ts` 导出 `createCanvasI18n` 翻译函数
+- `src/i18n/` — 国际化（en_US/zh_CN，zh_CN 为回退语言），`canvas.ts` 导出 `createCanvasI18n` 翻译函数。缺失的 en_US 键会自动回退到 zh_CN
 - `src/icons/` — 顶栏图标和 Tab 图标 SVG 字符串
 - `src/utils/` — 通用工具函数
 - `src/types/` — 思源 API 类型声明
 - `src/api.ts` — 思源 kernel API 封装
-- `tests/` — Vitest 测试文件，命名与源码对应（新模块需配套测试）。测试时 `siyuan` 模块通过 vite alias 映射到 `tests/__mocks__/siyuan.ts`
+- `tests/` — Vitest 测试文件，命名与源码对应（新模块需配套测试）。测试时 `siyuan` 模块通过 vite alias 映射到 `tests/__mocks__/siyuan.ts`（提供 `showMessage`、`openTab`、`confirm` 等 stub）
 - `docs/` — 设计文档、重构计划、JSON Canvas 规范
 - `plugin-sample-vite-vue/` — 官方思源插件开发样板项目（参考用，勿改）
 - `developer_docs/` — 思源插件开发 API 参考文档
@@ -84,7 +84,7 @@ Vite library mode（CJS 输出），`siyuan` 和 `process` 为外部依赖，输
 ## 编码规范
 
 - 2 空格缩进，UTF-8，文件末尾换行（`.editorconfig`）
-- ESLint 使用 `@antfu/eslint-config`，单引号，多行尾逗号
+- ESLint 使用 `@antfu/eslint-config`，单引号，多行尾逗号。另有 `eslint-plugin-perfectionist` 用于排序规则
 - Vue 组件用 PascalCase（`CanvasWorkspace.vue`），画布模块用 kebab-case（`selection-toolbar.ts`）
 - Vue SFC 块顺序：template → script → style
 - 样式使用 SCSS（Sass），全局样式入口 `src/index.scss`
@@ -95,3 +95,4 @@ Vite library mode（CJS 输出），`siyuan` 和 `process` 为外部依赖，输
 ## 提交规范
 
 使用 Conventional Commits 前缀：`feat:`、`fix:`、`docs:`、`refactor:` 等，中文提交信息。
+

@@ -118,6 +118,8 @@
   "inspectorNoRecentWorkspaceFiles": "暂无最近打开的工作区文件。",
   "contextMenuRename": "重命名",
   "contextMenuCopy": "复制",
+  "contextMenuCopyPath": "复制文件路径",
+  "contextMenuCopyPathSuccess": "已复制文件路径到剪贴板",
   "contextMenuDelete": "删除",
   "contextMenuOpenInExplorer": "打开所在目录",
   "contextMenuNewSubfolder": "新建子文件夹",

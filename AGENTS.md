@@ -52,4 +52,3 @@ Write Vitest tests in `tests/*.test.ts`. Cover new parsing, serialization, edito
 ## Commit & Pull Request Guidelines
 Recent history mostly follows Conventional Commit prefixes such as `feat:` and `fix:`; continue that pattern and keep subjects imperative. Branch names like `feature/floating-selection-toolbar` are already in use. Avoid vague commits like `update`.
 
-PRs should explain the user-visible change, list verification steps (`pnpm test`, relevant manual canvas flows), link any issue or spec, and include screenshots or short recordings for UI changes.
