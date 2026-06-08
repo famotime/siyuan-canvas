@@ -350,6 +350,60 @@ describe("canvas embed observer", () => {
     )
   })
 
+  it("opens a canvas from a reloaded HTML iframe preview path when no outer block id is available", async () => {
+    document.body.innerHTML = `
+      <iframe></iframe>
+    `
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement
+    iframe.contentDocument?.body.insertAdjacentHTML("beforeend", `
+      <html><head></head><body>
+        <div class="canvas-embed-preview" data-canvas-path="//data/storage/petal/siyuan-canvas/a.canvas">
+          <img src="preview" alt="Canvas" />
+        </div>
+      </body></html>
+    `)
+
+    embedObserver.startCanvasEmbedObserver({ app: "app" } as any, "siyuan-canvas")
+
+    iframe.contentDocument?.querySelector("img")?.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchSyncPost).not.toHaveBeenCalledWith("/api/attr/getBlockAttrs", expect.anything())
+    expect(openTab).toHaveBeenCalledWith(
+      { app: "app" },
+      "siyuan-canvas",
+      { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
+      "Untitled.canvas",
+    )
+  })
+
+  it("opens a canvas from a reloaded preview path when no block id is available", async () => {
+    document.body.innerHTML = `
+      <div class="canvas-embed-preview" data-canvas-path="//data/storage/petal/siyuan-canvas/a.canvas">
+        <img src="preview" alt="Canvas" />
+      </div>
+    `
+
+    embedObserver.startCanvasEmbedObserver({ app: "app" } as any, "siyuan-canvas")
+
+    document.querySelector<HTMLImageElement>("img")?.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchSyncPost).not.toHaveBeenCalledWith("/api/attr/getBlockAttrs", expect.anything())
+    expect(openTab).toHaveBeenCalledWith(
+      { app: "app" },
+      "siyuan-canvas",
+      { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
+      "Untitled.canvas",
+    )
+  })
+
   it("opens a canvas from a reloaded HTML iframe overlay when iframe content events are unavailable", async () => {
     document.body.innerHTML = `
       <div data-node-id="embed-html-overlay">

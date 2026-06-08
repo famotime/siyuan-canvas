@@ -20,7 +20,7 @@ function debugCanvasEmbed(message: string, data?: Record<string, unknown>) {
 function bindCanvasEmbedClick(element: HTMLElement, plugin: Plugin, pluginName: string) {
   if (element.getAttribute(CANVAS_EMBED_BOUND_ATTR) === "true") return
 
-  const canvasPath = element.dataset.canvasPath
+  const canvasPath = normalizeCanvasPath(element.dataset.canvasPath || "")
   if (!canvasPath) return
 
   element.setAttribute(CANVAS_EMBED_BOUND_ATTR, "true")
@@ -44,12 +44,17 @@ function findCanvasEmbedBlockId(element: HTMLElement): string {
   return element.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
 }
 
+function normalizeCanvasPath(path: string): string {
+  if (!path) return ""
+  return path.replace(/^\/\/data\//, "/data/")
+}
+
 async function getCanvasPathFromBlockAttrs(blockId: string): Promise<string> {
   if (!blockId) return ""
 
   try {
     const attrs = await getBlockAttrs(blockId)
-    const canvasPath = attrs?.["custom-canvas-path"] || ""
+    const canvasPath = normalizeCanvasPath(attrs?.["custom-canvas-path"] || "")
     if (!canvasPath) {
       debugCanvasEmbed("open canvas embed: missing custom canvas path", { attrs, blockId })
     }
@@ -65,6 +70,13 @@ function findClickedImageBlockId(target: EventTarget | null): string {
   const image = element?.closest("img")
   if (!image) return ""
   return image.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
+}
+
+function findClickedCanvasEmbedPath(target: EventTarget | null): string {
+  const element = target && "closest" in target ? target as Element : null
+  const image = element?.closest("img")
+  const embed = image?.closest<HTMLElement>(`.${CANVAS_EMBED_CLASS}`)
+  return normalizeCanvasPath(embed?.dataset.canvasPath || "")
 }
 
 async function openCanvasFromBlockId(event: MouseEvent, blockId: string, plugin: Plugin, pluginName: string) {
@@ -83,15 +95,29 @@ async function openCanvasFromBlockId(event: MouseEvent, blockId: string, plugin:
 }
 
 function openCanvasFromPath(event: MouseEvent, canvasPath: string, plugin: Plugin, pluginName: string) {
-  if (!canvasPath) return
+  const normalizedPath = normalizeCanvasPath(canvasPath)
+  if (!normalizedPath) return
 
   event.preventDefault()
   event.stopPropagation()
-  void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
+  debugCanvasEmbed("open canvas embed from path", { path: normalizedPath })
+  void openCanvasEditorTab(plugin, pluginName, { path: normalizedPath }, "Untitled.canvas")
 }
 
 async function openCanvasFromClickedImage(event: MouseEvent, plugin: Plugin, pluginName: string) {
-  await openCanvasFromBlockId(event, findClickedImageBlockId(event.target), plugin, pluginName)
+  const blockId = findClickedImageBlockId(event.target)
+  if (blockId) {
+    await openCanvasFromBlockId(event, blockId, plugin, pluginName)
+    return
+  }
+
+  const canvasPath = findClickedCanvasEmbedPath(event.target)
+  if (canvasPath) {
+    openCanvasFromPath(event, canvasPath, plugin, pluginName)
+    return
+  }
+
+  debugCanvasEmbed("open canvas embed: missing block id")
 }
 
 async function ensureIframeClickOverlay(iframe: HTMLIFrameElement, blockId: string, plugin: Plugin, pluginName: string) {
@@ -132,7 +158,7 @@ function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, plu
 
     const bindCurrentDocument = () => {
       const iframeDocument = iframe.contentDocument
-      if (!blockId || !iframeDocument || iframeClickListeners.has(iframeDocument)) {
+      if (!iframeDocument || iframeClickListeners.has(iframeDocument)) {
         return
       }
 
@@ -142,7 +168,18 @@ function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, plu
           return
         }
         debugCanvasEmbed("iframe canvas embed image clicked", { blockId })
-        void openCanvasFromBlockId(event, blockId, plugin, pluginName)
+        if (blockId) {
+          void openCanvasFromBlockId(event, blockId, plugin, pluginName)
+          return
+        }
+
+        const canvasPath = findClickedCanvasEmbedPath(event.target)
+        if (canvasPath) {
+          openCanvasFromPath(event, canvasPath, plugin, pluginName)
+          return
+        }
+
+        debugCanvasEmbed("iframe canvas embed image clicked without path", { blockId })
       }
       iframeClickListeners.set(iframeDocument, listener)
       iframeDocument.addEventListener("click", listener, true)
