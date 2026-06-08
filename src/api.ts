@@ -364,9 +364,29 @@ export async function getFile(path: string): Promise<any> {
   };
   let url = "/api/file/getFile";
   try {
-    let file = await fetchSyncPost(url, data);
-    return file;
+    let response = await fetchSyncPost(url, data);
+    return response.code === 0 ? response.data : null;
   } catch (error_msg) {
+    return null;
+  }
+}
+
+export async function getFileText(path: string): Promise<string | null> {
+  try {
+    const response = await fetch("/api/file/getFile", {
+      body: JSON.stringify({ path }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+
+    if (response.status !== 200) {
+      return null;
+    }
+
+    return response.text();
+  } catch {
     return null;
   }
 }

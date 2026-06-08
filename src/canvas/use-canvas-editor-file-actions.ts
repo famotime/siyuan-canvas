@@ -29,6 +29,7 @@ import {
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 import { createDebugLog } from "@/canvas/debug-log"
+import { CANVAS_EMBED_REFRESH_EVENT, type CanvasEmbedRefreshEventDetail } from "@/canvas/canvas-embed-events"
 import {
   type CanvasBoardMetrics,
   toBoardX,
@@ -97,6 +98,12 @@ async function workspacePathExists(path: string): Promise<boolean> {
   })
 
   return response.status === 200
+}
+
+function dispatchCanvasEmbedRefresh(path: string): void {
+  window.dispatchEvent(new CustomEvent<CanvasEmbedRefreshEventDetail>(CANVAS_EMBED_REFRESH_EVENT, {
+    detail: { path },
+  }))
 }
 
 export function createCanvasEditorFileActions(options: CanvasEditorFileActionOptions) {
@@ -329,6 +336,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     await state.save(path, {
       detectExternalChanges: getPluginSettings().detectExternalChanges,
     })
+    dispatchCanvasEmbedRefresh(path)
     suggestedFilename.value = getCanvasFileName(path)
     fileSource.value = "workspace"
     await rememberRecentPath(path, "workspace")
@@ -394,6 +402,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
         detectExternalChanges: getPluginSettings().detectExternalChanges,
         force: true,
       })
+      dispatchCanvasEmbedRefresh(state.filePath)
       await rememberRecentPath(state.filePath, "workspace")
     } catch (error) {
       showMessage(error instanceof Error ? error.message : t("messageUnableOverwriteDiskVersion"), 4000, "error")

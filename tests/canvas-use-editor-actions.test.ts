@@ -1900,6 +1900,8 @@ New body`)
 
   it("saves the current document through a dialog when prompt is unavailable", async () => {
     queueDialogResponse("saved-workspace")
+    const refreshListener = vi.fn()
+    window.addEventListener("siyuan-canvas-embed-refresh", refreshListener)
     const { editor, plugin, wrapper } = await mountEditor()
 
     editor.addNode("text")
@@ -1921,11 +1923,15 @@ New body`)
     expect(editor.state.filePath).toBe(savedPath)
     expect(editor.suggestedFilename).toBe("saved-workspace.canvas")
     expect(plugin.rememberRecentCanvas).toHaveBeenCalledWith(savedPath, "saved-workspace.canvas", "workspace")
+    expect(refreshListener).toHaveBeenCalledWith(expect.objectContaining({
+      detail: { path: savedPath },
+    }))
     expect(editor.recentFiles[0]).toEqual(expect.objectContaining({
       path: savedPath,
       title: "saved-workspace.canvas",
     }))
 
+    window.removeEventListener("siyuan-canvas-embed-refresh", refreshListener)
     wrapper.unmount()
   })
 

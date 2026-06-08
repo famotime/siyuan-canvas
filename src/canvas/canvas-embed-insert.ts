@@ -1,5 +1,5 @@
 import type { CanvasDocument } from "@/canvas/types"
-import { appendBlock, setBlockAttrs, updateBlock } from "@/api"
+import { appendBlock, setBlockAttrs } from "@/api"
 import { parseCanvasDocument } from "@/canvas/format"
 import { generateCanvasEmbedDataUrl } from "@/canvas/canvas-embed-preview"
 
@@ -61,6 +61,9 @@ export async function refreshCanvasEmbedBlock(
   canvasRaw: string,
   title?: string,
 ): Promise<boolean> {
+  void blockId
+  void canvasPath
+  void title
   const result = parseCanvasDocument(canvasRaw)
   if (!result.document || result.errors.length > 0) {
     return false
@@ -71,9 +74,5 @@ export async function refreshCanvasEmbedBlock(
     return false
   }
 
-  const embedTitle = title || canvasPath.replace(/^.*\//, "").replace(/\.canvas$/i, "")
-  const html = buildCanvasEmbedHtml(canvasPath, dataUrl, embedTitle)
-
-  await updateBlock("dom", html, blockId)
   return true
 }

@@ -27,8 +27,13 @@ import type { ModuleExports } from "vitest"
 
 const openTab = vi.fn()
 const showMessage = vi.fn()
+const fetchSyncPost = vi.fn()
+const fetchMock = vi.fn()
+const getAllEditor = vi.fn(() => [])
 const getFrontend = vi.fn(() => "desktop")
 type DialogAction = "cancel" | "confirm"
+
+const eventBusHandlers = new Map<string, Array<(event: CustomEvent<any>) => void>>()
 
 interface DialogResponse {
   action: DialogAction
@@ -89,6 +94,25 @@ class DialogMock {
 class PluginMock {
   public app = {}
   public commands: any[] = []
+  public eventBus = {
+    emit(type: string, detail?: unknown) {
+      for (const handler of eventBusHandlers.get(type) || []) {
+        handler(new CustomEvent(type, { detail }))
+      }
+    },
+    off: vi.fn((type: string, handler: (event: CustomEvent<any>) => void) => {
+      const handlers = eventBusHandlers.get(type)
+      if (!handlers) {
+        return
+      }
+      eventBusHandlers.set(type, handlers.filter(item => item !== handler))
+    }),
+    on: vi.fn((type: string, handler: (event: CustomEvent<any>) => void) => {
+      const handlers = eventBusHandlers.get(type) || []
+      handlers.push(handler)
+      eventBusHandlers.set(type, handlers)
+    }),
+  }
   public i18n?: Record<string, string>
   public icons: string[] = []
   public name = "siyuan-canvas"
@@ -142,6 +166,8 @@ const siyuanMock = {
   Dialog: DialogMock,
   Plugin: PluginMock,
   Setting: SettingMock,
+  fetchSyncPost,
+  getAllEditor,
   getFrontend,
   openTab,
   showMessage,
@@ -260,6 +286,13 @@ beforeAll(() => {
 
 beforeEach(() => {
   dialogResponses.length = 0
+  document.body.innerHTML = ""
+  eventBusHandlers.clear()
+  fetchMock.mockReset()
+  fetchSyncPost.mockReset()
+  getAllEditor.mockReset()
+  getAllEditor.mockReturnValue([])
+  vi.stubGlobal("fetch", fetchMock)
   openTab.mockReset()
   showMessage.mockReset()
   getFrontend.mockReset()
@@ -290,6 +323,186 @@ describe("canvas plugin lifecycle", () => {
         title: "from-command.canvas",
       }),
     }))
+  })
+
+  it("inserts a canvas preview from a workspace path entered in the command dialog", async () => {
+    const canvasRaw = JSON.stringify({
+      edges: [],
+      nodes: [
+        {
+          height: 120,
+          id: "node-1",
+          text: "大三元",
+          type: "text",
+          width: 180,
+          x: 0,
+          y: 0,
+        },
+      ],
+    })
+    const protyle = document.createElement("div")
+    protyle.className = "protyle-wysiwyg"
+    protyle.setAttribute("data-node-id", "20260608194800-docid")
+    document.body.appendChild(protyle)
+    dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/大三元1.canvas " })
+    fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
+    fetchSyncPost.mockImplementation(async (url: string, data: { path?: string }) => {
+      if (url === "/api/block/appendBlock") {
+        return {
+          code: 0,
+          data: [
+            {
+              doOperations: [
+                { id: "20260608194900-preview" },
+              ],
+            },
+          ],
+        }
+      }
+      if (url === "/api/attr/setBlockAttrs") {
+        return { code: 0, data: null }
+      }
+      throw new Error(`Unexpected request ${url} ${JSON.stringify(data)}`)
+    })
+
+    const plugin = new SiyuanCanvasPlugin()
+    await plugin.onload()
+
+    const insertCommand = plugin.commands.find(command => command.langKey === "insertCanvasEmbed")
+    expect(insertCommand).toBeTruthy()
+
+    await insertCommand.callback()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/file/getFile", expect.objectContaining({
+      body: JSON.stringify({ path: "/data/storage/petal/siyuan-canvas/大三元1.canvas" }),
+      method: "POST",
+    }))
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/appendBlock", expect.objectContaining({
+      dataType: "dom",
+      parentID: "20260608194800-docid",
+    }))
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/setBlockAttrs", {
+      attrs: { "custom-canvas-path": "/data/storage/petal/siyuan-canvas/大三元1.canvas" },
+      id: "20260608194900-preview",
+    })
+    expect(showMessage).toHaveBeenCalledWith("已插入 Canvas 预览", 3000)
+  })
+
+  it("inserts a canvas preview into the last active protyle document when the command dialog steals focus", async () => {
+    const canvasRaw = JSON.stringify({
+      edges: [],
+      nodes: [
+        {
+          height: 120,
+          id: "node-1",
+          text: "active doc",
+          type: "text",
+          width: 180,
+          x: 0,
+          y: 0,
+        },
+      ],
+    })
+    dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/active.canvas" })
+    fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
+    fetchSyncPost.mockImplementation(async (url: string) => {
+      if (url === "/api/block/appendBlock") {
+        return {
+          code: 0,
+          data: [
+            {
+              doOperations: [
+                { id: "20260608200100-preview" },
+              ],
+            },
+          ],
+        }
+      }
+      if (url === "/api/attr/setBlockAttrs") {
+        return { code: 0, data: null }
+      }
+      throw new Error(`Unexpected request ${url}`)
+    })
+
+    const plugin = new SiyuanCanvasPlugin()
+    await plugin.onload()
+    plugin.eventBus.emit("switch-protyle", {
+      protyle: {
+        block: { rootID: "20260608200000-rootdoc" },
+        element: document.createElement("div"),
+      },
+    })
+
+    const insertCommand = plugin.commands.find(command => command.langKey === "insertCanvasEmbed")
+    expect(insertCommand).toBeTruthy()
+
+    await insertCommand.callback()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/appendBlock", expect.objectContaining({
+      parentID: "20260608200000-rootdoc",
+    }))
+    expect(showMessage).toHaveBeenCalledWith("已插入 Canvas 预览", 3000)
+  })
+
+  it("falls back to the editor list when no protyle switch event has fired yet", async () => {
+    const canvasRaw = JSON.stringify({
+      edges: [],
+      nodes: [
+        {
+          height: 120,
+          id: "node-1",
+          text: "editor list doc",
+          type: "text",
+          width: 180,
+          x: 0,
+          y: 0,
+        },
+      ],
+    })
+    dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/editor-list.canvas" })
+    fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
+    fetchSyncPost.mockImplementation(async (url: string) => {
+      if (url === "/api/block/appendBlock") {
+        return {
+          code: 0,
+          data: [
+            {
+              doOperations: [
+                { id: "20260608200500-preview" },
+              ],
+            },
+          ],
+        }
+      }
+      if (url === "/api/attr/setBlockAttrs") {
+        return { code: 0, data: null }
+      }
+      throw new Error(`Unexpected request ${url}`)
+    })
+    getAllEditor.mockReturnValue([
+      {
+        protyle: {
+          block: { rootID: "20260608200400-rootdoc" },
+          element: document.createElement("div"),
+        },
+      },
+    ])
+
+    const plugin = new SiyuanCanvasPlugin()
+    await plugin.onload()
+
+    const insertCommand = plugin.commands.find(command => command.langKey === "insertCanvasEmbed")
+    expect(insertCommand).toBeTruthy()
+
+    await insertCommand.callback()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/appendBlock", expect.objectContaining({
+      parentID: "20260608200400-rootdoc",
+    }))
+    expect(showMessage).toHaveBeenCalledWith("已插入 Canvas 预览", 3000)
   })
 
   it("opens canvas tabs with path-derived and explicit titles", async () => {
@@ -430,7 +643,7 @@ describe("canvas plugin lifecycle", () => {
     })
     expect(plugin.addTab).toHaveBeenCalledTimes(1)
     expect(plugin.addTopBar).toHaveBeenCalledTimes(1)
-    expect(plugin.addCommand).toHaveBeenCalledTimes(3)
+    expect(plugin.addCommand).toHaveBeenCalledTimes(4)
     expect(plugin.addIcons).toHaveBeenCalledTimes(1)
   })
 

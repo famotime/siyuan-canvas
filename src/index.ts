@@ -1,4 +1,5 @@
 import type { Custom } from "siyuan"
+import type { IProtyle } from "siyuan"
 import type {
   CanvasPluginUiState,
   CanvasPluginSettings,
@@ -8,6 +9,7 @@ import type {
 
 import type { CanvasTabBootstrap } from "@/main"
 import {
+  getAllEditor,
   getFrontend,
   Plugin,
   Setting,
@@ -41,7 +43,7 @@ import {
 } from "@/main"
 import { startCanvasEmbedObserver, stopCanvasEmbedObserver } from "@/canvas/canvas-embed-observer"
 import { insertCanvasEmbed } from "@/canvas/canvas-embed-insert"
-import { getFile } from "@/api"
+import { getFileText } from "@/api"
 
 import "@/index.scss"
 
@@ -57,6 +59,13 @@ export default class SiyuanCanvasPlugin extends Plugin {
   public platform: SyFrontendTypes
   public readonly version = pluginInfo.version
   private canvasData = createDefaultCanvasPluginData()
+  private lastActiveProtyle: IProtyle | null = null
+
+  private readonly rememberActiveProtyle = (event: CustomEvent<{ protyle?: IProtyle }>) => {
+    if (event.detail?.protyle) {
+      this.lastActiveProtyle = event.detail.protyle
+    }
+  }
 
   async onload() {
     this.canvasData = normalizeCanvasPluginData(await this.loadData(STORAGE_KEY))
@@ -123,48 +132,24 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addCommand({
       langKey: "insertCanvasEmbed",
       langText: this.t("insertCanvasEmbed"),
-      callback: async () => {
-        const path = await openTextInputDialog({
-          cancelLabel: this.t("dialogCancel"),
-          confirmLabel: this.t("dialogConfirm"),
-          initialValue: `${this.canvasData.settings.defaultCanvasDirectory}/`,
-          title: this.t("insertCanvasEmbedPrompt"),
-        })
-        if (!path) return
-
-        try {
-          const raw = await getFile(path)
-          if (!raw) {
-            showMessage(this.t("messageUnableOpenCanvasFile"), 4000, "error")
-            return
-          }
-          const rawStr = typeof raw === "string" ? raw : new TextDecoder().decode(raw)
-          const protyle = document.querySelector(".protyle-wysiwyg")
-          const docId = protyle?.getAttribute("data-node-id")
-          if (!docId) {
-            showMessage(this.t("insertCanvasEmbedNoDocument"), 4000, "warning")
-            return
-          }
-          const blockId = await insertCanvasEmbed({
-            canvasPath: path,
-            canvasRaw: rawStr,
-            parentBlockId: docId,
-          })
-          if (blockId) {
-            showMessage(this.t("insertCanvasEmbedSuccess"), 3000)
-          } else {
-            showMessage(this.t("insertCanvasEmbedFailed"), 4000, "error")
-          }
-        } catch {
-          showMessage(this.t("insertCanvasEmbedFailed"), 4000, "error")
-        }
+      callback: () => {
+        void this.insertCanvasEmbedFromCommand()
+      },
+      editorCallback: (protyle) => {
+        void this.insertCanvasEmbedFromCommand(protyle)
       },
     })
 
+    this.eventBus?.on?.("loaded-protyle-static", this.rememberActiveProtyle)
+    this.eventBus?.on?.("loaded-protyle-dynamic", this.rememberActiveProtyle)
+    this.eventBus?.on?.("switch-protyle", this.rememberActiveProtyle)
     startCanvasEmbedObserver(this, pluginInfo.name)
   }
 
   onunload() {
+    this.eventBus?.off?.("loaded-protyle-static", this.rememberActiveProtyle)
+    this.eventBus?.off?.("loaded-protyle-dynamic", this.rememberActiveProtyle)
+    this.eventBus?.off?.("switch-protyle", this.rememberActiveProtyle)
     stopCanvasEmbedObserver()
   }
 
@@ -250,6 +235,95 @@ export default class SiyuanCanvasPlugin extends Plugin {
       },
       t: (key, replacements) => this.t(key, replacements),
     })
+  }
+
+  private async insertCanvasEmbedFromCommand(protyle?: IProtyle): Promise<void> {
+    const path = await openTextInputDialog({
+      cancelLabel: this.t("dialogCancel"),
+      confirmLabel: this.t("dialogConfirm"),
+      initialValue: `${this.canvasData.settings.defaultCanvasDirectory}/`,
+      title: this.t("insertCanvasEmbedPrompt"),
+    })
+    const canvasPath = path.trim()
+    if (!canvasPath) return
+
+    try {
+      const rawStr = await getFileText(canvasPath)
+      if (!rawStr) {
+        this.debugInsertCanvasEmbed("unable to read canvas file", { canvasPath })
+        showMessage(this.t("messageUnableOpenCanvasFile"), 4000, "error")
+        return
+      }
+
+      const docId = this.resolveInsertTargetDocumentId(protyle)
+      if (!docId) {
+        this.debugInsertCanvasEmbed("no target document found", {
+          activeElement: document.activeElement?.className,
+          canvasPath,
+          editorCount: getAllEditor?.()?.length ?? 0,
+          hasCommandProtyle: Boolean(protyle),
+          hasLastActiveProtyle: Boolean(this.lastActiveProtyle),
+          protyleCount: document.querySelectorAll(".protyle").length,
+          wysiwygCount: document.querySelectorAll(".protyle-wysiwyg").length,
+        })
+        showMessage(this.t("insertCanvasEmbedNoDocument"), 4000, "warning")
+        return
+      }
+
+      const blockId = await insertCanvasEmbed({
+        canvasPath,
+        canvasRaw: rawStr,
+        parentBlockId: docId,
+      })
+      if (blockId) {
+        showMessage(this.t("insertCanvasEmbedSuccess"), 3000)
+      } else {
+        showMessage(this.t("insertCanvasEmbedFailed"), 4000, "error")
+      }
+    } catch (error) {
+      this.debugInsertCanvasEmbed("insert failed", { canvasPath, error })
+      showMessage(this.t("insertCanvasEmbedFailed"), 4000, "error")
+    }
+  }
+
+  private resolveInsertTargetDocumentId(protyle?: IProtyle): string {
+    const fromCommand = this.getProtyleRootId(protyle)
+    if (fromCommand) {
+      this.lastActiveProtyle = protyle!
+      return fromCommand
+    }
+
+    const fromLastActive = this.getProtyleRootId(this.lastActiveProtyle)
+    if (fromLastActive) {
+      return fromLastActive
+    }
+
+    const fromEditorList = getAllEditor?.()
+      ?.map(editor => this.getProtyleRootId(editor.protyle))
+      .find(Boolean)
+    if (fromEditorList) {
+      return fromEditorList
+    }
+
+    const wysiwyg = document.querySelector<HTMLElement>(".protyle-wysiwyg[data-node-id]")
+    const fromWysiwyg = wysiwyg?.getAttribute("data-node-id")
+    if (fromWysiwyg) {
+      return fromWysiwyg
+    }
+
+    const docRoot = document.querySelector<HTMLElement>(".protyle-wysiwyg [data-node-id][data-type='NodeDocument']")
+    return docRoot?.getAttribute("data-node-id") || ""
+  }
+
+  private getProtyleRootId(protyle?: IProtyle | null): string {
+    return protyle?.block?.rootID || protyle?.block?.id || protyle?.element?.querySelector<HTMLElement>(".protyle-wysiwyg[data-node-id]")?.getAttribute("data-node-id") || ""
+  }
+
+  private debugInsertCanvasEmbed(message: string, payload: Record<string, unknown>): void {
+    if (!this.canvasData.settings.enableDebugLog) {
+      return
+    }
+    console.warn("[siyuan-canvas] insert canvas embed:", message, payload)
   }
 
   private async persistCanvasData(): Promise<void> {
