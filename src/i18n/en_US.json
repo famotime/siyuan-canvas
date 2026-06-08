@@ -274,5 +274,10 @@
   "commandPaletteKindRecent": "Recent",
   "commandPaletteKindNode": "Node",
   "commandPaletteNoResults": "No matches",
-  "commandPaletteOpen": "Command palette (Ctrl+K)"
+  "commandPaletteOpen": "Command palette (Ctrl+K)",
+  "insertCanvasEmbed": "Insert Canvas preview",
+  "insertCanvasEmbedPrompt": "Enter canvas file path",
+  "insertCanvasEmbedSuccess": "Canvas preview inserted",
+  "insertCanvasEmbedFailed": "Failed to insert canvas preview",
+  "insertCanvasEmbedNoDocument": "Open a document first"
 }

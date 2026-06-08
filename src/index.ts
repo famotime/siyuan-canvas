@@ -39,6 +39,9 @@ import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 import {
   bindPlugin,
 } from "@/main"
+import { startCanvasEmbedObserver, stopCanvasEmbedObserver } from "@/canvas/canvas-embed-observer"
+import { insertCanvasEmbed } from "@/canvas/canvas-embed-insert"
+import { getFile } from "@/api"
 
 import "@/index.scss"
 
@@ -116,9 +119,53 @@ export default class SiyuanCanvasPlugin extends Plugin {
         this.openCanvasSettings()
       },
     })
+
+    this.addCommand({
+      langKey: "insertCanvasEmbed",
+      langText: this.t("insertCanvasEmbed"),
+      callback: async () => {
+        const path = await openTextInputDialog({
+          cancelLabel: this.t("dialogCancel"),
+          confirmLabel: this.t("dialogConfirm"),
+          initialValue: `${this.canvasData.settings.defaultCanvasDirectory}/`,
+          title: this.t("insertCanvasEmbedPrompt"),
+        })
+        if (!path) return
+
+        try {
+          const raw = await getFile(path)
+          if (!raw) {
+            showMessage(this.t("messageUnableOpenCanvasFile"), 4000, "error")
+            return
+          }
+          const rawStr = typeof raw === "string" ? raw : new TextDecoder().decode(raw)
+          const protyle = document.querySelector(".protyle-wysiwyg")
+          const docId = protyle?.getAttribute("data-node-id")
+          if (!docId) {
+            showMessage(this.t("insertCanvasEmbedNoDocument"), 4000, "warning")
+            return
+          }
+          const blockId = await insertCanvasEmbed({
+            canvasPath: path,
+            canvasRaw: rawStr,
+            parentBlockId: docId,
+          })
+          if (blockId) {
+            showMessage(this.t("insertCanvasEmbedSuccess"), 3000)
+          } else {
+            showMessage(this.t("insertCanvasEmbedFailed"), 4000, "error")
+          }
+        } catch {
+          showMessage(this.t("insertCanvasEmbedFailed"), 4000, "error")
+        }
+      },
+    })
+
+    startCanvasEmbedObserver(this, pluginInfo.name)
   }
 
   onunload() {
+    stopCanvasEmbedObserver()
   }
 
   async uninstall() {

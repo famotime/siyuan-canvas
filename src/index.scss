@@ -1,3 +1,49 @@
+.canvas-embed-preview {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.canvas-embed-preview:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+.canvas-embed-preview img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.canvas-embed-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(91, 141, 239, 0.85);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.canvas-embed-title {
+  display: block;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--b3-theme-on-background);
+  background: var(--b3-theme-background);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .canvas-text-input-dialog {
   display: flex;
   flex-direction: column;
