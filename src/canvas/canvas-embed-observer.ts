@@ -2,12 +2,14 @@ import type { Plugin } from "siyuan"
 import { CANVAS_EMBED_BOUND_ATTR, CANVAS_EMBED_CLASS } from "@/canvas/canvas-embed-insert"
 import { CANVAS_EMBED_REFRESH_EVENT, type CanvasEmbedRefreshEventDetail } from "@/canvas/canvas-embed-events"
 import { openCanvasEditorTab } from "@/canvas/plugin-tabs"
-import { getFileText, sql } from "@/api"
+import { getBlockAttrs, getFileText, sql } from "@/api"
 import { parseCanvasDocument } from "@/canvas/format"
 import { generateCanvasEmbedDataUrl } from "@/canvas/canvas-embed-preview"
 
 let observer: MutationObserver | null = null
 let refreshListener: ((event: Event) => void) | null = null
+let delegatedClickListener: ((event: MouseEvent) => void) | null = null
+const iframeClickListeners = new WeakMap<Document, (event: MouseEvent) => void>()
 
 function bindCanvasEmbedClick(element: HTMLElement, plugin: Plugin, pluginName: string) {
   if (element.getAttribute(CANVAS_EMBED_BOUND_ATTR) === "true") return
@@ -34,6 +36,60 @@ function scanAndBind(root: Element, plugin: Plugin, pluginName: string) {
 
 function findCanvasEmbedBlockId(element: HTMLElement): string {
   return element.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
+}
+
+async function getCanvasPathFromBlockAttrs(blockId: string): Promise<string> {
+  if (!blockId) return ""
+
+  try {
+    const attrs = await getBlockAttrs(blockId)
+    return attrs?.["custom-canvas-path"] || ""
+  } catch {
+    return ""
+  }
+}
+
+function findClickedImageBlockId(target: EventTarget | null): string {
+  const element = target && "closest" in target ? target as Element : null
+  const image = element?.closest("img")
+  if (!image) return ""
+  return image.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
+}
+
+async function openCanvasFromBlockId(event: MouseEvent, blockId: string, plugin: Plugin, pluginName: string) {
+  if (!blockId) return
+
+  const canvasPath = await getCanvasPathFromBlockAttrs(blockId)
+  if (!canvasPath) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
+}
+
+async function openCanvasFromClickedImage(event: MouseEvent, plugin: Plugin, pluginName: string) {
+  await openCanvasFromBlockId(event, findClickedImageBlockId(event.target), plugin, pluginName)
+}
+
+function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, pluginName: string) {
+  const iframes = root.querySelectorAll<HTMLIFrameElement>("iframe")
+  for (const iframe of iframes) {
+    const blockId = iframe.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
+    const iframeDocument = iframe.contentDocument
+    if (!blockId || !iframeDocument || iframeClickListeners.has(iframeDocument)) {
+      continue
+    }
+
+    const listener = (event: MouseEvent) => {
+      const target = event.target && "closest" in event.target ? event.target as Element : null
+      if (!target?.closest("img")) {
+        return
+      }
+      void openCanvasFromBlockId(event, blockId, plugin, pluginName)
+    }
+    iframeClickListeners.set(iframeDocument, listener)
+    iframeDocument.addEventListener("click", listener, true)
+  }
 }
 
 interface CanvasEmbedBlockRef {
@@ -127,6 +183,7 @@ export function startCanvasEmbedObserver(plugin: Plugin, pluginName: string) {
             bindCanvasEmbedClick(node, plugin, pluginName)
           }
           scanAndBind(node, plugin, pluginName)
+          bindHtmlBlockIframeClicks(node, plugin, pluginName)
         }
       }
     }
@@ -142,8 +199,13 @@ export function startCanvasEmbedObserver(plugin: Plugin, pluginName: string) {
     void refreshCanvasEmbedsForPath(detail?.path || "")
   }
   window.addEventListener(CANVAS_EMBED_REFRESH_EVENT, refreshListener)
+  delegatedClickListener = (event: MouseEvent) => {
+    void openCanvasFromClickedImage(event, plugin, pluginName)
+  }
+  document.addEventListener("click", delegatedClickListener, true)
 
   scanAndBind(document.body, plugin, pluginName)
+  bindHtmlBlockIframeClicks(document, plugin, pluginName)
 }
 
 export function stopCanvasEmbedObserver() {
@@ -152,5 +214,9 @@ export function stopCanvasEmbedObserver() {
   if (refreshListener) {
     window.removeEventListener(CANVAS_EMBED_REFRESH_EVENT, refreshListener)
     refreshListener = null
+  }
+  if (delegatedClickListener) {
+    document.removeEventListener("click", delegatedClickListener, true)
+    delegatedClickListener = null
   }
 }
