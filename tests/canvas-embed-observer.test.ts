@@ -380,6 +380,63 @@ describe("canvas embed observer", () => {
     )
   })
 
+  it("opens a canvas from a reloaded HTML iframe document path when clicking a non-image preview element", async () => {
+    document.body.innerHTML = `
+      <iframe></iframe>
+    `
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement
+    iframe.contentDocument?.body.insertAdjacentHTML("beforeend", `
+      <div class="canvas-embed-preview" data-canvas-path="//data/storage/petal/siyuan-canvas/a.canvas">
+        <span class="canvas-embed-title">Canvas</span>
+      </div>
+    `)
+
+    embedObserver.startCanvasEmbedObserver({ app: "app" } as any, "siyuan-canvas")
+
+    iframe.contentDocument?.querySelector(".canvas-embed-title")?.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(openTab).toHaveBeenCalledWith(
+      { app: "app" },
+      "siyuan-canvas",
+      { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
+      "Untitled.canvas",
+    )
+  })
+
+  it("creates an iframe overlay from the iframe document preview path without an outer block id", async () => {
+    document.body.innerHTML = `
+      <div>
+        <iframe></iframe>
+      </div>
+    `
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement
+    iframe.contentDocument?.body.insertAdjacentHTML("beforeend", `
+      <div class="canvas-embed-preview" data-canvas-path="//data/storage/petal/siyuan-canvas/a.canvas">
+        <img src="preview" alt="Canvas" />
+      </div>
+    `)
+
+    embedObserver.startCanvasEmbedObserver({ app: "app" } as any, "siyuan-canvas")
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    document.querySelector<HTMLElement>('[data-canvas-embed-iframe-overlay="true"]')?.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(openTab).toHaveBeenCalledWith(
+      { app: "app" },
+      "siyuan-canvas",
+      { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
+      "Untitled.canvas",
+    )
+  })
+
   it("opens a canvas from a reloaded preview path when no block id is available", async () => {
     document.body.innerHTML = `
       <div class="canvas-embed-preview" data-canvas-path="//data/storage/petal/siyuan-canvas/a.canvas">
