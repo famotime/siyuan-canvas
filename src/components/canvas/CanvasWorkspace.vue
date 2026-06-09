@@ -1033,6 +1033,20 @@
               name="edit"
             />
           </button>
+          <button
+            v-if="editor.canRelayoutConnectedNodes"
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-relayout"
+            :aria-label="SELECTION_TOOLBAR_TOOLTIPS.relayout"
+            :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.relayout"
+            type="button"
+            @click.stop="editor.relayoutConnectedNodes"
+          >
+            <CanvasIcon
+              class="selection-toolbar__icon"
+              name="arrange-row"
+            />
+          </button>
           <template v-else-if="editor.selectedNodeCount > 1">
             <button
               v-if="editor.canConvertSelectionToDocument"
@@ -1073,20 +1087,6 @@
               <CanvasIcon
                 class="selection-toolbar__icon"
                 name="group"
-              />
-            </button>
-            <button
-              v-if="editor.canRelayoutConnectedNodes"
-              class="selection-toolbar__button"
-              data-testid="selection-toolbar-relayout"
-              :aria-label="SELECTION_TOOLBAR_TOOLTIPS.relayout"
-              :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.relayout"
-              type="button"
-              @click.stop="editor.relayoutConnectedNodes"
-            >
-              <CanvasIcon
-                class="selection-toolbar__icon"
-                name="arrange-row"
               />
             </button>
             <div class="selection-toolbar__menu">
