@@ -319,6 +319,56 @@ describe("relayoutConnectedNodes", () => {
     expect(ids).toContain("c")
   })
 
+  it("does not overlap with another disconnected connected subgraph", () => {
+    // Subgraph 1: A → B (will be relayouted)
+    // Subgraph 2: X → Y (placed nearby, should be avoided)
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("a", 0, 0),
+        makeText("b", 10, 10),
+        // Place X→Y close to origin so the relayouted A→B would overlap without avoidance
+        makeText("x", 200, -50),
+        makeText("y", 520, -50),
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "b", "left"),
+        makeEdge("e2", "x", "right", "y", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, {
+      selectedNodeId: "a",
+      primaryDirection: "horizontal",
+      layerGap: 80,
+      nodeGap: 32,
+    })
+
+    expect(result.success).toBe(true)
+
+    const a = findNode(result.document, "a")!
+    const b = findNode(result.document, "b")!
+    const x = findNode(result.document, "x")!
+    const y = findNode(result.document, "y")!
+
+    // X, Y should not have moved
+    expect(x.x).toBe(200)
+    expect(y.x).toBe(520)
+
+    // A-B bounding box should not overlap with X-Y bounding box
+    const abMinX = Math.min(a.x, b.x)
+    const abMaxX = Math.max(a.x + a.width, b.x + b.width)
+    const abMinY = Math.min(a.y, b.y)
+    const abMaxY = Math.max(a.y + a.height, b.y + b.height)
+
+    const xyMinX = Math.min(x.x, y.x)
+    const xyMaxX = Math.max(x.x + x.width, y.x + y.width)
+    const xyMinY = Math.min(x.y, y.y)
+    const xyMaxY = Math.max(x.y + x.height, y.y + y.height)
+
+    const overlaps = abMinX < xyMaxX && abMaxX > xyMinX && abMinY < xyMaxY && abMaxY > xyMinY
+    expect(overlaps).toBe(false)
+  })
+
   it("handles two disconnected groups by only relayouting the selected one", () => {
     // Group 1: A → B
     // Group 2: X → Y (isolated)

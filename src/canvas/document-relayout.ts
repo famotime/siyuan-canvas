@@ -471,6 +471,17 @@ function adjustGroups(
 
 // ─── Overlap Resolution ───────────────────────────────────────────────────────
 
+interface BBox {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * 将整个子图作为一个整体平移，避免与其他连通子图重叠。
+ * 策略：找到所有其他连通分量的包围盒作为障碍物，整体平移当前子图直到无重叠。
+ */
 function resolveOverlaps(
   document: CanvasDocument,
   subgraphNodes: CanvasNode[],
@@ -478,71 +489,150 @@ function resolveOverlaps(
   maxAttempts: number,
 ): CanvasDocument {
   const subgraphIds = new Set(subgraphNodes.map(n => n.id))
+  const obstaclePadding = 20
 
-  // Obstacle nodes: everything NOT in the subgraph and NOT a group
-  // (groups are adjusted separately via adjustGroups and should not be treated as obstacles)
-  const obstacleNodes = document.nodes.filter(n => !subgraphIds.has(n.id) && n.type !== "group")
+  // 找到所有其他连通分量，计算其包围盒作为障碍物
+  const obstacleBBoxes = findObstacleBBoxes(document, subgraphIds, obstaclePadding)
 
-  // Also get the current positions of subgraph nodes from the document
+  if (obstacleBBoxes.length === 0) {
+    return document
+  }
+
+  // 计算当前子图的包围盒
   const movableNodes = document.nodes.filter(n => subgraphIds.has(n.id))
+  const subgraphBBox = computeBBox(movableNodes)
+  if (!subgraphBBox) return document
 
-  // Shift direction: push away from obstacles
-  const shiftSign = 1 // push in positive direction
+  // 整体平移直到不与任何障碍物重叠
+  let offsetX = 0
+  let offsetY = 0
   const stepX = direction === "horizontal" ? 40 : 0
   const stepY = direction === "vertical" ? 40 : 0
+  // 垂直于主方向的微调步进
+  const altStepX = direction === "vertical" ? 40 : 0
+  const altStepY = direction === "horizontal" ? 40 : 0
+  let altSign = 1
+  let altCount = 0
+  const altThreshold = 3 // 每 altThreshold 次主方向步进后切换一次垂直方向
 
-  const patches = new Map<string, CanvasGeometryPatch>()
-
-  for (const node of movableNodes) {
-    let attempt = 0
-    let testX = node.x
-    let testY = node.y
-
-    while (attempt < maxAttempts) {
-      const candidate = {
-        x: testX,
-        y: testY,
-        width: node.width,
-        height: node.height,
-      }
-
-      const hasOverlap = obstacleNodes.some(obstacle => doNodesOverlap(candidate, obstacle))
-        || movableNodes.some((other) => {
-          if (other.id === node.id) return false
-          // Use the other node's patched position if available
-          const otherPatch = patches.get(other.id)
-          const otherX = otherPatch?.x ?? other.x
-          const otherY = otherPatch?.y ?? other.y
-          return doNodesOverlap(candidate, {
-            x: otherX,
-            y: otherY,
-            width: other.width,
-            height: other.height,
-          })
-        })
-
-      if (!hasOverlap) break
-
-      testX += stepX * shiftSign
-      testY += stepY * shiftSign
-      attempt++
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const shiftedBBox: BBox = {
+      x: subgraphBBox.x + offsetX,
+      y: subgraphBBox.y + offsetY,
+      width: subgraphBBox.width,
+      height: subgraphBBox.height,
     }
 
-    if (testX !== node.x || testY !== node.y) {
-      patches.set(node.id, { x: testX, y: testY })
+    const hasOverlap = obstacleBBoxes.some(obstacle => bboxOverlap(shiftedBBox, obstacle))
+    if (!hasOverlap) break
+
+    // 主方向步进
+    offsetX += stepX
+    offsetY += stepY
+
+    // 每隔几次，也尝试垂直于主方向的偏移（之字形搜索）
+    altCount++
+    if (altCount >= altThreshold) {
+      altCount = 0
+      offsetX += altStepX * altSign
+      offsetY += altStepY * altSign
+      altSign = -altSign // 交替正负
     }
   }
 
-  if (patches.size === 0) {
+  if (offsetX === 0 && offsetY === 0) {
     return document
   }
 
   return {
     ...document,
     nodes: document.nodes.map((node) => {
-      const patch = patches.get(node.id)
-      if (!patch) return node
-      return { ...node, ...patch }
+      if (!subgraphIds.has(node.id)) return node
+      return { ...node, x: node.x + offsetX, y: node.y + offsetY }
     }),
   }
+}
+
+/**
+ * 找到文档中所有不属于当前子图的连通分量和孤立节点，
+ * 返回它们的包围盒列表（作为障碍物）。
+ */
+function findObstacleBBoxes(
+  document: CanvasDocument,
+  currentSubgraphIds: Set<string>,
+  padding: number,
+): BBox[] {
+  const adjacency = buildAdjacencyList(document.edges)
+  const allNodeIds = new Set(document.nodes.map(n => n.id))
+  const visited = new Set<string>()
+  const bboxes: BBox[] = []
+
+  // BFS 找所有连通分量
+  for (const nodeId of allNodeIds) {
+    if (visited.has(nodeId) || currentSubgraphIds.has(nodeId)) continue
+
+    // BFS 遍历该连通分量
+    const component: string[] = []
+    const queue = [nodeId]
+    visited.add(nodeId)
+
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      component.push(current)
+      for (const neighbor of adjacency.get(current) ?? []) {
+        if (!visited.has(neighbor) && !currentSubgraphIds.has(neighbor)) {
+          visited.add(neighbor)
+          queue.push(neighbor)
+        }
+      }
+    }
+
+    // 计算该分量的包围盒（排除 group 节点）
+    const componentNodes = document.nodes.filter(
+      n => component.includes(n.id) && n.type !== "group",
+    )
+    if (componentNodes.length === 0) continue
+
+    const bbox = computeBBox(componentNodes)
+    if (bbox) {
+      bboxes.push({
+        x: bbox.x - padding,
+        y: bbox.y - padding,
+        width: bbox.width + padding * 2,
+        height: bbox.height + padding * 2,
+      })
+    }
+  }
+
+  return bboxes
+}
+
+function computeBBox(nodes: CanvasNode[]): BBox | null {
+  if (nodes.length === 0) return null
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  for (const node of nodes) {
+    minX = Math.min(minX, node.x)
+    minY = Math.min(minY, node.y)
+    maxX = Math.max(maxX, node.x + node.width)
+    maxY = Math.max(maxY, node.y + node.height)
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  }
+}
+
+function bboxOverlap(a: BBox, b: BBox): boolean {
+  return a.x < b.x + b.width
+    && a.x + a.width > b.x
+    && a.y < b.y + b.height
+    && a.y + a.height > b.y
 }

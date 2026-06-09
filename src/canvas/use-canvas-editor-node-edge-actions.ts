@@ -410,6 +410,32 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
 
       if (result.success) {
         commitDocument(result.document)
+
+        // 聚焦到选中节点的新位置
+        const stage = stageRef.value
+        const movedNode = result.document.nodes.find(n => n.id === node.id)
+        if (stage && movedNode) {
+          const nextViewport = centerViewportOnBounds(
+            viewport,
+            {
+              height: stage.clientHeight,
+              width: stage.clientWidth,
+            },
+            {
+              x: movedNode.x,
+              y: movedNode.y,
+              width: movedNode.width,
+              height: movedNode.height,
+            },
+            {
+              left: board.value.left,
+              top: board.value.top,
+            },
+          )
+          viewport.scale = nextViewport.scale
+          viewport.x = nextViewport.x
+          viewport.y = nextViewport.y
+        }
       }
       else if (result.message) {
         showMessage(result.message)
