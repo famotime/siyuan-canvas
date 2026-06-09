@@ -564,10 +564,10 @@ describe("relayoutConnectedNodes — group constraints", () => {
     // A → group G (containing C, D), user selects C
     const doc: CanvasDocument = {
       nodes: [
-        makeText("a", 1000, 0),
+        makeText("a", 1500, 0),
         makeGroup("g", -10, -10, 660, 400),
         makeText("c", 0, 0),
-        makeText("d", 340, 200),
+        makeText("d", 200, 150),
       ],
       edges: [
         makeEdge("e1", "a", "right", "c", "left"),
@@ -577,16 +577,20 @@ describe("relayoutConnectedNodes — group constraints", () => {
     const result = relayoutConnectedNodes(doc, { selectedNodeId: "c" })
     expect(result.success).toBe(true)
 
-    // C should have moved (group was relayouted)
     const c = findNode(result.document, "c")!
     const d = findNode(result.document, "d")!
     const g = findNode(result.document, "g")!
 
-    // C and D should still be inside group
+    // C and D should still be inside group boundaries
     expect(c.x).toBeGreaterThanOrEqual(g.x)
-    expect(d.x).toBeGreaterThanOrEqual(g.x)
+    expect(c.y).toBeGreaterThanOrEqual(g.y)
     expect(c.x + c.width).toBeLessThanOrEqual(g.x + g.width)
+    expect(c.y + c.height).toBeLessThanOrEqual(g.y + g.height)
+
+    expect(d.x).toBeGreaterThanOrEqual(g.x)
+    expect(d.y).toBeGreaterThanOrEqual(g.y)
     expect(d.x + d.width).toBeLessThanOrEqual(g.x + g.width)
+    expect(d.y + d.height).toBeLessThanOrEqual(g.y + g.height)
   })
 
   it("handles group with no external edges (isolated group)", () => {
