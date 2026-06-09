@@ -146,12 +146,6 @@
             :title="edgeInfo.connectedNodeTitle"
             @click="focusConnectedNode(edgeInfo.connectedNodeId)"
           >{{ edgeInfo.connectedNodeTitle }}</button>
-          <button
-            class="node-edge-item__focus"
-            type="button"
-            :title="t('inspectorFocusNode')"
-            @click="focusConnectedNode(edgeInfo.connectedNodeId)"
-          >⊙</button>
           <span
             v-if="edgeInfo.edge.label"
             class="node-edge-item__label"
@@ -1027,27 +1021,6 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 
 .node-edge-item__node:hover {
   text-decoration: underline;
-}
-
-.node-edge-item__focus {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--canvas-text-muted);
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.node-edge-item__focus:hover {
-  background: var(--canvas-floating-button-bg-hover);
-  color: var(--canvas-accent);
 }
 
 .node-edge-item__label {
