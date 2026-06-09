@@ -718,8 +718,7 @@ function applyDraft(): void {
 }
 
 function focusConnectedNode(nodeId: string): void {
-  props.editor.selectNode(nodeId)
-  props.editor.centerSelectionInViewport()
+  props.editor.focusNodeById(nodeId)
 }
 
 function getSectionChevron(section: keyof typeof props.editor.inspectorSectionState): string {

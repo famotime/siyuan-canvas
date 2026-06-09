@@ -272,6 +272,41 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     closeSelectionPopover()
   }
 
+  function focusNodeById(nodeId: string): void {
+    const stage = stageRef.value
+    if (!stage) return
+
+    const node = state.document.nodes.find(n => n.id === nodeId)
+    if (!node) return
+
+    state.selectNode(nodeId)
+
+    const bounds: CanvasBounds = {
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+    }
+
+    const nextViewport = centerViewportOnBounds(
+      viewport,
+      {
+        height: stage.clientHeight,
+        width: stage.clientWidth,
+      },
+      bounds,
+      {
+        left: board.value.left,
+        top: board.value.top,
+      },
+    )
+
+    viewport.scale = nextViewport.scale
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
+    closeSelectionPopover()
+  }
+
   function centerEdgeInViewport() {
     const stage = stageRef.value
     const anchors = selectedEdgeAnchors.value
@@ -704,6 +739,7 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     cancelEdgeLabelEditing,
     centerEdgeInViewport,
     centerSelectionInViewport,
+    focusNodeById,
     convertTextToLink,
     convertLinkToText,
     closeCreateEdgeDialog,
