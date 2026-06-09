@@ -1075,6 +1075,20 @@
                 name="group"
               />
             </button>
+            <button
+              v-if="editor.canRelayoutConnectedNodes"
+              class="selection-toolbar__button"
+              data-testid="selection-toolbar-relayout"
+              :aria-label="SELECTION_TOOLBAR_TOOLTIPS.relayout"
+              :data-tooltip="SELECTION_TOOLBAR_TOOLTIPS.relayout"
+              type="button"
+              @click.stop="editor.relayoutConnectedNodes"
+            >
+              <CanvasIcon
+                class="selection-toolbar__icon"
+                name="arrange-row"
+              />
+            </button>
             <div class="selection-toolbar__menu">
               <button
                 class="selection-toolbar__button"
@@ -1124,6 +1138,15 @@
           v-if="showCanvasThumbnails"
           :editor="editor"
         />
+
+        <div
+          v-if="editor.isRelayouting"
+          class="canvas-relayout-overlay"
+          data-testid="relayout-overlay"
+        >
+          <div class="canvas-relayout-spinner" />
+          <span class="canvas-relayout-text">{{ t('relayoutComputing') }}</span>
+        </div>
 
         <CanvasPngExportDialog
           :visible="pngExportDialogVisible"
@@ -2537,5 +2560,39 @@ watch(
   height: 1px;
   margin: 4px;
   background: var(--b3-border-color);
+}
+
+.canvas-relayout-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: color-mix(in srgb, var(--b3-theme-background, #fff) 60%, transparent);
+  pointer-events: all;
+  cursor: wait;
+}
+
+.canvas-relayout-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid color-mix(in srgb, var(--b3-theme-primary, #5b8ff9) 25%, transparent);
+  border-top-color: var(--b3-theme-primary, #5b8ff9);
+  border-radius: 50%;
+  animation: canvas-relayout-spin 0.8s linear infinite;
+}
+
+.canvas-relayout-text {
+  font-size: 13px;
+  color: var(--b3-theme-on-surface, #333);
+}
+
+@keyframes canvas-relayout-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

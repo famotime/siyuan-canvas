@@ -1,5 +1,6 @@
 export { applyCanvasNodeLayout } from "@/canvas/document-layout"
 export { createCanvasGroupForNodes, findCanvasNodesInGroup } from "@/canvas/document-group"
+export { relayoutConnectedNodes } from "@/canvas/document-relayout"
 
 import type {
   CanvasBounds,

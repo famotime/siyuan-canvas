@@ -266,6 +266,14 @@ export function useCanvasEditor(
 
     return false
   })
+  const canRelayoutConnectedNodes = computed(() => {
+    if (selectedNodeCount.value !== 1 || !selectedNode.value) {
+      return false
+    }
+    return state.document.edges.some(
+      e => e.fromNode === selectedNode.value!.id || e.toNode === selectedNode.value!.id,
+    )
+  })
   const canConvertSelectionToDocument = computed(() => {
     if (state.selectedNodeIds.length === 0) return false
     return state.selectedNodeIds.every(id => {
@@ -931,7 +939,9 @@ export function useCanvasEditor(
     createGroupFromSelection,
     deleteSelection,
     getRenderedMarkdown,
+    isRelayouting,
     openCreateEdgeDialog,
+    relayoutConnectedNodes,
     selectEdge,
     selectNode,
     setNewEdgeSourceId,
@@ -1249,6 +1259,7 @@ export function useCanvasEditor(
       applySelectionColor,
       applyEdgeColor,
       applySelectionLayout,
+      relayoutConnectedNodes,
       activateCanvasSurface,
       board,
       bottomToolbarVisible,
@@ -1257,6 +1268,7 @@ export function useCanvasEditor(
       canConvertSelectionToDocument,
       canConvertSelectionToText,
       canRefreshSelectedSiyuanNode,
+      canRelayoutConnectedNodes,
       centerEdgeInViewport,
       centerSelectionInViewport,
       closeCreateEdgeDialog,
@@ -1304,6 +1316,7 @@ export function useCanvasEditor(
       getNodeTitle,
       importCanvas,
       isConnectionTarget,
+      isRelayouting,
       newCanvas,
       newEdgeFromSide,
       newEdgeLabel,

@@ -15,12 +15,14 @@ import type {
 } from '@/canvas/types'
 import type { CanvasI18nTranslator } from '@/canvas/use-canvas-editor-shared'
 
+import { ref } from 'vue'
 import { showMessage } from 'siyuan'
 import {
   applyCanvasNodeLayout,
   createCanvasEdge,
   createCanvasGroupForNodes,
   createCanvasNode,
+  relayoutConnectedNodes,
   removeCanvasEdge,
   removeCanvasNode,
   removeCanvasNodes,
@@ -344,6 +346,43 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
 
     commitDocument(applyCanvasNodeLayout(state.document, state.selectedNodeIds, action))
     closeSelectionPopover()
+  }
+
+  const isRelayouting = ref(false)
+
+  async function relayoutConnectedNodesAction() {
+    if (!selectedNode.value || isRelayouting.value) return
+
+    const node = selectedNode.value
+    const hasEdges = state.document.edges.some(
+      e => e.fromNode === node.id || e.toNode === node.id,
+    )
+    if (!hasEdges) {
+      showMessage(t("relayoutNoConnectedNodes"))
+      return
+    }
+
+    isRelayouting.value = true
+    closeSelectionPopover()
+
+    try {
+      // Yield to allow the loading overlay to render
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      const result = relayoutConnectedNodes(state.document, {
+        selectedNodeId: node.id,
+      })
+
+      if (result.success) {
+        commitDocument(result.document)
+      }
+      else if (result.message) {
+        showMessage(result.message)
+      }
+    }
+    finally {
+      isRelayouting.value = false
+    }
   }
 
   function toggleSelectionPopover(popover: 'color' | 'layout') {
@@ -675,7 +714,9 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     deleteSelection,
     editingEdgeLabelId,
     getRenderedMarkdown,
+    isRelayouting,
     openCreateEdgeDialog,
+    relayoutConnectedNodes: relayoutConnectedNodesAction,
     selectEdge,
     selectNode,
     setNewEdgeSourceId,
