@@ -434,6 +434,7 @@ const nodeEdges = computed<NodeEdgeInfo[]>(() => {
         edge,
         localSide: edge.fromSide,
         direction: 'outgoing',
+        connectedNodeId: edge.toNode,
         connectedNodeTitle: connected ? props.editor.getNodeTitle(connected) : edge.toNode,
       })
     } else if (edge.toNode === node.id) {
@@ -442,6 +443,7 @@ const nodeEdges = computed<NodeEdgeInfo[]>(() => {
         edge,
         localSide: edge.toSide,
         direction: 'incoming',
+        connectedNodeId: edge.fromNode,
         connectedNodeTitle: connected ? props.editor.getNodeTitle(connected) : edge.fromNode,
       })
     }
