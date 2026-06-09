@@ -454,3 +454,154 @@ describe("relayoutConnectedNodes", () => {
     expect(a.customProp).toBe("hello")
   })
 })
+
+describe("relayoutConnectedNodes — group constraints", () => {
+  it("treats group as a super node and moves it with internal nodes", () => {
+    // A is outside group G, A → C (inside G)
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("a", 1000, 0),
+        makeGroup("g", -10, -10, 660, 400),
+        makeText("c", 0, 0),     // inside group
+        makeText("d", 200, 150),  // inside group
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "c", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, { selectedNodeId: "a" })
+    expect(result.success).toBe(true)
+
+    const g = findNode(result.document, "g")!
+    const c = findNode(result.document, "c")!
+    const d = findNode(result.document, "d")!
+
+    // C and D should still be inside group boundaries
+    expect(c.x).toBeGreaterThanOrEqual(g.x)
+    expect(c.y).toBeGreaterThanOrEqual(g.y)
+    expect(c.x + c.width).toBeLessThanOrEqual(g.x + g.width)
+    expect(c.y + c.height).toBeLessThanOrEqual(g.y + g.height)
+
+    expect(d.x).toBeGreaterThanOrEqual(g.x)
+    expect(d.y).toBeGreaterThanOrEqual(g.y)
+    expect(d.x + d.width).toBeLessThanOrEqual(g.x + g.width)
+    expect(d.y + d.height).toBeLessThanOrEqual(g.y + g.height)
+  })
+
+  it("preserves relative positions of group internal nodes", () => {
+    // A is outside group G, A → C (inside G)
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("a", 1000, 0),
+        makeGroup("g", -10, -10, 660, 400),
+        makeText("c", 0, 0),
+        makeText("d", 200, 150),
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "c", "left"),
+      ],
+    }
+
+    // Record original relative positions
+    const origRelX = 200 - 0 // d.x - c.x
+    const origRelY = 150 - 0 // d.y - c.y
+
+    const result = relayoutConnectedNodes(doc, { selectedNodeId: "a" })
+
+    const c = findNode(result.document, "c")!
+    const d = findNode(result.document, "d")!
+
+    // Relative positions should be preserved exactly
+    expect(d.x - c.x).toBe(origRelX)
+    expect(d.y - c.y).toBe(origRelY)
+  })
+
+  it("group bounding box does not overlap with other connected subgraphs", () => {
+    // Subgraph 1: A → group G (containing C, D), A outside G
+    // Subgraph 2: X → Y (placed nearby)
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("a", 1500, 0),
+        makeGroup("g", 200, -50, 660, 400),
+        makeText("c", 200, -50),
+        makeText("d", 500, 150),
+        makeText("x", 900, 0),
+        makeText("y", 1220, 0),
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "c", "left"),
+        makeEdge("e2", "x", "right", "y", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, { selectedNodeId: "a" })
+    expect(result.success).toBe(true)
+
+    // Get the group's actual bounding box (from its children)
+    const g = findNode(result.document, "g")!
+    const x = findNode(result.document, "x")!
+    const y = findNode(result.document, "y")!
+
+    // X, Y should not have moved
+    expect(x.x).toBe(900)
+    expect(y.x).toBe(1220)
+
+    // Group bounding box should not overlap with X-Y bounding box
+    const gRight = g.x + g.width
+    const xyLeft = Math.min(x.x, y.x)
+    const gBottom = g.y + g.height
+    const xyTop = Math.min(x.y, y.y)
+    const xyBottom = Math.max(x.y + x.height, y.y + y.height)
+
+    // No horizontal overlap OR no vertical overlap
+    const noOverlap = gRight <= xyLeft || g.x >= xyLeft + 320
+      || gBottom <= xyTop || g.y >= xyBottom
+    expect(noOverlap).toBe(true)
+  })
+
+  it("handles selected node inside a group", () => {
+    // A → group G (containing C, D), user selects C
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("a", 1000, 0),
+        makeGroup("g", -10, -10, 660, 400),
+        makeText("c", 0, 0),
+        makeText("d", 340, 200),
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "c", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, { selectedNodeId: "c" })
+    expect(result.success).toBe(true)
+
+    // C should have moved (group was relayouted)
+    const c = findNode(result.document, "c")!
+    const d = findNode(result.document, "d")!
+    const g = findNode(result.document, "g")!
+
+    // C and D should still be inside group
+    expect(c.x).toBeGreaterThanOrEqual(g.x)
+    expect(d.x).toBeGreaterThanOrEqual(g.x)
+    expect(c.x + c.width).toBeLessThanOrEqual(g.x + g.width)
+    expect(d.x + d.width).toBeLessThanOrEqual(g.x + g.width)
+  })
+
+  it("handles group with no external edges (isolated group)", () => {
+    // Group G with C, D inside but no external edges
+    const doc: CanvasDocument = {
+      nodes: [
+        makeGroup("g", -10, -10, 660, 400),
+        makeText("c", 0, 0),
+        makeText("d", 340, 200),
+      ],
+      edges: [],
+    }
+
+    const result = relayoutConnectedNodes(doc, { selectedNodeId: "c" })
+    // Should fail — no connected nodes outside the group
+    expect(result.success).toBe(false)
+  })
+})

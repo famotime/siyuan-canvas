@@ -334,19 +334,21 @@
       </label>
       <label>
         {{ t("fieldSourceNode") }}
-        <input
-          :value="selectedEdgeFromNodeTitle"
-          readonly
-          class="inspector__readonly-field"
-        />
+        <button
+          class="inspector__node-link"
+          type="button"
+          :title="selectedEdgeFromNodeTitle"
+          @click="focusConnectedNode(editor.selectedEdge.fromNode)"
+        >{{ selectedEdgeFromNodeTitle }}</button>
       </label>
       <label>
         {{ t("fieldTarget") }}
-        <input
-          :value="selectedEdgeToNodeTitle"
-          readonly
-          class="inspector__readonly-field"
-        />
+        <button
+          class="inspector__node-link"
+          type="button"
+          :title="selectedEdgeToNodeTitle"
+          @click="focusConnectedNode(editor.selectedEdge.toNode)"
+        >{{ selectedEdgeToNodeTitle }}</button>
       </label>
       <label>
         {{ t("fieldFromSide") }}
@@ -842,6 +844,28 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .inspector__readonly-field {
   cursor: default;
   opacity: 0.7;
+}
+
+.inspector__node-link {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 10px;
+  background: var(--canvas-input-bg);
+  color: var(--canvas-accent);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.inspector__node-link:hover {
+  text-decoration: underline;
 }
 
 .inspector__field-label {

@@ -59,34 +59,31 @@ export function relayoutConnectedNodes(
     maxOverlapFixAttempts = 50,
   } = options
 
-  // 1. 提取连通子图
-  const subgraph = extractConnectedSubgraph(document, selectedNodeId)
+  // 如果选中节点在某个 group 内，用该 group 作为子图入口
+  const entryNodeId = findParentGroup(document, selectedNodeId) ?? selectedNodeId
+
+  // 1. 提取连通子图（group 内节点折叠为 group 超级节点）
+  const subgraph = extractConnectedSubgraph(document, entryNodeId)
   if (subgraph.nodes.length <= 1) {
     return { document, success: false, message: "无连接节点" }
   }
 
-  // 2. 记录 group 的初始子节点
-  const groupChildren = recordGroupChildren(document, subgraph.nodes)
+  // 2. 推断主方向
+  const direction = options.primaryDirection ?? inferDirection(entryNodeId, subgraph.edges)
 
-  // 3. 推断主方向
-  const direction = options.primaryDirection ?? inferDirection(selectedNodeId, subgraph.edges)
+  // 3. 分层
+  const layers = assignLayers(subgraph, entryNodeId)
 
-  // 4. 分层
-  const layers = assignLayers(subgraph, selectedNodeId)
-
-  // 5. 层内排序（减少交叉）
+  // 4. 层内排序（减少交叉）
   const orderedLayers = reduceCrossings(layers, subgraph.edges)
 
-  // 6. 计算坐标
+  // 5. 计算坐标
   const positions = computePositions(orderedLayers, direction, layerGap, nodeGap)
 
-  // 7. 应用位置到文档
-  let updatedDoc = applyPositions(document, positions)
+  // 6. 应用位置到文档（group 内节点随 group 整体移动）
+  let updatedDoc = applyPositions(document, positions, groupPadding)
 
-  // 8. 调整 group 大小以包含初始子节点
-  updatedDoc = adjustGroups(updatedDoc, groupChildren, groupPadding)
-
-  // 9. 重叠修正（与文档中其他节点）
+  // 7. 重叠修正（将整个子图作为整体平移，避免与其他连通分量重叠）
   updatedDoc = resolveOverlaps(updatedDoc, subgraph.nodes, direction, maxOverlapFixAttempts)
 
   return { document: updatedDoc, success: true }
@@ -94,19 +91,68 @@ export function relayoutConnectedNodes(
 
 // ─── Connected Subgraph Extraction ────────────────────────────────────────────
 
+/**
+ * 如果 nodeId 在某个 group 内，返回该 group 的 ID。
+ */
+function findParentGroup(document: CanvasDocument, nodeId: string): string | undefined {
+  const groups = document.nodes.filter(
+    (n): n is CanvasGroupNode => n.type === "group",
+  )
+  for (const group of groups) {
+    const children = findCanvasNodesInGroup(document, group.id)
+    if (children.includes(nodeId)) {
+      return group.id
+    }
+  }
+  return undefined
+}
+
+/**
+ * 提取连通子图。Group 内的节点折叠为 group 超级节点：
+ * - group 的 children 不单独出现在子图中
+ * - 指向 group 内任意节点的边重定向到 group
+ * - group 以其包围盒（含 padding）作为节点尺寸参与布局
+ */
 function extractConnectedSubgraph(document: CanvasDocument, selectedNodeId: string): Subgraph {
   const nodeMap = new Map(document.nodes.map(n => [n.id, n]))
-  const adjacency = buildAdjacencyList(document.edges)
 
-  // BFS to find all reachable nodes (undirected traversal)
+  // 建立 group children 映射：childId → groupId
+  const childToGroup = new Map<string, string>()
+  const groupNodes = document.nodes.filter(
+    (n): n is CanvasGroupNode => n.type === "group",
+  )
+  for (const group of groupNodes) {
+    const children = findCanvasNodesInGroup(document, group.id)
+    for (const childId of children) {
+      childToGroup.set(childId, group.id)
+    }
+  }
+
+  // 将 nodeId 映射到其 group（如果有）
+  function resolveEndpoint(nodeId: string): string {
+    return childToGroup.get(nodeId) ?? nodeId
+  }
+
+  // 建立邻接表（group 内节点的边重定向到 group）
+  const adjacency = new Map<string, string[]>()
+  for (const edge of document.edges) {
+    const from = resolveEndpoint(edge.fromNode)
+    const to = resolveEndpoint(edge.toNode)
+    if (from === to) continue // group 内部边，忽略
+    if (!adjacency.has(from)) adjacency.set(from, [])
+    if (!adjacency.has(to)) adjacency.set(to, [])
+    adjacency.get(from)!.push(to)
+    adjacency.get(to)!.push(from)
+  }
+
+  // BFS
   const visited = new Set<string>()
   const queue = [selectedNodeId]
   visited.add(selectedNodeId)
 
   while (queue.length > 0) {
     const current = queue.shift()!
-    const neighbors = adjacency.get(current) ?? []
-    for (const neighbor of neighbors) {
+    for (const neighbor of adjacency.get(current) ?? []) {
       if (!visited.has(neighbor)) {
         visited.add(neighbor)
         queue.push(neighbor)
@@ -114,20 +160,60 @@ function extractConnectedSubgraph(document: CanvasDocument, selectedNodeId: stri
     }
   }
 
-  // Collect nodes
+  // 构建节点列表
+  const groupPadding = 24
   const nodes: CanvasNode[] = []
+
   for (const id of visited) {
     const node = nodeMap.get(id)
-    if (node) {
+    if (!node) continue
+
+    if (node.type === "group") {
+      // 用 group 的 children 包围盒 + padding 作为超级节点尺寸
+      const children = findCanvasNodesInGroup(document, id)
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (const childId of children) {
+        const child = nodeMap.get(childId)
+        if (!child) continue
+        minX = Math.min(minX, child.x)
+        minY = Math.min(minY, child.y)
+        maxX = Math.max(maxX, child.x + child.width)
+        maxY = Math.max(maxY, child.y + child.height)
+      }
+
+      if (minX !== Infinity) {
+        nodes.push({
+          ...node,
+          x: minX - groupPadding,
+          y: minY - groupPadding,
+          width: (maxX - minX) + groupPadding * 2,
+          height: (maxY - minY) + groupPadding * 2,
+        })
+      }
+      else {
+        nodes.push(node)
+      }
+    }
+    else {
       nodes.push(node)
     }
   }
 
-  // Collect edges between these nodes
+  // 构建边列表（重定向到 group）
   const nodeIds = new Set(visited)
-  const edges = document.edges.filter(
-    e => nodeIds.has(e.fromNode) && nodeIds.has(e.toNode),
-  )
+  const seenEdges = new Set<string>()
+  const edges: CanvasEdge[] = []
+
+  for (const edge of document.edges) {
+    const from = resolveEndpoint(edge.fromNode)
+    const to = resolveEndpoint(edge.toNode)
+    if (from === to) continue
+    if (!nodeIds.has(from) || !nodeIds.has(to)) continue
+    const key = `${from}->${to}`
+    if (seenEdges.has(key)) continue
+    seenEdges.add(key)
+    edges.push({ ...edge, fromNode: from, toNode: to })
+  }
 
   return { nodes, edges }
 }
@@ -363,110 +449,66 @@ function computePositions(
 
 // ─── Apply Positions ──────────────────────────────────────────────────────────
 
+/**
+ * 应用新位置到文档。对于 group 节点，同时移动其所有内部节点，
+ * 保持相对位置不变。
+ */
 function applyPositions(
   document: CanvasDocument,
   positions: Map<string, { x: number, y: number }>,
+  groupPadding: number,
 ): CanvasDocument {
   if (positions.size === 0) {
     return document
   }
 
+  // 建立 group children 映射
+  const groupChildrenMap = new Map<string, string[]>()
+  for (const node of document.nodes) {
+    if (node.type === "group") {
+      groupChildrenMap.set(node.id, findCanvasNodesInGroup(document, node.id))
+    }
+  }
+
+  // 收集属于某个 group 的子节点 ID（这些节点随 group 移动，不单独处理）
+  const groupedChildIds = new Set<string>()
+  for (const childIds of groupChildrenMap.values()) {
+    for (const id of childIds) {
+      groupedChildIds.add(id)
+    }
+  }
+
+  // 记录每个 group 的位移量
+  const groupDeltas = new Map<string, { dx: number, dy: number }>()
+  for (const node of document.nodes) {
+    if (node.type === "group") {
+      const pos = positions.get(node.id)
+      if (pos) {
+        groupDeltas.set(node.id, { dx: pos.x - node.x, dy: pos.y - node.y })
+      }
+    }
+  }
+
   return {
     ...document,
     nodes: document.nodes.map((node) => {
-      const pos = positions.get(node.id)
-      if (!pos) {
+      // group 子节点：随 group 整体移动
+      const parentId = [...groupChildrenMap.entries()]
+        .find(([, children]) => children.includes(node.id))?.[0]
+      if (parentId && parentId !== node.id) {
+        const delta = groupDeltas.get(parentId)
+        if (delta) {
+          return { ...node, x: node.x + delta.dx, y: node.y + delta.dy }
+        }
         return node
       }
 
-      return {
-        ...node,
-        x: pos.x,
-        y: pos.y,
-      }
+      // 普通节点或 group 节点本身
+      const pos = positions.get(node.id)
+      if (!pos) return node
+      return { ...node, x: pos.x, y: pos.y }
     }),
   }
-}
-
-// ─── Group Adjustment ─────────────────────────────────────────────────────────
-
-interface GroupChildRecord {
-  groupId: string
-  childNodeIds: string[]
-}
-
-function recordGroupChildren(
-  document: CanvasDocument,
-  subgraphNodes: CanvasNode[],
-): GroupChildRecord[] {
-  const subgraphIds = new Set(subgraphNodes.map(n => n.id))
-  const groups = document.nodes.filter(
-    (n): n is CanvasGroupNode => n.type === "group",
-  )
-
-  const records: GroupChildRecord[] = []
-
-  for (const group of groups) {
-    const childIds = findCanvasNodesInGroup(document, group.id)
-    // Only care about groups that contain subgraph nodes
-    const relevantChildren = childIds.filter(id => subgraphIds.has(id))
-    if (relevantChildren.length > 0) {
-      records.push({ groupId: group.id, childNodeIds: childIds })
-    }
-  }
-
-  return records
-}
-
-function adjustGroups(
-  document: CanvasDocument,
-  groupChildren: GroupChildRecord[],
-  groupPadding: number,
-): CanvasDocument {
-  if (groupChildren.length === 0) {
-    return document
-  }
-
-  const nodeMap = new Map(document.nodes.map(n => [n.id, n]))
-  let result = document
-
-  for (const record of groupChildren) {
-    const group = nodeMap.get(record.groupId) as CanvasGroupNode | undefined
-    if (!group || group.type !== "group") continue
-
-    // Calculate bounding box of all original children
-    let minX = Infinity
-    let minY = Infinity
-    let maxX = -Infinity
-    let maxY = -Infinity
-
-    for (const childId of record.childNodeIds) {
-      const child = nodeMap.get(childId)
-      if (!child) continue
-      minX = Math.min(minX, child.x)
-      minY = Math.min(minY, child.y)
-      maxX = Math.max(maxX, child.x + child.width)
-      maxY = Math.max(maxY, child.y + child.height)
-    }
-
-    if (minX === Infinity) continue
-
-    // Expand group to contain all children with padding
-    const newGroup: CanvasGroupNode = {
-      ...group,
-      x: minX - groupPadding,
-      y: minY - groupPadding,
-      width: (maxX - minX) + groupPadding * 2,
-      height: (maxY - minY) + groupPadding * 2,
-    }
-
-    result = {
-      ...result,
-      nodes: result.nodes.map(n => n.id === group.id ? newGroup : n),
-    }
-  }
-
-  return result
 }
 
 // ─── Overlap Resolution ───────────────────────────────────────────────────────
@@ -544,10 +586,20 @@ function resolveOverlaps(
     return document
   }
 
+  // 收集 group 内部节点 ID（随 group 一起移动）
+  const groupInternalIds = new Set<string>()
+  for (const node of document.nodes) {
+    if (node.type === "group" && subgraphIds.has(node.id)) {
+      for (const childId of findCanvasNodesInGroup(document, node.id)) {
+        groupInternalIds.add(childId)
+      }
+    }
+  }
+
   return {
     ...document,
     nodes: document.nodes.map((node) => {
-      if (!subgraphIds.has(node.id)) return node
+      if (!subgraphIds.has(node.id) && !groupInternalIds.has(node.id)) return node
       return { ...node, x: node.x + offsetX, y: node.y + offsetY }
     }),
   }
