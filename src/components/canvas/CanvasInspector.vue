@@ -140,10 +140,18 @@
         </div>
         <div class="node-edge-item__info">
           <span class="node-edge-item__direction">{{ edgeInfo.direction === 'outgoing' ? '→' : '←' }}</span>
-          <span
+          <button
             class="node-edge-item__node"
+            type="button"
             :title="edgeInfo.connectedNodeTitle"
-          >{{ edgeInfo.connectedNodeTitle }}</span>
+            @click="focusConnectedNode(edgeInfo.connectedNodeId)"
+          >{{ edgeInfo.connectedNodeTitle }}</button>
+          <button
+            class="node-edge-item__focus"
+            type="button"
+            :title="t('inspectorFocusNode')"
+            @click="focusConnectedNode(edgeInfo.connectedNodeId)"
+          >⊙</button>
           <span
             v-if="edgeInfo.edge.label"
             class="node-edge-item__label"
@@ -409,6 +417,7 @@ interface NodeEdgeInfo {
   edge: any
   localSide: string
   direction: 'incoming' | 'outgoing'
+  connectedNodeId: string
   connectedNodeTitle: string
 }
 
@@ -708,6 +717,11 @@ function applyDraft(): void {
   props.editor.applySelectedNodeChanges(fields)
 }
 
+function focusConnectedNode(nodeId: string): void {
+  props.editor.selectNode(nodeId)
+  props.editor.centerSelectionInViewport()
+}
+
 function getSectionChevron(section: keyof typeof props.editor.inspectorSectionState): string {
   return props.editor.inspectorSectionState[section] ? "−" : "+"
 }
@@ -972,11 +986,42 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .node-edge-item__node {
   flex: 1 1 0;
   min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
   font-size: 12px;
-  color: var(--canvas-text);
+  color: var(--canvas-accent);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  text-align: left;
+}
+
+.node-edge-item__node:hover {
+  text-decoration: underline;
+}
+
+.node-edge-item__focus {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--canvas-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.node-edge-item__focus:hover {
+  background: var(--canvas-floating-button-bg-hover);
+  color: var(--canvas-accent);
 }
 
 .node-edge-item__label {

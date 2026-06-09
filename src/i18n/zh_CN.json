@@ -143,6 +143,7 @@
   "fieldSelectSourceNode": "选择起始节点",
   "fieldSearchNodePlaceholder": "输入关键词搜索节点",
   "fieldNoMatchingNodes": "没有匹配的节点",
+  "inspectorFocusNode": "聚焦节点",
   "inspectorNodeEdges": "连线信息",
   "nodeEdgeNone": "暂无连线",
   "nodeEdgeFrom": "起点",

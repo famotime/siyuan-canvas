@@ -143,6 +143,7 @@
   "fieldSelectSourceNode": "Select source node",
   "fieldSearchNodePlaceholder": "Type keywords to search nodes",
   "fieldNoMatchingNodes": "No matching nodes",
+  "inspectorFocusNode": "Focus node",
   "inspectorNodeEdges": "Edge Connections",
   "nodeEdgeNone": "No connections",
   "nodeEdgeFrom": "From",
