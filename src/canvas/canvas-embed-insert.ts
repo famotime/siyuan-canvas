@@ -1,25 +1,39 @@
 import {
   appendBlock,
   setBlockAttrs,
+  upload,
   updateBlock,
 } from "@/api"
-import { generateCanvasEmbedDataUrl } from "@/canvas/canvas-embed-preview"
+import { generateCanvasEmbedSvg } from "@/canvas/canvas-embed-preview"
 import { parseCanvasDocument } from "@/canvas/format"
 
 export const CANVAS_EMBED_CLASS = "canvas-embed-preview"
 export const CANVAS_EMBED_BOUND_ATTR = "data-canvas-embed-bound"
 export const CANVAS_PATH_ATTR = "custom-canvas-path"
 
-export function buildCanvasEmbedHtml(canvasPath: string, dataUrl: string, title: string): string {
-  const escapedPath = canvasPath.replace(/"/g, "&quot;")
-  const escapedTitle = title.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+function escapeMarkdownImageAlt(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/]/g, "\\]")
+}
 
-  return `<!-- canvas-embed -->
-<div class="${CANVAS_EMBED_CLASS}" data-canvas-path="${escapedPath}">
-  <img src="${dataUrl}" alt="${escapedTitle}" style="max-width:100%;border-radius:6px;" />
-  <span class="canvas-embed-badge">Canvas</span>
-  <span class="canvas-embed-title">${escapedTitle}</span>
-</div>`
+function sanitizePreviewAssetName(value: string): string {
+  return (value || "canvas-preview")
+    .replace(/[\\/:*?"'<>|]/g, "_")
+    .replace(/[\x00-\x1f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\.+$/, "")
+    || "canvas-preview"
+}
+
+async function uploadCanvasEmbedPreview(svg: string, title: string): Promise<string | null> {
+  const fileName = `${sanitizePreviewAssetName(title)}.svg`
+  const file = new File([svg], fileName, { type: "image/svg+xml" })
+  const result = await upload("/assets/", [file])
+  return result?.succMap?.[fileName] || null
+}
+
+export function buildCanvasEmbedMarkdown(_canvasPath: string, imagePath: string, title: string): string {
+  return `![${escapeMarkdownImageAlt(title)}](${imagePath})`
 }
 
 export interface InsertCanvasEmbedOptions {
@@ -42,15 +56,19 @@ export async function insertCanvasEmbed(options: InsertCanvasEmbedOptions): Prom
     return null
   }
 
-  const dataUrl = generateCanvasEmbedDataUrl(result.document)
-  if (!dataUrl) {
+  const svg = generateCanvasEmbedSvg(result.document)
+  if (!svg) {
     return null
   }
 
   const embedTitle = title || canvasPath.replace(/^.*\//, "").replace(/\.canvas$/i, "")
-  const html = buildCanvasEmbedHtml(canvasPath, dataUrl, embedTitle)
+  const imagePath = await uploadCanvasEmbedPreview(svg, embedTitle)
+  if (!imagePath) {
+    return null
+  }
+  const markdown = buildCanvasEmbedMarkdown(canvasPath, imagePath, embedTitle)
 
-  const ops = await appendBlock("dom", html, parentBlockId)
+  const ops = await appendBlock("markdown", markdown, parentBlockId)
   if (!ops || ops.length === 0) {
     return null
   }
@@ -74,13 +92,18 @@ export async function refreshCanvasEmbedBlock(
     return false
   }
 
-  const dataUrl = generateCanvasEmbedDataUrl(result.document)
-  if (!dataUrl) {
+  const svg = generateCanvasEmbedSvg(result.document)
+  if (!svg) {
     return false
   }
 
   const embedTitle = title || canvasPath.replace(/^.*\//, "").replace(/\.canvas$/i, "")
-  await updateBlock("dom", buildCanvasEmbedHtml(canvasPath, dataUrl, embedTitle), blockId)
+  const imagePath = await uploadCanvasEmbedPreview(svg, embedTitle)
+  if (!imagePath) {
+    return false
+  }
+
+  await updateBlock("markdown", buildCanvasEmbedMarkdown(canvasPath, imagePath, embedTitle), blockId)
   await setBlockAttrs(blockId, { [CANVAS_PATH_ATTR]: canvasPath })
 
   return true

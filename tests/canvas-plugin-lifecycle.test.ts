@@ -347,6 +347,17 @@ describe("canvas plugin lifecycle", () => {
     dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/大三元1.canvas " })
     fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
     fetchSyncPost.mockImplementation(async (url: string, data: { path?: string }) => {
+      if (url === "/api/asset/upload") {
+        return {
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "大三元1.svg": "assets/大三元1-preview.svg",
+            },
+          },
+        }
+      }
       if (url === "/api/block/appendBlock") {
         return {
           code: 0,
@@ -378,8 +389,10 @@ describe("canvas plugin lifecycle", () => {
       body: JSON.stringify({ path: "/data/storage/petal/siyuan-canvas/大三元1.canvas" }),
       method: "POST",
     }))
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/asset/upload", expect.any(FormData))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/appendBlock", expect.objectContaining({
-      dataType: "dom",
+      data: "![大三元1](assets/大三元1-preview.svg)",
+      dataType: "markdown",
       parentID: "20260608194800-docid",
     }))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/setBlockAttrs", {
@@ -407,6 +420,17 @@ describe("canvas plugin lifecycle", () => {
     dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/active.canvas" })
     fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
     fetchSyncPost.mockImplementation(async (url: string) => {
+      if (url === "/api/asset/upload") {
+        return {
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "active.svg": "assets/active-preview.svg",
+            },
+          },
+        }
+      }
       if (url === "/api/block/appendBlock") {
         return {
           code: 0,
@@ -464,6 +488,17 @@ describe("canvas plugin lifecycle", () => {
     dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/editor-list.canvas" })
     fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
     fetchSyncPost.mockImplementation(async (url: string) => {
+      if (url === "/api/asset/upload") {
+        return {
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "editor-list.svg": "assets/editor-list-preview.svg",
+            },
+          },
+        }
+      }
       if (url === "/api/block/appendBlock") {
         return {
           code: 0,

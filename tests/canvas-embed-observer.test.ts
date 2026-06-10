@@ -191,6 +191,17 @@ describe("canvas embed observer", () => {
     `
     fetchMock.mockResolvedValue(new Response(createCanvasRaw("updated preview"), { status: 200 }))
     fetchSyncPost.mockImplementation(async (url: string) => {
+      if (url === "/api/asset/upload") {
+        return {
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "a.svg": "assets/a-preview.svg",
+            },
+          },
+        }
+      }
       if (url === "/api/query/sql") {
         return {
           code: 0,
@@ -227,11 +238,13 @@ describe("canvas embed observer", () => {
     expect(image?.getAttribute("src")).toContain("data:image/svg+xml;base64,")
     const otherImage = document.querySelector<HTMLElement>('[data-node-id="embed-2"] .canvas-embed-preview img')
     expect(otherImage?.getAttribute("src")).toBe("old-other-preview")
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/asset/upload", expect.any(FormData))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
-      data: expect.stringContaining("data:image/svg+xml;base64,"),
-      dataType: "dom",
+      data: "![a](assets/a-preview.svg)",
+      dataType: "markdown",
       id: "embed-1",
     }))
+    expect(fetchSyncPost).not.toHaveBeenCalledWith("/api/lute/spinBlockDOM", expect.anything())
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/setBlockAttrs", {
       attrs: { "custom-canvas-path": "/data/storage/petal/siyuan-canvas/a.canvas" },
       id: "embed-1",
@@ -245,6 +258,17 @@ describe("canvas embed observer", () => {
     const reload = vi.fn()
     fetchMock.mockResolvedValue(new Response(createCanvasRaw("updated from attr"), { status: 200 }))
     fetchSyncPost.mockImplementation(async (url: string, data: { stmt?: string }) => {
+      if (url === "/api/asset/upload") {
+        return {
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "a.svg": "assets/a-preview.svg",
+            },
+          },
+        }
+      }
       if (url === "/api/query/sql") {
         return {
           code: 0,
@@ -293,8 +317,8 @@ describe("canvas embed observer", () => {
       stmt: expect.stringContaining("/data/storage/petal/siyuan-canvas/a.canvas"),
     }))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
-      data: expect.stringContaining("data:image/svg+xml;base64,"),
-      dataType: "dom",
+      data: "![a](assets/a-preview.svg)",
+      dataType: "markdown",
       id: "embed-from-attr",
     }))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/setBlockAttrs", {
@@ -318,6 +342,17 @@ describe("canvas embed observer", () => {
     `)
     fetchMock.mockResolvedValue(new Response(createCanvasRaw("updated iframe preview"), { status: 200 }))
     fetchSyncPost.mockImplementation(async (url: string) => {
+      if (url === "/api/asset/upload") {
+        return {
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "a.svg": "assets/a-preview.svg",
+            },
+          },
+        }
+      }
       if (url === "/api/query/sql") {
         return {
           code: 0,
@@ -349,8 +384,8 @@ describe("canvas embed observer", () => {
     const image = iframe.contentDocument?.querySelector<HTMLImageElement>(".canvas-embed-preview img")
     expect(image?.getAttribute("src")).toContain("data:image/svg+xml;base64,")
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
-      data: expect.stringContaining("data:image/svg+xml;base64,"),
-      dataType: "dom",
+      data: "![a](assets/a-preview.svg)",
+      dataType: "markdown",
       id: "embed-html",
     }))
   })
