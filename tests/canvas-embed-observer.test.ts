@@ -1,15 +1,21 @@
 /* @vitest-environment jsdom */
 
+import type { ModuleExports } from "vitest"
 import {
   readFileSync,
 } from "node:fs"
 import { createRequire } from "node:module"
+
 import {
   dirname,
   extname,
   resolve,
 } from "node:path"
-
+import {
+  ModuleKind,
+  ScriptTarget,
+  transpileModule,
+} from "typescript"
 import {
   beforeAll,
   beforeEach,
@@ -18,12 +24,6 @@ import {
   it,
   vi,
 } from "vitest"
-import {
-  ModuleKind,
-  ScriptTarget,
-  transpileModule,
-} from "typescript"
-import type { ModuleExports } from "vitest"
 
 const openTab = vi.fn()
 const fetchSyncPost = vi.fn()
@@ -192,13 +192,22 @@ describe("canvas embed observer", () => {
     fetchMock.mockResolvedValue(new Response(createCanvasRaw("updated preview"), { status: 200 }))
     fetchSyncPost.mockImplementation(async (url: string) => {
       if (url === "/api/query/sql") {
-        return { code: 0, data: [] }
+        return {
+          code: 0,
+          data: [],
+        }
       }
       if (url === "/api/block/updateBlock") {
-        return { code: 0, data: null }
+        return {
+          code: 0,
+          data: null,
+        }
       }
       if (url === "/api/attr/setBlockAttrs") {
-        return { code: 0, data: null }
+        return {
+          code: 0,
+          data: null,
+        }
       }
       throw new Error(`Unexpected request ${url}`)
     })
@@ -208,7 +217,7 @@ describe("canvas embed observer", () => {
     window.dispatchEvent(new CustomEvent("siyuan-canvas-embed-refresh", {
       detail: { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchMock).toHaveBeenCalledWith("/api/file/getFile", expect.objectContaining({
       body: JSON.stringify({ path: "/data/storage/petal/siyuan-canvas/a.canvas" }),
@@ -218,6 +227,15 @@ describe("canvas embed observer", () => {
     expect(image?.getAttribute("src")).toContain("data:image/svg+xml;base64,")
     const otherImage = document.querySelector<HTMLElement>('[data-node-id="embed-2"] .canvas-embed-preview img')
     expect(otherImage?.getAttribute("src")).toBe("old-other-preview")
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
+      data: expect.stringContaining("data:image/svg+xml;base64,"),
+      dataType: "dom",
+      id: "embed-1",
+    }))
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/setBlockAttrs", {
+      attrs: { "custom-canvas-path": "/data/storage/petal/siyuan-canvas/a.canvas" },
+      id: "embed-1",
+    })
     expect(fetchSyncPost).not.toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
       id: "embed-2",
     }))
@@ -231,15 +249,24 @@ describe("canvas embed observer", () => {
         return {
           code: 0,
           data: [
-            { block_id: "embed-from-attr", root_id: "20260608204514-rootdoc" },
+            {
+              block_id: "embed-from-attr",
+              root_id: "20260608204514-rootdoc",
+            },
           ],
         }
       }
       if (url === "/api/block/updateBlock") {
-        return { code: 0, data: null }
+        return {
+          code: 0,
+          data: null,
+        }
       }
       if (url === "/api/attr/setBlockAttrs") {
-        return { code: 0, data: null }
+        return {
+          code: 0,
+          data: null,
+        }
       }
       throw new Error(`Unexpected request ${url} ${JSON.stringify(data)}`)
     })
@@ -257,7 +284,7 @@ describe("canvas embed observer", () => {
     window.dispatchEvent(new CustomEvent("siyuan-canvas-embed-refresh", {
       detail: { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/query/sql", expect.objectContaining({
       stmt: expect.stringContaining("custom-canvas-path"),
@@ -265,8 +292,67 @@ describe("canvas embed observer", () => {
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/query/sql", expect.objectContaining({
       stmt: expect.stringContaining("/data/storage/petal/siyuan-canvas/a.canvas"),
     }))
-    expect(fetchSyncPost).not.toHaveBeenCalledWith("/api/block/updateBlock", expect.anything())
-    expect(reload).not.toHaveBeenCalled()
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
+      data: expect.stringContaining("data:image/svg+xml;base64,"),
+      dataType: "dom",
+      id: "embed-from-attr",
+    }))
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/setBlockAttrs", {
+      attrs: { "custom-canvas-path": "/data/storage/petal/siyuan-canvas/a.canvas" },
+      id: "embed-from-attr",
+    })
+    expect(reload).toHaveBeenCalledOnce()
+  })
+
+  it("refreshes visible embed images rendered inside HTML block iframes", async () => {
+    document.body.innerHTML = `
+      <div data-node-id="embed-html">
+        <iframe></iframe>
+      </div>
+    `
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement
+    iframe.contentDocument?.body.insertAdjacentHTML("beforeend", `
+      <div class="canvas-embed-preview" data-canvas-path="//data/storage/petal/siyuan-canvas/a.canvas">
+        <img src="old-iframe-preview" alt="Canvas" />
+      </div>
+    `)
+    fetchMock.mockResolvedValue(new Response(createCanvasRaw("updated iframe preview"), { status: 200 }))
+    fetchSyncPost.mockImplementation(async (url: string) => {
+      if (url === "/api/query/sql") {
+        return {
+          code: 0,
+          data: [],
+        }
+      }
+      if (url === "/api/block/updateBlock") {
+        return {
+          code: 0,
+          data: null,
+        }
+      }
+      if (url === "/api/attr/setBlockAttrs") {
+        return {
+          code: 0,
+          data: null,
+        }
+      }
+      throw new Error(`Unexpected request ${url}`)
+    })
+
+    embedObserver.startCanvasEmbedObserver({} as any, "siyuan-canvas")
+
+    window.dispatchEvent(new CustomEvent("siyuan-canvas-embed-refresh", {
+      detail: { path: "/data/storage/petal/siyuan-canvas/a.canvas" },
+    }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const image = iframe.contentDocument?.querySelector<HTMLImageElement>(".canvas-embed-preview img")
+    expect(image?.getAttribute("src")).toContain("data:image/svg+xml;base64,")
+    expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
+      data: expect.stringContaining("data:image/svg+xml;base64,"),
+      dataType: "dom",
+      id: "embed-html",
+    }))
   })
 
   it("opens a canvas from a reloaded image block by reading the custom canvas path attribute", async () => {
@@ -294,7 +380,7 @@ describe("canvas embed observer", () => {
       bubbles: true,
       cancelable: true,
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/getBlockAttrs", {
       id: "embed-reloaded",
@@ -331,7 +417,7 @@ describe("canvas embed observer", () => {
       bubbles: true,
       cancelable: true,
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/getBlockAttrs", {
       id: "embed-without-attr",
@@ -374,7 +460,7 @@ describe("canvas embed observer", () => {
       bubbles: true,
       cancelable: true,
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/getBlockAttrs", {
       id: "embed-html",
@@ -406,7 +492,7 @@ describe("canvas embed observer", () => {
       bubbles: true,
       cancelable: true,
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchSyncPost).not.toHaveBeenCalledWith("/api/attr/getBlockAttrs", expect.anything())
     expect(openTab).toHaveBeenCalledWith(
@@ -434,7 +520,7 @@ describe("canvas embed observer", () => {
       bubbles: true,
       cancelable: true,
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(openTab).toHaveBeenCalledWith(
       { app: "app" },
@@ -458,13 +544,13 @@ describe("canvas embed observer", () => {
     `)
 
     embedObserver.startCanvasEmbedObserver({ app: "app" } as any, "siyuan-canvas")
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     document.querySelector<HTMLElement>('[data-canvas-embed-iframe-overlay="true"]')?.dispatchEvent(new MouseEvent("click", {
       bubbles: true,
       cancelable: true,
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(openTab).toHaveBeenCalledWith(
       { app: "app" },
@@ -487,7 +573,7 @@ describe("canvas embed observer", () => {
       bubbles: true,
       cancelable: true,
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchSyncPost).not.toHaveBeenCalledWith("/api/attr/getBlockAttrs", expect.anything())
     expect(openTab).toHaveBeenCalledWith(
@@ -517,13 +603,13 @@ describe("canvas embed observer", () => {
     })
 
     embedObserver.startCanvasEmbedObserver({ app: "app" } as any, "siyuan-canvas")
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     document.querySelector<HTMLElement>('[data-canvas-embed-iframe-overlay="true"]')?.dispatchEvent(new MouseEvent("click", {
       bubbles: true,
       cancelable: true,
     }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/attr/getBlockAttrs", {
       id: "embed-html-overlay",

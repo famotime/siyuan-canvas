@@ -1,10 +1,20 @@
 import type { Plugin } from "siyuan"
-import { CANVAS_EMBED_BOUND_ATTR, CANVAS_EMBED_CLASS } from "@/canvas/canvas-embed-insert"
-import { CANVAS_EMBED_REFRESH_EVENT, type CanvasEmbedRefreshEventDetail } from "@/canvas/canvas-embed-events"
-import { openCanvasEditorTab } from "@/canvas/plugin-tabs"
-import { getBlockAttrs, getFileText, sql } from "@/api"
-import { parseCanvasDocument } from "@/canvas/format"
+import type { CanvasEmbedRefreshEventDetail } from "@/canvas/canvas-embed-events"
+import { getAllEditor } from "siyuan"
+import {
+  getBlockAttrs,
+  getFileText,
+  sql,
+} from "@/api"
+import { CANVAS_EMBED_REFRESH_EVENT } from "@/canvas/canvas-embed-events"
+import {
+  CANVAS_EMBED_BOUND_ATTR,
+  CANVAS_EMBED_CLASS,
+  refreshCanvasEmbedBlock,
+} from "@/canvas/canvas-embed-insert"
 import { generateCanvasEmbedDataUrl } from "@/canvas/canvas-embed-preview"
+import { parseCanvasDocument } from "@/canvas/format"
+import { openCanvasEditorTab } from "@/canvas/plugin-tabs"
 
 let observer: MutationObserver | null = null
 let refreshListener: ((event: Event) => void) | null = null
@@ -60,7 +70,10 @@ async function getCanvasPathFromBlockAttrs(blockId: string): Promise<string> {
     const attrs = await getBlockAttrs(blockId)
     const canvasPath = normalizeCanvasPath(attrs?.["custom-canvas-path"] || "")
     if (!canvasPath) {
-      debugCanvasEmbed("open canvas embed: missing custom canvas path", { attrs, blockId })
+      debugCanvasEmbed("open canvas embed: missing custom canvas path", {
+        attrs,
+        blockId,
+      })
     }
     return canvasPath
   } catch {
@@ -134,7 +147,10 @@ async function openCanvasFromBlockId(event: MouseEvent, blockId: string, plugin:
   const canvasPath = await getCanvasPathFromBlockAttrs(blockId)
   if (!canvasPath) return
 
-  debugCanvasEmbed("open canvas embed", { blockId, path: canvasPath })
+  debugCanvasEmbed("open canvas embed", {
+    blockId,
+    path: canvasPath,
+  })
   event.preventDefault()
   event.stopPropagation()
   void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
@@ -150,7 +166,10 @@ async function openCanvasFromBlockIdOrPath(
   const canvasPathFromBlock = blockId ? await getCanvasPathFromBlockAttrs(blockId) : ""
   const canvasPath = canvasPathFromBlock || normalizeCanvasPath(fallbackCanvasPath)
   if (!canvasPath) {
-    debugCanvasEmbed("open canvas embed: missing canvas path", { blockId, hasFallbackPath: Boolean(fallbackCanvasPath) })
+    debugCanvasEmbed("open canvas embed: missing canvas path", {
+      blockId,
+      hasFallbackPath: Boolean(fallbackCanvasPath),
+    })
     return
   }
 
@@ -225,11 +244,17 @@ async function ensureIframeClickOverlay(
   overlay.style.cursor = "pointer"
   overlay.style.background = "transparent"
   overlay.addEventListener("click", (event) => {
-    debugCanvasEmbed("iframe canvas embed overlay clicked", { blockId, path: canvasPath })
+    debugCanvasEmbed("iframe canvas embed overlay clicked", {
+      blockId,
+      path: canvasPath,
+    })
     openCanvasFromPath(event, canvasPath, plugin, pluginName)
   }, true)
   host.appendChild(overlay)
-  debugCanvasEmbed("created iframe canvas embed overlay", { blockId, path: canvasPath })
+  debugCanvasEmbed("created iframe canvas embed overlay", {
+    blockId,
+    path: canvasPath,
+  })
 }
 
 function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, pluginName: string) {
@@ -302,6 +327,11 @@ interface CanvasEmbedBlockRef {
   rootId: string
 }
 
+interface VisibleCanvasEmbedRef {
+  blockId: string
+  element: HTMLElement
+}
+
 function escapeSqlString(value: string): string {
   return value.replace(/'/g, "''")
 }
@@ -317,53 +347,122 @@ async function findCanvasEmbedBlockRefsByPath(path: string): Promise<CanvasEmbed
   }
 
   return (rows || [])
-    .map(row => ({
+    .map((row) => ({
       blockId: row.block_id || "",
       rootId: row.root_id || "",
     }))
-    .filter(row => Boolean(row.blockId))
+    .filter((row) => Boolean(row.blockId))
+}
+
+function collectVisibleCanvasEmbedsByPath(path: string): VisibleCanvasEmbedRef[] {
+  const normalizedPath = normalizeCanvasPath(path)
+  const topLevelEmbeds = [...document.querySelectorAll<HTMLElement>(`.${CANVAS_EMBED_CLASS}`)]
+    .filter((element) => normalizeCanvasPath(element.dataset.canvasPath || "") === normalizedPath)
+    .map((element) => ({
+      blockId: findCanvasEmbedBlockId(element),
+      element,
+    }))
+
+  const iframeEmbeds = [...document.querySelectorAll<HTMLIFrameElement>("iframe")]
+    .flatMap((iframe) => {
+      const iframeDocument = iframe.contentDocument
+      if (!iframeDocument) return []
+
+      const blockId = iframe.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
+      return [...iframeDocument.querySelectorAll<HTMLElement>(`.${CANVAS_EMBED_CLASS}`)]
+        .filter((element) => normalizeCanvasPath(element.dataset.canvasPath || "") === normalizedPath)
+        .map((element) => ({
+          blockId,
+          element,
+        }))
+    })
+
+  return [...topLevelEmbeds, ...iframeEmbeds]
+}
+
+function getCanvasEmbedTitle(element: HTMLElement): string {
+  return element.querySelector<HTMLElement>(".canvas-embed-title")?.textContent?.trim() || ""
+}
+
+function reloadOpenEditors(rootIds: Set<string>) {
+  if (rootIds.size === 0) return
+
+  for (const editor of getAllEditor?.() || []) {
+    const rootId = editor?.protyle?.block?.rootID || editor?.protyle?.block?.id || ""
+    if (!rootIds.has(rootId)) continue
+
+    editor.reload?.()
+  }
 }
 
 async function refreshCanvasEmbedsForPath(path: string) {
-  if (!path) return
+  const normalizedPath = normalizeCanvasPath(path)
+  if (!normalizedPath) return
 
-  const visibleEmbeds = [...document.querySelectorAll<HTMLElement>(`.${CANVAS_EMBED_CLASS}`)]
-    .filter(element => element.dataset.canvasPath === path)
+  const visibleEmbeds = collectVisibleCanvasEmbedsByPath(normalizedPath)
   const domBlockIds = visibleEmbeds
-    .map(findCanvasEmbedBlockId)
+    .map((ref) => ref.blockId)
     .filter(Boolean)
-  const attributeBlockRefs = await findCanvasEmbedBlockRefsByPath(path)
-  const attributeBlockIds = attributeBlockRefs.map(ref => ref.blockId)
+  const attributeBlockRefs = await findCanvasEmbedBlockRefsByPath(normalizedPath)
+  const attributeBlockIds = attributeBlockRefs.map((ref) => ref.blockId)
   const blockIds = new Set([...domBlockIds, ...attributeBlockIds])
+  const visibleEmbedByBlockId = new Map(
+    visibleEmbeds
+      .filter((ref) => ref.blockId)
+      .map((ref) => [ref.blockId, ref.element]),
+  )
 
   debugCanvasEmbed("refresh canvas embeds", {
     attributeBlockIds,
     blockIds: [...blockIds],
     domBlockIds,
-    path,
+    path: normalizedPath,
   })
 
   if (blockIds.size === 0) return
 
-  const raw = await getFileText(path)
+  const raw = await getFileText(normalizedPath)
   if (!raw) {
-    debugCanvasEmbed("refresh canvas embeds: unable to read canvas", { path })
+    debugCanvasEmbed("refresh canvas embeds: unable to read canvas", { path: normalizedPath })
     return
   }
 
   const result = parseCanvasDocument(raw)
   if (!result.document || result.errors.length > 0) {
-    debugCanvasEmbed("refresh canvas embeds: invalid canvas", { errors: result.errors, path })
+    debugCanvasEmbed("refresh canvas embeds: invalid canvas", {
+      errors: result.errors,
+      path: normalizedPath,
+    })
     return
   }
 
   const dataUrl = generateCanvasEmbedDataUrl(result.document)
   if (!dataUrl) {
-    debugCanvasEmbed("refresh canvas embeds: empty preview", { path })
+    debugCanvasEmbed("refresh canvas embeds: empty preview", { path: normalizedPath })
     return
   }
 
-  for (const element of visibleEmbeds) {
+  for (const blockId of blockIds) {
+    const visibleEmbed = visibleEmbedByBlockId.get(blockId)
+    await refreshCanvasEmbedBlock(
+      blockId,
+      normalizedPath,
+      raw,
+      visibleEmbed ? getCanvasEmbedTitle(visibleEmbed) : undefined,
+    )
+  }
+
+  const rootIdsToReload = new Set(
+    attributeBlockRefs
+      .filter((ref) => ref.rootId && !domBlockIds.includes(ref.blockId))
+      .map((ref) => ref.rootId),
+  )
+  reloadOpenEditors(rootIdsToReload)
+
+  for (const {
+    blockId,
+    element,
+  } of visibleEmbeds) {
     const image = element.querySelector<HTMLImageElement>("img")
     if (!image) {
       continue
@@ -371,8 +470,8 @@ async function refreshCanvasEmbedsForPath(path: string) {
 
     image.src = dataUrl
     debugCanvasEmbed("refresh visible canvas embed image", {
-      blockId: findCanvasEmbedBlockId(element),
-      path,
+      blockId,
+      path: normalizedPath,
     })
   }
 }

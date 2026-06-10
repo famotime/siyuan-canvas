@@ -1,13 +1,16 @@
-import type { CanvasDocument } from "@/canvas/types"
-import { appendBlock, setBlockAttrs } from "@/api"
-import { parseCanvasDocument } from "@/canvas/format"
+import {
+  appendBlock,
+  setBlockAttrs,
+  updateBlock,
+} from "@/api"
 import { generateCanvasEmbedDataUrl } from "@/canvas/canvas-embed-preview"
+import { parseCanvasDocument } from "@/canvas/format"
 
 export const CANVAS_EMBED_CLASS = "canvas-embed-preview"
 export const CANVAS_EMBED_BOUND_ATTR = "data-canvas-embed-bound"
 export const CANVAS_PATH_ATTR = "custom-canvas-path"
 
-function buildCanvasEmbedHtml(canvasPath: string, dataUrl: string, title: string): string {
+export function buildCanvasEmbedHtml(canvasPath: string, dataUrl: string, title: string): string {
   const escapedPath = canvasPath.replace(/"/g, "&quot;")
   const escapedTitle = title.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
@@ -27,7 +30,12 @@ export interface InsertCanvasEmbedOptions {
 }
 
 export async function insertCanvasEmbed(options: InsertCanvasEmbedOptions): Promise<string | null> {
-  const { canvasPath, canvasRaw, parentBlockId, title } = options
+  const {
+    canvasPath,
+    canvasRaw,
+    parentBlockId,
+    title,
+  } = options
 
   const result = parseCanvasDocument(canvasRaw)
   if (!result.document || result.errors.length > 0) {
@@ -61,9 +69,6 @@ export async function refreshCanvasEmbedBlock(
   canvasRaw: string,
   title?: string,
 ): Promise<boolean> {
-  void blockId
-  void canvasPath
-  void title
   const result = parseCanvasDocument(canvasRaw)
   if (!result.document || result.errors.length > 0) {
     return false
@@ -73,6 +78,10 @@ export async function refreshCanvasEmbedBlock(
   if (!dataUrl) {
     return false
   }
+
+  const embedTitle = title || canvasPath.replace(/^.*\//, "").replace(/\.canvas$/i, "")
+  await updateBlock("dom", buildCanvasEmbedHtml(canvasPath, dataUrl, embedTitle), blockId)
+  await setBlockAttrs(blockId, { [CANVAS_PATH_ATTR]: canvasPath })
 
   return true
 }
