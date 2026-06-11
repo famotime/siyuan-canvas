@@ -169,7 +169,11 @@
       <h2>{{ t("inspectorCreateEdge") }}</h2>
       <span>{{ getSectionChevron('createEdge') }}</span>
     </button>
-    <div v-if="editor.inspectorSectionState.createEdge">
+    <div
+      v-if="editor.inspectorSectionState.createEdge"
+      class="inspector__field-stack"
+      data-testid="inspector-create-edge-body"
+    >
       <span class="inspector__field-label">{{ t("fieldSourceNode") }}</span>
       <div
         ref="inspSourcePickerRef"
@@ -221,6 +225,16 @@
           </div>
         </div>
       </div>
+      <label>
+        {{ t("fieldFromSide") }}
+        <select v-model="editor.newEdgeFromSide">
+          <option
+            v-for="side in editor.sides"
+            :key="side"
+            :value="side"
+          >{{ getSideLabel(side) }}</option>
+        </select>
+      </label>
       <span class="inspector__field-label">{{ t("fieldTarget") }}</span>
       <div
         ref="inspTargetPickerRef"
@@ -273,20 +287,6 @@
         </div>
       </div>
       <label>
-        {{ t("fieldEdgeLabel") }}
-        <input v-model="editor.newEdgeLabel" />
-      </label>
-      <label>
-        {{ t("fieldFromSide") }}
-        <select v-model="editor.newEdgeFromSide">
-          <option
-            v-for="side in editor.sides"
-            :key="side"
-            :value="side"
-          >{{ getSideLabel(side) }}</option>
-        </select>
-      </label>
-      <label>
         {{ t("fieldToSide") }}
         <select v-model="editor.newEdgeToSide">
           <option
@@ -295,6 +295,10 @@
             :value="side"
           >{{ getSideLabel(side) }}</option>
         </select>
+      </label>
+      <label>
+        {{ t("fieldEdgeLabel") }}
+        <input v-model="editor.newEdgeLabel" />
       </label>
       <button
         class="inspector__action-button"
@@ -318,14 +322,11 @@
       <h2>{{ t("inspectorEdge") }}</h2>
       <span>{{ getSectionChevron('edge') }}</span>
     </button>
-    <div v-if="editor.inspectorSectionState.edge">
-      <label>
-        {{ t("fieldEdgeLabel") }}
-        <input
-          :value="editor.selectedEdge.label || ''"
-          @input="editor.updateEdgeField('label', valueFromEvent($event))"
-        />
-      </label>
+    <div
+      v-if="editor.inspectorSectionState.edge"
+      class="inspector__field-stack"
+      data-testid="inspector-selected-edge-body"
+    >
       <label>
         {{ t("fieldSourceNode") }}
         <button
@@ -334,15 +335,6 @@
           :title="selectedEdgeFromNodeTitle"
           @click="focusConnectedNode(editor.selectedEdge.fromNode)"
         >{{ selectedEdgeFromNodeTitle }}</button>
-      </label>
-      <label>
-        {{ t("fieldTarget") }}
-        <button
-          class="inspector__node-link"
-          type="button"
-          :title="selectedEdgeToNodeTitle"
-          @click="focusConnectedNode(editor.selectedEdge.toNode)"
-        >{{ selectedEdgeToNodeTitle }}</button>
       </label>
       <label>
         {{ t("fieldFromSide") }}
@@ -358,6 +350,15 @@
         </select>
       </label>
       <label>
+        {{ t("fieldTarget") }}
+        <button
+          class="inspector__node-link"
+          type="button"
+          :title="selectedEdgeToNodeTitle"
+          @click="focusConnectedNode(editor.selectedEdge.toNode)"
+        >{{ selectedEdgeToNodeTitle }}</button>
+      </label>
+      <label>
         {{ t("fieldToSide") }}
         <select
           :value="editor.selectedEdge.toSide"
@@ -369,6 +370,13 @@
             :value="side"
           >{{ getSideLabel(side) }}</option>
         </select>
+      </label>
+      <label>
+        {{ t("fieldEdgeLabel") }}
+        <input
+          :value="editor.selectedEdge.label || ''"
+          @input="editor.updateEdgeField('label', valueFromEvent($event))"
+        />
       </label>
     </div>
   </section>
@@ -814,6 +822,11 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   gap: 6px;
   font-size: 12px;
   color: var(--canvas-text-muted);
+}
+
+.inspector__field-stack {
+  display: grid;
+  gap: 10px;
 }
 
 .inspector__section input,

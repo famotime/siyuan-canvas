@@ -1356,8 +1356,6 @@
               v-if="editor.inspectorSectionState.document"
               data-testid="inspector-section-document-body"
             >
-              <p>{{ editor.state.filePath || t("inspectorUnsavedWorkspacePath") }}</p>
-              <p>{{ editor.state.isDirty ? t("inspectorPendingSave") : t("inspectorInSync") }}</p>
               <CanvasWorkspaceTree
                 v-if="editor.workspaceDocuments.length"
                 :workspace-documents="editor.workspaceDocuments"
@@ -1882,7 +1880,7 @@ function contextMenuCopy() {
 
 function contextMenuCopyPath() {
   closeContextMenu()
-  const filePath = `/${contextMenuPath.value}`
+  const filePath = contextMenuPath.value.startsWith('/') ? contextMenuPath.value : `/${contextMenuPath.value}`
   navigator.clipboard.writeText(filePath).then(() => {
     showMessage(t("contextMenuCopyPathSuccess"), 2000)
   })

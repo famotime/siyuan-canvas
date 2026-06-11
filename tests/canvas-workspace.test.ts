@@ -1403,6 +1403,72 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='create-edge-target-trigger']").text()).toContain("关系——情况这么复杂")
   })
 
+  it("keeps inspector create-edge endpoint side fields under their matching node fields", async () => {
+    currentEditor = createEditorMock()
+    const sourceNode = createTextNode({ id: "source-1", text: "## 起点节点" })
+    const targetNode = createTextNode({ id: "target-1", text: "## 目标节点" })
+    currentEditor.state.document.nodes = [sourceNode, targetNode]
+    currentEditor.displayNodes = [sourceNode, targetNode]
+    currentEditor.edgeSources = [sourceNode]
+    currentEditor.edgeTargets = [targetNode]
+    currentEditor.newEdgeSourceId = "source-1"
+    currentEditor.newEdgeTargetId = "target-1"
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='inspector-tab-selection']").trigger("click")
+    await wrapper.vm.$nextTick()
+
+    const createEdgeText = wrapper.find("[data-testid='inspector-create-edge-body']").text()
+    expect(createEdgeText.indexOf("起始节点")).toBeLessThan(createEdgeText.indexOf("起点位置"))
+    expect(createEdgeText.indexOf("起点位置")).toBeLessThan(createEdgeText.indexOf("目标节点"))
+    expect(createEdgeText.indexOf("目标节点")).toBeLessThan(createEdgeText.indexOf("终点位置"))
+    expect(createEdgeText.indexOf("终点位置")).toBeLessThan(createEdgeText.indexOf("备注标签"))
+  })
+
+  it("keeps selected-edge endpoint side fields under their matching node fields", async () => {
+    currentEditor = createEditorMock()
+    const sourceNode = createTextNode({ id: "text-1", text: "## 起点节点" })
+    const targetNode = createTextNode({ id: "text-2", text: "## 目标节点" })
+    currentEditor.state.document.nodes = [sourceNode, targetNode]
+    currentEditor.displayNodes = [sourceNode, targetNode]
+    currentEditor.state.document.edges = [{
+      fromNode: "text-1",
+      fromSide: "right",
+      id: "edge-1",
+      label: "关系",
+      toNode: "text-2",
+      toSide: "left",
+    }]
+    currentEditor.state.selectedEdgeId = "edge-1"
+    currentEditor.selectedEdge = currentEditor.state.document.edges[0]
+    currentEditor.selectedNode = null
+    currentEditor.selectedNodeCount = 0
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find("[data-testid='inspector-tab-selection']").trigger("click")
+    await wrapper.vm.$nextTick()
+
+    const selectedEdgeText = wrapper.find("[data-testid='inspector-selected-edge-body']").text()
+    expect(selectedEdgeText.indexOf("起始节点")).toBeLessThan(selectedEdgeText.indexOf("起点位置"))
+    expect(selectedEdgeText.indexOf("起点位置")).toBeLessThan(selectedEdgeText.indexOf("目标节点"))
+    expect(selectedEdgeText.indexOf("目标节点")).toBeLessThan(selectedEdgeText.indexOf("终点位置"))
+    expect(selectedEdgeText.indexOf("终点位置")).toBeLessThan(selectedEdgeText.indexOf("备注标签"))
+  })
+
   it("constrains inspector create-edge selected node labels with measured picker width", () => {
     const stylesheet = readFileSync(resolve(__dirname, "../src/components/canvas/CanvasInspector.vue"), "utf-8")
 
@@ -2052,8 +2118,8 @@ describe("CanvasWorkspace", () => {
     expect(bottomToolbarStyle.getPropertyValue("--selection-toolbar-tooltip-border").trim()).not.toBe("")
     expect(wrapper.find(".workspace__inspector-handle").attributes("title")).toBe("收起侧栏")
     expect(inspectorText).toContain("文档")
-    expect(inspectorText).toContain("未保存的工作区路径")
-    expect(inspectorText).toContain("已同步")
+    expect(inspectorText).not.toContain("未保存的工作区路径")
+    expect(inspectorText).not.toContain("已同步")
     expect(inspectorText).toContain("当前工作区目录下暂无 Canvas 文件。")
     expect(inspectorText).toContain("最近打开")
     expect(inspectorText).toContain("暂无最近打开的工作区文件。")
