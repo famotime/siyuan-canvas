@@ -18,6 +18,7 @@ export interface CanvasPluginBridge extends Plugin {
   removeRecentCanvasFile?: (path: string) => Promise<void>
   openCanvasSettings?: () => void
   openCanvasTab?: (bootstrap?: CanvasTabBootstrap) => Promise<void>
+  updateCanvasSettings?: (settings: Partial<CanvasPluginSettings>) => Promise<void>
   updateCanvasUiState?: (ui: Partial<CanvasPluginUiState>) => Promise<void>
 }
 

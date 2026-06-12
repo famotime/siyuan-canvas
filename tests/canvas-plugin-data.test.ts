@@ -6,6 +6,7 @@ import {
 
 import {
   createDefaultCanvasPluginData,
+  createDefaultCanvasPluginSettings,
   normalizeCanvasPluginData,
   rememberRecentCanvasFile,
 } from "@/canvas/plugin-data"
@@ -96,5 +97,36 @@ describe("canvas plugin data", () => {
       selection: true,
     })
     expect(data.settings.showCanvasThumbnails).toBe(false)
+  })
+})
+
+describe("colorTheme in plugin settings", () => {
+  it("default settings include colorTheme as classic", () => {
+    const settings = createDefaultCanvasPluginSettings()
+    expect(settings.colorTheme).toBe("classic")
+  })
+
+  it("normalizes valid colorTheme", () => {
+    const data = normalizeCanvasPluginData({
+      version: 1,
+      settings: { colorTheme: "warm" },
+    })
+    expect(data.settings.colorTheme).toBe("warm")
+  })
+
+  it("falls back to classic for invalid colorTheme", () => {
+    const data = normalizeCanvasPluginData({
+      version: 1,
+      settings: { colorTheme: "invalid" },
+    })
+    expect(data.settings.colorTheme).toBe("classic")
+  })
+
+  it("falls back to classic when colorTheme is missing", () => {
+    const data = normalizeCanvasPluginData({
+      version: 1,
+      settings: {},
+    })
+    expect(data.settings.colorTheme).toBe("classic")
   })
 })

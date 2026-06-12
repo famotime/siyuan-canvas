@@ -1,8 +1,12 @@
+import type { CanvasColorThemeId } from "@/canvas/canvas-color-themes"
+import { DEFAULT_COLOR_THEME } from "@/canvas/canvas-color-themes"
+
 export type CanvasRecentFileSource = "local" | "workspace"
 
 export const CANVAS_DEFAULT_DIRECTORY = "/data/storage/petal/siyuan-canvas"
 
 export interface CanvasPluginSettings {
+  colorTheme: CanvasColorThemeId
   defaultCanvasDirectory: string
   detectExternalChanges: boolean
   enableDebugLog: boolean
@@ -41,6 +45,7 @@ export interface CanvasPluginData {
 
 export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
   return {
+    colorTheme: DEFAULT_COLOR_THEME,
     defaultCanvasDirectory: CANVAS_DEFAULT_DIRECTORY,
     detectExternalChanges: true,
     enableDebugLog: false,
@@ -87,6 +92,7 @@ function normalizeRecentSourceType(path: string, value: unknown): CanvasRecentFi
 }
 
 export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
+  const VALID_COLOR_THEMES: CanvasColorThemeId[] = ["classic", "cool-warm", "warm", "cool"]
   const defaults = createDefaultCanvasPluginData()
   if (!value || typeof value !== "object") {
     return defaults
@@ -115,6 +121,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     : defaults.recentFiles
 
   const settings = {
+    colorTheme: (VALID_COLOR_THEMES as string[]).includes(candidate.settings?.colorTheme as string)
+      ? candidate.settings!.colorTheme as CanvasColorThemeId
+      : defaults.settings.colorTheme,
     defaultCanvasDirectory: typeof candidate.settings?.defaultCanvasDirectory === "string"
       && candidate.settings.defaultCanvasDirectory.trim()
       ? candidate.settings.defaultCanvasDirectory.trim()

@@ -613,6 +613,7 @@ describe("canvas plugin lifecycle", () => {
     await Promise.resolve()
 
     expect(plugin.getCanvasSettings()).toEqual({
+      colorTheme: "classic",
       defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
       enableDebugLog: false,
@@ -652,6 +653,7 @@ describe("canvas plugin lifecycle", () => {
     await plugin.onload()
 
     expect(plugin.getCanvasSettings()).toEqual({
+      colorTheme: "classic",
       defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas",
       detectExternalChanges: false,
       enableDebugLog: false,
