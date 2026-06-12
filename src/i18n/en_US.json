@@ -175,6 +175,8 @@
   "promptWorkspaceSavePath": "Workspace save path",
   "confirmOverwriteCanvasTitle": "Overwrite existing canvas file",
   "confirmOverwriteCanvasDescription": "The target file already exists: {path}",
+  "settingsColorThemeTitle": "Color Theme",
+  "settingsColorThemeDescription": "Choose the default color scheme for canvas nodes and edges.",
   "settingsDefaultCanvasDirectoryTitle": "Default canvas directory",
   "settingsDefaultCanvasDirectoryDescription": "The workspace path where new canvas files are saved. Defaults to /data/storage/petal/siyuan-canvas.",
   "settingsRecentCanvasFileLimitTitle": "Recent canvas file limit",

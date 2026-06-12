@@ -1,6 +1,9 @@
+import type { CanvasColorThemeId } from "@/canvas/canvas-color-themes"
 import type { Setting } from "siyuan"
 import type { CanvasPluginSettings } from "@/canvas/plugin-data"
 import type { CanvasI18nTranslator } from "@/canvas/use-canvas-editor-shared"
+
+import { CANVAS_COLOR_THEMES } from "@/canvas/canvas-color-themes"
 
 interface CanvasPluginSettingsPanelOptions {
   createSetting: (options: { width: string }) => Setting
@@ -32,6 +35,28 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     onSettingsChanged?.()
   }
 
+  setting.addItem({
+    title: t("settingsColorThemeTitle"),
+    description: t("settingsColorThemeDescription"),
+    createActionElement: () => {
+      const select = document.createElement("select")
+      select.className = "b3-select fn__flex-center"
+      for (const theme of CANVAS_COLOR_THEMES) {
+        const option = document.createElement("option")
+        option.value = theme.id
+        option.textContent = t(theme.nameKey as any)
+        if (theme.id === draft.colorTheme) {
+          option.selected = true
+        }
+        select.appendChild(option)
+      }
+      select.addEventListener("change", () => {
+        draft.colorTheme = select.value as CanvasColorThemeId
+        void saveDraft()
+      })
+      return select
+    },
+  })
   setting.addItem({
     title: t("settingsDefaultCanvasDirectoryTitle"),
     description: t("settingsDefaultCanvasDirectoryDescription"),
