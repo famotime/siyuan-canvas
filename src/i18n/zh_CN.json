@@ -284,5 +284,10 @@
   "insertCanvasEmbedPrompt": "输入 Canvas 文件路径",
   "insertCanvasEmbedSuccess": "已插入 Canvas 预览",
   "insertCanvasEmbedFailed": "插入 Canvas 预览失败",
-  "insertCanvasEmbedNoDocument": "请先打开一个文档"
+  "insertCanvasEmbedNoDocument": "请先打开一个文档",
+  "toolbarColorTheme": "颜色主题",
+  "colorThemeClassic": "经典彩虹",
+  "colorThemeCoolWarm": "冷暖交织",
+  "colorThemeWarm": "暖调渐变",
+  "colorThemeCool": "冷调渐变"
 }

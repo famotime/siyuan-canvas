@@ -284,5 +284,10 @@
   "insertCanvasEmbedPrompt": "Enter canvas file path",
   "insertCanvasEmbedSuccess": "Canvas preview inserted",
   "insertCanvasEmbedFailed": "Failed to insert canvas preview",
-  "insertCanvasEmbedNoDocument": "Open a document first"
+  "insertCanvasEmbedNoDocument": "Open a document first",
+  "toolbarColorTheme": "Color Theme",
+  "colorThemeClassic": "Classic Rainbow",
+  "colorThemeCoolWarm": "Cool-Warm Mix",
+  "colorThemeWarm": "Warm Gradient",
+  "colorThemeCool": "Cool Gradient"
 }
