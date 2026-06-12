@@ -283,6 +283,10 @@ function createEditorMock(node = createTextNode()) {
     canUndo: false,
     canRedo: false,
     isSaving: false,
+    colorThemeId: "classic",
+    colorThemes: [],
+    currentColorStyles: undefined,
+    setColorTheme: vi.fn(),
     duplicateSelection: vi.fn(),
   })
 }

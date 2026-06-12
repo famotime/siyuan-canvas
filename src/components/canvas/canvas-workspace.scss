@@ -217,6 +217,10 @@
   filter: brightness(0.92);
 }
 
+.toolbar__button--active {
+  background: var(--canvas-floating-button-bg-hover);
+}
+
 .toolbar__button-badge {
   position: absolute;
   top: 6px;
@@ -280,6 +284,78 @@
 
 .toolbar__saved {
   color: var(--canvas-success);
+}
+
+// 颜色主题下拉菜单
+.toolbar__theme-menu {
+  position: relative;
+}
+
+.toolbar__theme-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  min-width: 220px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--canvas-floating-bg, var(--b3-theme-surface));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--canvas-floating-border, var(--b3-border-color));
+}
+
+.toolbar__theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--b3-theme-on-surface);
+  text-align: left;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--canvas-floating-hover, var(--b3-list-hover));
+  }
+
+  &--active {
+    font-weight: 600;
+  }
+}
+
+.toolbar__theme-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  font-size: 13px;
+  color: var(--b3-theme-primary);
+  flex-shrink: 0;
+}
+
+.toolbar__theme-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbar__theme-preview {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.toolbar__theme-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .conflict-banner {

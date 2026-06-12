@@ -181,6 +181,55 @@
           />
         </button>
       </div>
+      <span class="toolbar__divider" aria-hidden="true" />
+      <div class="toolbar__group">
+        <div class="toolbar__theme-menu">
+          <button
+            class="toolbar__button toolbar__button--icon"
+            :class="{ 'toolbar__button--active': colorThemePopoverOpen }"
+            data-testid="top-toolbar-color-theme"
+            :aria-label="t('toolbarColorTheme')"
+            :data-tooltip="t('toolbarColorTheme')"
+            :title="t('toolbarColorTheme')"
+            type="button"
+            @click="colorThemePopoverOpen = !colorThemePopoverOpen"
+          >
+            <CanvasIcon
+              class="toolbar__icon"
+              name="color"
+            />
+          </button>
+          <div
+            v-if="colorThemePopoverOpen"
+            class="toolbar__theme-popover"
+            data-testid="toolbar-color-theme-popover"
+            @pointerdown.stop
+          >
+            <button
+              v-for="theme in editor.colorThemes"
+              :key="theme.id"
+              class="toolbar__theme-option"
+              :class="{ 'toolbar__theme-option--active': editor.colorThemeId === theme.id }"
+              :data-testid="`color-theme-${theme.id}`"
+              type="button"
+              @click="editor.setColorTheme(theme.id); colorThemePopoverOpen = false"
+            >
+              <span class="toolbar__theme-check" aria-hidden="true">
+                {{ editor.colorThemeId === theme.id ? "✓" : "" }}
+              </span>
+              <span class="toolbar__theme-name">{{ t(theme.nameKey) }}</span>
+              <span class="toolbar__theme-preview" aria-hidden="true">
+                <span
+                  v-for="colorKey in ['1','2','3','4','5','6'] as const"
+                  :key="colorKey"
+                  class="toolbar__theme-dot"
+                  :style="{ backgroundColor: theme.colors[colorKey] }"
+                />
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="toolbar__meta">
         <span class="toolbar__meta-stats">{{ t("toolbarGraphStats", { nodes: editor.state.document.nodes.length, edges: editor.state.document.edges.length }) }}</span>
         <span
@@ -1670,6 +1719,7 @@ const pngExportDialogVisible = ref(false)
 const pngExportLoading = ref(false)
 const pngExportRange = ref<CanvasPngExportRange>("full")
 const sortDropdownOpen = ref(false)
+const colorThemePopoverOpen = ref(false)
 const contextMenuVisible = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
@@ -1759,10 +1809,19 @@ function onContextMenuKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') closeContextMenu()
 }
 
+function closeColorThemePopover(event: PointerEvent) {
+  const target = event.target as HTMLElement
+  if (!target.closest('[data-testid="toolbar-color-theme-popover"]')
+    && !target.closest('[data-testid="top-toolbar-color-theme"]')) {
+    colorThemePopoverOpen.value = false
+  }
+}
+
 onMounted(() => {
   window.addEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
   document.addEventListener("click", closeContextMenu)
   document.addEventListener("keydown", onContextMenuKeydown)
+  document.addEventListener("pointerdown", closeColorThemePopover)
 })
 
 onBeforeUnmount(() => {
@@ -1772,6 +1831,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
   document.removeEventListener("click", closeContextMenu)
   document.removeEventListener("keydown", onContextMenuKeydown)
+  document.removeEventListener("pointerdown", closeColorThemePopover)
 })
 
 // 选区/边变更时若用户尚停留在文档 tab，自动切到选区 tab，避免反复手动切换
@@ -2170,7 +2230,7 @@ function getSideLabel(side: string): string {
 }
 
 function getSelectionColorStyle(color: string) {
-  return resolveSelectionColorStyle(color)
+  return resolveSelectionColorStyle(color, editor.currentColorStyles)
 }
 
 function resolveEdgeStartMarker(enabled?: boolean) {
@@ -2182,23 +2242,25 @@ function resolveEdgeEndMarker(enabled?: boolean) {
 }
 
 function getEdgeStrokeStyle(edge: CanvasEdge) {
-  const colorStyle = edge.color ? selectionColorStyles[edge.color] : undefined
+  const styles = editor.currentColorStyles ?? selectionColorStyles
+  const colorStyle = edge.color ? styles[edge.color] : undefined
   return colorStyle ? { color: colorStyle.border, stroke: colorStyle.border } : undefined
 }
 
 function getEdgeLabelStyle(edge: CanvasEdge) {
-  const colorStyle = edge.color ? selectionColorStyles[edge.color] : undefined
+  const styles = editor.currentColorStyles ?? selectionColorStyles
+  const colorStyle = edge.color ? styles[edge.color] : undefined
   return colorStyle ? { fill: colorStyle.border } : undefined
 }
 
 function getCanvasNodeStyle(node: CanvasNode) {
   return buildCanvasNodeStyle(node, editor.getNodeStyle(node), {
     selected: editor.state.selectedNodeIds.includes(node.id),
-  })
+  }, editor.currentColorStyles)
 }
 
 function getCanvasNodeContentStyle(node: CanvasNode) {
-  return resolveCanvasNodeContentStyle(node)
+  return resolveCanvasNodeContentStyle(node, editor.currentColorStyles)
 }
 
 function hasCanvasSearchMatch(nodeId: string) {
