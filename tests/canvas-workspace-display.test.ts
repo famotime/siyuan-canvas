@@ -5,6 +5,10 @@ import {
 } from "vitest"
 
 import {
+  getColorThemeById,
+  buildColorStyles,
+} from "@/canvas/canvas-color-themes"
+import {
   CLEAR_SELECTION_COLOR,
   getCanvasNodeContentStyle,
   getCanvasNodeStyle,
@@ -198,5 +202,48 @@ describe("canvas workspace display helpers", () => {
         y: 0,
       },
     )).toBe(CLEAR_SELECTION_COLOR)
+  })
+})
+
+describe("theme-aware color styles", () => {
+  it("getSelectionColorStyle uses default theme colors", () => {
+    const style = getSelectionColorStyle("1")
+    // getSelectionColorStyle returns swatch (hex) for backgroundColor
+    expect(style.backgroundColor).toBe("#ef4444")
+    expect(style.borderColor).toBe("#ef4444")
+  })
+
+  it("getCanvasNodeStyle uses provided colorStyles", () => {
+    const warmTheme = getColorThemeById("warm")
+    const warmStyles = buildColorStyles(warmTheme)
+    const result = getCanvasNodeStyle(
+      { color: "1", height: 100, id: "n1", text: "x", type: "text", width: 200, x: 0, y: 0 },
+      { height: "100px", left: "0px", top: "0px", width: "200px" },
+      {},
+      warmStyles,
+    )
+    // warm slot 1 = #e11d48
+    expect(result.backgroundColor).toBe("rgba(225, 29, 72, 0.18)")
+    expect(result.borderColor).toBe("#e11d48")
+  })
+
+  it("getCanvasNodeContentStyle uses provided colorStyles", () => {
+    const coolTheme = getColorThemeById("cool")
+    const coolStyles = buildColorStyles(coolTheme)
+    const result = getCanvasNodeContentStyle(
+      { color: "1", height: 200, id: "g1", label: "G", type: "group", width: 400, x: 0, y: 0 },
+      coolStyles,
+    )
+    // cool slot 1 = #4f46e5
+    expect(result?.backgroundColor).toBe("#4f46e5")
+  })
+
+  it("getCanvasNodeStyle falls back to default styles when no colorStyles provided", () => {
+    const result = getCanvasNodeStyle(
+      { color: "2", height: 100, id: "n1", text: "x", type: "text", width: 200, x: 0, y: 0 },
+      { height: "100px", left: "0px", top: "0px", width: "200px" },
+    )
+    expect(result.backgroundColor).toBe("rgba(249, 115, 22, 0.18)")
+    expect(result.borderColor).toBe("#f97316")
   })
 })

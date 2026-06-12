@@ -1,39 +1,15 @@
 import type { CanvasNode } from "@/canvas/types"
 
+import {
+  buildColorStyles,
+  getColorThemeById,
+  DEFAULT_COLOR_THEME,
+} from "@/canvas/canvas-color-themes"
+
 export const CLEAR_SELECTION_COLOR = ""
 
-export const selectionColorStyles: Record<string, { background: string, border: string, swatch: string }> = {
-  "1": {
-    background: "rgba(239, 68, 68, 0.18)",
-    border: "#ef4444",
-    swatch: "#ef4444",
-  },
-  "2": {
-    background: "rgba(249, 115, 22, 0.18)",
-    border: "#f97316",
-    swatch: "#f97316",
-  },
-  "3": {
-    background: "rgba(244, 180, 0, 0.18)",
-    border: "#f4b400",
-    swatch: "#f4b400",
-  },
-  "4": {
-    background: "rgba(34, 197, 94, 0.18)",
-    border: "#22c55e",
-    swatch: "#22c55e",
-  },
-  "5": {
-    background: "rgba(77, 208, 225, 0.18)",
-    border: "#4dd0e1",
-    swatch: "#4dd0e1",
-  },
-  "6": {
-    background: "rgba(139, 92, 246, 0.18)",
-    border: "#8b5cf6",
-    swatch: "#8b5cf6",
-  },
-}
+// Default theme color styles (backward compatible static export)
+export const selectionColorStyles = buildColorStyles(getColorThemeById(DEFAULT_COLOR_THEME))
 
 export const clearSelectionColorStyle = {
   border: "#94a3b8",
@@ -71,7 +47,12 @@ function getContrastingLabelTextColor(background: string): string {
   return luminance >= 160 ? "#111827" : "#ffffff"
 }
 
-export function getSelectionColorStyle(color: string) {
+export function getSelectionColorStyle(
+  color: string,
+  colorStyles?: Record<string, { background: string, border: string, swatch: string }>,
+) {
+  const styles = colorStyles ?? selectionColorStyles
+
   if (!color) {
     return {
       backgroundColor: clearSelectionColorStyle.swatch,
@@ -79,7 +60,7 @@ export function getSelectionColorStyle(color: string) {
     }
   }
 
-  const colorStyle = selectionColorStyles[color]
+  const colorStyle = styles[color]
 
   return {
     backgroundColor: colorStyle?.swatch || "#64748b",
@@ -93,8 +74,10 @@ export function getCanvasNodeStyle(
   options: {
     selected?: boolean
   } = {},
+  colorStyles?: Record<string, { background: string, border: string, swatch: string }>,
 ) {
-  const colorStyle = "color" in node && node.color ? selectionColorStyles[node.color] : undefined
+  const styles = colorStyles ?? selectionColorStyles
+  const colorStyle = "color" in node && node.color ? styles[node.color] : undefined
   const zIndex = node.type === "group"
     ? options.selected ? "2" : "1"
     : options.selected ? "4" : "3"
@@ -109,12 +92,16 @@ export function getCanvasNodeStyle(
   }
 }
 
-export function getCanvasNodeContentStyle(node: CanvasNode) {
+export function getCanvasNodeContentStyle(
+  node: CanvasNode,
+  colorStyles?: Record<string, { background: string, border: string, swatch: string }>,
+) {
   if (node.type !== "group" || !node.color) {
     return undefined
   }
 
-  const colorStyle = selectionColorStyles[node.color]
+  const styles = colorStyles ?? selectionColorStyles
+  const colorStyle = styles[node.color]
 
   if (!colorStyle) {
     return undefined
