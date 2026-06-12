@@ -1,3 +1,4 @@
+import type { CanvasColorThemeId } from "@/canvas/canvas-color-themes"
 import type {
   CanvasBounds,
   CanvasDocument,
@@ -19,6 +20,11 @@ import type { CanvasFileTargetPreview } from "@/canvas/file-target-preview"
 import type { CanvasPluginBridge } from "@/canvas/use-canvas-editor-shared"
 import type { CanvasEditorFileSource } from "@/canvas/use-canvas-editor-shared"
 
+import {
+  buildColorStyles,
+  CANVAS_COLOR_THEMES,
+  getColorThemeById,
+} from "@/canvas/canvas-color-themes"
 import {
   openTab,
   showMessage,
@@ -146,6 +152,12 @@ export function useCanvasEditor(
   const stageRef = ref<HTMLElement>()
   const searchDecorations = ref<CanvasSearchDecoration[]>([])
   const recentFiles = ref<CanvasRecentFile[]>([])
+  const colorThemeId = ref<CanvasColorThemeId>(
+    getPluginSettings().colorTheme ?? "classic",
+  )
+  const currentColorStyles = computed(() =>
+    buildColorStyles(getColorThemeById(colorThemeId.value)),
+  )
   const searchListeners = new Set<() => void>()
   let unregisterCanvasSearchHost: (() => void) | null = null
 
@@ -500,8 +512,20 @@ export function useCanvasEditor(
     recentFiles.value = plugin.getRecentCanvasFiles?.() ?? []
   }
 
+  async function setColorTheme(themeId: CanvasColorThemeId) {
+    colorThemeId.value = themeId
+    await plugin.updateCanvasSettings?.({ colorTheme: themeId })
+  }
+
   function notifyCanvasSearchChanged() {
     searchListeners.forEach(listener => listener())
+  }
+
+  function handleExternalSettingsChange() {
+    const settings = getPluginSettings()
+    if (settings.colorTheme && settings.colorTheme !== colorThemeId.value) {
+      colorThemeId.value = settings.colorTheme
+    }
   }
 
   function activateCanvasSurface() {
@@ -1214,6 +1238,7 @@ export function useCanvasEditor(
       t,
     })
     window.addEventListener("keydown", handleKeydown)
+    window.addEventListener("siyuan-canvas-settings-changed", handleExternalSettingsChange)
     const hostRoot = stageRef.value?.closest<HTMLElement>(".siyuan-canvas__tab")
       ?? stageRef.value
     if (hostRoot) {
@@ -1226,6 +1251,7 @@ export function useCanvasEditor(
     unregisterCanvasSearchHost?.()
     unregisterCanvasSearchHost = null
     window.removeEventListener("keydown", handleKeydown)
+    window.removeEventListener("siyuan-canvas-settings-changed", handleExternalSettingsChange)
     blockJumpHighlighter.dispose()
   })
 
@@ -1410,6 +1436,10 @@ export function useCanvasEditor(
       workspaceSortDirection: workspaceTree.workspaceSortDirection,
       workspaceSortField: workspaceTree.workspaceSortField,
       selectionColors,
+      colorThemeId,
+      colorThemes: CANVAS_COLOR_THEMES,
+      currentColorStyles,
+      setColorTheme,
       selectionLayoutActions,
       selectionToolbar,
       selectionToolbarPopover,
