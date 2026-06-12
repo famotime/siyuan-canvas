@@ -183,52 +183,22 @@
       </div>
       <span class="toolbar__divider" aria-hidden="true" />
       <div class="toolbar__group">
-        <div class="toolbar__theme-menu">
-          <button
-            class="toolbar__button toolbar__button--icon"
-            :class="{ 'toolbar__button--active': colorThemePopoverOpen }"
-            data-testid="top-toolbar-color-theme"
-            :aria-label="t('toolbarColorTheme')"
-            :data-tooltip="t('toolbarColorTheme')"
-            :title="t('toolbarColorTheme')"
-            type="button"
-            @click="colorThemePopoverOpen = !colorThemePopoverOpen"
-          >
-            <CanvasIcon
-              class="toolbar__icon"
-              name="color"
-            />
-          </button>
-          <div
-            v-if="colorThemePopoverOpen"
-            class="toolbar__theme-popover"
-            data-testid="toolbar-color-theme-popover"
-            @pointerdown.stop
-          >
-            <button
-              v-for="theme in editor.colorThemes"
-              :key="theme.id"
-              class="toolbar__theme-option"
-              :class="{ 'toolbar__theme-option--active': editor.colorThemeId === theme.id }"
-              :data-testid="`color-theme-${theme.id}`"
-              type="button"
-              @click="editor.setColorTheme(theme.id); colorThemePopoverOpen = false"
-            >
-              <span class="toolbar__theme-check" aria-hidden="true">
-                {{ editor.colorThemeId === theme.id ? "✓" : "" }}
-              </span>
-              <span class="toolbar__theme-name">{{ t(theme.nameKey) }}</span>
-              <span class="toolbar__theme-preview" aria-hidden="true">
-                <span
-                  v-for="colorKey in ['1','2','3','4','5','6'] as const"
-                  :key="colorKey"
-                  class="toolbar__theme-dot"
-                  :style="{ backgroundColor: theme.colors[colorKey] }"
-                />
-              </span>
-            </button>
-          </div>
-        </div>
+        <button
+          ref="colorThemeButtonRef"
+          class="toolbar__button toolbar__button--icon"
+          :class="{ 'toolbar__button--active': colorThemePopoverOpen }"
+          data-testid="top-toolbar-color-theme"
+          :aria-label="t('toolbarColorTheme')"
+          :data-tooltip="t('toolbarColorTheme')"
+          :title="t('toolbarColorTheme')"
+          type="button"
+          @click="toggleColorThemePopover"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="color"
+          />
+        </button>
       </div>
       <div class="toolbar__meta">
         <span class="toolbar__meta-stats">{{ t("toolbarGraphStats", { nodes: editor.state.document.nodes.length, edges: editor.state.document.edges.length }) }}</span>
@@ -285,6 +255,39 @@
         </button>
       </div>
     </header>
+
+    <Teleport to="body">
+      <div
+        v-if="colorThemePopoverOpen"
+        class="toolbar__theme-popover"
+        data-testid="toolbar-color-theme-popover"
+        :style="colorThemePopoverStyle"
+        @pointerdown.stop
+      >
+        <button
+          v-for="theme in editor.colorThemes"
+          :key="theme.id"
+          class="toolbar__theme-option"
+          :class="{ 'toolbar__theme-option--active': editor.colorThemeId === theme.id }"
+          :data-testid="`color-theme-${theme.id}`"
+          type="button"
+          @click="editor.setColorTheme(theme.id); colorThemePopoverOpen = false"
+        >
+          <span class="toolbar__theme-check" aria-hidden="true">
+            {{ editor.colorThemeId === theme.id ? "✓" : "" }}
+          </span>
+          <span class="toolbar__theme-name">{{ t(theme.nameKey) }}</span>
+          <span class="toolbar__theme-preview" aria-hidden="true">
+            <span
+              v-for="colorKey in ['1','2','3','4','5','6'] as const"
+              :key="colorKey"
+              class="toolbar__theme-dot"
+              :style="{ backgroundColor: theme.colors[colorKey] }"
+            />
+          </span>
+        </button>
+      </div>
+    </Teleport>
 
     <div
       class="workspace"
@@ -1720,6 +1723,8 @@ const pngExportLoading = ref(false)
 const pngExportRange = ref<CanvasPngExportRange>("full")
 const sortDropdownOpen = ref(false)
 const colorThemePopoverOpen = ref(false)
+const colorThemeButtonRef = ref<HTMLElement>()
+const colorThemePopoverStyle = ref<Record<string, string>>({})
 const contextMenuVisible = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
@@ -1807,6 +1812,25 @@ function handleCanvasSettingsChanged() {
 
 function onContextMenuKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') closeContextMenu()
+}
+
+function toggleColorThemePopover() {
+  if (colorThemePopoverOpen.value) {
+    colorThemePopoverOpen.value = false
+    return
+  }
+  const button = colorThemeButtonRef.value
+  if (button) {
+    const rect = button.getBoundingClientRect()
+    colorThemePopoverStyle.value = {
+      position: "fixed",
+      top: `${rect.bottom + 6}px`,
+      left: `${rect.left + rect.width / 2}px`,
+      transform: "translateX(-50%)",
+      zIndex: "10000",
+    }
+  }
+  colorThemePopoverOpen.value = true
 }
 
 function closeColorThemePopover(event: PointerEvent) {

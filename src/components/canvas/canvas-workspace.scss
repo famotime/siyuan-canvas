@@ -286,17 +286,7 @@
   color: var(--canvas-success);
 }
 
-// 颜色主题下拉菜单
-.toolbar__theme-menu {
-  position: relative;
-}
-
 .toolbar__theme-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
   min-width: 220px;
   padding: 4px;
   border-radius: 8px;
@@ -321,7 +311,7 @@
   white-space: nowrap;
 
   &:hover {
-    background: var(--canvas-floating-hover, var(--b3-list-hover));
+    background: var(--canvas-floating-button-bg-hover);
   }
 
   &--active {
