@@ -464,7 +464,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
       : bounds
     const iframeCount = world.querySelectorAll("iframe").length
 
-    console.log("[Canvas PNG Export] starting export", {
+    debugLog("[Canvas PNG Export] starting export", {
       background: options.background,
       bounds: exportBounds,
       filename: createCanvasPngExportFilename(suggestedFilename.value || state.filePath),
@@ -475,7 +475,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     })
 
     if (iframeCount > 0) {
-      console.warn("[Canvas PNG Export] world contains iframe nodes; they will be excluded from export", {
+      debugLog("[Canvas PNG Export] world contains iframe nodes; they will be excluded from export", {
         iframeCount,
       })
     }
@@ -487,7 +487,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
         filename: createCanvasPngExportFilename(suggestedFilename.value || state.filePath),
         world,
       })
-      console.log("[Canvas PNG Export] completed successfully")
+      debugLog("[Canvas PNG Export] completed successfully")
     } catch (error) {
       console.error("[Canvas PNG Export] failed", error)
       const message = error instanceof Error ? error.message : String(error)

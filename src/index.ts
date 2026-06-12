@@ -42,7 +42,7 @@ import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 import {
   bindPlugin,
 } from "@/main"
-import { startCanvasEmbedObserver, stopCanvasEmbedObserver } from "@/canvas/canvas-embed-observer"
+import { setCanvasEmbedDebugEnabled, startCanvasEmbedObserver, stopCanvasEmbedObserver } from "@/canvas/canvas-embed-observer"
 import { insertCanvasEmbed } from "@/canvas/canvas-embed-insert"
 import { getFileText } from "@/api"
 
@@ -144,7 +144,9 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.eventBus?.on?.("loaded-protyle-static", this.rememberActiveProtyle)
     this.eventBus?.on?.("loaded-protyle-dynamic", this.rememberActiveProtyle)
     this.eventBus?.on?.("switch-protyle", this.rememberActiveProtyle)
-    startCanvasEmbedObserver(this, pluginInfo.name)
+    startCanvasEmbedObserver(this, pluginInfo.name, {
+      debugLogEnabled: this.canvasData.settings.enableDebugLog,
+    })
   }
 
   onunload() {
@@ -228,6 +230,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
       createSetting: (options) => new Setting(options),
       getSettings: () => this.getCanvasSettings(),
       onSettingsChanged: () => {
+        setCanvasEmbedDebugEnabled(this.canvasData.settings.enableDebugLog)
         window.dispatchEvent(new CustomEvent("siyuan-canvas-settings-changed"))
       },
       pluginName: this.name,

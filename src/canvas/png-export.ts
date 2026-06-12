@@ -108,14 +108,12 @@ export function createCanvasPngExportFilename(name: string): string {
 }
 
 export function downloadDataUrl(dataUrl: string, filename: string) {
-  console.log("[Canvas PNG Export] downloadDataUrl", { filename, dataUrlLen: dataUrl.length })
   const anchor = document.createElement("a")
   anchor.href = dataUrl
   anchor.download = filename
   document.body.appendChild(anchor)
   anchor.click()
   document.body.removeChild(anchor)
-  console.log("[Canvas PNG Export] anchor click dispatched")
 }
 
 export function shouldIncludeCanvasPngExportNode(node: Node): boolean {
@@ -165,11 +163,8 @@ export async function exportCanvasWorldToPng(options: ExportCanvasWorldToPngOpti
     throw new Error(`Invalid export bounds: ${toPngOptions.width}x${toPngOptions.height}`)
   }
 
-  console.log("[Canvas PNG Export] toPng options", toPngOptions)
-
   try {
     const dataUrl = await toPng(options.world, toPngOptions)
-    console.log("[Canvas PNG Export] toPng succeeded, dataUrl length:", dataUrl.length)
     downloadDataUrl(dataUrl, options.filename)
   } finally {
     scrollbarStyle.remove()

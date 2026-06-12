@@ -23,7 +23,14 @@ const iframeClickListeners = new WeakMap<Document, (event: MouseEvent) => void>(
 const iframeLoadListeners = new WeakMap<HTMLIFrameElement, () => void>()
 const CANVAS_EMBED_IFRAME_OVERLAY_ATTR = "data-canvas-embed-iframe-overlay"
 
+let debugEnabled = false
+
+export function setCanvasEmbedDebugEnabled(enabled: boolean): void {
+  debugEnabled = enabled
+}
+
 function debugCanvasEmbed(message: string, data?: Record<string, unknown>) {
+  if (!debugEnabled) return
   console.debug(`[siyuan-canvas] ${message}`, data || {})
 }
 
@@ -476,8 +483,10 @@ async function refreshCanvasEmbedsForPath(path: string) {
   }
 }
 
-export function startCanvasEmbedObserver(plugin: Plugin, pluginName: string) {
+export function startCanvasEmbedObserver(plugin: Plugin, pluginName: string, options?: { debugLogEnabled?: boolean }): void {
   if (observer) return
+
+  debugEnabled = options?.debugLogEnabled ?? false
 
   observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
