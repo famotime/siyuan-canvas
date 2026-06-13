@@ -193,7 +193,11 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     editingOriginalText.value = initialText
     void nextTick(() => {
       editingTextareaRef.value?.focus()
-      editingTextareaRef.value?.setSelectionRange(editingMarkdown.value.length, editingMarkdown.value.length)
+      if (initialText === "New note") {
+        editingTextareaRef.value?.select()
+      } else {
+        editingTextareaRef.value?.setSelectionRange(editingMarkdown.value.length, editingMarkdown.value.length)
+      }
     })
   }
 
