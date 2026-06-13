@@ -980,6 +980,7 @@ export function useCanvasEditor(
     void historyVersion.value
     return history.canRedo
   })
+  const readonly = computed(() => Boolean(state.conflict || plugin.isMobile))
   const {
     addNode,
     addNodeAtPosition,
@@ -1133,6 +1134,7 @@ export function useCanvasEditor(
     connectionDraft,
     edgeReconnectDraft,
     getAnchor,
+    readonly,
     selectionBox,
     selectedEdge,
     stageRef,
@@ -1199,7 +1201,7 @@ export function useCanvasEditor(
       getContext: () => ({
         filePath: state.filePath,
         id: `canvas:${state.filePath || getCanvasSearchTitle()}`,
-        readonly: Boolean(state.conflict),
+        readonly: readonly.value,
         title: getCanvasSearchTitle(),
       }),
       getSnapshot: async () => ({
@@ -1437,6 +1439,7 @@ export function useCanvasEditor(
       redo,
       canUndo,
       canRedo,
+      readonly,
       isSaving,
       duplicateSelection,
       getRenderedMarkdown,

@@ -695,7 +695,7 @@
         />
 
         <div
-          v-if="editor.edgeToolbar.visible"
+          v-if="editor.edgeToolbar.visible && !editor.readonly"
           :ref="setEdgeToolbarRef"
           class="edge-toolbar selection-toolbar"
           :class="[
@@ -861,7 +861,7 @@
         >
 
         <div
-          v-if="editor.bottomToolbarVisible"
+          v-if="editor.bottomToolbarVisible && !editor.readonly"
           class="bottom-toolbar"
           data-testid="bottom-toolbar"
           :style="{
@@ -927,7 +927,7 @@
         </div>
 
         <div
-          v-if="editor.selectionToolbar.visible"
+          v-if="editor.selectionToolbar.visible && !editor.readonly"
           :ref="setSelectionToolbarRef"
           class="selection-toolbar"
           :class="[

@@ -2,6 +2,7 @@ import type {
   ComputedRef,
   Ref,
 } from "vue"
+import { watch } from "vue"
 import type { CanvasBoardMetrics } from "@/canvas/board"
 import type { CanvasEditorState } from "@/canvas/editor-state"
 import type {
@@ -73,6 +74,7 @@ interface CanvasEditorGestureOptions {
   connectionDraft: CanvasEditorConnectionDraftState
   edgeReconnectDraft: CanvasEditorEdgeReconnectDraftState
   getAnchor: (node: CanvasNode, side: CanvasSide) => { x: number, y: number }
+  readonly: ComputedRef<boolean>
   selectionBox: CanvasEditorSelectionBoxState
   selectedEdge: ComputedRef<CanvasEdge | null>
   stageRef: Ref<HTMLElement | undefined>
@@ -91,6 +93,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     connectionDraft,
     edgeReconnectDraft,
     getAnchor,
+    readonly,
     selectionBox,
     selectedEdge,
     stageRef,
@@ -165,6 +168,55 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     viewport.x = nextViewport.x
     viewport.y = nextViewport.y
   }
+
+  watch(() => stageRef.value, (stage) => {
+    if (!stage) return
+
+    let initialPinchDistance = 0
+    let initialScale = 1
+    let pinchCenter = { x: 0, y: 0 }
+
+    stage.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        const t1 = e.touches[0]
+        const t2 = e.touches[1]
+        initialPinchDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
+        initialScale = viewport.scale
+        
+        const rect = stage.getBoundingClientRect()
+        pinchCenter = {
+          x: (t1.clientX + t2.clientX) / 2 - rect.left,
+          y: (t1.clientY + t2.clientY) / 2 - rect.top,
+        }
+      }
+    }, { passive: false })
+
+    stage.addEventListener("touchmove", (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        const t1 = e.touches[0]
+        const t2 = e.touches[1]
+        const distance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
+        
+        if (initialPinchDistance > 0) {
+          const scaleRatio = distance / initialPinchDistance
+          const nextScale = clampViewportScale(Number((initialScale * scaleRatio).toFixed(2)))
+          const nextViewport = scaleViewportAtPoint(viewport, pinchCenter, nextScale)
+          
+          viewport.scale = nextViewport.scale
+          viewport.x = nextViewport.x
+          viewport.y = nextViewport.y
+        }
+      }
+    }, { passive: false })
+
+    stage.addEventListener("touchend", (e) => {
+      if (e.touches.length < 2) {
+        initialPinchDistance = 0
+      }
+    })
+  })
 
   function isAdditiveSelectionGesture(event: MouseEvent | PointerEvent): boolean {
     return Boolean(event.ctrlKey || event.metaKey || event.shiftKey)
@@ -317,10 +369,13 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return
     }
 
+    if (readonly.value) return
+
     startDrag(node, event)
   }
 
   function startDrag(node: CanvasNode, event: PointerEvent) {
+    if (readonly.value) return
     const selectedNodeIds = resolveDragNodeIds(state.document, node.id, state.selectedNodeIds)
     const initialPositions = new Map(
       state.document.nodes
@@ -467,7 +522,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   }
 
   function startConnectionDrag(node: CanvasNode, side: CanvasSide, event: PointerEvent) {
-    if (event.button !== 0) {
+    if (event.button !== 0 || readonly.value) {
       return
     }
 
@@ -543,7 +598,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   }
 
   function startEdgeEndpointDrag(endpoint: "from" | "to", event: PointerEvent) {
-    if (event.button !== 0) {
+    if (event.button !== 0 || readonly.value) {
       return
     }
 
@@ -570,7 +625,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   }
 
   function startResize(node: CanvasNode, side: CanvasSide, event: PointerEvent) {
-    if (event.button !== 0) {
+    if (event.button !== 0 || readonly.value) {
       return
     }
 
@@ -588,7 +643,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   }
 
   function startCornerResize(node: CanvasNode, event: PointerEvent) {
-    if (event.button !== 0) {
+    if (event.button !== 0 || readonly.value) {
       return
     }
 
