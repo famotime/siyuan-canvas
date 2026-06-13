@@ -27,6 +27,7 @@ import {
 import { openCanvasPluginSettingsPanel } from "@/canvas/plugin-settings-panel"
 import { detectCanvasPluginRuntime } from "@/canvas/plugin-runtime"
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
+import { openCanvasFilePickerDialog } from "@/canvas/canvas-file-picker-dialog"
 import {
   CANVAS_EDITOR_TAB_TYPE,
   openCanvasEditorTab,
@@ -242,13 +243,15 @@ export default class SiyuanCanvasPlugin extends Plugin {
   }
 
   private async insertCanvasEmbedFromCommand(protyle?: IProtyle): Promise<void> {
-    const path = await openTextInputDialog({
+    const path = await openCanvasFilePickerDialog({
       cancelLabel: this.t("dialogCancel"),
       confirmLabel: this.t("dialogConfirm"),
-      initialValue: `${this.canvasData.settings.defaultCanvasDirectory}/`,
+      noResultsLabel: this.t("canvasFilePickerNoResults"),
+      searchPlaceholder: this.t("canvasFilePickerSearchPlaceholder"),
       title: this.t("insertCanvasEmbedPrompt"),
+      defaultDirectory: this.canvasData.settings.defaultCanvasDirectory,
     })
-    let canvasPath = path.trim().replace(/^["']|["']$/g, '')
+    let canvasPath = path?.trim().replace(/^["']|["']$/g, '') ?? ""
     if (!canvasPath) return
 
     // 支持绝对路径：自动剥离工作区目录前缀，转为工作区相对路径

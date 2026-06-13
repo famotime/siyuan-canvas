@@ -240,7 +240,7 @@ describe("canvas embed observer", () => {
     expect(otherImage?.getAttribute("src")).toBe("old-other-preview")
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/asset/upload", expect.any(FormData))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
-      data: "![a](assets/a-preview.svg)",
+      data: '![a](assets/a-preview.svg "a")',
       dataType: "markdown",
       id: "embed-1",
     }))
@@ -317,7 +317,7 @@ describe("canvas embed observer", () => {
       stmt: expect.stringContaining("/data/storage/petal/siyuan-canvas/a.canvas"),
     }))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
-      data: "![a](assets/a-preview.svg)",
+      data: '![a](assets/a-preview.svg "a")',
       dataType: "markdown",
       id: "embed-from-attr",
     }))
@@ -384,7 +384,7 @@ describe("canvas embed observer", () => {
     const image = iframe.contentDocument?.querySelector<HTMLImageElement>(".canvas-embed-preview img")
     expect(image?.getAttribute("src")).toContain("data:image/svg+xml;base64,")
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
-      data: "![a](assets/a-preview.svg)",
+      data: '![a](assets/a-preview.svg "a")',
       dataType: "markdown",
       id: "embed-html",
     }))

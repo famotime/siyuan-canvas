@@ -62,3 +62,76 @@
   gap: 8px;
   justify-content: flex-end;
 }
+
+.canvas-file-picker {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 20px;
+  box-sizing: border-box;
+}
+
+.canvas-file-picker__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+}
+
+.canvas-file-picker__list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  min-height: 80px;
+}
+
+.canvas-file-picker__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.canvas-file-picker__item:hover,
+.canvas-file-picker__item--active {
+  background: var(--b3-list-hover);
+}
+
+.canvas-file-picker__item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--b3-theme-on-background);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canvas-file-picker__item-path {
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canvas-file-picker__empty {
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+.canvas-file-picker__loading {
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+.canvas-file-picker__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

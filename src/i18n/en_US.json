@@ -287,6 +287,8 @@
   "insertCanvasEmbedSuccess": "Canvas preview inserted",
   "insertCanvasEmbedFailed": "Failed to insert canvas preview",
   "insertCanvasEmbedNoDocument": "Open a document first",
+  "canvasFilePickerSearchPlaceholder": "Search canvas file name…",
+  "canvasFilePickerNoResults": "No matching canvas files — will use typed path",
   "toolbarColorTheme": "Color Theme",
   "colorThemeClassic": "Classic Rainbow",
   "colorThemeCoolWarm": "Cool-Warm Mix",

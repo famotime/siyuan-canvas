@@ -32,8 +32,13 @@ async function uploadCanvasEmbedPreview(svg: string, title: string): Promise<str
   return result?.succMap?.[fileName] || null
 }
 
+function escapeMarkdownImageTitle(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+}
+
 export function buildCanvasEmbedMarkdown(_canvasPath: string, imagePath: string, title: string): string {
-  return `![${escapeMarkdownImageAlt(title)}](${imagePath})`
+  const safeTitle = escapeMarkdownImageTitle(title)
+  return `![${escapeMarkdownImageAlt(title)}](${imagePath} "${safeTitle}")`
 }
 
 export interface InsertCanvasEmbedOptions {

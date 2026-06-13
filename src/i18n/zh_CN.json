@@ -287,6 +287,8 @@
   "insertCanvasEmbedSuccess": "已插入 Canvas 预览",
   "insertCanvasEmbedFailed": "插入 Canvas 预览失败",
   "insertCanvasEmbedNoDocument": "请先打开一个文档",
+  "canvasFilePickerSearchPlaceholder": "搜索 Canvas 文件名…",
+  "canvasFilePickerNoResults": "未找到匹配的 Canvas 文件，将使用输入路径",
   "toolbarColorTheme": "颜色主题",
   "colorThemeClassic": "经典彩虹",
   "colorThemeCoolWarm": "冷暖交织",
