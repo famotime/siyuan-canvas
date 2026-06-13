@@ -99,7 +99,6 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addCommand({
       langKey: "openCanvas",
       langText: this.t("openCanvas"),
-      hotkey: "⌃⌥C",
       callback: () => {
         void this.openCanvasTab()
       },
@@ -134,6 +133,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addCommand({
       langKey: "insertCanvasEmbed",
       langText: this.t("insertCanvasEmbed"),
+      hotkey: "⌃⇧⌥C",
       callback: () => {
         void this.insertCanvasEmbedFromCommand()
       },
