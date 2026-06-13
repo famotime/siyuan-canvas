@@ -1,6 +1,6 @@
 {
   "name": "siyuan-canvas",
-  "version": "1.3.0",
+  "version": "1.3.5",
   "type": "module",
   "description": "SiYuan plugin for importing, editing, and exporting Obsidian .canvas files",
   "author": "Quincy Zou",

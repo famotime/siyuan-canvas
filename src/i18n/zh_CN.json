@@ -62,7 +62,7 @@
   "selectionToolbarRefresh": "刷新",
   "selectionToolbarConvert": "转为文档",
   "selectionToolbarConvertToText": "转为文本",
-  "selectionToolbarRelayout": "重布局连接节点",
+  "selectionToolbarRelayout": "重布局",
   "relayoutComputing": "正在计算布局…",
   "relayoutNoConnectedNodes": "该节点没有连线，无需重布局",
   "selectionToolbarClearColor": "清除颜色",

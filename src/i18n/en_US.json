@@ -62,7 +62,7 @@
   "selectionToolbarRefresh": "Refresh",
   "selectionToolbarConvert": "Convert to document",
   "selectionToolbarConvertToText": "Convert to text",
-  "selectionToolbarRelayout": "Relayout connected nodes",
+  "selectionToolbarRelayout": "Relayout",
   "relayoutComputing": "Computing layout…",
   "relayoutNoConnectedNodes": "This node has no connections, nothing to relayout",
   "selectionToolbarClearColor": "Clear color",
