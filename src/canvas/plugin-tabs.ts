@@ -54,7 +54,9 @@ export function registerCanvasEditorTab(plugin: Plugin, tabType = CANVAS_EDITOR_
       host.innerHTML = ""
       host.classList.add("siyuan-canvas__tab")
       mountCanvasApp(host, this.data ?? {}, (title) => {
-        this.tab.updateTitle(title)
+        if (this.tab) {
+          this.tab.updateTitle(title)
+        }
       })
     },
     destroy(this: Custom) {

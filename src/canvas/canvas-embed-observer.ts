@@ -43,11 +43,13 @@ function bindCanvasEmbedClick(element: HTMLElement, plugin: Plugin, pluginName: 
   element.setAttribute(CANVAS_EMBED_BOUND_ATTR, "true")
   element.style.cursor = "pointer"
 
-  element.addEventListener("click", (event) => {
+  const openHandler = (event: Event) => {
     event.preventDefault()
     event.stopPropagation()
     void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
-  })
+  }
+  element.addEventListener("click", openHandler)
+  element.addEventListener("touchend", openHandler)
 }
 
 function scanAndBind(root: Element, plugin: Plugin, pluginName: string) {
@@ -96,7 +98,7 @@ function findClickedImageBlockId(target: EventTarget | null): string {
   return image.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
 }
 
-function getEventElements(event: MouseEvent): Element[] {
+function getEventElements(event: Event): Element[] {
   const path = typeof event.composedPath === "function" ? event.composedPath() : []
   const elements = path.filter(isElement)
   const target = event.target instanceof Element ? event.target : null
@@ -145,7 +147,7 @@ function findCanvasEmbedPathInDocument(doc: Document): string {
   return normalizeCanvasPath(embed?.dataset.canvasPath || "")
 }
 
-async function openCanvasFromBlockId(event: MouseEvent, blockId: string, plugin: Plugin, pluginName: string) {
+async function openCanvasFromBlockId(event: Event, blockId: string, plugin: Plugin, pluginName: string) {
   if (!blockId) {
     debugCanvasEmbed("open canvas embed: missing block id")
     return
@@ -164,7 +166,7 @@ async function openCanvasFromBlockId(event: MouseEvent, blockId: string, plugin:
 }
 
 async function openCanvasFromBlockIdOrPath(
-  event: MouseEvent,
+  event: Event,
   blockId: string,
   fallbackCanvasPath: string,
   plugin: Plugin,
@@ -190,7 +192,7 @@ async function openCanvasFromBlockIdOrPath(
   void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
 }
 
-function openCanvasFromPath(event: MouseEvent, canvasPath: string, plugin: Plugin, pluginName: string) {
+function openCanvasFromPath(event: Event, canvasPath: string, plugin: Plugin, pluginName: string) {
   const normalizedPath = normalizeCanvasPath(canvasPath)
   if (!normalizedPath) return
 
@@ -200,7 +202,7 @@ function openCanvasFromPath(event: MouseEvent, canvasPath: string, plugin: Plugi
   void openCanvasEditorTab(plugin, pluginName, { path: normalizedPath }, "Untitled.canvas")
 }
 
-async function openCanvasFromClickedImage(event: MouseEvent, plugin: Plugin, pluginName: string) {
+async function openCanvasFromClickedImage(event: Event, plugin: Plugin, pluginName: string) {
   const elements = getEventElements(event)
   const blockId = findBlockIdFromElements(elements)
   const canvasPath = findCanvasEmbedPathFromElements(elements)
@@ -249,14 +251,15 @@ async function ensureIframeClickOverlay(
   overlay.style.inset = "0"
   overlay.style.zIndex = "2"
   overlay.style.cursor = "pointer"
-  overlay.style.background = "transparent"
-  overlay.addEventListener("click", (event) => {
+  const overlayHandler = (event: Event) => {
     debugCanvasEmbed("iframe canvas embed overlay clicked", {
       blockId,
       path: canvasPath,
     })
     openCanvasFromPath(event, canvasPath, plugin, pluginName)
-  }, true)
+  }
+  overlay.addEventListener("click", overlayHandler, true)
+  overlay.addEventListener("touchend", overlayHandler, true)
   host.appendChild(overlay)
   debugCanvasEmbed("created iframe canvas embed overlay", {
     blockId,
@@ -281,7 +284,7 @@ function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, plu
         void ensureIframeClickOverlay(iframe, blockId, plugin, pluginName, documentCanvasPath)
       }
 
-      const listener = (event: MouseEvent) => {
+      const listener = (event: Event) => {
         const elements = getEventElements(event)
         const target = elements[0]
         const canvasPath = findCanvasEmbedPathFromElements(elements) || documentCanvasPath
@@ -304,8 +307,9 @@ function bindHtmlBlockIframeClicks(root: Element | Document, plugin: Plugin, plu
 
         debugCanvasEmbed("iframe document clicked without path", { blockId })
       }
-      iframeClickListeners.set(iframeDocument, listener)
+      iframeClickListeners.set(iframeDocument, listener as (e: MouseEvent) => void)
       iframeDocument.addEventListener("click", listener, true)
+      iframeDocument.addEventListener("touchend", listener, true)
       debugCanvasEmbed("bound iframe canvas embed clicks", { blockId })
     }
 
@@ -512,10 +516,11 @@ export function startCanvasEmbedObserver(plugin: Plugin, pluginName: string, opt
     void refreshCanvasEmbedsForPath(detail?.path || "")
   }
   window.addEventListener(CANVAS_EMBED_REFRESH_EVENT, refreshListener)
-  delegatedClickListener = (event: MouseEvent) => {
+  delegatedClickListener = (event: Event) => {
     void openCanvasFromClickedImage(event, plugin, pluginName)
   }
   document.addEventListener("click", delegatedClickListener, true)
+  document.addEventListener("touchend", delegatedClickListener, true)
 
   scanAndBind(document.body, plugin, pluginName)
   bindHtmlBlockIframeClicks(document, plugin, pluginName)
@@ -530,6 +535,7 @@ export function stopCanvasEmbedObserver() {
   }
   if (delegatedClickListener) {
     document.removeEventListener("click", delegatedClickListener, true)
+    document.removeEventListener("touchend", delegatedClickListener, true)
     delegatedClickListener = null
   }
   document.querySelectorAll(`[${CANVAS_EMBED_IFRAME_OVERLAY_ATTR}="true"]`).forEach((element) => {
