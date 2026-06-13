@@ -185,6 +185,8 @@
   "settingsDetectExternalFileChangesDescription": "Warn before saving if the underlying canvas file changed on disk.",
   "settingsShowCanvasThumbnailsTitle": "Show canvas thumbnail",
   "settingsShowCanvasThumbnailsDescription": "When enabled, show the whole-canvas minimap in the bottom-right corner. Off by default.",
+  "settingsShowNodeHeaderTitle": "Show node header",
+  "settingsShowNodeHeaderDescription": "When enabled, show the title bar (icon, title text, drag handle) on each canvas card. On by default.",
   "settingsEnableDebugLogTitle": "Enable debug logging",
   "settingsEnableDebugLogDescription": "When enabled, output Canvas save flow debug information in the browser console.",
   "settingsNoteCreationDirectoryTitle": "Note creation directory",

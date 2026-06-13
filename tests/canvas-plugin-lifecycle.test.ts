@@ -604,12 +604,14 @@ describe("canvas plugin lifecycle", () => {
     const recentFilesLimitInput = setting.items[2].createActionElement() as HTMLInputElement
     const detectExternalChangesInput = setting.items[3].createActionElement() as HTMLInputElement
     const showCanvasThumbnailsInput = setting.items[4].createActionElement() as HTMLInputElement
+    const showNodeHeaderInput = setting.items[5].createActionElement() as HTMLInputElement
 
     expect(colorThemeSelect.value).toBe("classic")
     expect(defaultDirectoryInput.value).toBe("/data/storage/petal/siyuan-canvas")
     expect(recentFilesLimitInput.value).toBe("8")
     expect(detectExternalChangesInput.checked).toBe(true)
     expect(showCanvasThumbnailsInput.checked).toBe(false)
+    expect(showNodeHeaderInput.checked).toBe(true)
 
     recentFilesLimitInput.value = "1"
     recentFilesLimitInput.dispatchEvent(new Event("change"))
@@ -631,6 +633,7 @@ describe("canvas plugin lifecycle", () => {
       noteCreationDirectory: "",
       recentFilesLimit: 1,
       showCanvasThumbnails: true,
+      showNodeHeader: true,
     })
   })
 
@@ -671,6 +674,7 @@ describe("canvas plugin lifecycle", () => {
       noteCreationDirectory: "",
       recentFilesLimit: 3,
       showCanvasThumbnails: false,
+      showNodeHeader: true,
     })
     expect(plugin.getRecentCanvasFiles()).toEqual([
       expect.objectContaining({

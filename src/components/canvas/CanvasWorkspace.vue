@@ -486,7 +486,7 @@
             @wheel.passive="handleNodeWheel(node, $event)"
           >
             <header
-              v-if="node.type !== 'group'"
+              v-if="node.type !== 'group' && showNodeHeader"
               class="canvas-node__header"
               data-drag-handle="true"
             >
@@ -1804,6 +1804,11 @@ function applyTextMarkdownImageBlobUrls(html: string): string {
 const showCanvasThumbnails = computed(() => {
   settingsRevision.value
   return editor.getPluginSettings().showCanvasThumbnails
+})
+
+const showNodeHeader = computed(() => {
+  settingsRevision.value
+  return editor.getPluginSettings().showNodeHeader
 })
 
 function handleCanvasSettingsChanged() {

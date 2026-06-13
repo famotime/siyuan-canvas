@@ -117,6 +117,20 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     },
   })
   setting.addItem({
+    title: t("settingsShowNodeHeaderTitle"),
+    description: t("settingsShowNodeHeaderDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.type = "checkbox"
+      input.checked = draft.showNodeHeader
+      input.addEventListener("change", () => {
+        draft.showNodeHeader = input.checked
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
     title: t("settingsEnableDebugLogTitle"),
     description: t("settingsEnableDebugLogDescription"),
     createActionElement: () => {

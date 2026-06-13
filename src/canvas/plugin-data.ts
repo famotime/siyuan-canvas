@@ -13,6 +13,7 @@ export interface CanvasPluginSettings {
   recentFilesLimit: number
   noteCreationDirectory: string
   showCanvasThumbnails: boolean
+  showNodeHeader: boolean
 }
 
 export interface CanvasInspectorSectionsState {
@@ -52,6 +53,7 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     recentFilesLimit: 8,
     noteCreationDirectory: "",
     showCanvasThumbnails: false,
+    showNodeHeader: true,
   }
 }
 
@@ -144,6 +146,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     showCanvasThumbnails: typeof candidate.settings?.showCanvasThumbnails === "boolean"
       ? candidate.settings.showCanvasThumbnails
       : defaults.settings.showCanvasThumbnails,
+    showNodeHeader: typeof candidate.settings?.showNodeHeader === "boolean"
+      ? candidate.settings.showNodeHeader
+      : defaults.settings.showNodeHeader,
   }
 
   const defaultInspectorSections = defaults.ui.inspectorSections

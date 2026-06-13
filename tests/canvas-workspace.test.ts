@@ -151,6 +151,7 @@ function createEditorMock(node = createTextNode()) {
     })),
     getPluginSettings: vi.fn(() => ({
       showCanvasThumbnails: false,
+      showNodeHeader: true,
     })),
     getNodeStyle: vi.fn(() => ({
       height: "180px",
