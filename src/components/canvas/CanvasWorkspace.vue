@@ -45,9 +45,9 @@
             'toolbar__button--saving': editor.isSaving,
           }"
           data-testid="top-toolbar-save"
-          :aria-label="editor.isSaving ? t('toolbarSaving') : t('toolbarSave')"
-          :data-tooltip="editor.isSaving ? t('toolbarSaving') : t('toolbarSave')"
-          :title="editor.isSaving ? t('toolbarSaving') : t('toolbarSave')"
+          :aria-label="editor.isSaving ? t('toolbarSaving') : t('toolbarSaveAs')"
+          :data-tooltip="editor.isSaving ? t('toolbarSaving') : t('toolbarSaveAs')"
+          :title="editor.isSaving ? t('toolbarSaving') : t('toolbarSaveAs')"
           :disabled="editor.isSaving"
           type="button"
           @click="editor.save"

@@ -126,7 +126,7 @@ const commandItems = computed<PaletteItem[]>(() => {
   return [
     { id: "cmd:new", kind: "command", title: props.t("toolbarNew"), keywords: ["new", "create", "新建"], shortcut: "", run: () => e.newCanvas() },
     { id: "cmd:open", kind: "command", title: props.t("toolbarOpen"), keywords: ["open", "import", "打开"], run: () => e.triggerImport() },
-    { id: "cmd:save", kind: "command", title: props.t("toolbarSave"), keywords: ["save", "保存"], shortcut: `${accel}+S`, run: () => e.save() },
+    { id: "cmd:save", kind: "command", title: props.t("toolbarSaveAs"), keywords: ["save", "save as", "保存", "另存为"], shortcut: `${accel}+S`, run: () => e.save() },
     { id: "cmd:export", kind: "command", title: props.t("toolbarExport"), keywords: ["export", "导出"], run: () => e.exportCanvas() },
     ...(e.undo ? [{ id: "cmd:undo", kind: "command" as const, title: props.t("toolbarUndo"), keywords: ["undo", "撤销"], shortcut: `${accel}+Z`, run: () => e.undo!() }] : []),
     ...(e.redo ? [{ id: "cmd:redo", kind: "command" as const, title: props.t("toolbarRedo"), keywords: ["redo", "重做"], shortcut: `${accel}+Y`, run: () => e.redo!() }] : []),

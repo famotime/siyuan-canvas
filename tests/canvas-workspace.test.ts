@@ -718,14 +718,14 @@ describe("CanvasWorkspace", () => {
 
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
-    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("另存为")
     expect(wrapper.find("[data-testid='top-toolbar-export']").attributes("data-tooltip")).toBe("导出")
     expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
     expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("aria-label")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("aria-label")).toBe("打开")
-    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("另存为")
     expect(wrapper.find("[data-testid='top-toolbar-export']").attributes("aria-label")).toBe("导出")
     expect(wrapper.find("[data-testid='top-toolbar-new'] .toolbar__icon").exists()).toBe(true)
     expect(wrapper.find("[data-testid='top-toolbar-open'] .toolbar__icon").exists()).toBe(true)
@@ -839,8 +839,8 @@ describe("CanvasWorkspace", () => {
           action: "平移画布",
         },
         {
-          key: "文档树中右键文档",
-          action: "重命名文档",
+          key: "文档树中右键",
+          action: "文件管理菜单",
         },
       ]),
     )
@@ -2103,7 +2103,7 @@ describe("CanvasWorkspace", () => {
 
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
-    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("保存")
+    expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("另存为")
     expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
     expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")

@@ -891,6 +891,7 @@ export function useCanvasEditor(
     overwriteConflictVersion,
     rememberRecentPath,
     save: saveImpl,
+    silentSave: silentSaveImpl,
     triggerImport,
   } = createCanvasEditorFileActions({
     board,
@@ -923,6 +924,39 @@ export function useCanvasEditor(
       isSaving.value = false
     }
   }
+
+  /**
+   * 静默保存包装：复用 isSaving 守卫，不弹对话框直接写入当前文件路径。
+   */
+  async function silentSave() {
+    if (isSaving.value) {
+      return
+    }
+    isSaving.value = true
+    try {
+      await silentSaveImpl()
+    } finally {
+      isSaving.value = false
+    }
+  }
+
+  // 自动保存：文档变脏后 1 秒静默保存到当前路径
+  let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+  watch(
+    () => state.isDirty,
+    (dirty) => {
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer)
+        autoSaveTimer = null
+      }
+      if (dirty) {
+        autoSaveTimer = setTimeout(() => {
+          autoSaveTimer = null
+          void silentSave()
+        }, 1000)
+      }
+    },
+  )
 
   function clearHistory() {
     history.clear()
@@ -1123,6 +1157,7 @@ export function useCanvasEditor(
     openFilePickerDialog,
     redo,
     save,
+    silentSave,
     selectAllNodes: () => state.selectAllNodes(),
     selectEdge: () => state.selectEdge(),
     selectNode: () => state.selectNode(),
@@ -1359,6 +1394,7 @@ export function useCanvasEditor(
       openRecentFile,
       resetViewport,
       save,
+      silentSave,
       closeFilePickerDialog,
       selectFilePickerResult,
       selectEdge,

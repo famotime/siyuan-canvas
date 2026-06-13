@@ -64,7 +64,7 @@ describe("CanvasCommandPalette", () => {
 
     await wrapper.find(".command-palette__input").setValue("toolbarSave")
     const titles = wrapper.findAll(".command-palette__item-title").map((node) => node.text())
-    expect(titles).toContain("toolbarSave")
+    expect(titles).toContain("toolbarSaveAs")
     expect(titles).not.toContain("toolbarZoomIn")
   })
 

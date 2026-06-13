@@ -15,6 +15,7 @@ interface CanvasEditorKeyboardHandlerOptions {
   openFilePickerDialog?: () => void
   redo?: () => void
   save: () => void | Promise<void>
+  silentSave: () => void | Promise<void>
   selectAllNodes: () => void
   selectEdge: () => void
   selectNode: () => void
@@ -52,6 +53,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     openFilePickerDialog,
     redo,
     save,
+    silentSave,
     selectAllNodes,
     selectEdge,
     selectNode,
@@ -136,7 +138,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
 
     if (isAccelerator && key === 's') {
       event.preventDefault()
-      void save()
+      void silentSave()
       return
     }
 

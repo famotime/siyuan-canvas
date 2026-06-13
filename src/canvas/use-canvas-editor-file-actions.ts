@@ -379,6 +379,22 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     }
   }
 
+  async function silentSave() {
+    if (!state.filePath) {
+      return
+    }
+
+    try {
+      if (fileSource.value === "local") {
+        await saveLocal(state.filePath)
+      } else {
+        await saveWorkspace(state.filePath)
+      }
+    } catch {
+      // 自动保存失败静默处理，不干扰用户编辑
+    }
+  }
+
   async function openRecentFile(recent: CanvasRecentFile) {
     if (recent.sourceType === "local") {
       await openLocalPath(recent.path, recent.title)
@@ -510,6 +526,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     overwriteConflictVersion,
     rememberRecentPath,
     save,
+    silentSave,
     triggerImport,
   }
 }
