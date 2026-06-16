@@ -1140,6 +1140,7 @@ export function useCanvasEditor(
     stageRef,
     state,
     viewport,
+    showNodeHeader: computed(() => getPluginSettings().showNodeHeader),
   })
 
   const { handleKeydown } = createCanvasEditorKeyboardHandler({

@@ -1,4 +1,4 @@
-﻿/* 璁捐 token 鍏ㄩ儴浠庢€濇簮 --b3-* 娲剧敓锛沜olor-mix 缁熶竴澶勭悊閫忔槑/娣疯壊锛屼富棰樺垏鎹㈤浂澶遍厤 */
+/* 璁捐 token 鍏ㄩ儴浠庢€濇簮 --b3-* 娲剧敓锛沜olor-mix 缁熶竴澶勭悊閫忔槑/娣疯壊锛屼富棰樺垏鎹㈤浂澶遍厤 */
 .canvas-shell {
   /* 琛ㄩ潰灞?*/
   --canvas-bg: var(--b3-theme-background);
@@ -461,6 +461,27 @@
   touch-action: none;
 }
 
+.stage--readonly {
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  .canvas-node {
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+
+    .canvas-node__body,
+    .canvas-node__body--selectable {
+      cursor: inherit;
+    }
+  }
+}
+
 .stage__selection-box {
   position: absolute;
   z-index: 3;
@@ -863,6 +884,19 @@
   color: var(--canvas-text);
   /* cursor: grab 绉诲埌 header锛沚ody 鍖哄煙鍙€変腑鏂囨湰 */
   touch-action: none;
+}
+
+.canvas-node--no-header {
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  .canvas-node__body,
+  .canvas-node__body--selectable {
+    cursor: inherit;
+  }
 }
 
 .canvas-node--group {

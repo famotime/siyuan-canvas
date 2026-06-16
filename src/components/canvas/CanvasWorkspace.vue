@@ -308,6 +308,7 @@
       <section
         ref="stageRef"
         class="stage"
+        :class="{ 'stage--readonly': editor.readonly }"
         @pointerdown="handleStagePointerDown"
         @dblclick="handleStageDoubleClick"
         @paste="handleStagePaste"
@@ -477,6 +478,7 @@
                 'canvas-node--search-current': hasCanvasCurrentSearchMatch(node.id),
                 'canvas-node--search-match': hasCanvasSearchMatch(node.id),
                 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id),
+                'canvas-node--no-header': !showNodeHeader,
               },
             ]"
             :style="getCanvasNodeStyle(node)"

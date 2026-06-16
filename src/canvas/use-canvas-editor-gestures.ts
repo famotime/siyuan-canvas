@@ -84,6 +84,7 @@ interface CanvasEditorGestureOptions {
     x: number
     y: number
   }
+  showNodeHeader: ComputedRef<boolean>
 }
 
 export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOptions) {
@@ -99,6 +100,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     stageRef,
     state,
     viewport,
+    showNodeHeader,
   } = options
 
   function clearSelectionBox() {
@@ -227,8 +229,24 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return false
     }
 
-    // 排除节点上"应该消化点击"的元素：尺寸把手、连接锚点、可交互控件、文本可选择体
-    return !target.closest(".canvas-node__resize-handle, .canvas-node__resize-corner, .canvas-node__anchor, .canvas-node__body--selectable, a, button, input, textarea, select")
+    // 排除节点上"应该消化点击"的元素：尺寸把手、连接锚点、可交互控件
+    const excludeSelector = [
+      ".canvas-node__resize-handle",
+      ".canvas-node__resize-corner",
+      ".canvas-node__anchor",
+      "a",
+      "button",
+      "input",
+      "textarea",
+      "select",
+    ]
+
+    // 如果开启了显示标题栏，那么卡片主体（selectable区域）是不允许拖拽的，需要排除它
+    if (showNodeHeader.value) {
+      excludeSelector.push(".canvas-node__body--selectable")
+    }
+
+    return !target.closest(excludeSelector.join(", "))
   }
 
   function isStageGestureTarget(target: EventTarget | null): target is Element {
@@ -307,7 +325,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   }
 
   function startPan(event: PointerEvent) {
-    if (event.button === 2) {
+    if (event.button === 2 || (readonly.value && event.button === 0)) {
       event.preventDefault()
       const initialX = viewport.x
       const initialY = viewport.y
@@ -365,11 +383,27 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return
     }
 
-    if (event.button !== 0 || isAdditiveSelectionGesture(event) || !isNodeGestureTarget(event.target)) {
+    if (event.button !== 0 || isAdditiveSelectionGesture(event)) {
       return
     }
 
-    if (readonly.value) return
+    // 排除节点上"应该消化点击"的元素：尺寸把手、连接锚点、可交互控件（如链接、按钮、文本输入框等）
+    const isInteractive = event.target instanceof HTMLElement && event.target.closest(
+      "a, button, input, textarea, select, .canvas-node__resize-handle, .canvas-node__resize-corner, .canvas-node__anchor"
+    )
+    if (isInteractive) {
+      return
+    }
+
+    if (readonly.value) {
+      // 在只读模式下（如发布站），在卡片上的拖拽操作退化为移动画布（Pan）
+      startPan(event)
+      return
+    }
+
+    if (!isNodeGestureTarget(event.target)) {
+      return
+    }
 
     startDrag(node, event)
   }
