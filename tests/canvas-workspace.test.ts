@@ -839,8 +839,16 @@ describe("CanvasWorkspace", () => {
           action: "平移画布",
         },
         {
-          key: "文档树中右键",
-          action: "文件管理菜单",
+          key: "拖拽节点",
+          action: "移动节点位置",
+        },
+        {
+          key: "拖拽节点锚点",
+          action: "创建连线",
+        },
+        {
+          key: "文档树中右键文档",
+          action: "重命名文档",
         },
       ]),
     )

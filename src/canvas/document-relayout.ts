@@ -80,11 +80,18 @@ export function relayoutConnectedNodes(
   // 5. 计算坐标
   const positions = computePositions(orderedLayers, direction, layerGap, nodeGap)
 
+  // 5.5 将新坐标偏移到原始子图中心位置，避免子图从 (0,0) 布局导致与外部元素重叠
+  applyOriginalCenterOffset(positions, subgraph.nodes)
+
+  // 预计算子图中 group 的子节点映射（必须在 applyPositions 之前，
+  // 因为位置变化后基于几何的 group 成员判断可能错误地"吞入"无关节点）
+  const originalGroupChildIds = collectGroupChildIds(document, subgraph.nodes)
+
   // 6. 应用位置到文档（group 内节点随 group 整体移动）
   let updatedDoc = applyPositions(document, positions, groupPadding)
 
   // 7. 重叠修正（将整个子图作为整体平移，避免与其他连通分量重叠）
-  updatedDoc = resolveOverlaps(updatedDoc, subgraph.nodes, direction, maxOverlapFixAttempts)
+  updatedDoc = resolveOverlaps(updatedDoc, subgraph.nodes, direction, maxOverlapFixAttempts, originalGroupChildIds)
 
   return { document: updatedDoc, success: true }
 }
@@ -511,6 +518,29 @@ function applyPositions(
   }
 }
 
+// ─── Group Child ID Collection ────────────────────────────────────────────────
+
+/**
+ * 从原始文档中预计算子图内 group 的所有子节点 ID。
+ * 必须在 applyPositions 之前调用，因为位置变化后基于几何的
+ * group 成员判断可能错误地将无关节点纳入 group。
+ */
+function collectGroupChildIds(
+  document: CanvasDocument,
+  subgraphNodes: CanvasNode[],
+): Set<string> {
+  const childIds = new Set<string>()
+  for (const node of subgraphNodes) {
+    if (node.type === "group") {
+      const children = findCanvasNodesInGroup(document, node.id)
+      for (const childId of children) {
+        childIds.add(childId)
+      }
+    }
+  }
+  return childIds
+}
+
 // ─── Overlap Resolution ───────────────────────────────────────────────────────
 
 interface BBox {
@@ -523,14 +553,23 @@ interface BBox {
 /**
  * 将整个子图作为一个整体平移，避免与其他连通子图重叠。
  * 策略：找到所有其他连通分量的包围盒作为障碍物，整体平移当前子图直到无重叠。
+ *
+ * @param originalGroupChildIds 从原始文档预计算的 group 子节点 ID 集合，
+ *   避免位置变化后基于几何的 group 成员判断出错。
  */
 function resolveOverlaps(
   document: CanvasDocument,
   subgraphNodes: CanvasNode[],
   direction: "horizontal" | "vertical",
   maxAttempts: number,
+  originalGroupChildIds: Set<string>,
 ): CanvasDocument {
   const subgraphIds = new Set(subgraphNodes.map(n => n.id))
+  // 使用预计算的 group 子节点 ID（基于原始文档位置），避免位置变化后误判
+  for (const childId of originalGroupChildIds) {
+    subgraphIds.add(childId)
+  }
+
   const obstaclePadding = 20
 
   // 找到所有其他连通分量，计算其包围盒作为障碍物
@@ -545,61 +584,19 @@ function resolveOverlaps(
   const subgraphBBox = computeBBox(movableNodes)
   if (!subgraphBBox) return document
 
-  // 整体平移直到不与任何障碍物重叠
-  let offsetX = 0
-  let offsetY = 0
-  const stepX = direction === "horizontal" ? 40 : 0
-  const stepY = direction === "vertical" ? 40 : 0
-  // 垂直于主方向的微调步进
-  const altStepX = direction === "vertical" ? 40 : 0
-  const altStepY = direction === "horizontal" ? 40 : 0
-  let altSign = 1
-  let altCount = 0
-  const altThreshold = 3 // 每 altThreshold 次主方向步进后切换一次垂直方向
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const shiftedBBox: BBox = {
-      x: subgraphBBox.x + offsetX,
-      y: subgraphBBox.y + offsetY,
-      width: subgraphBBox.width,
-      height: subgraphBBox.height,
-    }
-
-    const hasOverlap = obstacleBBoxes.some(obstacle => bboxOverlap(shiftedBBox, obstacle))
-    if (!hasOverlap) break
-
-    // 主方向步进
-    offsetX += stepX
-    offsetY += stepY
-
-    // 每隔几次，也尝试垂直于主方向的偏移（之字形搜索）
-    altCount++
-    if (altCount >= altThreshold) {
-      altCount = 0
-      offsetX += altStepX * altSign
-      offsetY += altStepY * altSign
-      altSign = -altSign // 交替正负
-    }
-  }
+  // 计算精确的最小平移偏移量，使子图脱离所有障碍物
+  const { x: offsetX, y: offsetY } = computeMinimalShift(
+    subgraphBBox, obstacleBBoxes, direction, maxAttempts,
+  )
 
   if (offsetX === 0 && offsetY === 0) {
     return document
   }
 
-  // 收集 group 内部节点 ID（随 group 一起移动）
-  const groupInternalIds = new Set<string>()
-  for (const node of document.nodes) {
-    if (node.type === "group" && subgraphIds.has(node.id)) {
-      for (const childId of findCanvasNodesInGroup(document, node.id)) {
-        groupInternalIds.add(childId)
-      }
-    }
-  }
-
   return {
     ...document,
     nodes: document.nodes.map((node) => {
-      if (!subgraphIds.has(node.id) && !groupInternalIds.has(node.id)) return node
+      if (!subgraphIds.has(node.id)) return node
       return { ...node, x: node.x + offsetX, y: node.y + offsetY }
     }),
   }
@@ -609,51 +606,70 @@ function resolveOverlaps(
  * 找到文档中所有不属于当前子图的连通分量和孤立节点，
  * 返回它们的包围盒列表（作为障碍物）。
  */
+function isNodeInGroups(node: CanvasNode, groups: CanvasGroupNode[]): boolean {
+  const nodeLeft = node.x
+  const nodeTop = node.y
+  const nodeRight = node.x + node.width
+  const nodeBottom = node.y + node.height
+
+  return groups.some((group) => {
+    const groupLeft = group.x
+    const groupTop = group.y
+    const groupRight = group.x + group.width
+    const groupBottom = group.y + group.height
+
+    return (
+      nodeLeft >= groupLeft &&
+      nodeTop >= groupTop &&
+      nodeRight <= groupRight &&
+      nodeBottom <= groupBottom
+    )
+  })
+}
+
+/**
+ * 找到文档中所有不属于当前子图的障碍物包围盒列表。
+ * 包括：所有外部的 Group 节点本身，以及所有不包含在外部 Group 内部的外部游离节点。
+ */
 function findObstacleBBoxes(
   document: CanvasDocument,
   currentSubgraphIds: Set<string>,
   padding: number,
 ): BBox[] {
-  const adjacency = buildAdjacencyList(document.edges)
-  const allNodeIds = new Set(document.nodes.map(n => n.id))
-  const visited = new Set<string>()
   const bboxes: BBox[] = []
 
-  // BFS 找所有连通分量
-  for (const nodeId of allNodeIds) {
-    if (visited.has(nodeId) || currentSubgraphIds.has(nodeId)) continue
+  // 1. 过滤出不属于当前子图的所有节点
+  const externalNodes = document.nodes.filter(n => !currentSubgraphIds.has(n.id))
 
-    // BFS 遍历该连通分量
-    const component: string[] = []
-    const queue = [nodeId]
-    visited.add(nodeId)
+  // 2. 提取其中的 Group 节点
+  const externalGroups = externalNodes.filter(
+    (n): n is CanvasGroupNode => n.type === "group",
+  )
 
-    while (queue.length > 0) {
-      const current = queue.shift()!
-      component.push(current)
-      for (const neighbor of adjacency.get(current) ?? []) {
-        if (!visited.has(neighbor) && !currentSubgraphIds.has(neighbor)) {
-          visited.add(neighbor)
-          queue.push(neighbor)
-        }
-      }
-    }
+  // 3. 提取其中未被任何外部 Group 包含的普通节点
+  const externalOrphanNodes = externalNodes.filter((n) => {
+    if (n.type === "group") return false
+    return !isNodeInGroups(n, externalGroups)
+  })
 
-    // 计算该分量的包围盒（排除 group 节点）
-    const componentNodes = document.nodes.filter(
-      n => component.includes(n.id) && n.type !== "group",
-    )
-    if (componentNodes.length === 0) continue
+  // 4. 为每个外部 Group 生成避让包围盒
+  for (const group of externalGroups) {
+    bboxes.push({
+      x: group.x - padding,
+      y: group.y - padding,
+      width: group.width + padding * 2,
+      height: group.height + padding * 2,
+    })
+  }
 
-    const bbox = computeBBox(componentNodes)
-    if (bbox) {
-      bboxes.push({
-        x: bbox.x - padding,
-        y: bbox.y - padding,
-        width: bbox.width + padding * 2,
-        height: bbox.height + padding * 2,
-      })
-    }
+  // 5. 为每个外部游离节点生成避让包围盒
+  for (const node of externalOrphanNodes) {
+    bboxes.push({
+      x: node.x - padding,
+      y: node.y - padding,
+      width: node.width + padding * 2,
+      height: node.height + padding * 2,
+    })
   }
 
   return bboxes
@@ -687,4 +703,128 @@ function bboxOverlap(a: BBox, b: BBox): boolean {
     && a.x + a.width > b.x
     && a.y < b.y + b.height
     && a.y + a.height > b.y
+}
+
+// ─── Center Offset ────────────────────────────────────────────────────────────
+
+/**
+ * 将 computePositions 输出的坐标（从 (0,0) 开始）偏移回原始子图的中心位置，
+ * 避免重布局后子图跑到画布原点附近与外部元素重叠。
+ */
+function applyOriginalCenterOffset(
+  positions: Map<string, { x: number, y: number }>,
+  subgraphNodes: CanvasNode[],
+): void {
+  if (positions.size === 0 || subgraphNodes.length === 0) return
+
+  // 原始子图中心
+  const originalBBox = computeBBox(subgraphNodes)
+  if (!originalBBox) return
+  const originalCenterX = originalBBox.x + originalBBox.width / 2
+  const originalCenterY = originalBBox.y + originalBBox.height / 2
+
+  // 新布局中心（需要用 positions + 原始节点尺寸计算）
+  const nodeMap = new Map(subgraphNodes.map(n => [n.id, n]))
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [id, pos] of positions) {
+    const node = nodeMap.get(id)
+    if (!node) continue
+    minX = Math.min(minX, pos.x)
+    minY = Math.min(minY, pos.y)
+    maxX = Math.max(maxX, pos.x + node.width)
+    maxY = Math.max(maxY, pos.y + node.height)
+  }
+  if (minX === Infinity) return
+
+  const newCenterX = (minX + maxX) / 2
+  const newCenterY = (minY + maxY) / 2
+
+  // 将所有坐标偏移回原始中心
+  const dx = originalCenterX - newCenterX
+  const dy = originalCenterY - newCenterY
+
+  for (const [id, pos] of positions) {
+    positions.set(id, { x: pos.x + dx, y: pos.y + dy })
+  }
+}
+
+// ─── Minimal Shift Calculation ────────────────────────────────────────────────
+
+/**
+ * 计算最小平移偏移量，使子图脱离所有障碍物。
+ * 优先尝试四个方向的精确逃逸距离，选择平移最小的方案；
+ * 若单方向逃逸不够（多个障碍物），回退到步进搜索。
+ */
+function computeMinimalShift(
+  subject: BBox,
+  obstacles: BBox[],
+  direction: "horizontal" | "vertical",
+  maxAttempts: number,
+): { x: number, y: number } {
+  // 如果当前已无重叠，无需平移
+  if (!obstacles.some(obs => bboxOverlap(subject, obs))) {
+    return { x: 0, y: 0 }
+  }
+
+  const escapeGap = 40
+
+  // 为每个重叠的障碍物计算四个方向的逃逸候选偏移
+  const candidates: { x: number, y: number }[] = []
+  for (const obs of obstacles) {
+    if (!bboxOverlap(subject, obs)) continue
+    // 向右逃逸：子图左边缘移到障碍物右边缘之后
+    candidates.push({ x: (obs.x + obs.width) - subject.x + escapeGap, y: 0 })
+    // 向左逃逸
+    candidates.push({ x: obs.x - (subject.x + subject.width) - escapeGap, y: 0 })
+    // 向下逃逸
+    candidates.push({ x: 0, y: (obs.y + obs.height) - subject.y + escapeGap })
+    // 向上逃逸
+    candidates.push({ x: 0, y: obs.y - (subject.y + subject.height) - escapeGap })
+  }
+
+  // 按平移距离排序，优先主方向
+  candidates.sort((a, b) => {
+    const distA = Math.abs(a.x) + Math.abs(a.y)
+    const distB = Math.abs(b.x) + Math.abs(b.y)
+    if (distA !== distB) return distA - distB
+    // 同距离时优先主方向
+    if (direction === "horizontal") return Math.abs(b.y) - Math.abs(a.y)
+    return Math.abs(b.x) - Math.abs(a.x)
+  })
+
+  // 找到第一个能脱离所有障碍物的偏移
+  for (const candidate of candidates) {
+    const shifted: BBox = {
+      x: subject.x + candidate.x,
+      y: subject.y + candidate.y,
+      width: subject.width,
+      height: subject.height,
+    }
+    if (!obstacles.some(obs => bboxOverlap(shifted, obs))) {
+      return candidate
+    }
+  }
+
+  // 若单方向精确逃逸不够（多个相邻障碍物），回退到步进搜索
+  const stepX = direction === "horizontal" ? 40 : 0
+  const stepY = direction === "vertical" ? 40 : 0
+  let offsetX = 0
+  let offsetY = 0
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    offsetX += stepX
+    offsetY += stepY
+    const shifted: BBox = {
+      x: subject.x + offsetX,
+      y: subject.y + offsetY,
+      width: subject.width,
+      height: subject.height,
+    }
+    if (!obstacles.some(obs => bboxOverlap(shifted, obs))) {
+      return { x: offsetX, y: offsetY }
+    }
+  }
+
+  // 耗尽迭代仍有重叠时返回最后尝试的偏移
+  return { x: offsetX, y: offsetY }
 }

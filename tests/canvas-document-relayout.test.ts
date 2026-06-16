@@ -608,4 +608,274 @@ describe("relayoutConnectedNodes — group constraints", () => {
     // Should fail — no connected nodes outside the group
     expect(result.success).toBe(false)
   })
+
+  it("avoids overlapping with external empty group nodes during relayout", () => {
+    // Subgraph: a -> b (moving to horizontal layout)
+    // External empty group: g_empty is placed directly in the path where 'b' would land if not avoided
+    // Node size is 320x180. a is at (0, 0), after layout a is centered at (0, -90).
+    // b is at (400, -90). So we place the group at (350, -150) with width 300, height 300.
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("a", 0, 0),
+        makeText("b", 0, 0),
+        makeGroup("g_empty", 350, -150, 300, 300),
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "b", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, {
+      selectedNodeId: "a",
+      primaryDirection: "horizontal",
+      layerGap: 80,
+      nodeGap: 32,
+    })
+
+    expect(result.success).toBe(true)
+
+    const a = findNode(result.document, "a")!
+    const b = findNode(result.document, "b")!
+    const g = findNode(result.document, "g_empty")!
+
+    // Verify that neither a nor b overlaps with the empty group g
+    for (const node of [a, b]) {
+      const hasOverlap = node.x < g.x + g.width
+        && node.x + node.width > g.x
+        && node.y < g.y + g.height
+        && node.y + node.height > g.y
+      expect(hasOverlap).toBe(false)
+    }
+  })
+
+  it("avoids overlapping with external group nodes that contain child nodes", () => {
+    // Subgraph: a -> b
+    // External group g_other containing c_other. We place g_other where b would land.
+    // Group is at (350, -150) with size 300x300, containing c_other at (400, -50, size 100x100)
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("a", 0, 0),
+        makeText("b", 0, 0),
+        makeGroup("g_other", 350, -150, 300, 300),
+        makeText("c_other", 400, -50, 100, 100),
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "b", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, {
+      selectedNodeId: "a",
+      primaryDirection: "horizontal",
+      layerGap: 80,
+      nodeGap: 32,
+    })
+
+    expect(result.success).toBe(true)
+
+    const a = findNode(result.document, "a")!
+    const b = findNode(result.document, "b")!
+    const g = findNode(result.document, "g_other")!
+
+    // Verify neither a nor b overlaps with the group g_other (which represents the group area itself)
+    for (const node of [a, b]) {
+      const hasOverlap = node.x < g.x + g.width
+        && node.x + node.width > g.x
+        && node.y < g.y + g.height
+        && node.y + node.height > g.y
+      expect(hasOverlap).toBe(false)
+    }
+  })
+
+  it("avoids overlapping with external group nodes when the current subgraph itself contains a group", () => {
+    // Current Subgraph: g_subgraph (-10, -10, w=360, h=400) containing child 'a'
+    // 'a' is at (0, 0) - inside g_subgraph.
+    // 'b' is at (800, 150) - outside g_subgraph.
+    // Connected: 'a' -> 'b'.
+    // External group: g_external is placed at (350, -150, w=300, h=300) directly in the path of 'b' or layout.
+    const doc: CanvasDocument = {
+      nodes: [
+        makeGroup("g_subgraph", -10, -10, 360, 400),
+        makeText("a", 0, 0),
+        makeText("b", 800, 150),
+        makeGroup("g_external", 350, -150, 300, 300),
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "b", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, {
+      selectedNodeId: "a",
+      primaryDirection: "horizontal",
+      layerGap: 80,
+      nodeGap: 32,
+    })
+
+    expect(result.success).toBe(true)
+
+    const g_sub = findNode(result.document, "g_subgraph")!
+    const b = findNode(result.document, "b")!
+    const g_ext = findNode(result.document, "g_external")!
+
+    // Verify neither g_subgraph nor b overlaps with g_external
+    for (const node of [g_sub, b]) {
+      const hasOverlap = node.x < g_ext.x + g_ext.width
+        && node.x + node.width > g_ext.x
+        && node.y < g_ext.y + g_ext.height
+        && node.y + node.height > g_ext.y
+      expect(hasOverlap).toBe(false)
+    }
+  })
+
+  // ─── 中心保持和大型子图避让测试 ──────────────────────────────────────────────
+
+  it("preserves approximate center position after relayout for a subgraph far from origin", () => {
+    // 子图在 y=3000 附近，外部 group 在 y=0 附近
+    // 重布局后子图中心应仍在 y=3000 附近，不会跑到 y=0
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("root", 500, 3000, 200, 60),
+        makeText("child1", 300, 3200, 250, 150),
+        makeText("child2", 700, 3200, 250, 150),
+        makeText("leaf1", 100, 3500, 200, 120),
+        makeText("leaf2", 500, 3500, 200, 120),
+        makeText("leaf3", 900, 3500, 200, 120),
+        // 外部 group 在 y=-500~500 区域
+        makeGroup("ext_group", -50, -500, 2000, 1000),
+      ],
+      edges: [
+        makeEdge("e1", "root", "right", "child1", "left"),
+        makeEdge("e2", "root", "right", "child2", "left"),
+        makeEdge("e3", "child1", "right", "leaf1", "left"),
+        makeEdge("e4", "child1", "right", "leaf2", "left"),
+        makeEdge("e5", "child2", "right", "leaf3", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, {
+      selectedNodeId: "root",
+      primaryDirection: "horizontal",
+    })
+
+    expect(result.success).toBe(true)
+
+    // 计算重布局后子图的中心 Y 坐标
+    const subgraphNodeIds = ["root", "child1", "child2", "leaf1", "leaf2", "leaf3"]
+    const movedNodes = subgraphNodeIds.map(id => findNode(result.document, id)!)
+    const minY = Math.min(...movedNodes.map(n => n.y))
+    const maxY = Math.max(...movedNodes.map(n => n.y + n.height))
+    const centerY = (minY + maxY) / 2
+
+    // 原始中心 Y ≈ (3000 + 3500+120) / 2 = 3310
+    // 重布局后中心 Y 应在合理范围内（不会跑到 y=0 附近）
+    expect(centerY).toBeGreaterThan(2000)
+    expect(centerY).toBeLessThan(5000)
+
+    // 且不与外部 group 重叠
+    const extGroup = findNode(result.document, "ext_group")!
+    for (const node of movedNodes) {
+      const overlaps = node.x < extGroup.x + extGroup.width
+        && node.x + node.width > extGroup.x
+        && node.y < extGroup.y + extGroup.height
+        && node.y + node.height > extGroup.y
+      expect(overlaps).toBe(false)
+    }
+  })
+
+  it("does not overlap with distant external groups for a large subgraph (>10 nodes)", () => {
+    // 模拟类似"知识"节点场景：多层树形子图 + 远处的外部 group
+    const nodes = [
+      makeText("a", 400, 2500, 150, 60),
+      makeText("b", 200, 2700, 280, 200),
+      makeText("c", 700, 2700, 280, 200),
+      makeText("d", 100, 3000, 250, 150),
+      makeText("e", 400, 3000, 250, 150),
+      makeText("f", 700, 3000, 250, 150),
+      makeText("g", 1000, 3000, 250, 150),
+      makeText("h", 100, 3300, 250, 120),
+      makeText("i", 400, 3300, 250, 120),
+      makeText("j", 700, 3300, 250, 120),
+      makeText("k", 1000, 3300, 250, 120),
+      makeText("l", 1300, 3000, 250, 150),
+      // 外部 group 在 y=-800~600，与子图有 1900px 的间距
+      makeGroup("far_group", -50, -800, 3000, 1400),
+      // 另一个外部 group 在 y=800~1500
+      makeGroup("mid_group", 0, 800, 1500, 700),
+    ]
+
+    const edges = [
+      makeEdge("e1", "a", "right", "b", "left"),
+      makeEdge("e2", "a", "right", "c", "left"),
+      makeEdge("e3", "b", "right", "d", "left"),
+      makeEdge("e4", "b", "right", "e", "left"),
+      makeEdge("e5", "c", "right", "f", "left"),
+      makeEdge("e6", "c", "right", "g", "left"),
+      makeEdge("e7", "d", "right", "h", "left"),
+      makeEdge("e8", "e", "right", "i", "left"),
+      makeEdge("e9", "f", "right", "j", "left"),
+      makeEdge("e10", "g", "right", "k", "left"),
+      makeEdge("e11", "g", "right", "l", "left"),
+    ]
+
+    const doc: CanvasDocument = { nodes, edges }
+
+    const result = relayoutConnectedNodes(doc, {
+      selectedNodeId: "a",
+      primaryDirection: "horizontal",
+    })
+
+    expect(result.success).toBe(true)
+
+    // 验证子图中没有节点与两个外部 group 重叠
+    const subgraphIds = new Set(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"])
+    const farGroup = findNode(result.document, "far_group")!
+    const midGroup = findNode(result.document, "mid_group")!
+
+    for (const node of result.document.nodes) {
+      if (!subgraphIds.has(node.id)) continue
+      for (const group of [farGroup, midGroup]) {
+        const overlaps = node.x < group.x + group.width
+          && node.x + node.width > group.x
+          && node.y < group.y + group.height
+          && node.y + node.height > group.y
+        expect(overlaps, `node ${node.id} should not overlap with ${group.id}`).toBe(false)
+      }
+    }
+  })
+
+  it("handles relayout when subgraph is near but not overlapping external obstacles", () => {
+    // 子图在 y=600，外部 group 在 y=0~500，间距仅 100px
+    // 重布局后应保持不重叠
+    const doc: CanvasDocument = {
+      nodes: [
+        makeText("a", 100, 600, 200, 100),
+        makeText("b", 400, 600, 200, 100),
+        makeText("c", 700, 600, 200, 100),
+        makeGroup("nearby_group", 0, 0, 1000, 500),
+      ],
+      edges: [
+        makeEdge("e1", "a", "right", "b", "left"),
+        makeEdge("e2", "b", "right", "c", "left"),
+      ],
+    }
+
+    const result = relayoutConnectedNodes(doc, {
+      selectedNodeId: "a",
+      primaryDirection: "horizontal",
+    })
+
+    expect(result.success).toBe(true)
+
+    const group = findNode(result.document, "nearby_group")!
+    for (const id of ["a", "b", "c"]) {
+      const node = findNode(result.document, id)!
+      const overlaps = node.x < group.x + group.width
+        && node.x + node.width > group.x
+        && node.y < group.y + group.height
+        && node.y + node.height > group.y
+      expect(overlaps, `node ${id} should not overlap with nearby_group`).toBe(false)
+    }
+  })
 })
+
