@@ -296,5 +296,12 @@
   "colorThemeClassic": "经典彩虹",
   "colorThemeCoolRainbow": "冷调彩虹",
   "colorThemeEarth": "复古大地",
-  "colorThemeNeon": "赛博霓虹"
+  "colorThemeNeon": "赛博霓虹",
+  "settingsPresentationStyleTitle": "播放演示视觉效果",
+  "settingsPresentationStyleDescription": "选择在播放演示时的画布背景表现。",
+  "settingsPresentationStyleZoom": "仅居中放大",
+  "settingsPresentationStyleMask": "背景暗色遮罩",
+  "settingsPresentationAutoPlayIntervalTitle": "自动播放间隔时间",
+  "settingsPresentationAutoPlayIntervalDescription": "在混合模式下，卡片自动切换到下一张的时间（秒）。",
+  "selectionToolbarPlay": "播放演示"
 }

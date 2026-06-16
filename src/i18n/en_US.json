@@ -296,5 +296,12 @@
   "colorThemeClassic": "Classic Rainbow",
   "colorThemeCoolRainbow": "Cool Rainbow",
   "colorThemeEarth": "Retro Earth",
-  "colorThemeNeon": "Cyber Neon"
+  "colorThemeNeon": "Cyber Neon",
+  "settingsPresentationStyleTitle": "Presentation Style",
+  "settingsPresentationStyleDescription": "Select the visual effect when playing a presentation.",
+  "settingsPresentationStyleZoom": "Zoom & Center Only",
+  "settingsPresentationStyleMask": "Dark Background Mask",
+  "settingsPresentationAutoPlayIntervalTitle": "Auto Play Interval",
+  "settingsPresentationAutoPlayIntervalDescription": "Time in seconds before automatically transitioning to the next card.",
+  "selectionToolbarPlay": "Play Presentation"
 }

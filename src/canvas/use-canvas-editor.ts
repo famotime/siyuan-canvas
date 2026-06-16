@@ -116,6 +116,8 @@ import {
 } from "@/canvas/search-bridge"
 
 
+import { useCanvasPresentation } from "@/canvas/use-canvas-presentation"
+
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
 const DEFAULT_SELECTION_TOOLBAR_SIZE = {
   height: 48,
@@ -963,6 +965,23 @@ export function useCanvasEditor(
     historyVersion.value++
   }
 
+  let focusNodeByIdFn: (id: string) => void
+
+  const presentation = useCanvasPresentation({
+    getDocument: () => state.document,
+    getSettings: getPluginSettings,
+    clearSelection: () => {
+      state.selectedEdgeId = ""
+      state.selectedNodeIds = []
+    },
+    selectNode: (nodeId: string) => {
+      state.selectedNodeIds = [nodeId]
+    },
+    focusNode: (nodeId: string) => {
+      focusNodeByIdFn?.(nodeId)
+    }
+  })
+
   // 跟踪 filePath 变化（newCanvas / open* 都会改 filePath），切换文档时清空历史
   watch(
     () => state.filePath,
@@ -980,7 +999,7 @@ export function useCanvasEditor(
     void historyVersion.value
     return history.canRedo
   })
-  const readonly = computed(() => Boolean(state.conflict || plugin.isMobile))
+  const readonly = computed(() => Boolean(state.conflict || plugin.isMobile || presentation.isActive))
   const {
     addNode,
     addNodeAtPosition,
@@ -1051,6 +1070,8 @@ export function useCanvasEditor(
     t,
     viewport,
   })
+
+  focusNodeByIdFn = focusNodeById
 
   const {
     closeFilePickerDialog,
@@ -1496,6 +1517,7 @@ export function useCanvasEditor(
       toggleSelectionPopover,
       updateSelectedEdgeDirection,
       selectedEdgeDirectionMode,
+      presentation,
       defaultCanvasDirectory: computed(() => getPluginSettings().defaultCanvasDirectory),
     },
     ["fileInputRef", "stageRef"],

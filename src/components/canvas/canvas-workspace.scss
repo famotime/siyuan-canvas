@@ -2276,3 +2276,78 @@
   background: var(--canvas-danger-soft);
   color: var(--canvas-danger);
 }
+
+/* ---------------------------------------------------------
+   Presentation Mode (Slideshow)
+   --------------------------------------------------------- */
+.stage--presentation-mask::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 0;
+  pointer-events: none;
+  transition: background-color 0.4s ease-in-out;
+}
+
+html[data-theme-mode="dark"] .stage--presentation-mask::before {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.canvas-presentation-active {
+  /* Dim all nodes and edges by default */
+  .canvas-node {
+    opacity: 0.2;
+    transition: opacity 0.4s ease-in-out, box-shadow 0.4s ease-in-out;
+    pointer-events: none; /* Disable interaction for non-active nodes */
+    
+    &--presentation-history {
+      opacity: 0.6;
+    }
+    
+    &--presentation-next {
+      opacity: 0.8;
+      pointer-events: auto; /* Allow clicking on next branches */
+      cursor: pointer;
+      box-shadow: 0 0 0 2px var(--canvas-accent);
+      
+      &:hover {
+        opacity: 1;
+        box-shadow: 0 0 0 4px var(--canvas-accent);
+      }
+    }
+    
+    &--presentation-current {
+      opacity: 1;
+      pointer-events: auto;
+      z-index: 10;
+      box-shadow: 0 0 0 4px var(--canvas-accent), 0 8px 32px rgba(0,0,0,0.2);
+    }
+  }
+
+  .stage__edge {
+    opacity: 0.1;
+    transition: opacity 0.4s ease-in-out, stroke-width 0.4s ease-in-out;
+    
+    &--presentation-path {
+      opacity: 0.5;
+    }
+    
+    &--presentation-next {
+      opacity: 1;
+      stroke-width: 4px !important;
+      stroke: var(--canvas-accent) !important;
+      animation: pulse-edge 2s infinite;
+    }
+  }
+}
+
+@keyframes pulse-edge {
+  0% { stroke-opacity: 0.6; }
+  50% { stroke-opacity: 1; }
+  100% { stroke-opacity: 0.6; }
+}
+

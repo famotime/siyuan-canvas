@@ -308,7 +308,10 @@
       <section
         ref="stageRef"
         class="stage"
-        :class="{ 'stage--readonly': editor.readonly }"
+        :class="{
+          'stage--readonly': editor.readonly,
+          'stage--presentation-mask': editor.presentation.isActive && plugin.getCanvasSettings().presentationStyle === 'mask'
+        }"
         @pointerdown="handleStagePointerDown"
         @dblclick="handleStageDoubleClick"
         @paste="handleStagePaste"
@@ -347,6 +350,9 @@
         </div>
         <div
           class="stage__world"
+          :class="{
+            'canvas-presentation-active': editor.presentation.isActive && plugin.getCanvasSettings().presentationStyle === 'mask'
+          }"
           :style="{
             height: `${editor.board.height}px`,
             transform: `translate(${editor.viewport.x}px, ${editor.viewport.y}px) scale(${editor.viewport.scale})`,
@@ -479,6 +485,9 @@
                 'canvas-node--search-match': hasCanvasSearchMatch(node.id),
                 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id),
                 'canvas-node--no-header': !showNodeHeader,
+                'canvas-node--presentation-current': editor.presentation.pathHistory.length > 0 && editor.presentation.pathHistory[editor.presentation.pathHistory.length - 1] === node.id,
+                'canvas-node--presentation-history': editor.presentation.pathHistory.includes(node.id),
+                'canvas-node--presentation-next': editor.presentation.availableNextNodes.includes(node.id),
               },
             ]"
             :style="getCanvasNodeStyle(node)"
@@ -638,6 +647,8 @@
                   'stage__edge--hovered': hoveredEdgeId === edge.id,
                   'stage__edge--selected': editor.state.selectedEdgeId === edge.id,
                   'stage__edge--visible': hoveredEdgeId === edge.id || editor.state.selectedEdgeId === edge.id,
+                  'stage__edge--presentation-path': editor.presentation.isActive && editor.presentation.pathHistory.includes(edge.fromNode) && editor.presentation.pathHistory.includes(edge.toNode) && editor.presentation.pathHistory.indexOf(edge.fromNode) < editor.presentation.pathHistory.indexOf(edge.toNode),
+                  'stage__edge--presentation-next': editor.presentation.isActive && editor.presentation.pathHistory.length > 0 && editor.presentation.pathHistory[editor.presentation.pathHistory.length - 1] === edge.fromNode && editor.presentation.availableNextNodes.includes(edge.toNode)
                 }"
                 :d="editor.getEdgePath(edge)"
                 fill="none"
@@ -945,6 +956,20 @@
           @click.stop
           @pointerdown.stop
         >
+          <button
+            v-if="canPlayPresentation"
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-play"
+            :aria-label="t('selectionToolbarPlay')"
+            :data-tooltip="t('selectionToolbarPlay')"
+            type="button"
+            @click.stop="editor.presentation.start(editor.state.selectedNodeIds[0])"
+          >
+            <CanvasIcon
+              class="selection-toolbar__icon"
+              name="play"
+            />
+          </button>
           <button
             class="selection-toolbar__button"
             data-testid="selection-toolbar-delete"
@@ -1617,6 +1642,8 @@
       @close="commandPaletteOpen = false"
     />
 
+    <CanvasPresentationController :editor="editor" />
+
     <input
       ref="fileInputRef"
       accept=".canvas,application/json"
@@ -1661,6 +1688,7 @@ import CanvasFileCard from "@/components/canvas/CanvasFileCard.vue"
 import CanvasMinimap from "@/components/canvas/CanvasMinimap.vue"
 import CanvasWorkspaceTree from "@/components/canvas/CanvasWorkspaceTree.vue"
 import CanvasInspector from "@/components/canvas/CanvasInspector.vue"
+import CanvasPresentationController from "@/components/canvas/CanvasPresentationController.vue"
 import CanvasPngExportDialog from "@/components/canvas/CanvasPngExportDialog.vue"
 import {
   CLEAR_SELECTION_COLOR,
@@ -1728,6 +1756,14 @@ const colorThemePopoverOpen = ref(false)
 const colorThemeButtonRef = ref<HTMLElement>()
 const colorThemePopoverStyle = ref<Record<string, string>>({})
 const contextMenuVisible = ref(false)
+
+const canPlayPresentation = computed(() => {
+  if (editor.state.selectedNodeIds.length !== 1 || editor.state.selectedEdgeId) {
+    return false
+  }
+  const nodeId = editor.state.selectedNodeIds[0]
+  return Array.from(editor.state.document.edges.values()).some(e => e.fromNode === nodeId)
+})
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const contextMenuPath = ref("")
@@ -2157,6 +2193,10 @@ function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
 }
 
 function handleNodeClick(node: CanvasNode, event: MouseEvent) {
+  if (editor.presentation.isActive) {
+    editor.presentation.goTo(node.id)
+    return
+  }
   editor.activateCanvasSurface()
   editor.selectNode(node.id, event)
 }

@@ -14,6 +14,8 @@ export interface CanvasPluginSettings {
   noteCreationDirectory: string
   showCanvasThumbnails: boolean
   showNodeHeader: boolean
+  presentationStyle: "zoom" | "mask"
+  presentationAutoPlayInterval: number
 }
 
 export interface CanvasInspectorSectionsState {
@@ -54,6 +56,8 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     noteCreationDirectory: "",
     showCanvasThumbnails: false,
     showNodeHeader: true,
+    presentationStyle: "zoom",
+    presentationAutoPlayInterval: 3,
   }
 }
 
@@ -149,6 +153,12 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     showNodeHeader: typeof candidate.settings?.showNodeHeader === "boolean"
       ? candidate.settings.showNodeHeader
       : defaults.settings.showNodeHeader,
+    presentationStyle: candidate.settings?.presentationStyle === "mask" || candidate.settings?.presentationStyle === "zoom"
+      ? candidate.settings.presentationStyle
+      : defaults.settings.presentationStyle,
+    presentationAutoPlayInterval: typeof candidate.settings?.presentationAutoPlayInterval === "number" && candidate.settings.presentationAutoPlayInterval >= 1
+      ? candidate.settings.presentationAutoPlayInterval
+      : defaults.settings.presentationAutoPlayInterval,
   }
 
   const defaultInspectorSections = defaults.ui.inspectorSections

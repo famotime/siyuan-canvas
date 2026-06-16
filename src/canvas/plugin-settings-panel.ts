@@ -160,6 +160,53 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     },
   })
 
+  setting.addItem({
+    title: t("settingsPresentationStyleTitle"),
+    description: t("settingsPresentationStyleDescription"),
+    createActionElement: () => {
+      const select = document.createElement("select")
+      select.className = "b3-select fn__flex-center"
+      
+      const optionZoom = document.createElement("option")
+      optionZoom.value = "zoom"
+      optionZoom.textContent = t("settingsPresentationStyleZoom")
+      
+      const optionMask = document.createElement("option")
+      optionMask.value = "mask"
+      optionMask.textContent = t("settingsPresentationStyleMask")
+      
+      select.appendChild(optionZoom)
+      select.appendChild(optionMask)
+      
+      select.value = draft.presentationStyle || "zoom"
+      
+      select.addEventListener("change", () => {
+        draft.presentationStyle = select.value as "zoom" | "mask"
+        void saveDraft()
+      })
+      return select
+    },
+  })
+  setting.addItem({
+    title: t("settingsPresentationAutoPlayIntervalTitle"),
+    description: t("settingsPresentationAutoPlayIntervalDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.className = "b3-text-field fn__flex-center"
+      input.type = "number"
+      input.min = "1"
+      input.max = "60"
+      input.value = (draft.presentationAutoPlayInterval || 3).toString()
+      input.addEventListener("change", () => {
+        const nextValue = Number.parseInt(input.value, 10)
+        draft.presentationAutoPlayInterval = Number.isNaN(nextValue) ? 3 : Math.min(60, Math.max(1, nextValue))
+        input.value = draft.presentationAutoPlayInterval.toString()
+        void saveDraft()
+      })
+      return input
+    },
+  })
+
   setting.open(pluginName)
   return setting
 }
