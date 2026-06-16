@@ -1762,7 +1762,17 @@ const canPlayPresentation = computed(() => {
     return false
   }
   const nodeId = editor.state.selectedNodeIds[0]
-  return Array.from(editor.state.document.edges.values()).some(e => e.fromNode === nodeId)
+  return Array.from(editor.state.document.edges.values()).some(e => {
+    const hasEndArrow = e.endArrow !== false
+    const hasStartArrow = e.startArrow === true
+    const isUndirected = !hasEndArrow && !hasStartArrow
+    
+    const canGoToToNode = hasEndArrow || isUndirected
+    const canGoToFromNode = hasStartArrow || isUndirected
+    
+    return (e.fromNode === nodeId && canGoToToNode) ||
+           (e.toNode === nodeId && canGoToFromNode)
+  })
 })
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
@@ -2162,12 +2172,17 @@ function getIssueLevelLabel(level: "error" | "warning"): string {
 }
 
 function handleStagePointerDown(event: PointerEvent) {
+  if (editor.presentation.isActive) {
+    editor.startPan(event)
+    return
+  }
   commitTextNodeEditing()
   editor.activateCanvasSurface()
   editor.startPan(event)
 }
 
 function handleStageDoubleClick(event: MouseEvent) {
+  if (editor.presentation.isActive) return
   const rect = stageRef.value?.getBoundingClientRect()
   if (!rect) return
   const stageX = event.clientX - rect.left
@@ -2188,6 +2203,9 @@ function handleStagePaste(event: ClipboardEvent) {
 }
 
 function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
+  if (editor.presentation.isActive) {
+    return // Prevent normal dragging/selection logic during presentation
+  }
   editor.activateCanvasSurface()
   editor.handleNodePointerDown(node, event)
 }

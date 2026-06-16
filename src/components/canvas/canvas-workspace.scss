@@ -2302,15 +2302,14 @@ html[data-theme-mode="dark"] .stage--presentation-mask::before {
   .canvas-node {
     opacity: 0.2;
     transition: opacity 0.4s ease-in-out, box-shadow 0.4s ease-in-out;
-    pointer-events: none; /* Disable interaction for non-active nodes */
     
     &--presentation-history {
       opacity: 0.6;
+      cursor: pointer;
     }
     
     &--presentation-next {
       opacity: 0.8;
-      pointer-events: auto; /* Allow clicking on next branches */
       cursor: pointer;
       box-shadow: 0 0 0 2px var(--canvas-accent);
       
@@ -2322,7 +2321,6 @@ html[data-theme-mode="dark"] .stage--presentation-mask::before {
     
     &--presentation-current {
       opacity: 1;
-      pointer-events: auto;
       z-index: 10;
       box-shadow: 0 0 0 4px var(--canvas-accent), 0 8px 32px rgba(0,0,0,0.2);
     }

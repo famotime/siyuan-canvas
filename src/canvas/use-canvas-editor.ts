@@ -1060,6 +1060,7 @@ export function useCanvasEditor(
     newEdgeTargetId,
     newEdgeTargetQuery,
     newEdgeToSide,
+    presentationActive: computed(() => presentation.isActive),
     selectedEdge,
     selectedEdgeAnchors,
     selectedNode,

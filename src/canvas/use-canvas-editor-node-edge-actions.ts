@@ -62,7 +62,8 @@ interface CanvasEditorNodeEdgeActionsOptions {
   newEdgeTargetId: Ref<string>
   newEdgeTargetQuery: Ref<string>
   newEdgeToSide: Ref<CanvasSide>
-  selectedEdge: ComputedRef<CanvasEdge | null>
+  presentationActive?: Ref<boolean>
+  selectedEdge: ComputedRef<CanvasEdge | undefined>
   selectedEdgeAnchors: ComputedRef<{
     from: { x: number, y: number }
     to: { x: number, y: number }
@@ -300,6 +301,11 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
         top: board.value.top,
       },
     )
+
+    // Offset viewport Y by 40px when presentation is active to account for bottom controller
+    if (options.presentationActive?.value) {
+      nextViewport.y -= 40
+    }
 
     viewport.scale = nextViewport.scale
     viewport.x = nextViewport.x

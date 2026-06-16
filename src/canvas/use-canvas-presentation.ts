@@ -25,12 +25,27 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   const availableNextNodes = computed(() => {
     if (!currentNodeId.value) return []
     const edges = getDocument().edges
-    const outEdges = edges.filter(e => e.fromNode === currentNodeId.value)
+    const outEdges = edges.map(e => {
+      const hasEndArrow = e.endArrow !== false
+      const hasStartArrow = e.startArrow === true
+      const isUndirected = !hasEndArrow && !hasStartArrow
+      
+      const canGoToToNode = hasEndArrow || isUndirected
+      const canGoToFromNode = hasStartArrow || isUndirected
+
+      if (e.fromNode === currentNodeId.value && canGoToToNode) {
+        return { edge: e, targetNodeId: e.toNode }
+      }
+      if (e.toNode === currentNodeId.value && canGoToFromNode) {
+        return { edge: e, targetNodeId: e.fromNode }
+      }
+      return null
+    }).filter(item => item !== null) as Array<{ edge: CanvasEdge, targetNodeId: string }>
     
     // Sort edges by some stable metric, e.g., target node spatial Y, then X
-    const targetNodes = outEdges.map(e => {
-      const node = getDocument().nodes.find(n => n.id === e.toNode)
-      return { edge: e, node }
+    const targetNodes = outEdges.map(item => {
+      const node = getDocument().nodes.find(n => n.id === item.targetNodeId)
+      return { edge: item.edge, node }
     }).filter(item => item.node !== undefined)
     
     targetNodes.sort((a, b) => {
@@ -179,19 +194,26 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     next,
     prev,
     goTo: (nodeId: string) => {
-      const isNext = availableNextNodes.value.includes(nodeId)
-      if (isNext) {
-        clearTimer()
-        pathHistory.value.push(currentNodeId.value!)
-        currentNodeId.value = nodeId
+      clearTimer()
+      
+      const historyIndex = pathHistory.value.indexOf(nodeId)
+      if (historyIndex !== -1) {
+        pathHistory.value = pathHistory.value.slice(0, historyIndex)
+        visitedNodes.value = new Set([...pathHistory.value, nodeId])
+      } else if (currentNodeId.value) {
+        pathHistory.value.push(currentNodeId.value)
         visitedNodes.value.add(nodeId)
-        clearSelection()
-        selectNode(nodeId)
-        focusNode(nodeId)
-        
-        if (isPlaying.value) {
-          scheduleNext()
-        }
+      } else {
+        visitedNodes.value.add(nodeId)
+      }
+
+      currentNodeId.value = nodeId
+      clearSelection()
+      selectNode(nodeId)
+      focusNode(nodeId)
+      
+      if (isPlaying.value) {
+        scheduleNext()
       }
     },
     togglePlay,
