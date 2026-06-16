@@ -51,12 +51,12 @@ describe("canvas color themes", () => {
   })
 
   it("buildColorStyles derives 18% opacity background from hex", () => {
-    const theme = getColorThemeById("cool-warm")
+    const theme = getColorThemeById("cool-rainbow")
     const styles = buildColorStyles(theme)
-    // cool-warm slot 1 is #3b82f6 → rgba(59, 130, 246, 0.18)
-    expect(styles["1"].background).toBe("rgba(59, 130, 246, 0.18)")
-    expect(styles["1"].border).toBe("#3b82f6")
-    expect(styles["1"].swatch).toBe("#3b82f6")
+    // cool-rainbow slot 1 is #10b981 → rgba(16, 185, 129, 0.18)
+    expect(styles["1"].background).toBe("rgba(16, 185, 129, 0.18)")
+    expect(styles["1"].border).toBe("#10b981")
+    expect(styles["1"].swatch).toBe("#10b981")
   })
 
   it("all themes have 6 distinct colors (no duplicate border values within a theme)", () => {

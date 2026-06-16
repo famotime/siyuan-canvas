@@ -294,7 +294,7 @@
   "canvasFilePickerNoResults": "No matching canvas files — will use typed path",
   "toolbarColorTheme": "Color Theme",
   "colorThemeClassic": "Classic Rainbow",
-  "colorThemeCoolWarm": "Cool-Warm Mix",
-  "colorThemeWarm": "Warm Gradient",
-  "colorThemeCool": "Cool Gradient"
+  "colorThemeCoolRainbow": "Cool Rainbow",
+  "colorThemeEarth": "Retro Earth",
+  "colorThemeNeon": "Cyber Neon"
 }

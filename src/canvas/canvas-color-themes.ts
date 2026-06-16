@@ -1,4 +1,4 @@
-export type CanvasColorThemeId = "classic" | "cool-warm" | "warm" | "cool"
+export type CanvasColorThemeId = "classic" | "cool-rainbow" | "earth" | "neon"
 
 export interface CanvasColorTheme {
   id: CanvasColorThemeId
@@ -22,39 +22,39 @@ export const CANVAS_COLOR_THEMES: CanvasColorTheme[] = [
     },
   },
   {
-    id: "cool-warm",
-    nameKey: "colorThemeCoolWarm",
+    id: "cool-rainbow",
+    nameKey: "colorThemeCoolRainbow",
     colors: {
-      "1": "#3b82f6",
-      "2": "#22c55e",
-      "3": "#f97316",
-      "4": "#ef4444",
-      "5": "#8b5cf6",
-      "6": "#06b6d4",
+      "1": "#10b981",
+      "2": "#0ea5e9",
+      "3": "#2563eb",
+      "4": "#7c3aed",
+      "5": "#4f46e5",
+      "6": "#059669",
     },
   },
   {
-    id: "warm",
-    nameKey: "colorThemeWarm",
+    id: "earth",
+    nameKey: "colorThemeEarth",
     colors: {
-      "1": "#e11d48",
-      "2": "#ea580c",
-      "3": "#d97706",
-      "4": "#059669",
-      "5": "#2563eb",
-      "6": "#9333ea",
+      "1": "#c77a3a",
+      "2": "#4a6b53",
+      "3": "#8c6239",
+      "4": "#5b7a9c",
+      "5": "#a88d5e",
+      "6": "#7c587f",
     },
   },
   {
-    id: "cool",
-    nameKey: "colorThemeCool",
+    id: "neon",
+    nameKey: "colorThemeNeon",
     colors: {
-      "1": "#4f46e5",
-      "2": "#059669",
-      "3": "#65a30d",
-      "4": "#0ea5e9",
-      "5": "#7c3aed",
-      "6": "#db2777",
+      "1": "#00f0ff",
+      "2": "#bd00ff",
+      "3": "#ff2a85",
+      "4": "#ff9900",
+      "5": "#ccff00",
+      "6": "#00ff66",
     },
   },
 ]

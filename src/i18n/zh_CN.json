@@ -294,7 +294,7 @@
   "canvasFilePickerNoResults": "未找到匹配的 Canvas 文件，将使用输入路径",
   "toolbarColorTheme": "颜色主题",
   "colorThemeClassic": "经典彩虹",
-  "colorThemeCoolWarm": "冷暖交织",
-  "colorThemeWarm": "暖调渐变",
-  "colorThemeCool": "冷调渐变"
+  "colorThemeCoolRainbow": "冷调彩虹",
+  "colorThemeEarth": "复古大地",
+  "colorThemeNeon": "赛博霓虹"
 }

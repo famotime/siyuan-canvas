@@ -111,9 +111,9 @@ describe("colorTheme in plugin settings", () => {
   it("normalizes valid colorTheme", () => {
     const data = normalizeCanvasPluginData({
       version: 1,
-      settings: { colorTheme: "warm" },
+      settings: { colorTheme: "earth" },
     })
-    expect(data.settings.colorTheme).toBe("warm")
+    expect(data.settings.colorTheme).toBe("earth")
   })
 
   it("falls back to classic for invalid colorTheme", () => {

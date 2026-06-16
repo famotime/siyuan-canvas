@@ -94,7 +94,7 @@ function normalizeRecentSourceType(path: string, value: unknown): CanvasRecentFi
 }
 
 export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
-  const VALID_COLOR_THEMES: CanvasColorThemeId[] = ["classic", "cool-warm", "warm", "cool"]
+  const VALID_COLOR_THEMES: CanvasColorThemeId[] = ["classic", "cool-rainbow", "earth", "neon"]
   const defaults = createDefaultCanvasPluginData()
   if (!value || typeof value !== "object") {
     return defaults
