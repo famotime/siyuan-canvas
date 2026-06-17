@@ -46,6 +46,7 @@ import {
 import { setCanvasEmbedDebugEnabled, startCanvasEmbedObserver, stopCanvasEmbedObserver } from "@/canvas/canvas-embed-observer"
 import { insertCanvasEmbed } from "@/canvas/canvas-embed-insert"
 import { getFileText } from "@/api"
+import { runCanvasEmbedCommand } from "@/canvas/canvas-embed-command"
 
 import "@/index.scss"
 
@@ -251,97 +252,30 @@ export default class SiyuanCanvasPlugin extends Plugin {
       title: this.t("insertCanvasEmbedPrompt"),
       defaultDirectory: this.canvasData.settings.defaultCanvasDirectory,
     })
-    let canvasPath = path?.trim().replace(/^["']|["']$/g, '') ?? ""
-    if (!canvasPath) return
-
-    // 支持绝对路径：自动剥离工作区目录前缀，转为工作区相对路径
-    if (/^[a-zA-Z]:[/\\]/.test(canvasPath)) {
-      try {
+    const blockId = await runCanvasEmbedCommand({
+      canvasPath: path,
+      commandProtyle: protyle,
+      debugLog: (message, payload) => this.debugInsertCanvasEmbed(message, payload),
+      getAllEditor: () => getAllEditor?.() ?? [],
+      getFileText,
+      getWorkspaceDir: async () => {
         const resp = await fetchSyncPost('/api/system/getConf', {})
-        const workspaceDir: string | undefined = resp?.data?.conf?.system?.workspaceDir
-        if (workspaceDir) {
-          const normalizedWorkspace = workspaceDir.replace(/\\/g, '/').replace(/\/+$/, '')
-          const normalizedPath = canvasPath.replace(/\\/g, '/')
-          if (normalizedPath.toLowerCase().startsWith(normalizedWorkspace.toLowerCase())) {
-            canvasPath = normalizedPath.slice(normalizedWorkspace.length)
-            if (!canvasPath.startsWith('/')) canvasPath = `/${canvasPath}`
-          }
-        }
-      } catch {
-        // 获取工作区路径失败时保持原路径不变
-      }
-    }
+        return resp?.data?.conf?.system?.workspaceDir
+      },
+      insertCanvasEmbed,
+      lastActiveProtyle: this.lastActiveProtyle,
+      messages: {
+        insertCanvasEmbedFailed: this.t("insertCanvasEmbedFailed"),
+        insertCanvasEmbedNoDocument: this.t("insertCanvasEmbedNoDocument"),
+        insertCanvasEmbedSuccess: this.t("insertCanvasEmbedSuccess"),
+        messageUnableOpenCanvasFile: this.t("messageUnableOpenCanvasFile"),
+      },
+      showMessage,
+    })
 
-    try {
-      const rawStr = await getFileText(canvasPath)
-      if (!rawStr) {
-        this.debugInsertCanvasEmbed("unable to read canvas file", { canvasPath })
-        showMessage(this.t("messageUnableOpenCanvasFile"), 4000, "error")
-        return
-      }
-
-      const docId = this.resolveInsertTargetDocumentId(protyle)
-      if (!docId) {
-        this.debugInsertCanvasEmbed("no target document found", {
-          activeElement: document.activeElement?.className,
-          canvasPath,
-          editorCount: getAllEditor?.()?.length ?? 0,
-          hasCommandProtyle: Boolean(protyle),
-          hasLastActiveProtyle: Boolean(this.lastActiveProtyle),
-          protyleCount: document.querySelectorAll(".protyle").length,
-          wysiwygCount: document.querySelectorAll(".protyle-wysiwyg").length,
-        })
-        showMessage(this.t("insertCanvasEmbedNoDocument"), 4000, "warning")
-        return
-      }
-
-      const blockId = await insertCanvasEmbed({
-        canvasPath,
-        canvasRaw: rawStr,
-        parentBlockId: docId,
-      })
-      if (blockId) {
-        showMessage(this.t("insertCanvasEmbedSuccess"), 3000)
-      } else {
-        showMessage(this.t("insertCanvasEmbedFailed"), 4000, "error")
-      }
-    } catch (error) {
-      this.debugInsertCanvasEmbed("insert failed", { canvasPath, error })
-      showMessage(this.t("insertCanvasEmbedFailed"), 4000, "error")
-    }
-  }
-
-  private resolveInsertTargetDocumentId(protyle?: IProtyle): string {
-    const fromCommand = this.getProtyleRootId(protyle)
-    if (fromCommand) {
+    if (blockId && protyle) {
       this.lastActiveProtyle = protyle!
-      return fromCommand
     }
-
-    const fromLastActive = this.getProtyleRootId(this.lastActiveProtyle)
-    if (fromLastActive) {
-      return fromLastActive
-    }
-
-    const fromEditorList = getAllEditor?.()
-      ?.map(editor => this.getProtyleRootId(editor.protyle))
-      .find(Boolean)
-    if (fromEditorList) {
-      return fromEditorList
-    }
-
-    const wysiwyg = document.querySelector<HTMLElement>(".protyle-wysiwyg[data-node-id]")
-    const fromWysiwyg = wysiwyg?.getAttribute("data-node-id")
-    if (fromWysiwyg) {
-      return fromWysiwyg
-    }
-
-    const docRoot = document.querySelector<HTMLElement>(".protyle-wysiwyg [data-node-id][data-type='NodeDocument']")
-    return docRoot?.getAttribute("data-node-id") || ""
-  }
-
-  private getProtyleRootId(protyle?: IProtyle | null): string {
-    return protyle?.block?.rootID || protyle?.block?.id || protyle?.element?.querySelector<HTMLElement>(".protyle-wysiwyg[data-node-id]")?.getAttribute("data-node-id") || ""
   }
 
   private debugInsertCanvasEmbed(message: string, payload: Record<string, unknown>): void {

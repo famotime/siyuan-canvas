@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 编辑器组合式函数
 
-`src/canvas/use-canvas-editor.ts` 是核心组合入口（~1420 行），组装响应式状态并委托给多个子模块：
+`src/canvas/use-canvas-editor.ts` 是核心组合入口（~1430 行），组装响应式状态并委托给多个子模块：
 
 - `use-canvas-editor-gestures.ts` — 指针手势：平移、框选、拖拽、连线创建、缩放、边重连
 - `use-canvas-editor-file-actions.ts` — 工作区路径、导入/导出、保存/冲突处理
@@ -37,7 +37,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `use-canvas-editor-node-activation.ts` — 双击激活节点
 - `use-canvas-editor-file-picker.ts` — 文件选择器
 - `use-canvas-editor-stage-drop.ts` — 拖放创建文件节点
-- `use-canvas-editor-workspace-tree.ts` — 工作区文档树：目录读取、排序、展开折叠、CRUD、拖拽移动
+- `use-canvas-editor-workspace-tree.ts` — 工作区文档树编排：展开折叠、CRUD、拖拽移动、文案/弹窗依赖注入
+- `workspace-tree-core.ts` — 工作区树纯函数：递归目录读取、排序、路径收集、文件名规范化
+- `canvas-embed-command.ts` — 嵌入画布命令：路径规范化、目标文档解析、文件读取、插入流程
+- `use-canvas-editor-selection-ui.ts` — 选择/边工具栏 UI：位置计算、popover 状态、尺寸跟踪、端点手柄位置
 
 ### 数据流
 
@@ -69,7 +72,7 @@ Vite library mode（CJS 输出），`siyuan` 和 `process` 为外部依赖，输
 ## 目录结构约定
 
 - `src/canvas/` — 核心画布逻辑、类型、格式解析、编辑器状态、文档变换、Markdown 安全
-- `src/components/canvas/` — 画布 Vue 组件（CanvasWorkspace、CanvasWorkspaceTree、CanvasInspector、CanvasPngExportDialog、CanvasFileCard 等）
+- `src/components/canvas/` — 画布 Vue 组件与 UI 组合逻辑（CanvasWorkspace、CanvasWorkspaceTree、CanvasInspector、CanvasPngExportDialog、CanvasFileCard、use-canvas-workspace-context-menu 等）
 - `src/components/SiyuanTheme/` — 思源风格 UI 组件（SyButton、SyInput 等）
 - `src/i18n/` — 国际化（en_US/zh_CN，zh_CN 为回退语言），`canvas.ts` 导出 `createCanvasI18n` 翻译函数。缺失的 en_US 键会自动回退到 zh_CN
 - `src/icons/` — 顶栏图标和 Tab 图标 SVG 字符串

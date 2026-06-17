@@ -2,95 +2,72 @@
 
 ## 1. 项目快照
 
-- 生成日期：2026-06-07
-- 范围：`siyuan-canvas` 编辑器主编排层、重叠检测工具、安全 SQL、Vue 组件样式、测试覆盖
-- 目标：在不改变现有用户行为的前提下，继续压缩 `use-canvas-editor.ts`（当前 1856 行）的职责，消除代码重复，修复安全隐患，补充关键模块测试
+- 生成日期：2026-06-17
+- 范围：`D:\MyCodingProjects\siyuan-canvas`
+- 目标：在不改变 JSON Canvas 行为、SiYuan 插件生命周期和现有 UI 交互的前提下，继续拆分高耦合模块，提高可测性与后续维护效率。
 - 文档刷新目标：`docs/project-structure.md`、`README.md`
-- 当前基线：`pnpm test` 通过（38 个测试文件，350 个测试通过）
-- 前轮重构：RF-101~RF-107 已全部完成（2026-05-19），本轮编号从 RF-201 开始
+- 当前仓库状态：开始分析时 `git status --short` 无输出，工作区干净。
+- 基线验证：`pnpm test` 通过，47 个测试文件、499 个测试用例全部通过。
 
 ## 2. 架构与模块分析
 
 | 模块 | 关键文件 | 当前职责 | 主要痛点 | 测试覆盖情况 |
 | --- | --- | --- | --- | --- |
-| 编辑器主编排层 | `src/canvas/use-canvas-editor.ts`（1856 行） | 聚合状态、子模块装配、返回 ~170 属性绑定对象 | 内联函数 ~500 行（选区导出、文档合并、目录解析、浮层展示等）未提取；SQL 注入风险 | 间接覆盖，无直接测试内联函数 |
-| 重叠检测逻辑 | `use-canvas-editor.ts`（571-596）+ `use-canvas-editor-node-edge-actions.ts`（147-176） | AABB 重叠测试 + 非重叠位置查找 | 两处独立实现，算法相同但命名略有不同 | 无针对性测试 |
-| 调试日志 | `use-canvas-editor.ts`（1220）+ `use-canvas-editor-file-actions.ts`（118） | 条件日志输出 | 完全相同的闭包重复定义 | 无 |
-| CanvasWorkspace.vue（4702 行） | `src/components/canvas/CanvasWorkspace.vue` | 全部画布 UI 渲染 | 样式 2350+ 行内联在 SFC 中，样式改动触发整个文件 diff | 62 个测试覆盖行为 |
-| Markdown 安全 | `markdown-sanitize.ts`（235 行） | XSS 防护：HTML 转义、CSS 颜色验证、标签白名单 | 安全敏感但无独立测试文件，仅通过 `canvas-markdown-preview.test.ts` 间接覆盖 | 10 个间接测试 |
-| 节点/边编辑命令 | `use-canvas-editor-node-edge-actions.ts`（716 行） | 节点增删改、思维导图子/兄弟节点、颜色、连线 | 无独立测试文件 | 仅通过 workspace 测试间接覆盖 |
-| 手势处理 | `use-canvas-editor-gestures.ts`（625 行） | 平移、框选、拖拽、连线创建、缩放 | 复杂交互逻辑仅 1 个测试用例 | 1 个测试 |
+| 插件入口与生命周期 | `src/index.ts`、`src/main.ts`、`src/canvas/plugin-runtime.ts`、`src/canvas/plugin-tabs.ts`、`src/canvas/plugin-settings-panel.ts` | 插件启动、命令注册、设置面板、标签页挂载、最近文件持久化、嵌入画布命令 | `src/index.ts` 仍包含嵌入画布命令的路径归一化、目标文档解析、调试日志与 UI 提示；生命周期职责与命令业务职责混在同一个类中 | `tests/canvas-plugin-lifecycle.test.ts` 覆盖插件加载、命令注册、设置、最近文件、嵌入命令主流程；缺少面向路径归一化与目标文档解析的纯函数级测试 |
+| 编辑器组合入口 | `src/canvas/use-canvas-editor.ts` 及 `use-canvas-editor-*` 子模块 | 聚合状态、视口、选择、文件操作、节点/边动作、手势、快捷键、搜索、演示模式 | 主文件约 1535 行，仍承担大量 computed、UI 状态和动作编排；部分行为虽已委托，但返回对象和依赖注入面较大，继续扩展时容易回归 | `tests/canvas-use-editor-actions.test.ts`、`tests/canvas-editor-*.test.ts` 覆盖广；重构前需补充即将抽取部分的定向测试，避免只依赖大型组合测试 |
+| 工作区文档树 | `src/canvas/use-canvas-editor-workspace-tree.ts`、`src/components/canvas/CanvasWorkspaceTree.vue` | 读取目录树、排序、展开折叠、创建/删除/复制/重命名/移动文件夹与画布文件 | 文件约 528 行，纯目录树算法、SiYuan 文件 API 调用、确认/输入弹窗、英文硬编码提示混在同一 factory；部分测试以注释说明由集成测试覆盖，单测对创建、删除、重命名路径不足 | `tests/canvas-editor-workspace-tree.test.ts` 覆盖读取、排序、展开折叠、移动与最近文件；创建/删除/重命名仍有测试缺口 |
+| UI 工作区壳层 | `src/components/canvas/CanvasWorkspace.vue`、`src/components/canvas/canvas-workspace.scss`、`CanvasFileCard.vue`、`CanvasCreateEdgeDialog.vue`、`CanvasInspector.vue` | 主画布视图、工具栏、舞台、上下文菜单、文件选择器、PNG 导出、检查器联动 | `CanvasWorkspace.vue` 约 2756 行，样式约 2351 行；模板和本地交互状态复杂，继续加功能时认知成本高 | `tests/canvas-workspace.test.ts`、`tests/canvas-file-card.test.ts`、`tests/canvas-create-edge-dialog.test.ts` 覆盖关键交互；如拆分 UI，需要补充子组件行为测试 |
+| 文档与格式核心 | `src/canvas/document.ts`、`document-layout.ts`、`document-group.ts`、`format.ts`、`canvas-history.ts` | JSON Canvas 解析、校验、序列化、节点/边 CRUD、布局、分组、历史 | 已经拆分较清晰；当前不是最高价值重构点 | `tests/canvas-document*.test.ts`、`tests/canvas-format.test.ts`、`tests/canvas-history.test.ts` 覆盖较好 |
+| 文件节点与预览 | `src/canvas/file-target-resolution.ts`、`file-target-preview.ts`、`file-preview-fallbacks.ts`、`file-node-*` | 文件目标解析、预览、兼容旧 file-node API | 主链路已清晰，遗留兼容适配层需要保持稳定，不适合本轮优先改动 | `tests/canvas-file-*.test.ts` 覆盖较完整 |
+| 类型与边界 | `src/canvas/types.ts`、`src/types/*`、`src/canvas/use-canvas-editor-shared.ts` | Canvas 类型、SiYuan ambient typings、插件 bridge 类型 | bridge 类型随着编辑器拆分增长，后续抽模块时需要同步收窄依赖 | 多数通过调用方测试间接覆盖 |
 
 ## 3. 按优先级排序的重构待办
 
 | ID | 优先级 | 模块/场景 | 涉及文件 | 重构目标 | 风险等级 | 重构前测试清单 | 文档影响 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| RF-201 | P0 | 提取选区导出/合并函数 | `use-canvas-editor.ts`，新增 `use-canvas-editor-selection-export.ts` | 将 `decomposeSelectedDocument`、`convertSelectionToDocument`、`convertSelectionToText`、`topologicalSortSelectedNodes`、`buildMergedMarkdown`、`findHeadingBlockIds`、`resolveNoteCreationDirectory`、`showFloatLayerForSelection` 等内联函数提取到独立模块；预计主入口减少 ~350 行 | 中 | - [x] 补测试：选区→文档转换（节点类型、边保留）；- [x] 补测试：选区→文本导出（格式、排序）；- [x] 补测试：拓扑排序正确性；- [x] 跑 `pnpm test` | `project-structure.md` 新增 selection-export 模块 | done |
-| RF-202 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：39 个测试文件，356 个测试通过 | 未刷新文档 | 新增 `node-overlap.ts`（~40 行纯函数）。`doNodesOverlap` + `findNonOverlappingPosition` 统一为共享模块。新增 `canvas-node-overlap.test.ts`（11 个测试）。`use-canvas-editor-node-edge-actions.ts` 中的重复实现改为调用共享模块。 |
-| RF-203 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：39 个测试文件，361 个测试通过 | 未刷新文档 | `siyuan-file-node-lookups.ts` 导出 `escapeSqlString`。`findHeadingBlockIds` 中的 SQL 注入风险已修复。新增 5 个 `escapeSqlString` 测试用例。 |
-| RF-204 | 2026-06-07 | 2026-06-07 | `pnpm test` + `pnpm build` | pass：39 个测试文件，361 个测试通过，构建成功 | 未刷新文档 | `CanvasWorkspace.vue` 从 4702 行减至 2524 行（-2178 行）。样式提取到 `canvas-workspace.scss`（2178 行）。CSS 输出不变（69.03 kB）。 |
-| RF-205 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：39 个测试文件，361 个测试通过 | 未刷新文档 | 新增 `debug-log.ts`（~15 行）。`use-canvas-editor.ts` 和 `use-canvas-editor-file-actions.ts` 中的 `debugLog` 统一为 `createDebugLog` 工厂。 |
-| RF-206 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：40 个测试文件，399 个测试通过 | 未刷新文档 | 新增 `canvas-markdown-sanitize.test.ts`（38 个测试）。覆盖 `escapeHtml`、`sanitizeColorValue`、`sanitizeInlineStyle`、`parseAllowedInlineOpenTag`、`parseAllowedImageTag`、`sanitizeMarkdownPreviewSource` 等安全敏感函数。 |
-| RF-207 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass | 未刷新文档 | workspace 状态已在 RF-101 中充分提取，本轮无额外代码变更。 | | `use-canvas-editor.ts`、`use-canvas-editor-node-edge-actions.ts`，新增 `node-overlap.ts` | 将 `doNodesOverlap` 和 `findNonOverlappingNodePosition` / `findNonOverlappingTextNodePosition` 合并为一个纯函数模块，消除重复实现 | 中 | - [x] 补测试：AABB 重叠边界用例；- [x] 补测试：非重叠位置迭代查找；- [x] 跑 `pnpm test` | `project-structure.md` 新增 node-overlap 工具 | done |
-| RF-203 | P0 | 修复 SQL 注入风险 + 提取文档创建逻辑 | `use-canvas-editor.ts`（752-759 行附近） | 将 `findHeadingBlockIds` 中的字符串拼接 SQL 改为参数化或使用 `escapeSqlString`；将内联 `createDocWithMd` + `sql` 调用封装为可通过依赖注入的纯函数 | 高 | - [x] 补测试：SQL 转义特殊字符场景；- [x] 补测试：文档创建→标题块查询流程；- [x] 跑 `pnpm test` | 无用户可见变更 | done |
-| RF-204 | P1 | 提取 `CanvasWorkspace.vue` 样式到独立文件 | `CanvasWorkspace.vue`，新增 `canvas-workspace.scss` | 将 ~2350 行 scoped styles 移到独立 SCSS 文件，用 `@use` 引入；减少 SFC 体量，降低样式改动的 diff 面 | 低 | - [x] 确认构建后 CSS 输出不变；- [x] 跑 `pnpm test` + `pnpm build` | 无用户可见变更 | done |
-| RF-205 | P1 | 提取 `debugLog` 到共享工具 | `use-canvas-editor.ts`、`use-canvas-editor-file-actions.ts`，新增 `debug-log.ts` | 统一 `debugLog` 实现，通过 `createDebugLog(getPluginSettings)` 工厂创建，消除两处重复闭包 | 低 | - [x] 补测试：debugLog 在开启/关闭设置时的行为；- [x] 跑 `pnpm test` | 无用户可见变更 | done |
-| RF-206 | P1 | 补充关键模块测试 | 新增 `tests/canvas-markdown-sanitize.test.ts`、`tests/canvas-node-edge-actions.test.ts` | 为安全敏感的 `markdown-sanitize.ts` 建立独立测试文件（XSS 回归、颜色验证、标签白名单）；为 `use-canvas-editor-node-edge-actions.ts` 补充节点增删改、思维导图创建等核心命令的单元测试 | 无 | - [x] XSS 回归：script/img/onerror 注入；- [x] CSS 颜色验证：hex/rgb/named/无效值；- [x] kramdown 属性剥离；- [x] 节点增删改基本行为（通过现有集成测试覆盖）；- [x] 跑 `pnpm test` | 测试覆盖提升，无源码变更 | done |
-| RF-207 | P2 | 提取 workspace 相关 UI refs | `use-canvas-editor.ts` → `use-canvas-editor-workspace-tree.ts` | 将 `workspaceSidebarCollapsed`、`workspaceTreeState` 等 workspace 相关的 ref 声明移入已有子模块，减少主入口 ref 数量 | 低 | - [x] 确认所有 workspace 相关绑定正常（已在 RF-101 中完成）；- [x] 跑 `pnpm test` | 无用户可见变更 | done（workspace 状态已在 RF-101 中通过 `createCanvasEditorWorkspaceTree` 充分提取，`inspectorSectionState`/`inspectorExpanded` 属于 Inspector 而非 workspace 文档树，保留在主入口） |
+| RF-001 | P0 | 工作区文档树操作拆分 | `src/canvas/use-canvas-editor-workspace-tree.ts`、`src/canvas/workspace-tree-core.ts`、`tests/canvas-editor-workspace-tree.test.ts`、`tests/canvas-workspace-tree-core.test.ts` | 将目录树读取、排序、路径/文件名处理、递归收集等纯逻辑从 UI 弹窗与 SiYuan 文件 API 操作中拆出；保留原 factory 对外 API 不变 | 中 | - [x] 读取空目录、嵌套目录、非 `.canvas` 文件过滤；- [x] 按名称、更新时间、创建时间排序且文件夹优先；- [x] 收集文件夹路径与画布文件路径；- [x] 移动前同目录与同名冲突由原测试保持覆盖；- [x] 重命名/复制的文件名清洗与 `.canvas` 后缀处理 | `docs/project-structure.md`：新增纯 workspace tree 模块职责；`README.md`：项目结构描述更新 | done |
+| RF-002 | P0 | 嵌入画布命令从插件入口抽离 | `src/index.ts`、`src/canvas/canvas-embed-command.ts`、`tests/canvas-plugin-lifecycle.test.ts`、`tests/canvas-embed-command.test.ts` | 把嵌入画布命令的路径归一化、工作区绝对路径转换、目标文档解析、文件读取与插入流程从插件类中抽出；插件入口只负责注册命令和传入依赖 | 中高 | - [x] 输入为空、带引号路径、工作区绝对路径转换；- [x] 指定 protyle、最后活跃 protyle、编辑器列表、DOM fallback 的目标文档解析顺序；- [x] 读文件失败、无目标文档、插入失败时提示不变；- [x] debug 开关通过入口注入保持原行为 | `docs/project-structure.md`：入口职责更薄，新增嵌入命令模块；`README.md`：项目结构描述更新 | done |
+| RF-003 | P1 | 编辑器选择与浮层编排收窄 | `src/canvas/use-canvas-editor.ts`、`src/canvas/use-canvas-editor-selection-ui.ts`、`tests/canvas-use-editor-actions.test.ts`、`tests/canvas-editor-selection-ui.test.ts` | 抽出 selection toolbar、edge toolbar、popover、尺寸更新与位置计算编排，降低 `use-canvas-editor.ts` 文件长度和返回对象局部复杂度 | 中高 | - [x] 多选节点时选择工具栏位置与尺寸更新；- [x] 选中边时边工具栏位置、端点手柄、标签编辑器位置不变；- [x] 关闭颜色/布局/方向 popover 行为不变；- [x] 演示模式或只读状态下相关交互由原组合测试保持覆盖 | `docs/project-structure.md`：记录 selection UI composable；`README.md`：项目结构描述可能更新 | done |
+| RF-004 | P1 | `CanvasWorkspace.vue` 本地交互状态拆分 | `src/components/canvas/CanvasWorkspace.vue`、`src/components/canvas/use-canvas-workspace-context-menu.ts`、`tests/canvas-workspace-context-menu.test.ts`、`tests/canvas-workspace.test.ts` | 把上下文菜单本地 UI 状态拆为小 composable，模板接口保持不变 | 中 | - [x] 右键菜单打开、关闭、重命名、复制、删除分派正确；- [x] 文件路径复制归一化；- [x] 现有 CanvasWorkspace 交互测试保持通过 | `docs/project-structure.md`：新增 UI composable；`README.md`：项目结构描述可能更新 | done |
+| RF-005 | P2 | 文案与依赖边界一致性清理 | `src/canvas/use-canvas-editor-workspace-tree.ts`、`src/i18n/canvas.ts`、`src/i18n/*.json`、相关测试 | 梳理工作区树中硬编码英文提示，改为注入或 i18n key；减少模块直接依赖弹窗实现 | 低中 | - [x] 创建/删除/重命名/移动提示文案仍能显示；- [x] 中英文 i18n key 完整；- [x] 现有 UI 测试不因文案缺失失败 | `docs/project-structure.md`：说明文案边界；`README.md`：项目结构描述更新 | done |
 
 优先级说明：
-- `P0`：价值和风险都最高，优先执行——涉及安全修复、代码重复消除、大文件瘦身
-- `P1`：中等价值或风险——样式提取、日志统一、测试补充
-- `P2`：低风险清理项，最后处理
+- `P0`：价值和风险都最高，优先执行。
+- `P1`：价值或风险中等，放在 `P0` 之后。
+- `P2`：低风险清理项，最后执行。
 
-状态说明：`pending` → `in_progress` → `done` / `blocked`
+状态说明：
+- `pending`
+- `in_progress`
+- `done`
+- `blocked`
 
 ## 4. 执行日志
 
 | ID | 开始日期 | 结束日期 | 验证命令 | 结果 | 已刷新文档 | 备注 |
 | --- | --- | --- | --- | --- | --- | --- |
-| BASELINE | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：38 个测试文件，345 个测试通过 | — | 新一轮重构前基线 |
-| RF-201 | 2026-06-07 | 2026-06-07 | `pnpm test` + `pnpm build` | pass：38 个测试文件，345 个测试通过，构建成功 | 未刷新文档 | 新增 `use-canvas-editor-selection-export.ts`（526 行，纯函数+工厂）。主入口 `use-canvas-editor.ts` 从 1856 行减至 1421 行（-435 行）。同时清理 14 个仅被提取函数使用的导入和 1 个死导入 `getBlockByID`。`showFloatLayerForSelection`/`closeFloatLayer` 因与编辑器 UI refs 强耦合保留在主文件。 |
-| RF-202 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：39 个测试文件，356 个测试通过 | 未刷新文档 | 新增 `node-overlap.ts`（~40 行纯函数）。`doNodesOverlap` + `findNonOverlappingPosition` 统一为共享模块。新增 11 个测试。 |
-| RF-203 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：39 个测试文件，361 个测试通过 | 未刷新文档 | `escapeSqlString` 已导出并用于 `findHeadingBlockIds`。新增 5 个 SQL 转义测试。 |
-| RF-204 | 2026-06-07 | 2026-06-07 | `pnpm test` + `pnpm build` | pass：361 个测试通过，构建成功 | 未刷新文档 | `CanvasWorkspace.vue` 4702→2524 行（-2178）。样式提取到 `canvas-workspace.scss`。CSS 输出不变。 |
-| RF-205 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：361 个测试通过 | 未刷新文档 | 新增 `debug-log.ts`。两处 `debugLog` 统一为 `createDebugLog` 工厂。 |
-| RF-206 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass：40 个测试文件，399 个测试通过 | 未刷新文档 | 新增 `canvas-markdown-sanitize.test.ts`（38 个测试）。覆盖安全敏感函数。 |
-| RF-207 | 2026-06-07 | 2026-06-07 | `pnpm test` | pass | 未刷新文档 | workspace 状态已在 RF-101 中充分提取，无额外代码变更。 |
+| BASELINE | 2026-06-17 | 2026-06-17 | `pnpm test` | pass：47 个测试文件、499 个测试用例通过 | 无 | 重构前基线验证 |
+| RF-001 | 2026-06-17 | 2026-06-17 | `pnpm test -- tests/canvas-workspace-tree-core.test.ts tests/canvas-editor-workspace-tree.test.ts`；`pnpm test` | pass：48 个测试文件、505 个测试用例通过 | 待最终刷新 | 新增 `workspace-tree-core.ts` 和 6 个纯函数测试，原 workspace tree factory 委托核心函数 |
+| RF-002 | 2026-06-17 | 2026-06-17 | `pnpm test -- tests/canvas-embed-command.test.ts tests/canvas-plugin-lifecycle.test.ts`；`pnpm test` | pass：49 个测试文件、510 个测试用例通过 | 待最终刷新 | 新增 `canvas-embed-command.ts` 和 5 个定向测试，`src/index.ts` 移除嵌入命令内部解析逻辑 |
+| RF-003 | 2026-06-17 | 2026-06-17 | `pnpm test -- tests/canvas-editor-selection-ui.test.ts tests/canvas-selection-toolbar.test.ts`；`pnpm test -- tests/canvas-use-editor-actions.test.ts tests/canvas-editor-shortcuts.test.ts`；`pnpm test` | pass：50 个测试文件、512 个测试用例通过 | 待最终刷新 | 新增 `use-canvas-editor-selection-ui.ts` 和 2 个定向测试，主编辑器委托 toolbar/popover 计算 |
+| RF-004 | 2026-06-17 | 2026-06-17 | `pnpm test -- tests/canvas-workspace-context-menu.test.ts tests/canvas-workspace.test.ts`；`pnpm test` | pass：51 个测试文件、515 个测试用例通过 | 待最终刷新 | 新增 `use-canvas-workspace-context-menu.ts` 和 3 个定向测试，`CanvasWorkspace.vue` 委托上下文菜单状态 |
+| RF-005 | 2026-06-17 | 2026-06-17 | `pnpm test -- tests/canvas-editor-workspace-tree.test.ts tests/canvas-i18n.test.ts`；`pnpm test` | pass：51 个测试文件、516 个测试用例通过 | 待最终刷新 | Workspace tree 支持 labels/prompt/confirm 注入，主编辑器传入 i18n 文案，新增中英文 workspace 文案 key |
 
 ## 5. 决策与确认
 
-- 用户批准的条目：RF-201 ~ RF-207（全部）
-- 延后的条目：无
-- 阻塞条目及原因：无
-
-建议执行顺序：
-1. `RF-201`：先提取选区导出函数，降低主入口最大块的内联代码量
-2. `RF-202`：统一重叠检测，消除明确的代码重复
-3. `RF-203`：修复 SQL 注入风险，安全问题优先
-4. `RF-206`：在重构前先补测试保护网（可与 RF-201~203 交替执行）
-5. `RF-204`、`RF-205`、`RF-207`：低风险清理项，按序执行
+- 用户批准的条目：RF-001、RF-002、RF-003、RF-004、RF-005。
+- 延后的条目：无。
+- 阻塞条目及原因：暂无。
+- 建议执行顺序：先执行 `RF-001`，因为它的纯逻辑边界最清晰、现有测试最集中，能先降低工作区树后续改动风险；随后执行 `RF-002`，继续收窄插件入口职责；`RF-003` 和 `RF-004` 适合在前两项稳定后分批执行；`RF-005` 可在工作区树结构稳定后作为清理项处理。
 
 ## 6. 文档刷新
 
-- `docs/project-structure.md`：已更新——新增 `use-canvas-editor-selection-export.ts`、`node-overlap.ts`、`debug-log.ts`、`canvas-workspace.scss` 模块说明
-- `README.md`：用户可见能力未变化，无需更新
-- 最终同步检查：2026-06-07 完成
+- `docs/project-structure.md`：已刷新，新增 `workspace-tree-core.ts`、`canvas-embed-command.ts`、`use-canvas-editor-selection-ui.ts`、`use-canvas-workspace-context-menu.ts` 及对应测试说明。
+- `README.md`：已刷新 Project structure 小节，用户可见能力描述保持不变，仅更新内部模块结构。
+- 最终同步检查：2026-06-17 完成，最终验证命令为 `pnpm test`。
 
-## 7. 完成总结
+## 7. 下一步
 
-本轮重构（RF-201 ~ RF-207）全部完成。
-
-**代码变化：**
-- `use-canvas-editor.ts`：1856 → 1421 行（-435 行）
-- `CanvasWorkspace.vue`：4702 → 2524 行（-2178 行）
-- 新增模块：`use-canvas-editor-selection-export.ts`（526 行）、`node-overlap.ts`（~40 行）、`debug-log.ts`（~15 行）、`canvas-workspace.scss`（2178 行）
-- 安全修复：`findHeadingBlockIds` SQL 注入风险已修复
-
-**测试变化：**
-- 基线：38 个测试文件，345 个测试
-- 完成后：40 个测试文件，399 个测试（+54 个测试）
-
-**已刷新文档：**
-- `docs/refactor-plan.md` — 本文件
-- `docs/project-structure.md` — 新增模块说明
+1. 如需发布，按常规流程执行 `pnpm build` 或 release 脚本。
+2. 如需提交，建议提交信息：`refactor: 拆分工作区树与画布嵌入命令边界`。
+3. 后续可继续拆分 `CanvasWorkspace.vue` 的文件选择器键盘导航与颜色主题弹层状态。

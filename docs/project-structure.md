@@ -3,7 +3,7 @@
 ## Entry And Host Integration
 
 - `src/index.ts`
-  SiYuan plugin entry. Owns lifecycle orchestration, command registration, recent-file persistence, and delegates runtime detection, settings UI, and tab wiring to focused helpers.
+  SiYuan plugin entry. Owns lifecycle orchestration, command registration, recent-file persistence, and delegates runtime detection, settings UI, tab wiring, and canvas embed command execution to focused helpers.
 - `src/main.ts`
   Vue mount/unmount bridge for canvas tabs. Binds the plugin instance, mounts `App.vue`, and keeps host theme state synchronized with the canvas root.
 - `src/App.vue`
@@ -45,6 +45,8 @@
   Groups picker-search results for the bottom-toolbar file action.
 - `src/canvas/workspace-image-files.ts`
   Derives sibling asset directories and writes pasted workspace image files.
+- `src/canvas/workspace-tree-core.ts`
+  Pure workspace tree helpers for recursive directory reading, folder/file sorting, path collection, and workspace filename normalization.
 - `src/canvas/plugin-data.ts`
   Plugin settings and recent-file normalization helpers.
 - `src/canvas/plugin-runtime.ts`
@@ -53,10 +55,14 @@
   Settings panel builder for canvas-specific plugin options.
 - `src/canvas/plugin-tabs.ts`
   Shared tab registration and tab opening helpers.
+- `src/canvas/canvas-embed-command.ts`
+  Canvas embed command pipeline: path normalization, workspace absolute-path conversion, target document resolution, file loading, insertion, and message/debug handling with injected dependencies.
 - `src/canvas/use-canvas-editor.ts`
   Main composition entry for the editor. Coordinates state, computed view models, node/edge actions, and keyboard shortcuts.
 - `src/canvas/use-canvas-editor-selection-export.ts`
   Selection export and document merge logic: decompose, convert selection to document/text, topological sort, markdown merge. Pure helpers exported directly; impure functions via factory with injected dependencies.
+- `src/canvas/use-canvas-editor-selection-ui.ts`
+  Selection and edge toolbar UI composition: popover state, toolbar sizing, edge handle positions, and viewport-aware toolbar placement.
 - `src/canvas/use-canvas-editor-file-actions.ts`
   Workspace path normalization, import/export, save/conflict flows, and recent-file refresh logic.
 - `src/canvas/use-canvas-editor-file-nodes.ts`
@@ -90,6 +96,8 @@
   Shared card color, swatch, and group-label display helpers.
 - `src/components/canvas/use-canvas-workspace-behavior.ts`
   Inline text editing and floating-toolbar/theme observer behavior.
+- `src/components/canvas/use-canvas-workspace-context-menu.ts`
+  Workspace tree context-menu state and command dispatch for rename, copy, path copy, open-in-folder, new item, and delete actions.
 - `src/components/SiyuanTheme/*`
   Reusable theme-aligned form controls for the inspector.
 
@@ -112,6 +120,14 @@
   Pure helper coverage for preview image candidate generation and HTML source replacement.
 - `tests/canvas-workspace-display.test.ts`
   Pure display helper coverage for color and group-label styling.
+- `tests/canvas-workspace-tree-core.test.ts`
+  Pure workspace tree coverage for directory filtering, sorting, path collection, and filename normalization.
+- `tests/canvas-embed-command.test.ts`
+  Canvas embed command coverage for path normalization, target document fallback order, and no-target warning behavior.
+- `tests/canvas-editor-selection-ui.test.ts`
+  Selection UI composable coverage for toolbar placement, size updates, edge toolbar visibility, and popover closing.
+- `tests/canvas-workspace-context-menu.test.ts`
+  Workspace context-menu composable coverage for state, command dispatch, and copied path normalization.
 - `tests/canvas-plugin-lifecycle.test.ts`
   Plugin entry lifecycle, settings panel, and tab opening coverage.
 - `tests/canvas-theme-sync.test.ts`

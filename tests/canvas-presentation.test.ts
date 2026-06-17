@@ -363,4 +363,74 @@ describe('useCanvasPresentation', () => {
       vi.useRealTimers()
     }
   })
+
+  it('continues recording from the end node of the saved path when starting recording with a saved path already present', () => {
+    const document: CanvasDocument = {
+      edges: [],
+      nodes: [createNode('a'), createNode('b'), createNode('c'), createNode('d')],
+      presentation: {
+        recordedPath: ['a', 'b', 'c'],
+      },
+    }
+    const { presentation, savedPaths } = createPresentation(document)
+
+    expect(presentation.hasRecordedPath).toBe(true)
+
+    // 在已有保存路径的情况下开启录制
+    presentation.toggleRecording()
+
+    expect(presentation.isRecording).toBe(true)
+    expect(presentation.currentNodeId).toBe('c') // 应当跳转到已保存路径的最后一个节点 'c'
+    expect(presentation.pathHistory).toEqual(['a', 'b']) // 游历历史应当初始化为除了最后一个节点的其余节点
+
+    // 继续添加节点
+    presentation.goTo('d')
+    presentation.toggleRecording() // 结束录制
+
+    // 保存的路径应该是延长的路径 ['a', 'b', 'c', 'd']
+    expect(savedPaths).toEqual([['a', 'b', 'c', 'd']])
+  })
+
+  it('truncates the path and continues recording from the current step when stepping back to a node during playback and starting recording', () => {
+    const document: CanvasDocument = {
+      edges: [],
+      nodes: [createNode('a'), createNode('b'), createNode('c'), createNode('d'), createNode('e')],
+      presentation: {
+        recordedPath: ['a', 'b', 'c', 'd'],
+      },
+    }
+    const { presentation, savedPaths } = createPresentation(document)
+
+    expect(presentation.hasRecordedPath).toBe(true)
+
+    // 启动演示
+    presentation.start('a')
+    
+    // 模拟播放走到 'd'
+    presentation.next() // b
+    presentation.next() // c
+    presentation.next() // d
+    expect(presentation.currentNodeId).toBe('d')
+
+    // 退回两步到 'b'
+    presentation.prev() // c
+    presentation.prev() // b
+    expect(presentation.currentNodeId).toBe('b')
+
+    // 点击录制按钮开始录制
+    presentation.toggleRecording()
+
+    expect(presentation.isRecording).toBe(true)
+    expect(presentation.currentNodeId).toBe('b')
+    expect(presentation.pathHistory).toEqual(['a'])
+
+    // 继续添加节点 'e'
+    presentation.goTo('e')
+    presentation.toggleRecording() // 结束录制
+
+    // 最终保存的路径应该是截断后延长的路径 ['a', 'b', 'e']
+    expect(savedPaths).toEqual([['a', 'b', 'e']])
+  })
 })
+
+

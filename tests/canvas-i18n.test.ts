@@ -22,9 +22,11 @@ describe("canvas i18n", () => {
     const t = createCanvasI18n({
       toolbarGraphStats: "{nodes} 个节点 / {edges} 条连线",
       selectionCount: "已选择 {count} 个节点。",
+      workspaceDeleteFolderDescription: "删除“{name}”及其所有内容？",
     })
 
     expect(t("toolbarGraphStats", { edges: 3, nodes: 5 })).toBe("5 个节点 / 3 条连线")
     expect(t("selectionCount", { count: 2 })).toBe("已选择 2 个节点。")
+    expect(t("workspaceDeleteFolderDescription", { name: "项目" })).toBe("删除“项目”及其所有内容？")
   })
 })

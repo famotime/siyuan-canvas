@@ -309,9 +309,29 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     playbackMode.value = "graph"
     recordedPlaybackPath.value = []
     recordedPlaybackIndex.value = 0
-    recordedDraftPath.value = currentNodeId.value ? [currentNodeId.value] : []
-    visitedNodes.value = new Set(currentNodeId.value ? [currentNodeId.value] : [])
-    pathHistory.value = []
+
+    const savedPath = validSavedRecordedPath.value
+    if (savedPath.length > 0) {
+      if (currentNodeId.value) {
+        const currentPath = [...pathHistory.value, currentNodeId.value]
+        recordedDraftPath.value = [...currentPath]
+        visitedNodes.value = new Set(currentPath)
+        pathHistory.value = currentPath.slice(0, currentPath.length - 1)
+      } else {
+        recordedDraftPath.value = [...savedPath]
+        const lastNodeId = savedPath[savedPath.length - 1]
+        currentNodeId.value = lastNodeId
+        visitedNodes.value = new Set(savedPath)
+        pathHistory.value = savedPath.slice(0, savedPath.length - 1)
+        clearSelection()
+        selectNode(lastNodeId)
+        focusNode(lastNodeId)
+      }
+    } else {
+      recordedDraftPath.value = currentNodeId.value ? [currentNodeId.value] : []
+      visitedNodes.value = new Set(currentNodeId.value ? [currentNodeId.value] : [])
+      pathHistory.value = []
+    }
   }
 
   const finishRecording = () => {

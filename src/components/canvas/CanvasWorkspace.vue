@@ -1698,6 +1698,7 @@ import {
   selectionColorStyles,
 } from "@/components/canvas/canvas-workspace-display"
 import { useCanvasWorkspaceBehavior } from "@/components/canvas/use-canvas-workspace-behavior"
+import { useCanvasWorkspaceContextMenu } from "@/components/canvas/use-canvas-workspace-context-menu"
 import { createCanvasI18n } from "@/i18n/canvas"
 import type {
   CanvasEdge,
@@ -1755,7 +1756,27 @@ const sortDropdownOpen = ref(false)
 const colorThemePopoverOpen = ref(false)
 const colorThemeButtonRef = ref<HTMLElement>()
 const colorThemePopoverStyle = ref<Record<string, string>>({})
-const contextMenuVisible = ref(false)
+const {
+  closeContextMenu,
+  contextMenuCopy,
+  contextMenuCopyPath,
+  contextMenuDelete,
+  contextMenuNewDocument,
+  contextMenuNewSubfolder,
+  contextMenuOpenInExplorer,
+  contextMenuRename,
+  contextMenuType,
+  contextMenuVisible,
+  contextMenuX,
+  contextMenuY,
+  onContextMenu,
+} = useCanvasWorkspaceContextMenu({
+  copyPath: path => navigator.clipboard.writeText(path),
+  editor,
+  showCopyPathSuccess: () => {
+    showMessage(t("contextMenuCopyPathSuccess"), 2000)
+  },
+})
 
 const presentationPathNodeIds = computed(() => [
   ...editor.presentation.pathHistory,
@@ -1779,10 +1800,6 @@ const canPlayPresentation = computed(() => {
            (e.toNode === nodeId && canGoToFromNode)
   })
 })
-const contextMenuX = ref(0)
-const contextMenuY = ref(0)
-const contextMenuPath = ref("")
-const contextMenuType = ref<'file' | 'folder'>('file')
 const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
 const settingsRevision = ref(0)
@@ -1991,64 +2008,6 @@ function onDragEnd() {
   if (dragExpandTimer) {
     clearTimeout(dragExpandTimer)
     dragExpandTimer = null
-  }
-}
-
-function onContextMenu(event: MouseEvent, path: string, type: 'file' | 'folder') {
-  contextMenuPath.value = path
-  contextMenuType.value = type
-  contextMenuX.value = event.clientX
-  contextMenuY.value = event.clientY
-  contextMenuVisible.value = true
-}
-
-function closeContextMenu() {
-  contextMenuVisible.value = false
-}
-
-function contextMenuRename() {
-  closeContextMenu()
-  if (contextMenuType.value === 'file') {
-    editor.renameWorkspaceDocument(contextMenuPath.value)
-  } else {
-    editor.renameWorkspaceFolder(contextMenuPath.value)
-  }
-}
-
-function contextMenuCopy() {
-  closeContextMenu()
-  editor.copyWorkspaceDocument(contextMenuPath.value)
-}
-
-function contextMenuCopyPath() {
-  closeContextMenu()
-  const filePath = contextMenuPath.value.startsWith('/') ? contextMenuPath.value : `/${contextMenuPath.value}`
-  navigator.clipboard.writeText(filePath).then(() => {
-    showMessage(t("contextMenuCopyPathSuccess"), 2000)
-  })
-}
-
-function contextMenuOpenInExplorer() {
-  closeContextMenu()
-  editor.openInExplorer(contextMenuPath.value)
-}
-
-function contextMenuNewSubfolder() {
-  closeContextMenu()
-  editor.createWorkspaceFolder()
-}
-
-function contextMenuNewDocument() {
-  closeContextMenu()
-  editor.newCanvas()
-}
-
-function contextMenuDelete() {
-  closeContextMenu()
-  if (contextMenuType.value === 'file') {
-    editor.deleteWorkspaceDocument(contextMenuPath.value)
-  } else {
-    editor.deleteWorkspaceFolder(contextMenuPath.value)
   }
 }
 

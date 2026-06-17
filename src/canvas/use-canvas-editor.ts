@@ -74,6 +74,7 @@ import { createCanvasEditorKeyboardHandler } from "@/canvas/use-canvas-editor-sh
 import {
   createCanvasEditorSelectionExport,
 } from "@/canvas/use-canvas-editor-selection-export"
+import { createCanvasEditorSelectionUi } from "@/canvas/use-canvas-editor-selection-ui"
 import { createDebugLog } from "@/canvas/debug-log"
 import { createCanvasBlockJumpHighlighter } from "@/canvas/block-jump-highlight"
 import { BLOCK_NAVIGATION_ACTIONS } from "@/canvas/protyle-navigation"
@@ -103,8 +104,6 @@ import { SiyuanCanvasTextGateway } from "@/canvas/siyuan-text-gateway"
 import {
   createEdgeCurvePath,
   getEdgeMidpointPosition,
-  resolveEdgeToolbarPosition,
-  resolveSelectionToolbarPosition,
 } from "@/canvas/selection-toolbar"
 import {
   collectCanvasSearchTargets,
@@ -119,10 +118,6 @@ import {
 import { useCanvasPresentation } from "@/canvas/use-canvas-presentation"
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
-const DEFAULT_SELECTION_TOOLBAR_SIZE = {
-  height: 48,
-  width: 220,
-}
 const SELECTION_COLORS = ["1", "2", "3", "4", "5", "6"] as const
 
 export function useCanvasEditor(
@@ -172,11 +167,35 @@ export function useCanvasEditor(
     plugin,
     refreshRecentFiles,
     onFilePathUpdate: (path) => { state.filePath = path },
+    labels: {
+      copyTitle: t("contextMenuCopy"),
+      deleteCanvasDescription: path => t("workspaceDeleteCanvasDescription", { path }),
+      deleteCanvasTitle: t("workspaceDeleteCanvasTitle"),
+      deleteFolderDescription: name => t("workspaceDeleteFolderDescription", { name }),
+      deleteFolderTitle: t("contextMenuDeleteFolderConfirm"),
+      dialogCancel: t("dialogCancel"),
+      dialogConfirm: t("dialogConfirm"),
+      fileAlreadyExistsMessage: t("messageFileAlreadyExists"),
+      folderNameTitle: t("workspaceFolderNameTitle"),
+      messageFileCopied: name => t("workspaceFileCopied", { name }),
+      messageFileMoved: (name, folder) => t("messageFileMoved", { folder, name }),
+      messageFileRenamed: name => t("messageFileRenamed", { name }),
+      messageFolderRenamed: name => t("workspaceFolderRenamed", { name }),
+      newFolderMessage: name => t("workspaceNewFolder", { name }),
+      notAvailableInBrowserMessage: t("workspaceNotAvailableInBrowser"),
+      renameFolderTitle: t("workspaceRenameFolderTitle"),
+      renameTitle: t("contextMenuRename"),
+      unableToCopyFileMessage: t("workspaceUnableCopyFile"),
+      unableToGetWorkspacePathMessage: t("workspaceUnableGetWorkspacePath"),
+      unableToMoveFileMessage: t("messageUnableMoveFile"),
+      unableToOpenFolderMessage: t("workspaceUnableOpenFolder"),
+      unableToRenameFileMessage: t("messageUnableRenameFile"),
+      unableToRenameFolderMessage: t("workspaceUnableRenameFolder"),
+      unableToSaveMessage: t("messageUnableSaveCanvas"),
+    },
   })
 
   const suggestedFilename = ref(bootstrap.title || t("untitledCanvas"))
-  const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
-  const edgeToolbarPopover = ref<"closed" | "color" | "direction">("closed")
   const floatLayerActive = ref(false)
   const bottomToolbarVisible = ref(false)
   const createEdgeDialog = reactive({
@@ -197,10 +216,6 @@ export function useCanvasEditor(
       plugin.getCanvasUiState?.().inspectorSections
       ?? createDefaultCanvasPluginUiState().inspectorSections
     ),
-  })
-  const selectionToolbarSize = reactive({
-    height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
-    width: DEFAULT_SELECTION_TOOLBAR_SIZE.width,
   })
   const selectionBox = reactive<CanvasEditorSelectionBoxState>({
     height: 0,
@@ -235,10 +250,6 @@ export function useCanvasEditor(
   const newEdgeTargetQuery = ref("")
   const newEdgeToSide = ref<CanvasSide>("left")
   const inspectorExpanded = ref(true)
-  const edgeToolbarSize = reactive({
-    height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,
-    width: 240,
-  })
   const editingEdgeLabelId = ref("")
   const edgeLabelDraft = ref("")
 
@@ -322,78 +333,25 @@ export function useCanvasEditor(
   )
   const board = computed(() => createCanvasBoardMetrics(state.document.nodes))
   const canDelete = computed(() => Boolean(state.selectedNodeIds.length || selectedEdge.value))
-  const selectedEdgeAnchors = computed(() => {
-    if (!selectedEdge.value) {
-      return null
-    }
-
-    const fromNode = state.document.nodes.find((node) => node.id === selectedEdge.value?.fromNode)
-    const toNode = state.document.nodes.find((node) => node.id === selectedEdge.value?.toNode)
-    if (!fromNode || !toNode) {
-      return null
-    }
-
-    return {
-      from: getCanvasNodeAnchor(fromNode, selectedEdge.value.fromSide),
-      to: getCanvasNodeAnchor(toNode, selectedEdge.value.toSide),
-    }
-  })
-  const edgeToolbar = computed(() => {
-    const stage = stageRef.value
-    const anchors = selectedEdgeAnchors.value
-
-    if (!stage || !selectedEdge.value || !anchors || state.selectedNodeIds.length > 0) {
-      return {
-        placement: "top" as const,
-        visible: false,
-        x: 0,
-        y: 0,
-      }
-    }
-
-    const midpoint = getEdgeMidpointPosition(
-      {
-        x: toBoardX(board.value, anchors.from.x),
-        y: toBoardY(board.value, anchors.from.y),
-      },
-      selectedEdge.value.fromSide,
-      {
-        x: toBoardX(board.value, anchors.to.x),
-        y: toBoardY(board.value, anchors.to.y),
-      },
-      selectedEdge.value.toSide,
-    )
-
-    return {
-      ...resolveEdgeToolbarPosition(
-        {
-          x: midpoint.x * viewport.scale + viewport.x,
-          y: midpoint.y * viewport.scale + viewport.y,
-        },
-        {
-          height: stage.clientHeight,
-          width: stage.clientWidth,
-        },
-        edgeToolbarSize,
-      ),
-      visible: true,
-    }
-  })
-  const selectedEdgeHandlePositions = computed(() => {
-    if (!selectedEdge.value || !selectedEdgeAnchors.value) {
-      return null
-    }
-
-    return {
-      from: {
-        x: toBoardX(board.value, selectedEdgeAnchors.value.from.x) * viewport.scale + viewport.x,
-        y: toBoardY(board.value, selectedEdgeAnchors.value.from.y) * viewport.scale + viewport.y,
-      },
-      to: {
-        x: toBoardX(board.value, selectedEdgeAnchors.value.to.x) * viewport.scale + viewport.x,
-        y: toBoardY(board.value, selectedEdgeAnchors.value.to.y) * viewport.scale + viewport.y,
-      },
-    }
+  const {
+    closeEdgePopover,
+    closeSelectionPopover,
+    edgeToolbar,
+    edgeToolbarPopover,
+    selectedEdgeAnchors,
+    selectedEdgeHandlePositions,
+    selectionToolbar,
+    selectionToolbarPopover,
+    setEdgeToolbarSize,
+    setSelectionToolbarSize,
+  } = createCanvasEditorSelectionUi({
+    board,
+    getCanvasNodeAnchor,
+    selectedEdge,
+    selectionBounds,
+    stageRef,
+    state,
+    viewport,
   })
   const selectedEdgeDirectionMode = computed<"both" | "none" | "single">(() => {
     if (!selectedEdge.value) {
@@ -442,38 +400,6 @@ export function useCanvasEditor(
     return {
       x: midpoint.x * viewport.scale + viewport.x,
       y: midpoint.y * viewport.scale + viewport.y,
-    }
-  })
-  const selectionToolbar = computed(() => {
-    const stage = stageRef.value
-    const bounds = selectionBounds.value
-
-    if (!stage || !bounds || selectedEdge.value) {
-      return {
-        placement: "top" as const,
-        visible: false,
-        x: 0,
-        y: 0,
-      }
-    }
-
-    const selectionRect = {
-      height: bounds.height * viewport.scale,
-      width: bounds.width * viewport.scale,
-      x: toBoardX(board.value, bounds.x) * viewport.scale + viewport.x,
-      y: toBoardY(board.value, bounds.y) * viewport.scale + viewport.y,
-    }
-
-    return {
-      ...resolveSelectionToolbarPosition(
-        selectionRect,
-        {
-          height: stage.clientHeight,
-          width: stage.clientWidth,
-        },
-        selectionToolbarSize,
-      ),
-      visible: state.selectedNodeIds.length > 0,
     }
   })
   const selectionColors = computed(() => [...SELECTION_COLORS])
@@ -799,14 +725,6 @@ export function useCanvasEditor(
     resetViewport()
   }
 
-  function closeSelectionPopover() {
-    selectionToolbarPopover.value = "closed"
-  }
-
-  function closeEdgePopover() {
-    edgeToolbarPopover.value = "closed"
-  }
-
   function closeFloatLayer() {
     const panels = (window as any).siyuan?.blockPanels
     if (Array.isArray(panels)) {
@@ -856,26 +774,6 @@ export function useCanvasEditor(
       ...(targetElement ? { targetElement } : {}),
     })
     floatLayerActive.value = true
-  }
-
-  function setSelectionToolbarSize(size: { height: number, width: number }) {
-    if (size.width > 0) {
-      selectionToolbarSize.width = size.width
-    }
-
-    if (size.height > 0) {
-      selectionToolbarSize.height = size.height
-    }
-  }
-
-  function setEdgeToolbarSize(size: { height: number, width: number }) {
-    if (size.width > 0) {
-      edgeToolbarSize.width = size.width
-    }
-
-    if (size.height > 0) {
-      edgeToolbarSize.height = size.height
-    }
   }
 
   const {

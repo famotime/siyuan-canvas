@@ -31,9 +31,10 @@ SiYuan Canvas is a SiYuan plugin for importing, editing, and exporting Obsidian 
 
 ## Project structure
 
-- `src/index.ts` keeps the plugin lifecycle thin and delegates runtime detection, tab wiring, and settings UI to focused helpers in `src/canvas/`.
-- `src/canvas/use-canvas-editor.ts` is the editor composition entry, with file actions, file-node metadata, and pointer gestures split into dedicated `use-canvas-editor-*` modules.
-- `src/components/canvas/CanvasWorkspace.vue` remains the main workspace composition view, with `CanvasFileCard.vue` and `CanvasCreateEdgeDialog.vue` extracting file preview and edge-dialog UI from the large SFC.
+- `src/index.ts` keeps the plugin lifecycle thin and delegates runtime detection, tab wiring, settings UI, and canvas embed command execution to focused helpers in `src/canvas/`.
+- `src/canvas/use-canvas-editor.ts` is the editor composition entry, with file actions, file-node metadata, pointer gestures, selection toolbar UI, and workspace tree helpers split into dedicated modules.
+- `src/components/canvas/CanvasWorkspace.vue` remains the main workspace composition view, with `CanvasFileCard.vue`, `CanvasCreateEdgeDialog.vue`, and workspace context-menu helpers extracting focused UI behavior from the large SFC.
+- `src/canvas/workspace-tree-core.ts` and `src/canvas/canvas-embed-command.ts` isolate pure workspace tree logic and embed-command orchestration behind testable dependency-injected APIs.
 - `src/canvas/file-target-resolution.ts`, `src/canvas/file-target-preview.ts`, and `src/canvas/file-preview-fallbacks.ts` now form the primary file preview pipeline, while older `file-node-*` modules are compatibility adapters.
 - `src/canvas/siyuan-file-node-lookups.ts` contains pure lookup logic for SiYuan document and asset resolution, with runtime SQL access isolated in `src/canvas/siyuan-kernel-file-node-lookups.ts`.
 - `tests/` mirrors the canvas modules with focused Vitest coverage for editor flows, plugin lifecycle, theme sync, display helpers, parsing, geometry, and persistence.

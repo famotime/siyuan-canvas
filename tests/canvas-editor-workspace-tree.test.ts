@@ -48,7 +48,13 @@ describe("workspace tree", () => {
     vi.restoreAllMocks()
   })
 
-  function createTree(overrides: { getSettings?: () => CanvasPluginSettings } = {}) {
+  function createTree(overrides: Parameters<typeof createCanvasEditorWorkspaceTree>[0] extends infer Deps
+    ? {
+        getSettings?: () => CanvasPluginSettings
+        labels?: Partial<Deps extends { labels?: infer Labels } ? Labels : never>
+        promptText?: Deps extends { promptText?: infer PromptText } ? PromptText : never
+      }
+    : { getSettings?: () => CanvasPluginSettings } = {}) {
     return createCanvasEditorWorkspaceTree({
       readDir: readDirMock as MockReadDir,
       putFile: putFileMock,
@@ -58,6 +64,8 @@ describe("workspace tree", () => {
       plugin: { removeRecentCanvasFile: removeRecentCanvasFileMock, updateCanvasUiState: vi.fn() },
       refreshRecentFiles: refreshRecentFilesMock,
       onFilePathUpdate: onFilePathUpdateMock,
+      labels: overrides.labels,
+      promptText: overrides.promptText,
     })
   }
 
@@ -376,6 +384,28 @@ describe("workspace tree", () => {
       // We need to mock the dialog — but createWorkspaceFolder imports openTextInputDialog directly.
       // Tests for createWorkspaceFolder are covered by integration tests in canvas-use-editor-actions.
       // This is documented as tested at integration level.
+    })
+
+    it("uses injected labels for folder creation feedback", async () => {
+      readDirMock.mockResolvedValue([])
+      putFileMock.mockResolvedValue(undefined)
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ response: "确认", text: "项目" })))
+
+      const tree = createTree({
+        labels: {
+          dialogCancel: "取消",
+          dialogConfirm: "确认",
+          folderNameTitle: "文件夹名称",
+          newFolderMessage: name => `新建文件夹：${name}`,
+          unableToSaveMessage: "无法保存",
+        },
+        promptText: vi.fn(async () => "项目"),
+      })
+
+      await tree.createWorkspaceFolder()
+
+      expect(putFileMock).toHaveBeenCalledWith("/data/storage/canvas/项目", true, expect.any(Blob))
+      expect(showMessageMock).toHaveBeenCalledWith("新建文件夹：项目")
     })
   })
 
