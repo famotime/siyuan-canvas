@@ -273,9 +273,20 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   const togglePlay = () => {
     isPlaying.value = !isPlaying.value
     if (isPlaying.value) {
+      if (isRecording.value && availableNextNodes.value.length > 1) {
+        moveToNode(availableNextNodes.value[0])
+        scheduleNext()
+        return
+      }
+
+      if (playbackMode.value === "graph" && !isRecording.value && validSavedRecordedPath.value.length > 0) {
+        startRecordedPlayback(validSavedRecordedPath.value)
+        return
+      }
+
       if (playbackMode.value === "recorded") {
         if (recordedPlaybackIndex.value >= recordedPlaybackPath.value.length - 1) {
-          isPlaying.value = false
+          startRecordedPlayback(recordedPlaybackPath.value)
         } else {
           scheduleNext()
         }
@@ -299,10 +310,14 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     recordedPlaybackPath.value = []
     recordedPlaybackIndex.value = 0
     recordedDraftPath.value = currentNodeId.value ? [currentNodeId.value] : []
+    visitedNodes.value = new Set(currentNodeId.value ? [currentNodeId.value] : [])
+    pathHistory.value = []
   }
 
   const finishRecording = () => {
     isRecording.value = false
+    isPlaying.value = false
+    clearTimer()
     saveRecordedPath?.(recordedDraftPath.value)
   }
 
