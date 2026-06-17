@@ -485,7 +485,7 @@
                 'canvas-node--search-match': hasCanvasSearchMatch(node.id),
                 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id),
                 'canvas-node--no-header': !showNodeHeader,
-                'canvas-node--presentation-current': editor.presentation.pathHistory.length > 0 && editor.presentation.pathHistory[editor.presentation.pathHistory.length - 1] === node.id,
+                'canvas-node--presentation-current': editor.presentation.currentNodeId === node.id,
                 'canvas-node--presentation-history': editor.presentation.pathHistory.includes(node.id),
                 'canvas-node--presentation-next': editor.presentation.availableNextNodes.includes(node.id),
               },
@@ -647,8 +647,8 @@
                   'stage__edge--hovered': hoveredEdgeId === edge.id,
                   'stage__edge--selected': editor.state.selectedEdgeId === edge.id,
                   'stage__edge--visible': hoveredEdgeId === edge.id || editor.state.selectedEdgeId === edge.id,
-                  'stage__edge--presentation-path': editor.presentation.isActive && editor.presentation.pathHistory.includes(edge.fromNode) && editor.presentation.pathHistory.includes(edge.toNode) && editor.presentation.pathHistory.indexOf(edge.fromNode) < editor.presentation.pathHistory.indexOf(edge.toNode),
-                  'stage__edge--presentation-next': editor.presentation.isActive && editor.presentation.pathHistory.length > 0 && editor.presentation.pathHistory[editor.presentation.pathHistory.length - 1] === edge.fromNode && editor.presentation.availableNextNodes.includes(edge.toNode)
+                  'stage__edge--presentation-path': editor.presentation.isActive && presentationPathNodeIds.includes(edge.fromNode) && presentationPathNodeIds.includes(edge.toNode) && presentationPathNodeIds.indexOf(edge.fromNode) < presentationPathNodeIds.indexOf(edge.toNode),
+                  'stage__edge--presentation-next': editor.presentation.isActive && editor.presentation.currentNodeId === edge.fromNode && editor.presentation.availableNextNodes.includes(edge.toNode)
                 }"
                 :d="editor.getEdgePath(edge)"
                 fill="none"
@@ -1756,6 +1756,11 @@ const colorThemePopoverOpen = ref(false)
 const colorThemeButtonRef = ref<HTMLElement>()
 const colorThemePopoverStyle = ref<Record<string, string>>({})
 const contextMenuVisible = ref(false)
+
+const presentationPathNodeIds = computed(() => [
+  ...editor.presentation.pathHistory,
+  ...(editor.presentation.currentNodeId ? [editor.presentation.currentNodeId] : []),
+])
 
 const canPlayPresentation = computed(() => {
   if (editor.state.selectedNodeIds.length !== 1 || editor.state.selectedEdgeId) {

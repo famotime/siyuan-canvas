@@ -2106,6 +2106,62 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".workspace__inspector-handle").attributes("style")).toContain("right: 8px;")
   })
 
+  it("highlights the actual current node in mask presentation mode", () => {
+    const previousNode = createTextNode({ id: "node-a", text: "A", x: 0 })
+    const currentNode = createTextNode({ id: "node-b", text: "B", x: 400 })
+    currentEditor = createEditorMock(previousNode)
+    currentEditor.displayNodes = [previousNode, currentNode]
+    currentEditor.state.document.nodes = [previousNode, currentNode]
+    currentEditor.state.selectedNodeIds = ["node-b"]
+    currentEditor.selectedNode = currentNode
+    currentEditor.presentation.isActive = true
+    currentEditor.presentation.currentNodeId = "node-b"
+    currentEditor.presentation.pathHistory = ["node-a"]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock({ presentationStyle: "mask" }),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const nodeA = wrapper.find('[data-canvas-node-id="node-a"]')
+    const nodeB = wrapper.find('[data-canvas-node-id="node-b"]')
+
+    expect(nodeA.classes()).toContain("canvas-node--presentation-history")
+    expect(nodeA.classes()).not.toContain("canvas-node--presentation-current")
+    expect(nodeB.classes()).toContain("canvas-node--presentation-current")
+  })
+
+  it("keeps the last edge in the travelled path highlighted in mask presentation mode", () => {
+    const nodeA = createTextNode({ id: "node-a", text: "A", x: 0 })
+    const nodeB = createTextNode({ id: "node-b", text: "B", x: 400 })
+    const nodeC = createTextNode({ id: "node-c", text: "C", x: 800 })
+    currentEditor = createEditorMock(nodeA)
+    currentEditor.displayNodes = [nodeA, nodeB, nodeC]
+    currentEditor.state.document.nodes = [nodeA, nodeB, nodeC]
+    currentEditor.state.document.edges = [
+      { id: "edge-ab", fromNode: "node-a", fromSide: "right", toNode: "node-b", toSide: "left" },
+      { id: "edge-bc", fromNode: "node-b", fromSide: "right", toNode: "node-c", toSide: "left" },
+    ]
+    currentEditor.getEdgePath = vi.fn(() => "M 0 0 L 100 0")
+    currentEditor.presentation.isActive = true
+    currentEditor.presentation.currentNodeId = "node-c"
+    currentEditor.presentation.pathHistory = ["node-a", "node-b"]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock({ presentationStyle: "mask" }),
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find('[data-testid="edge-overlay-edge-ab"]').classes()).toContain("stage__edge--presentation-path")
+    expect(wrapper.find('[data-testid="edge-overlay-edge-bc"]').classes()).toContain("stage__edge--presentation-path")
+  })
+
   it("renders toolbar and sidebar labels in Chinese from plugin i18n", async () => {
     currentEditor = createEditorMock()
     currentEditor.suggestedFilename = ""
