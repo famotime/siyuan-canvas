@@ -2217,7 +2217,11 @@ function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
 
 function handleNodeClick(node: CanvasNode, event: MouseEvent) {
   if (editor.presentation.isActive) {
-    editor.presentation.goTo(node.id)
+    if (editor.presentation.availableNextNodes.includes(node.id)) {
+      editor.presentation.selectBranch(node.id)
+    } else {
+      editor.presentation.goTo(node.id)
+    }
     return
   }
   editor.activateCanvasSurface()

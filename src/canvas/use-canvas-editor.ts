@@ -979,7 +979,16 @@ export function useCanvasEditor(
     },
     focusNode: (nodeId: string) => {
       focusNodeByIdFn?.(nodeId)
-    }
+    },
+    saveRecordedPath: (path: string[]) => {
+      commitDocument({
+        ...state.document,
+        presentation: {
+          ...((state.document.presentation as Record<string, unknown> | undefined) ?? {}),
+          recordedPath: path,
+        },
+      })
+    },
   })
 
   // 跟踪 filePath 变化（newCanvas / open* 都会改 filePath），切换文档时清空历史

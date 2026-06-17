@@ -2106,6 +2106,30 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".workspace__inspector-handle").attributes("style")).toContain("right: 8px;")
   })
 
+  it("selects highlighted branch nodes through presentation branch selection", async () => {
+    const currentNode = createTextNode({ id: "node-a", text: "A", x: 0 })
+    const branchNode = createTextNode({ id: "node-b", text: "B", x: 400 })
+    currentEditor = createEditorMock(currentNode)
+    currentEditor.displayNodes = [currentNode, branchNode]
+    currentEditor.state.document.nodes = [currentNode, branchNode]
+    currentEditor.presentation.isActive = true
+    currentEditor.presentation.currentNodeId = "node-a"
+    currentEditor.presentation.availableNextNodes = ["node-b"]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find('[data-canvas-node-id="node-b"]').trigger("click")
+
+    expect(currentEditor.presentation.selectBranch).toHaveBeenCalledWith("node-b")
+    expect(currentEditor.presentation.goTo).not.toHaveBeenCalled()
+  })
+
   it("highlights the actual current node in mask presentation mode", () => {
     const previousNode = createTextNode({ id: "node-a", text: "A", x: 0 })
     const currentNode = createTextNode({ id: "node-b", text: "B", x: 400 })
