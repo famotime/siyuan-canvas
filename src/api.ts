@@ -176,8 +176,18 @@ export async function upload(
   for (let file of files) {
     form.append("file[]", file);
   }
-  let url = "/api/asset/upload";
-  return request(url, form);
+  const response = await fetch("/api/asset/upload", {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    throw new Error(`Upload failed: ${response.status}`);
+  }
+  const payload = await response.json();
+  if (payload.code !== 0) {
+    throw new Error(payload.msg || "Upload failed");
+  }
+  return payload.data;
 }
 
 // **************************************** Block ****************************************
@@ -399,8 +409,18 @@ export async function putFile(path: string, isDir: boolean, file: any) {
   // https://github.com/terwer/siyuan-plugin-importer/blob/v1.4.1/src/api/kernel-api.ts
   form.append("modTime", Math.floor(Date.now() / 1000).toString());
   form.append("file", file);
-  let url = "/api/file/putFile";
-  return request(url, form);
+  const response = await fetch("/api/file/putFile", {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    throw new Error(`putFile failed: ${response.status}`);
+  }
+  const payload = await response.json();
+  if (payload.code !== 0) {
+    throw new Error(payload.msg || "putFile failed");
+  }
+  return payload.data;
 }
 
 export async function removeFile(path: string) {

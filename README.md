@@ -5,31 +5,41 @@
 SiYuan Canvas is a SiYuan plugin for importing, editing, and exporting Obsidian `.canvas` files using the open JSON Canvas format.
 ![image](https://raw.githubusercontent.com/famotime/siyuan-canvas/main/assets/image-20260501190639-s2lebrh.png)
 
+## Core Features & What it does
 
-## What it does
-
-- Opens standard `.canvas` files from the SiYuan workspace
-- Imports local `.canvas` files for editing inside SiYuan
-- Edits `text`, `file`, `link`, and `group` nodes
-- Creates and edits edges with side anchors and labels
-- Saves back to the workspace as a standard `.canvas` file
-- Preserves unknown JSON Canvas fields during parse and save
+- **Auto-save**: Your workspace is automatically saved as you edit, allowing you to focus purely on your ideas.
+- **Presentation Mode (New)**: Record a playback path through your canvas and present your ideas linearly. During playback, the background is masked to highlight the current node, guiding your audience through complex networks of thought.
+- **Mobile Support (New)**: Fully supports view-only mode on mobile devices with pinch-to-zoom capabilities, so you can review your canvas anywhere.
+- **Rich Visuals (New)**: Toggle node headers off for a minimal look (while keeping dragging intact), and apply vibrant new themes like Cold Rainbow and Cyber Neon.
+- Opens standard `.canvas` files from the SiYuan workspace and imports local `.canvas` files for editing inside SiYuan.
+- Edits `text`, `file`, `link`, and `group` nodes.
+- Creates and edits edges with side anchors and labels.
+- Preserves unknown JSON Canvas fields during parse and save for maximum compatibility.
 
 <video controls="controls" src="https://raw.githubusercontent.com/famotime/siyuan-canvas/main/assets/4月22日1-20260422214002-iw8j5j0.mp4"></video>
 
-## Current interaction model
+## Use Cases
 
-- Open a blank canvas from the top bar or command palette
-- Use the top toolbar to start a new canvas, import a local `.canvas` file, or save the current workspace file
-- Activate the canvas surface to reveal the bottom toolbar for adding text, file, connect, and group actions
-- Drag node headers to move cards
-- Drag the bottom-right handle to resize cards
-- Edit node and edge properties in the right inspector
-- Double-click link nodes to open the URL
-- Double-click `.canvas` file nodes to open them in a new plugin tab
-- Use the create-edge dialog or floating edge toolbar to create and adjust connections
+- **Knowledge Structuring**: Visually map out your thoughts using cards and connections. Group them by themes to form a comprehensive knowledge network.
+- **Presentations & Briefings**: Use the new presentation mode to walk your audience through your canvas step by step, turning a non-linear graph into a clear, linear story.
+- **Cross-Tool Collaboration**: Seamlessly share `.canvas` files between SiYuan and Obsidian. Edit in SiYuan and save back to standard `.canvas` format.
+- **Project Planning**: Organize tasks using text cards, denote dependencies with edges, use groups for project phases, and color-code priorities.
+- **Reference Collection**: Paste images directly from your clipboard and embed SiYuan documents or other canvases. Keep all references in one unified visual workspace.
 
-## Project structure
+## Current Interaction Model
+
+- Open a blank canvas from the top bar or command palette.
+- Use the top toolbar to start a new canvas, import a local `.canvas` file, or use "Save As".
+- Activate the canvas surface to reveal the bottom toolbar for adding text, file, connect, and group actions.
+- Drag node headers to move cards (or drag from the top if headers are hidden).
+- Drag the bottom-right handle to resize cards.
+- Edit node and edge properties in the right inspector.
+- Double-click link nodes to open the URL.
+- Double-click `.canvas` file nodes to open them in a new plugin tab.
+- Use the create-edge dialog or floating edge toolbar to create and adjust connections.
+- Fast preview: Use `Ctrl+Shift+Alt+C` to insert a canvas preview right into your current document.
+
+## Project Structure
 
 - `src/index.ts` keeps the plugin lifecycle thin and delegates runtime detection, tab wiring, settings UI, and canvas embed command execution to focused helpers in `src/canvas/`.
 - `src/canvas/use-canvas-editor.ts` is the editor composition entry, with file actions, file-node metadata, pointer gestures, selection toolbar UI, and workspace tree helpers split into dedicated modules.

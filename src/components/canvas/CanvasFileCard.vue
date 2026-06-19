@@ -102,6 +102,11 @@ const emit = defineEmits<{
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+.file-card:has(.file-card__canvas-preview) {
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .file-card:has(.file-card__document-preview) {
   height: 100%;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -123,14 +128,15 @@ const emit = defineEmits<{
   width: 100%;
   height: 100%;
   min-height: 0;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 12px;
   border: 1px solid var(--canvas-border);
   background: var(--canvas-surface);
 }
 
 .file-card__canvas-preview {
-  height: 132px;
+  height: 100%;
+  min-height: 132px;
   overflow: hidden;
   border-radius: 12px;
   border: 1px solid var(--canvas-border);
@@ -240,10 +246,19 @@ const emit = defineEmits<{
   padding: 0;
 }
 
+.markdown-preview :deep(p:has(> img)) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-height: 100%;
+}
+
 .markdown-preview :deep(img) {
   display: block;
   max-width: 100%;
+  max-height: 100%;
   height: auto;
+  object-fit: contain;
   border-radius: 12px;
 }
 
