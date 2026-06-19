@@ -345,10 +345,36 @@ describe("canvas plugin lifecycle", () => {
     protyle.setAttribute("data-node-id", "20260608194800-docid")
     document.body.appendChild(protyle)
     dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/大三元1.canvas " })
-    fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as Request).url || String(input)
+      if (url.includes("/api/asset/upload")) {
+        return new Response(JSON.stringify({
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "大三元1.svg": "assets/大三元1-preview.svg",
+            },
+          },
+        }), { status: 200 })
+      }
+      return new Response(canvasRaw, { status: 200 })
+    })
     fetchSyncPost.mockImplementation(async (url: string, data: { path?: string }) => {
       if (url === "/api/file/readDir") {
         return []
+      }
+      if (url === "/api/system/getConf") {
+        return {
+          code: 0,
+          data: {
+            conf: {
+              system: {
+                workspaceDir: "/data",
+              },
+            },
+          },
+        }
       }
       if (url === "/api/asset/upload") {
         return {
@@ -392,7 +418,10 @@ describe("canvas plugin lifecycle", () => {
       body: JSON.stringify({ path: "/data/storage/petal/siyuan-canvas/大三元1.canvas" }),
       method: "POST",
     }))
-    expect(fetchSyncPost).toHaveBeenCalledWith("/api/asset/upload", expect.any(FormData))
+    expect(fetchMock).toHaveBeenCalledWith("/api/asset/upload", expect.objectContaining({
+      method: "POST",
+      body: expect.any(FormData),
+    }))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/appendBlock", expect.objectContaining({
       data: '![大三元1](assets/大三元1-preview.svg "大三元1")',
       dataType: "markdown",
@@ -421,10 +450,36 @@ describe("canvas plugin lifecycle", () => {
       ],
     })
     dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/active.canvas" })
-    fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as Request).url || String(input)
+      if (url.includes("/api/asset/upload")) {
+        return new Response(JSON.stringify({
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "active.svg": "assets/active-preview.svg",
+            },
+          },
+        }), { status: 200 })
+      }
+      return new Response(canvasRaw, { status: 200 })
+    })
     fetchSyncPost.mockImplementation(async (url: string) => {
       if (url === "/api/file/readDir") {
         return []
+      }
+      if (url === "/api/system/getConf") {
+        return {
+          code: 0,
+          data: {
+            conf: {
+              system: {
+                workspaceDir: "/data",
+              },
+            },
+          },
+        }
       }
       if (url === "/api/asset/upload") {
         return {
@@ -492,10 +547,36 @@ describe("canvas plugin lifecycle", () => {
       ],
     })
     dialogResponses.push({ action: "confirm", value: "/data/storage/petal/siyuan-canvas/editor-list.canvas" })
-    fetchMock.mockResolvedValue(new Response(canvasRaw, { status: 200 }))
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as Request).url || String(input)
+      if (url.includes("/api/asset/upload")) {
+        return new Response(JSON.stringify({
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "editor-list.svg": "assets/editor-list-preview.svg",
+            },
+          },
+        }), { status: 200 })
+      }
+      return new Response(canvasRaw, { status: 200 })
+    })
     fetchSyncPost.mockImplementation(async (url: string) => {
       if (url === "/api/file/readDir") {
         return []
+      }
+      if (url === "/api/system/getConf") {
+        return {
+          code: 0,
+          data: {
+            conf: {
+              system: {
+                workspaceDir: "/data",
+              },
+            },
+          },
+        }
       }
       if (url === "/api/asset/upload") {
         return {

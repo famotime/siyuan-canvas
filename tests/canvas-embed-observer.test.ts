@@ -189,7 +189,22 @@ describe("canvas embed observer", () => {
         </div>
       </div>
     `
-    fetchMock.mockResolvedValue(new Response(createCanvasRaw("updated preview"), { status: 200 }))
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as Request).url || String(input)
+      if (url.includes("/api/asset/upload")) {
+        return new Response(JSON.stringify({
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "a.svg": "assets/a-preview.svg",
+              "b.svg": "assets/b-preview.svg",
+            },
+          },
+        }), { status: 200 })
+      }
+      return new Response(createCanvasRaw("updated preview"), { status: 200 })
+    })
     fetchSyncPost.mockImplementation(async (url: string) => {
       if (url === "/api/asset/upload") {
         return {
@@ -238,7 +253,10 @@ describe("canvas embed observer", () => {
     expect(image?.getAttribute("src")).toContain("data:image/svg+xml;base64,")
     const otherImage = document.querySelector<HTMLElement>('[data-node-id="embed-2"] .canvas-embed-preview img')
     expect(otherImage?.getAttribute("src")).toBe("old-other-preview")
-    expect(fetchSyncPost).toHaveBeenCalledWith("/api/asset/upload", expect.any(FormData))
+    expect(fetchMock).toHaveBeenCalledWith("/api/asset/upload", expect.objectContaining({
+      method: "POST",
+      body: expect.any(FormData),
+    }))
     expect(fetchSyncPost).toHaveBeenCalledWith("/api/block/updateBlock", expect.objectContaining({
       data: '![a](assets/a-preview.svg "a")',
       dataType: "markdown",
@@ -256,7 +274,21 @@ describe("canvas embed observer", () => {
 
   it("refreshes embed blocks found by custom canvas path attributes when no preview DOM is visible", async () => {
     const reload = vi.fn()
-    fetchMock.mockResolvedValue(new Response(createCanvasRaw("updated from attr"), { status: 200 }))
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as Request).url || String(input)
+      if (url.includes("/api/asset/upload")) {
+        return new Response(JSON.stringify({
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "a.svg": "assets/a-preview.svg",
+            },
+          },
+        }), { status: 200 })
+      }
+      return new Response(createCanvasRaw("updated from attr"), { status: 200 })
+    })
     fetchSyncPost.mockImplementation(async (url: string, data: { stmt?: string }) => {
       if (url === "/api/asset/upload") {
         return {
@@ -340,7 +372,21 @@ describe("canvas embed observer", () => {
         <img src="old-iframe-preview" alt="Canvas" />
       </div>
     `)
-    fetchMock.mockResolvedValue(new Response(createCanvasRaw("updated iframe preview"), { status: 200 }))
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as Request).url || String(input)
+      if (url.includes("/api/asset/upload")) {
+        return new Response(JSON.stringify({
+          code: 0,
+          data: {
+            errFiles: [],
+            succMap: {
+              "a.svg": "assets/a-preview.svg",
+            },
+          },
+        }), { status: 200 })
+      }
+      return new Response(createCanvasRaw("updated iframe preview"), { status: 200 })
+    })
     fetchSyncPost.mockImplementation(async (url: string) => {
       if (url === "/api/asset/upload") {
         return {
