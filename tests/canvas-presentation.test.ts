@@ -431,6 +431,132 @@ describe('useCanvasPresentation', () => {
     // 最终保存的路径应该是截断后延长的路径 ['a', 'b', 'e']
     expect(savedPaths).toEqual([['a', 'b', 'e']])
   })
+
+  describe('group node autoplay and jump skipping', () => {
+    function createGroupNode(id: string, x = 0, y = 0, width = 200, height = 200) {
+      return {
+        id,
+        type: 'group' as const,
+        x,
+        y,
+        width,
+        height,
+        text: id,
+      }
+    }
+
+    it('resolves group node to its leftmost non-group child node and skips the group node in graph playback', () => {
+      vi.useFakeTimers()
+      try {
+        const document: CanvasDocument = {
+          edges: [
+            { fromNode: 'a', fromSide: 'right', id: 'a-group', toNode: 'group1', toSide: 'left' },
+          ],
+          nodes: [
+            createNode('a', 0, 0),
+            createGroupNode('group1', 50, 0, 300, 200),
+            createNode('b', 100, 50), // x=100 (最靠左的子节点)
+            createNode('c', 200, 50), // x=200
+          ],
+        }
+        const { presentation } = createPresentation(document)
+
+        presentation.start('a')
+        expect(presentation.availableNextNodes).toEqual(['b']) // 应直接解析为最靠左侧子节点 'b'
+
+        vi.advanceTimersByTime(1000)
+        expect(presentation.currentNodeId).toBe('b') // 应跳过 group1，自动切换到 'b'
+        expect(presentation.isPlaying).toBe(true)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('skips empty group node and continues playback in recorded path', () => {
+      vi.useFakeTimers()
+      try {
+        const document: CanvasDocument = {
+          edges: [],
+          nodes: [
+            createNode('a', 0, 0),
+            createGroupNode('emptyGroup', 50, 0, 10, 10),
+            createNode('b', 100, 0),
+          ],
+          presentation: {
+            recordedPath: ['a', 'emptyGroup', 'b'],
+          },
+        }
+        const { presentation } = createPresentation(document)
+
+        presentation.start('a')
+        expect(presentation.currentNodeId).toBe('a')
+
+        vi.advanceTimersByTime(1000)
+        expect(presentation.currentNodeId).toBe('b') // emptyGroup 应被直接跳过，展示 'b'
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('resolves group node in recorded path for both next and prev directions', () => {
+      const document: CanvasDocument = {
+        edges: [],
+        nodes: [
+          createNode('a', 0, 0),
+          createGroupNode('group1', 50, 0, 300, 200),
+          createNode('b', 200, 50), // 内部节点 b
+          createNode('c', 100, 50), // 内部节点 c (最靠左侧)
+          createNode('d', 400, 0),
+        ],
+        presentation: {
+          recordedPath: ['a', 'group1', 'd'],
+        },
+      }
+      const { presentation } = createPresentation(document)
+
+      // 从 'a' 开始播放
+      presentation.start('a')
+      expect(presentation.currentNodeId).toBe('a')
+
+      // 切换到下一个节点
+      presentation.next()
+      expect(presentation.currentNodeId).toBe('c') // group1 应该解析为最左侧子节点 'c'
+
+      // 再切换到下一个节点
+      presentation.next()
+      expect(presentation.currentNodeId).toBe('d')
+
+      // 回退到上一个节点
+      presentation.prev()
+      expect(presentation.currentNodeId).toBe('c') // 应回退并解析为 'c'
+
+      // 再回退到上一个节点
+      presentation.prev()
+      expect(presentation.currentNodeId).toBe('a')
+    })
+
+    it('skips empty group node when traversing backwards in recorded path', () => {
+      const document: CanvasDocument = {
+        edges: [],
+        nodes: [
+          createNode('a', 0, 0),
+          createGroupNode('emptyGroup', 50, 0, 10, 10),
+          createNode('b', 100, 0),
+        ],
+        presentation: {
+          recordedPath: ['a', 'emptyGroup', 'b'],
+        },
+      }
+      const { presentation } = createPresentation(document)
+
+      presentation.start('a')
+      presentation.next() // 跳过空组，到达 b
+      expect(presentation.currentNodeId).toBe('b')
+
+      presentation.prev() // 往回退，跳过空组，应退回到 a
+      expect(presentation.currentNodeId).toBe('a')
+    })
+  })
 })
 
 

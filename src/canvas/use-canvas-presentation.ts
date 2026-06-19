@@ -91,10 +91,12 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
       return a.node.x - b.node.x
     })
 
-    // Filter out already visited nodes to prevent loops
-    return targetNodes
-      .map(item => item.node!.id)
-      .filter(id => !visitedNodes.value.has(id))
+    // 解析 group 节点为最左侧非 group 节点，过滤 null 并剔除已访问的节点以防止死循环
+    const resolvedTargetIds = targetNodes
+      .map(item => resolveTargetNodeId(getDocument(), item.node!.id))
+      .filter((id): id is string => id !== null && !visitedNodes.value.has(id))
+
+    return Array.from(new Set(resolvedTargetIds))
   })
 
   const clearTimer = () => {
@@ -111,6 +113,10 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   }
 
   const moveToNode = (nodeId: string, options: { record?: boolean } = {}) => {
+    const resolvedId = resolveTargetNodeId(getDocument(), nodeId)
+    if (!resolvedId) return
+    nodeId = resolvedId
+
     if (currentNodeId.value) {
       pathHistory.value.push(currentNodeId.value)
     }
@@ -133,14 +139,23 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
       if (!isPlaying.value || !isActive.value) return
 
       if (playbackMode.value === "recorded") {
-        const nextIndex = recordedPlaybackIndex.value + 1
-        if (nextIndex >= recordedPlaybackPath.value.length) {
+        let nextIndex = recordedPlaybackIndex.value + 1
+        let resolvedId: string | null = null
+        while (nextIndex < recordedPlaybackPath.value.length) {
+          resolvedId = resolveTargetNodeId(getDocument(), recordedPlaybackPath.value[nextIndex])
+          if (resolvedId) {
+            break
+          }
+          nextIndex++
+        }
+
+        if (nextIndex >= recordedPlaybackPath.value.length || !resolvedId) {
           isPlaying.value = false
           return
         }
 
         recordedPlaybackIndex.value = nextIndex
-        moveToNode(recordedPlaybackPath.value[nextIndex], { record: false })
+        moveToNode(resolvedId, { record: false })
         scheduleNext()
         return
       }
@@ -177,27 +192,51 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     isActive.value = true
     isPlaying.value = true
     pathHistory.value = []
-    visitedNodes.value = new Set([nodeId])
-    currentNodeId.value = nodeId
+
+    const resolvedId = resolveTargetNodeId(getDocument(), nodeId)
+    if (!resolvedId) {
+      isPlaying.value = false
+      isActive.value = false
+      return
+    }
+
+    visitedNodes.value = new Set([resolvedId])
+    currentNodeId.value = resolvedId
     clearSelection()
-    selectNode(nodeId)
-    focusNode(nodeId)
+    selectNode(resolvedId)
+    focusNode(resolvedId)
     scheduleNext()
   }
 
   const startRecordedPlayback = (path: string[]) => {
-    const startNodeId = path[0]
+    let startNodeId = path[0]
+    let resolvedId: string | null = null
+    let startIndex = 0
+    for (let i = 0; i < path.length; i++) {
+      resolvedId = resolveTargetNodeId(getDocument(), path[i])
+      if (resolvedId) {
+        startIndex = i
+        break
+      }
+    }
+
+    if (!resolvedId) {
+      isPlaying.value = false
+      isActive.value = false
+      return
+    }
+
     playbackMode.value = "recorded"
     recordedPlaybackPath.value = [...path]
-    recordedPlaybackIndex.value = 0
+    recordedPlaybackIndex.value = startIndex
     isActive.value = true
     isPlaying.value = true
     pathHistory.value = []
-    visitedNodes.value = new Set([startNodeId])
-    currentNodeId.value = startNodeId
+    visitedNodes.value = new Set([resolvedId])
+    currentNodeId.value = resolvedId
     clearSelection()
-    selectNode(startNodeId)
-    focusNode(startNodeId)
+    selectNode(resolvedId)
+    focusNode(resolvedId)
     scheduleNext()
   }
 
@@ -227,10 +266,19 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
 
   const next = () => {
     if (playbackMode.value === "recorded") {
-      const nextIndex = recordedPlaybackIndex.value + 1
-      if (nextIndex < recordedPlaybackPath.value.length) {
+      let nextIndex = recordedPlaybackIndex.value + 1
+      let resolvedId: string | null = null
+      while (nextIndex < recordedPlaybackPath.value.length) {
+        resolvedId = resolveTargetNodeId(getDocument(), recordedPlaybackPath.value[nextIndex])
+        if (resolvedId) {
+          break
+        }
+        nextIndex++
+      }
+
+      if (nextIndex < recordedPlaybackPath.value.length && resolvedId) {
         recordedPlaybackIndex.value = nextIndex
-        moveToNode(recordedPlaybackPath.value[nextIndex], { record: false })
+        moveToNode(resolvedId, { record: false })
       } else {
         isPlaying.value = false
         clearTimer()
@@ -253,16 +301,27 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
 
   const prev = () => {
     if (playbackMode.value === "recorded" && recordedPlaybackIndex.value > 0) {
-      recordedPlaybackIndex.value -= 1
-      const prevNodeId = recordedPlaybackPath.value[recordedPlaybackIndex.value]
-      if (currentNodeId.value) {
-        visitedNodes.value.delete(currentNodeId.value)
+      let prevIndex = recordedPlaybackIndex.value - 1
+      let resolvedId: string | null = null
+      while (prevIndex >= 0) {
+        resolvedId = resolveTargetNodeId(getDocument(), recordedPlaybackPath.value[prevIndex])
+        if (resolvedId) {
+          break
+        }
+        prevIndex--
       }
-      currentNodeId.value = prevNodeId
-      pathHistory.value = recordedPlaybackPath.value.slice(0, recordedPlaybackIndex.value)
-      clearSelection()
-      selectNode(prevNodeId)
-      focusNode(prevNodeId)
+
+      if (prevIndex >= 0 && resolvedId) {
+        recordedPlaybackIndex.value = prevIndex
+        if (currentNodeId.value) {
+          visitedNodes.value.delete(currentNodeId.value)
+        }
+        currentNodeId.value = resolvedId
+        pathHistory.value = recordedPlaybackPath.value.slice(0, prevIndex)
+        clearSelection()
+        selectNode(resolvedId)
+        focusNode(resolvedId)
+      }
       isPlaying.value = false
       clearTimer()
       return
@@ -335,12 +394,13 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
       } else {
         recordedDraftPath.value = [...savedPath]
         const lastNodeId = savedPath[savedPath.length - 1]
-        currentNodeId.value = lastNodeId
-        visitedNodes.value = new Set(savedPath)
+        const resolvedId = resolveTargetNodeId(getDocument(), lastNodeId) || lastNodeId
+        currentNodeId.value = resolvedId
+        visitedNodes.value = new Set([...savedPath.slice(0, savedPath.length - 1), resolvedId])
         pathHistory.value = savedPath.slice(0, savedPath.length - 1)
         clearSelection()
-        selectNode(lastNodeId)
-        focusNode(lastNodeId)
+        selectNode(resolvedId)
+        focusNode(resolvedId)
       }
     } else {
       recordedDraftPath.value = currentNodeId.value ? [currentNodeId.value] : []
@@ -400,6 +460,10 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     goTo: (nodeId: string) => {
       clearTimer()
       playbackMode.value = "graph"
+
+      const resolvedId = resolveTargetNodeId(getDocument(), nodeId)
+      if (!resolvedId) return
+      nodeId = resolvedId
 
       const historyIndex = pathHistory.value.indexOf(nodeId)
       if (historyIndex !== -1) {
