@@ -34,6 +34,7 @@ const getFrontend = vi.fn(() => "desktop")
 type DialogAction = "cancel" | "confirm"
 
 const eventBusHandlers = new Map<string, Array<(event: CustomEvent<any>) => void>>()
+const createdDialogs: DialogMock[] = []
 
 interface DialogResponse {
   action: DialogAction
@@ -57,6 +58,7 @@ class DialogMock {
     this.element = document.createElement("div")
     this.element.innerHTML = options.content
     document.body.appendChild(this.element)
+    createdDialogs.push(this)
 
     const response = dialogResponses.shift()
     queueMicrotask(() => {
@@ -286,6 +288,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   dialogResponses.length = 0
+  createdDialogs.length = 0
   document.body.innerHTML = ""
   eventBusHandlers.clear()
   fetchMock.mockReset()
@@ -654,6 +657,21 @@ describe("canvas plugin lifecycle", () => {
         title: "Custom title",
       }),
     }))
+  })
+
+  it("opens a full screen canvas viewer dialog on mobile instead of a custom tab", async () => {
+    getFrontend.mockReturnValue("mobile")
+    const plugin = new SiyuanCanvasPlugin()
+    await plugin.onload()
+
+    await plugin.openCanvasTab({ path: "/data/storage/siyuan-canvas/mobile.canvas" })
+    await Promise.resolve()
+
+    expect(openTab).not.toHaveBeenCalled()
+    expect(createdDialogs).toHaveLength(1)
+    const dialog = createdDialogs[0]
+    expect(dialog.element.querySelector(".siyuan-canvas__mobile-viewer")).toBeTruthy()
+    expect(dialog.element.querySelector(".siyuan-canvas__tab")).toBeTruthy()
   })
 
   it("deduplicates recent files and respects the configured limit", async () => {

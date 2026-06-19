@@ -5,6 +5,8 @@ import type {
 import type { CanvasTabBootstrap } from "@/main"
 
 import {
+  Dialog,
+  getFrontend,
   openTab,
 } from "siyuan"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
@@ -26,6 +28,38 @@ export { CANVAS_TAB_ICON_ID }
  */
 export const CANVAS_TAB_ICON_SVG = CANVAS_TAB_ICON_BODY
 
+function isMobileFrontend(): boolean {
+  const frontend = getFrontend()
+  return frontend === "mobile" || frontend === "browser-mobile"
+}
+
+function openCanvasEditorMobileDialog(
+  bootstrap: CanvasTabBootstrap,
+  title: string,
+): void {
+  let host: HTMLElement | null = null
+  const dialog = new Dialog({
+    title,
+    width: "100vw",
+    height: "100vh",
+    content: `<div class="siyuan-canvas__mobile-viewer"><div class="siyuan-canvas__tab"></div></div>`,
+    destroyCallback: () => {
+      if (host) {
+        unmountCanvasApp(host)
+      }
+    },
+  })
+  host = dialog.element.querySelector<HTMLElement>(".siyuan-canvas__tab")
+  if (!host) {
+    dialog.destroy()
+    return
+  }
+
+  mountCanvasApp(host, bootstrap, (nextTitle) => {
+    dialog.element.setAttribute("aria-label", nextTitle)
+  })
+}
+
 export async function openCanvasEditorTab(
   plugin: Plugin & { app: unknown },
   pluginName: string,
@@ -33,6 +67,11 @@ export async function openCanvasEditorTab(
   untitledTitle: string,
 ): Promise<void> {
   const title = bootstrap.title || (bootstrap.path ? getCanvasFileName(bootstrap.path) : "") || untitledTitle
+  if (isMobileFrontend()) {
+    openCanvasEditorMobileDialog(bootstrap, title)
+    return
+  }
+
   await openTab({
     app: plugin.app,
     custom: {
