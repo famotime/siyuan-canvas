@@ -98,6 +98,8 @@
   "inspectorNoIssues": "暂无问题",
   "inspectorNewCanvas": "新建画布",
   "inspectorNewFolder": "新建文件夹",
+  "inspectorPin": "钉住",
+  "inspectorUnpin": "取消钉住",
   "inspectorSort": "排序",
   "inspectorSortByName": "按文件名",
   "inspectorSortByUpdated": "按编辑时间",

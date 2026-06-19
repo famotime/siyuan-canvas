@@ -424,6 +424,16 @@
   min-height: 0;
 }
 
+.workspace__inspector-trigger {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  z-index: 99;
+  background: transparent;
+}
+
 .workspace__inspector-handle {
   position: absolute;
   top: 50%;
@@ -1474,6 +1484,28 @@
   padding: 0;
 }
 
+.inspector--floating {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 100;
+  width: 320px;
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--canvas-inspector-bg);
+  border-left: 1px solid var(--canvas-border);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+
+  &.inspector--collapsed {
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
+    border-left: none;
+  }
+}
+
 .inspector__content {
   display: grid;
   gap: 12px;
@@ -1511,14 +1543,58 @@
   color: inherit;
 }
 
-/* 涓?tab 椤堕儴瀵艰埅锛氭枃妗?/ 閫夊尯 / 闂 */
+/* tab 顶部导航：文档 / 选区 / 问题 */
+.inspector__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
 .inspector__tabs {
   display: flex;
   gap: 2px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   padding: 2px;
   border-radius: 8px;
   background: var(--canvas-floating-button-bg);
+  flex: 1;
+}
+
+.inspector__pin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 6px;
+  background: var(--canvas-inspector-section-bg);
+  color: var(--canvas-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+
+  &:hover {
+    background: var(--canvas-surface);
+    color: var(--canvas-text);
+  }
+}
+
+.inspector__pin-btn--pinned {
+  background: var(--canvas-surface);
+  color: var(--canvas-accent);
+  border-color: var(--canvas-accent);
+}
+
+.inspector__pin-icon {
+  transition: transform 0.15s ease;
+
+  &--unpinned {
+    transform: rotate(-45deg);
+  }
 }
 
 .inspector__tab {

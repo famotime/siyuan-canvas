@@ -98,6 +98,8 @@
   "inspectorNoIssues": "No issues",
   "inspectorNewCanvas": "New Canvas",
   "inspectorNewFolder": "New Folder",
+  "inspectorPin": "Pin",
+  "inspectorUnpin": "Unpin",
   "inspectorSort": "Sort",
   "inspectorSortByName": "By Name",
   "inspectorSortByUpdated": "By Edit Time",

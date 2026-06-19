@@ -291,10 +291,17 @@
 
     <div
       class="workspace"
-      :class="{ 'workspace--inspector-collapsed': !editor.inspectorExpanded }"
-      :style="editor.inspectorExpanded ? undefined : { gridTemplateColumns: '1fr 0px' }"
+      :class="{ 'workspace--inspector-collapsed': !editor.inspectorExpanded || !pinned }"
+      :style="(editor.inspectorExpanded && pinned) ? undefined : { gridTemplateColumns: '1fr 0px' }"
     >
+      <div
+        v-if="!pinned && !editor.inspectorExpanded"
+        class="workspace__inspector-trigger"
+        @mouseenter="editor.inspectorExpanded = true"
+      />
+
       <button
+        v-if="pinned"
         class="workspace__inspector-handle"
         :class="{ 'workspace__inspector-handle--collapsed': !editor.inspectorExpanded }"
         :style="editor.inspectorExpanded ? undefined : { right: '8px' }"
@@ -1291,50 +1298,70 @@
 
       <aside
         class="inspector"
-        :class="{ 'inspector--collapsed': !editor.inspectorExpanded }"
+        :class="{
+          'inspector--collapsed': !editor.inspectorExpanded,
+          'inspector--floating': !pinned
+        }"
         @pointerdown.capture="editor.deactivateCanvasSurface"
+        @mouseleave="handleInspectorMouseLeave"
       >
         <div
           v-if="editor.inspectorExpanded"
           class="inspector__content"
           @click="sortDropdownOpen = false; closeContextMenu()"
         >
-          <nav
-            class="inspector__tabs"
-            role="tablist"
-            data-testid="inspector-tabs"
-          >
-            <button
-              class="inspector__tab"
-              :class="{ 'inspector__tab--active': activeInspectorTab === 'documents' }"
-              data-testid="inspector-tab-documents"
-              role="tab"
-              :aria-selected="activeInspectorTab === 'documents'"
-              type="button"
-              @click="activeInspectorTab = 'documents'"
+          <div class="inspector__header">
+            <nav
+              class="inspector__tabs"
+              role="tablist"
+              data-testid="inspector-tabs"
             >
-              {{ t('inspectorTabDocuments') }}
-              <span
-                v-if="totalInspectorIssueCount > 0"
-                class="inspector__tab-badge inspector__tab-badge--danger"
-              >{{ totalInspectorIssueCount }}</span>
-            </button>
+              <button
+                class="inspector__tab"
+                :class="{ 'inspector__tab--active': activeInspectorTab === 'documents' }"
+                data-testid="inspector-tab-documents"
+                role="tab"
+                :aria-selected="activeInspectorTab === 'documents'"
+                type="button"
+                @click="activeInspectorTab = 'documents'"
+              >
+                {{ t('inspectorTabDocuments') }}
+                <span
+                  v-if="totalInspectorIssueCount > 0"
+                  class="inspector__tab-badge inspector__tab-badge--danger"
+                >{{ totalInspectorIssueCount }}</span>
+              </button>
+              <button
+                class="inspector__tab"
+                :class="{ 'inspector__tab--active': activeInspectorTab === 'selection' }"
+                data-testid="inspector-tab-selection"
+                role="tab"
+                :aria-selected="activeInspectorTab === 'selection'"
+                type="button"
+                @click="activeInspectorTab = 'selection'"
+              >
+                {{ t('inspectorTabSelection') }}
+                <span
+                  v-if="editor.selectedNodeCount > 0 || editor.selectedEdge"
+                  class="inspector__tab-badge"
+                >{{ editor.selectedNodeCount > 0 ? editor.selectedNodeCount : '·' }}</span>
+              </button>
+            </nav>
             <button
-              class="inspector__tab"
-              :class="{ 'inspector__tab--active': activeInspectorTab === 'selection' }"
-              data-testid="inspector-tab-selection"
-              role="tab"
-              :aria-selected="activeInspectorTab === 'selection'"
+              class="inspector__pin-btn"
+              :class="{ 'inspector__pin-btn--pinned': pinned }"
+              :title="pinned ? t('inspectorUnpin') : t('inspectorPin')"
               type="button"
-              @click="activeInspectorTab = 'selection'"
+              @click="pinned = !pinned"
             >
-              {{ t('inspectorTabSelection') }}
-              <span
-                v-if="editor.selectedNodeCount > 0 || editor.selectedEdge"
-                class="inspector__tab-badge"
-              >{{ editor.selectedNodeCount > 0 ? editor.selectedNodeCount : '·' }}</span>
+              <CanvasIcon
+                class="inspector__pin-icon"
+                :class="{ 'inspector__pin-icon--unpinned': !pinned }"
+                name="pin"
+                :size="14"
+              />
             </button>
-          </nav>
+          </div>
           <template v-if="activeInspectorTab === 'documents'">
           <div class="inspector__toolbar">
             <button
@@ -1764,6 +1791,17 @@ const sortDropdownOpen = ref(false)
 const colorThemePopoverOpen = ref(false)
 const colorThemeButtonRef = ref<HTMLElement>()
 const colorThemePopoverStyle = ref<Record<string, string>>({})
+
+const pinned = ref(localStorage.getItem("siyuan-canvas-inspector-pinned") !== "false")
+watch(pinned, (val) => {
+  localStorage.setItem("siyuan-canvas-inspector-pinned", String(val))
+})
+
+function handleInspectorMouseLeave() {
+  if (!pinned.value) {
+    editor.inspectorExpanded = false
+  }
+}
 const {
   closeContextMenu,
   contextMenuCopy,
