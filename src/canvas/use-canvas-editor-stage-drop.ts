@@ -5,8 +5,10 @@ import type { CanvasI18nTranslator } from '@/canvas/use-canvas-editor-shared'
 import type { CanvasEditorFileSource } from '@/canvas/use-canvas-editor-shared'
 
 import { showMessage } from 'siyuan'
+import { putFile } from '@/api'
 import { upsertCanvasNode } from '@/canvas/document'
 import { createFileNodeAtViewport } from '@/canvas/use-canvas-editor-file-picker'
+import { writeWorkspaceImageFile } from '@/canvas/workspace-image-files'
 
 const SIYUAN_DROP_FILE = 'application/siyuan-file'
 const SIYUAN_DROP_GUTTER = 'application/siyuan-gutter'
@@ -47,7 +49,9 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
 
     const hasSiyuanDrop = types.includes(SIYUAN_DROP_FILE)
       || types.some(t => t.startsWith(SIYUAN_DROP_GUTTER))
-    if (!hasSiyuanDrop)
+    const hasFiles = types.includes('Files')
+
+    if (!hasSiyuanDrop && !hasFiles)
       return
 
     event.preventDefault()
@@ -56,6 +60,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
   }
 
   async function handleStageDrop(event: DragEvent) {
+    // 1. 优先获取思源原生的块/卡片拖拽 ID
     let rawIds = event.dataTransfer?.getData(SIYUAN_DROP_FILE) ?? ''
 
     if (!rawIds) {
@@ -66,42 +71,89 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
       }
     }
 
-    if (!rawIds)
-      return
+    // 2. 如果是思源原生元素的拖拽，走原本的思源块添加流程
+    if (rawIds) {
+      if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
+        showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'warning')
+        return
+      }
 
-    if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
-      showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'warning')
+      event.preventDefault()
+
+      const stageEl = (event.currentTarget as HTMLElement)
+      const rect = stageEl.getBoundingClientRect()
+      const stageX = event.clientX - rect.left
+      const stageY = event.clientY - rect.top
+
+      const ids = rawIds.split(',').filter(id => SIYUAN_BLOCK_ID_PATTERN.test(id.trim()))
+      if (ids.length === 0)
+        return
+
+      const verticalGap = 360 * viewport.scale
+      const startY = stageY - ((ids.length - 1) * verticalGap) / 2
+
+      for (let i = 0; i < ids.length; i++) {
+        const blockId = ids[i].trim()
+        const node = createFileNodeAtViewport(
+          board.value,
+          viewport,
+          { x: stageX, y: startY + i * verticalGap },
+        )
+        node.file = blockId
+        commitDocument(upsertCanvasNode(state.document, node))
+        if (i === ids.length - 1)
+          selectNode(node.id)
+      }
+
+      await refreshFileNodeMetadata()
       return
     }
 
-    event.preventDefault()
+    // 3. 如果不是思源原生的拖拽，再检测是否有外部图片文件被拖入
+    const files = event.dataTransfer?.files ? Array.from(event.dataTransfer.files) : []
+    const imageFiles = files.filter(f => f.type.startsWith('image/') || /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(f.name))
 
-    const stageEl = (event.currentTarget as HTMLElement)
-    const rect = stageEl.getBoundingClientRect()
-    const stageX = event.clientX - rect.left
-    const stageY = event.clientY - rect.top
+    if (imageFiles.length > 0) {
+      if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
+        showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'warning')
+        return
+      }
 
-    const ids = rawIds.split(',').filter(id => SIYUAN_BLOCK_ID_PATTERN.test(id.trim()))
-    if (ids.length === 0)
+      event.preventDefault()
+
+      const stageEl = (event.currentTarget as HTMLElement)
+      const rect = stageEl.getBoundingClientRect()
+      const stageX = event.clientX - rect.left
+      const stageY = event.clientY - rect.top
+
+      const verticalGap = 260 * viewport.scale
+      const startY = stageY - ((imageFiles.length - 1) * verticalGap) / 2
+
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i]
+        try {
+          const imagePath = await writeWorkspaceImageFile(state.filePath, file, putFile)
+
+          const node = createFileNodeAtViewport(
+            board.value,
+            viewport,
+            { x: stageX, y: startY + i * verticalGap },
+          )
+          node.file = imagePath
+          node.width = 320
+          node.height = 240
+
+          commitDocument(upsertCanvasNode(state.document, node))
+          if (i === imageFiles.length - 1)
+            selectNode(node.id)
+        } catch (error) {
+          console.error('Failed to upload drop image file', error)
+        }
+      }
+
+      // 图片为静态资源，直接匹配路径后缀展示，无需立即向思源的 SQLite 数据库查询刷新元数据，避免并发数据库锁定冲突
       return
-
-    const verticalGap = 360 * viewport.scale
-    const startY = stageY - ((ids.length - 1) * verticalGap) / 2
-
-    for (let i = 0; i < ids.length; i++) {
-      const blockId = ids[i].trim()
-      const node = createFileNodeAtViewport(
-        board.value,
-        viewport,
-        { x: stageX, y: startY + i * verticalGap },
-      )
-      node.file = blockId
-      commitDocument(upsertCanvasNode(state.document, node))
-      if (i === ids.length - 1)
-        selectNode(node.id)
     }
-
-    await refreshFileNodeMetadata()
   }
 
   return {

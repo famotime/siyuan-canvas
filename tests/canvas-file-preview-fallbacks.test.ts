@@ -24,6 +24,13 @@ describe('canvas file preview fallbacks', () => {
     ])
   })
 
+  it('builds display URL candidates for workspace storage image files', () => {
+    expect(getFilePreviewImageCandidates('/data/storage/maps/roadmap.assets/dropped.png')).toEqual([
+      '/data/storage/maps/roadmap.assets/dropped.png',
+      '/storage/maps/roadmap.assets/dropped.png',
+    ])
+  })
+
   it('replaces preview html image sources with stored override mappings', () => {
     const html = '<p><img src="/data/assets/road.png" alt="road"></p>'
 

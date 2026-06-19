@@ -87,6 +87,10 @@ function extractEmbeddedImagePath(input: string): string | null {
   return input.match(MARKDOWN_IMAGE_PATTERN)?.[1]?.trim() || null
 }
 
+function isWorkspaceCanvasAssetPath(path: string): boolean {
+  return /(?:^|[/\\])[^/\\]+\.assets[/\\]/i.test(path)
+}
+
 export async function resolveCanvasFileTarget(
   input: string,
   lookups: CanvasFileTargetLookups,
@@ -133,6 +137,16 @@ export async function resolveCanvasFileTarget(
   }
 
   const lookupPath = extractEmbeddedImagePath(trimmed) || trimmed
+
+  // 拖拽/粘贴到当前 canvas 的图片位于同级 .assets 目录，不存在块 ID，可直接展示并避免无意义查询。
+  if (IMAGE_PATH_PATTERN.test(lookupPath) && isWorkspaceCanvasAssetPath(lookupPath)) {
+    return {
+      kind: "image",
+      openPath: toDirectImageOpenPath(lookupPath),
+      path: lookupPath,
+      title: getFallbackTitle(lookupPath),
+    }
+  }
 
   const canvas = await lookups.resolveCanvasByPath(lookupPath)
   if (canvas) {

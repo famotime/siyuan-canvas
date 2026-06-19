@@ -1,6 +1,7 @@
 /* @vitest-environment jsdom */
 
 import {
+  beforeEach,
   describe,
   expect,
   it,
@@ -13,6 +14,13 @@ import {
 
 import { createEmptyCanvasDocument } from '@/canvas/document'
 import { createCanvasEditorStageDropActions } from '@/canvas/use-canvas-editor-stage-drop'
+
+const apiMocks = vi.hoisted(() => ({
+  putFile: vi.fn(async () => null),
+  upload: vi.fn(async () => ({ succMap: {} })),
+}))
+
+vi.mock('@/api', () => apiMocks)
 
 function createStageDropHarness(options?: { fileSource?: string, filePath?: string }) {
   const committed: ReturnType<typeof createEmptyCanvasDocument>[] = []
@@ -72,7 +80,41 @@ function createDropEvent(data: string, clientX = 100, clientY = 200): DragEvent 
   } as unknown as DragEvent
 }
 
+function createFileDropEvent(files: File[], clientX = 100, clientY = 200): DragEvent {
+  const stageEl = document.createElement('section')
+  stageEl.getBoundingClientRect = vi.fn(() => ({
+    bottom: 600,
+    height: 600,
+    left: 0,
+    right: 800,
+    top: 0,
+    width: 800,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  }))
+
+  const dt = {
+    files,
+    getData: () => '',
+    types: ['Files'],
+  }
+
+  return {
+    clientX,
+    clientY,
+    currentTarget: stageEl,
+    dataTransfer: dt,
+    preventDefault: vi.fn(),
+  } as unknown as DragEvent
+}
+
 describe('canvas editor stage drop', () => {
+  beforeEach(() => {
+    apiMocks.putFile.mockClear()
+    apiMocks.upload.mockClear()
+  })
+
   it('accepts dragover with siyuan-file type', () => {
     const { harness } = createStageDropHarness()
     const event = {
@@ -166,5 +208,35 @@ describe('canvas editor stage drop', () => {
     const node = committed[0].nodes.find((n: any) => n.type === 'file')!
     expect(node.file).toBe('20230613234017-zkw3pr0')
     expect(refreshFileNodeMetadata).toHaveBeenCalledTimes(1)
+  })
+
+  it('writes dropped image files beside the saved workspace canvas without using global asset upload or metadata refresh', async () => {
+    const { committed, harness, refreshFileNodeMetadata, selectNode } = createStageDropHarness({
+      filePath: '/data/storage/maps/roadmap.canvas',
+    })
+    const imageFile = new File(['png'], 'dropped.png', { type: 'image/png' })
+    const event = createFileDropEvent([imageFile], 400, 300)
+
+    await harness.handleStageDrop(event)
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(apiMocks.upload).not.toHaveBeenCalled()
+    expect(apiMocks.putFile).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/data\/storage\/maps\/roadmap\.assets\/\d+\.png$/),
+      false,
+      imageFile,
+    )
+    expect(refreshFileNodeMetadata).not.toHaveBeenCalled()
+    expect(committed).toHaveLength(1)
+    const node = committed[0].nodes.find((n: any) => n.type === 'file')!
+    expect(node.file).toMatch(/^\/data\/storage\/maps\/roadmap\.assets\/\d+\.png$/)
+    expect(node).toMatchObject({
+      height: 240,
+      type: 'file',
+      width: 320,
+      x: 400,
+      y: 300,
+    })
+    expect(selectNode).toHaveBeenCalledWith(node.id)
   })
 })

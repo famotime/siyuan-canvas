@@ -1401,6 +1401,59 @@ describe("CanvasWorkspace", () => {
 
     expect(wrapper.find(".file-card__image").attributes("src")).toBe("/assets/road.png")
   })
+
+  it("loads workspace storage image file previews through object URLs", async () => {
+    const source = "/data/storage/maps/roadmap.assets/dropped.png"
+    currentEditor = createEditorMock({
+      id: "file-workspace-image-1",
+      file: source,
+      type: "file",
+    })
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Image",
+      detail: source,
+      headline: "dropped.png",
+      helper: "Image file",
+      imageSrc: source,
+      kind: "image",
+    }))
+    const fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+      blob: async () => new Blob(["png"], { type: "image/png" }),
+      ok: true,
+    } as Response)
+    const createObjectUrlSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:canvas-file-image")
+    const revokeObjectUrlSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
+
+    try {
+      const wrapper = mount(CanvasWorkspace, {
+        props: {
+          bootstrap: {},
+          plugin: createPluginMock(),
+          setTitle: vi.fn(),
+        },
+      })
+
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      await nextTick()
+
+      expect(fetchSpy).toHaveBeenCalledWith("/api/file/getFile", expect.objectContaining({
+        body: JSON.stringify({ path: source }),
+        method: "POST",
+      }))
+      expect(createObjectUrlSpy).toHaveBeenCalled()
+      expect(wrapper.find(".file-card__image").attributes("src")).toBe("blob:canvas-file-image")
+
+      wrapper.unmount()
+      expect(revokeObjectUrlSpy).toHaveBeenCalledWith("blob:canvas-file-image")
+    } finally {
+      fetchSpy.mockRestore()
+      createObjectUrlSpy.mockRestore()
+      revokeObjectUrlSpy.mockRestore()
+    }
+  })
+
   it("renders the create-edge dialog when requested", () => {
     currentEditor = createEditorMock()
     currentEditor.createEdgeDialog.visible = true

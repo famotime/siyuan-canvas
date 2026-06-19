@@ -1745,6 +1745,7 @@ const {
 const edgeLabelInputRef = ref<HTMLInputElement>()
 const fileCardImageOverrides = ref<Record<string, string>>({})
 const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>>({})
+const fileCardImageBlobUrls = ref<Record<string, string>>({})
 const textMarkdownImageBlobUrls = ref<Record<string, string>>({})
 const hoveredEdgeId = ref("")
 const pngExportBackgroundMode = ref<CanvasPngExportBackgroundMode>("white")
@@ -1804,6 +1805,7 @@ const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
 const settingsRevision = ref(0)
 let dragExpandTimer: ReturnType<typeof setTimeout> | null = null
+const fileCardImageBlobUrlLoads = new Set<string>()
 const textMarkdownImageBlobUrlLoads = new Set<string>()
 
 type InspectorTab = 'documents' | 'selection'
@@ -1847,6 +1849,36 @@ async function loadTextMarkdownImageBlobUrl(source: string) {
     console.warn("[siyuan-canvas] unable to load text markdown image:", source, error)
   } finally {
     textMarkdownImageBlobUrlLoads.delete(source)
+  }
+}
+
+async function loadFileCardImageBlobUrl(source: string) {
+  if (fileCardImageBlobUrls.value[source] || fileCardImageBlobUrlLoads.has(source)) {
+    return
+  }
+
+  fileCardImageBlobUrlLoads.add(source)
+  try {
+    const response = await fetch("/api/file/getFile", {
+      body: JSON.stringify({ path: source }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    })
+    if (!response.ok) {
+      return
+    }
+
+    const blobUrl = URL.createObjectURL(await response.blob())
+    fileCardImageBlobUrls.value = {
+      ...fileCardImageBlobUrls.value,
+      [source]: blobUrl,
+    }
+  } catch (error) {
+    console.warn("[siyuan-canvas] unable to load file card image:", source, error)
+  } finally {
+    fileCardImageBlobUrlLoads.delete(source)
   }
 }
 
@@ -1924,6 +1956,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  for (const blobUrl of Object.values(fileCardImageBlobUrls.value)) {
+    URL.revokeObjectURL(blobUrl)
+  }
   for (const blobUrl of Object.values(textMarkdownImageBlobUrls.value)) {
     URL.revokeObjectURL(blobUrl)
   }
@@ -2400,6 +2435,14 @@ function getFileCardImageSource(node: CanvasNode): string | undefined {
   const preview = editor.getFileNodePreview(node)
   if (preview.kind !== "image" || !preview.imageSrc) {
     return undefined
+  }
+
+  if (isWorkspaceStorageImageSource(preview.imageSrc)) {
+    const blobUrl = fileCardImageBlobUrls.value[preview.imageSrc]
+    if (blobUrl) {
+      return blobUrl
+    }
+    void loadFileCardImageBlobUrl(preview.imageSrc)
   }
 
   const candidates = getFilePreviewImageCandidates(preview.imageSrc)

@@ -8,12 +8,22 @@ export function getFilePreviewImageCandidates(source: string): string[] {
 
   if (/^\/data\/assets\//i.test(normalized)) {
     candidates.push(normalized.replace(/^\/data\/assets\//i, '/assets/'))
+  } else if (/^\/data\/storage\//i.test(normalized)) {
+    candidates.push(normalized.replace(/^\/data\/storage\//i, '/storage/'))
   } else if (/^data\/assets\//i.test(normalized)) {
     candidates.push(`/${normalized}`)
     candidates.push(normalized.replace(/^data\/assets\//i, '/assets/'))
+  } else if (/^data\/storage\//i.test(normalized)) {
+    candidates.push(`/${normalized}`)
+    candidates.push(normalized.replace(/^data\/storage\//i, '/storage/'))
   } else if (/^\/assets\//i.test(normalized)) {
     candidates.push(normalized.replace(/^\/assets\//i, '/data/assets/'))
+  } else if (/^\/storage\//i.test(normalized)) {
+    candidates.push(normalized.replace(/^\/storage\//i, '/data/storage/'))
   } else if (/^assets\//i.test(normalized)) {
+    candidates.push(`/data/${normalized}`)
+    candidates.push(`/${normalized}`)
+  } else if (/^storage\//i.test(normalized)) {
     candidates.push(`/data/${normalized}`)
     candidates.push(`/${normalized}`)
   }
