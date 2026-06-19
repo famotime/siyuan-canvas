@@ -1,6 +1,8 @@
 import { computed, reactive, ref, watch } from "vue"
-import type { CanvasDocument, CanvasEdge } from "@/canvas/types"
+import type { CanvasDocument, CanvasEdge, CanvasNode } from "@/canvas/types"
 import type { CanvasPluginSettings } from "@/canvas/plugin-data"
+import { findCanvasNodesInGroup } from "@/canvas/document-group"
+
 
 export interface CanvasPresentationOptions {
   getDocument: () => CanvasDocument
@@ -11,7 +13,20 @@ export interface CanvasPresentationOptions {
   saveRecordedPath?: (path: string[]) => void
 }
 
-type CanvasPresentationPlaybackMode = "graph" | "recorded"
+// 解析目标节点。如果是 group 节点，则自动寻找该 group 内最靠左侧的非 group 节点。如果是空组，返回 null。
+function resolveTargetNodeId(document: CanvasDocument, targetId: string): string | null {
+  const node = document.nodes.find(n => n.id === targetId)
+  if (node && node.type === "group") {
+    const childIds = findCanvasNodesInGroup(document, targetId)
+    const childNodes = document.nodes.filter(n => childIds.includes(n.id) && n.type !== "group")
+    if (childNodes.length > 0) {
+      childNodes.sort((a, b) => a.x - b.x)
+      return childNodes[0].id
+    }
+    return null
+  }
+  return targetId
+}
 
 function getSavedRecordedPath(document: CanvasDocument): string[] {
   const presentation = document.presentation as { recordedPath?: unknown } | undefined
