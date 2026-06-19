@@ -103,4 +103,70 @@ Paragraph with **bold**, \`code\`, and [link](https://example.com).
     expect(html).not.toContain("{:")
     expect(html).not.toContain("20260412094047-ihhbskn")
   })
+
+  it("renders raw and markdown YouTube links to iframe video cards", () => {
+    const html = renderMarkdownPreview(`Here is a video: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+And a markdown link: [My Favorite Video](https://youtu.be/dQw4w9WgXcQ)`)
+
+    expect(html).toContain('<div class="video-card video-card--youtube">')
+    expect(html).toContain('<iframe class="video-card__iframe" width="100%" height="100%" src="https://www.youtube.com/embed/dQw4w9WgXcQ"')
+    expect(html).toContain('<span class="video-card__title">YouTube Video</span>')
+    expect(html).toContain('<span class="video-card__title">My Favorite Video</span>')
+    expect(html).toContain('href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"')
+    expect(html).toContain('href="https://youtu.be/dQw4w9WgXcQ"')
+  })
+
+  it("renders raw and markdown Bilibili links to iframe video cards", () => {
+    const html = renderMarkdownPreview(`Raw B站: https://www.bilibili.com/video/BV1xx411c7Fz
+Markdown B站: [Bilibili](https://www.bilibili.com/video/av123456)`)
+
+    expect(html).toContain('<div class="video-card video-card--bilibili">')
+    expect(html).toContain('src="https://player.bilibili.com/player.html?bvid=BV1xx411c7Fz&amp;p=1&amp;autoplay=0&amp;high_quality=1&amp;danmaku=0&amp;as_wide=1"')
+    expect(html).toContain('src="https://player.bilibili.com/player.html?aid=123456&amp;p=1&amp;autoplay=0&amp;high_quality=1&amp;danmaku=0&amp;as_wide=1"')
+    expect(html).toContain('<span class="video-card__title">Bilibili Video</span>')
+    expect(html).toContain('<span class="video-card__title">Bilibili</span>')
+  })
+
+  it("renders shared Bilibili links with the desktop player embed", () => {
+    const html = renderMarkdownPreview("https://www.bilibili.com/video/BV1ijLQ67EWd/?share_source=copy_web")
+
+    expect(html).toContain('src="https://player.bilibili.com/player.html?bvid=BV1ijLQ67EWd&amp;p=1&amp;autoplay=0&amp;high_quality=1&amp;danmaku=0&amp;as_wide=1"')
+  })
+
+  it("does not render normal links or video links in code blocks as iframes", () => {
+    const html = renderMarkdownPreview(`Normal link: [Google](https://google.com)
+Code block:
+\`\`\`
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+\`\`\`
+Inline code: \`https://www.bilibili.com/video/BV1xx411c7Fz\``)
+
+    expect(html).toContain('<a href="https://google.com"')
+    expect(html).not.toContain('video-card')
+    expect(html).toContain('<code>https://www.youtube.com/watch?v=dQw4w9WgXcQ</code>')
+    expect(html).toContain('<code>https://www.bilibili.com/video/BV1xx411c7Fz</code>')
+  })
+
+  it("renders solo video links as direct blocks without P tag wrapping", () => {
+    // Solo plain URL
+    const html1 = renderMarkdownPreview("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    expect(html1).toContain('<div class="video-card video-card--youtube">')
+    expect(html1).not.toContain("<p>")
+    expect(html1).not.toContain("</p>")
+
+    // Solo markdown link
+    const html2 = renderMarkdownPreview("[Bilibili Video](https://www.bilibili.com/video/BV1xx411c7Fz)")
+    expect(html2).toContain('<div class="video-card video-card--bilibili">')
+    expect(html2).not.toContain("<p>")
+    expect(html2).not.toContain("</p>")
+
+    // Sibling paragraphs are split correctly
+    const html3 = renderMarkdownPreview(`Paragraph before.
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+Paragraph after.`)
+    expect(html3).toContain("<p>Paragraph before.</p>")
+    expect(html3).toContain('<div class="video-card video-card--youtube">')
+    expect(html3).toContain("<p>Paragraph after.</p>")
+  })
 })
+

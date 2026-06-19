@@ -180,6 +180,141 @@ function extractAllowedInlineHtml(value: string): { placeholders: string[], text
   }
 }
 
+export function getVideoEmbedUrl(url: string): { type: "youtube" | "bilibili"; embedUrl: string } | null {
+  const cleanUrl = url.trim()
+  let parsed: URL
+  try {
+    parsed = new URL(cleanUrl)
+  } catch {
+    // Try prepending https:// if it has no protocol
+    if (!/^[a-zA-Z]+:\/\//i.test(cleanUrl)) {
+      try {
+        parsed = new URL(`https://${cleanUrl}`)
+      } catch {
+        return null
+      }
+    } else {
+      return null
+    }
+  }
+
+  const host = parsed.hostname.toLowerCase()
+  const path = parsed.pathname
+
+  // YouTube
+  if (host.includes("youtube.com") || host.includes("youtu.be") || host.includes("youtube-nocookie.com")) {
+    let videoId: string | null = null
+    if (host.includes("youtu.be")) {
+      videoId = path.slice(1)
+    } else if (host.includes("youtube.com") || host.includes("youtube-nocookie.com")) {
+      if (path.startsWith("/embed/")) {
+        videoId = path.slice(7)
+      } else if (path.startsWith("/shorts/")) {
+        videoId = path.slice(8)
+      } else if (path === "/watch") {
+        videoId = parsed.searchParams.get("v")
+      }
+    }
+    if (videoId) {
+      videoId = videoId.split("?")[0].split("&")[0].split("/")[0]
+      if (videoId) {
+        return {
+          type: "youtube",
+          embedUrl: `https://www.youtube.com/embed/${videoId}`,
+        }
+      }
+    }
+  }
+
+  // Bilibili
+  if (host.includes("bilibili.com") || host.includes("b23.tv")) {
+    if (host.includes("player.bilibili.com")) {
+      return {
+        type: "bilibili",
+        embedUrl: cleanUrl,
+      }
+    }
+    const match = path.match(/\/video\/(BV[a-zA-Z0-9]+|av\d+)/i)
+    if (match) {
+      const id = match[1]
+      if (id.toLowerCase().startsWith("bv")) {
+        return {
+          type: "bilibili",
+          embedUrl: createBilibiliEmbedUrl({ bvid: id }),
+        }
+      } else {
+        const aid = id.slice(2)
+        return {
+          type: "bilibili",
+          embedUrl: createBilibiliEmbedUrl({ aid }),
+        }
+      }
+    }
+    const bvid = parsed.searchParams.get("bvid")
+    const aid = parsed.searchParams.get("aid")
+    if (bvid) {
+      return {
+        type: "bilibili",
+        embedUrl: createBilibiliEmbedUrl({ bvid }),
+      }
+    }
+    if (aid) {
+      return {
+        type: "bilibili",
+        embedUrl: createBilibiliEmbedUrl({ aid }),
+      }
+    }
+  }
+
+  return null
+}
+
+function createBilibiliEmbedUrl(params: { aid?: string, bvid?: string }): string {
+  const searchParams = new URLSearchParams()
+
+  if (params.bvid) {
+    searchParams.set("bvid", params.bvid)
+  } else if (params.aid) {
+    searchParams.set("aid", params.aid)
+  }
+
+  searchParams.set("p", "1")
+  searchParams.set("autoplay", "0")
+  searchParams.set("high_quality", "1")
+  searchParams.set("danmaku", "0")
+  searchParams.set("as_wide", "1")
+
+  return `https://player.bilibili.com/player.html?${searchParams.toString()}`
+}
+
+function createVideoIframeHtml(
+  type: "youtube" | "bilibili",
+  embedUrl: string,
+  originalUrl: string,
+  label?: string,
+): string {
+  const safeEmbedUrl = escapeHtmlAttribute(embedUrl)
+  const safeOriginalUrl = escapeHtmlAttribute(originalUrl)
+  const displayLabel = label?.trim() || (type === "youtube" ? "YouTube Video" : "Bilibili Video")
+  const safeLabel = escapeHtml(displayLabel)
+
+  const youtubeIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="color: #ff0000; display: inline-block; vertical-align: middle;"><path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.516 0-9.387.507a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11C4.483 20.455 12 20.455 12 20.455s7.517 0 9.387-.507a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`
+  const bilibiliIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="color: #00aeec; display: inline-block; vertical-align: middle;"><path d="M17.877 1.258l1.49 1.336-2.617 2.923c.712.28 1.4.636 2.054 1.058l2.977-2.658 1.488 1.338-3.993 3.566c.866.93 1.547 2.003 2.005 3.197.643 1.678.711 3.447.195 5.17a10.278 10.278 0 0 1-5.116 6.305c-1.637.893-3.447 1.242-5.26 1.018a10.354 10.354 0 0 1-6.19-2.993 10.024 10.024 0 0 1-2.695-5.918c-.378-2.029.071-4.093 1.272-5.86.883-1.3 2.046-2.333 3.39-3.007L2.9 3.585l1.488-1.337 2.976 2.657c.654-.422 1.342-.777 2.055-1.057L6.802 1.258V1.26l1.488 1.336 3.187 3.56c.415-.058.835-.088 1.257-.088.423 0 .843.03 1.258.087l3.187-3.56 1.489.317c.07-.107.139-.214.21-.32zm-3.076 11.233c-.63 0-1.144.577-1.144 1.288s.514 1.288 1.144 1.288 1.144-.577 1.144-1.288-.514-1.288-1.144-1.288zm-5.602 0c-.63 0-1.144.577-1.144 1.288s.514 1.288 1.144 1.288 1.144-.577 1.144-1.288-.514-1.288-1.144-1.288z"/></svg>`
+
+  const icon = type === "youtube" ? youtubeIcon : bilibiliIcon
+
+  return `<div class="video-card video-card--${type}">`
+    + `<div class="video-card__header">`
+    + `<span class="video-card__platform-icon">${icon}</span>`
+    + `<span class="video-card__title">${safeLabel}</span>`
+    + `<a class="video-card__open-link" href="${safeOriginalUrl}" target="_blank" rel="noopener noreferrer" title="在新标签页打开">↗</a>`
+    + `</div>`
+    + `<div class="video-card__iframe-container">`
+    + `<iframe class="video-card__iframe" width="100%" height="100%" src="${safeEmbedUrl}" scrolling="no" border="0" frameborder="no" framespacing="0" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"></iframe>`
+    + `</div>`
+    + `</div>`
+}
+
 function renderInlineMarkdown(value: string): string {
   const codePlaceholders: string[] = []
   let rendered = value.replace(/`([^`\n]+)`/g, (_, code: string) => {
@@ -197,6 +332,29 @@ function renderInlineMarkdown(value: string): string {
     imagePlaceholders.push(`<img src="${src}" alt="${escapedAlt}"${titleAttribute}>`)
     return placeholder
   })
+
+  // Extract Bilibili and YouTube links to video placeholders
+  const videoPlaceholders: string[] = []
+  rendered = rendered.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (match, label: string, url: string) => {
+    const videoInfo = getVideoEmbedUrl(url)
+    if (videoInfo) {
+      const placeholder = `%%VIDEO_${videoPlaceholders.length}%%`
+      videoPlaceholders.push(createVideoIframeHtml(videoInfo.type, videoInfo.embedUrl, url, label))
+      return placeholder
+    }
+    return match
+  })
+
+  rendered = rendered.replace(/(https?:\/\/[^\s)<>"]+)/g, (match) => {
+    const videoInfo = getVideoEmbedUrl(match)
+    if (videoInfo) {
+      const placeholder = `%%VIDEO_${videoPlaceholders.length}%%`
+      videoPlaceholders.push(createVideoIframeHtml(videoInfo.type, videoInfo.embedUrl, match, ""))
+      return placeholder
+    }
+    return match
+  })
+
   const { placeholders: htmlPlaceholders, text } = extractAllowedInlineHtml(rendered)
   rendered = escapeHtml(text)
 
@@ -209,7 +367,47 @@ function renderInlineMarkdown(value: string): string {
 
   rendered = restorePlaceholders(rendered, "HTML", htmlPlaceholders)
   rendered = restorePlaceholders(rendered, "IMAGE", imagePlaceholders)
+  rendered = restorePlaceholders(rendered, "VIDEO", videoPlaceholders)
   return restorePlaceholders(rendered, "CODE", codePlaceholders)
+}
+
+function parseSoloVideoLink(line: string): { type: "youtube" | "bilibili"; embedUrl: string; originalUrl: string; label?: string } | null {
+  const trimmed = line.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  // Try matching markdown link format: [label](url)
+  const mdLinkMatch = trimmed.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/)
+  if (mdLinkMatch) {
+    const label = mdLinkMatch[1]!
+    const url = mdLinkMatch[2]!
+    const videoInfo = getVideoEmbedUrl(url)
+    if (videoInfo) {
+      return {
+        type: videoInfo.type,
+        embedUrl: videoInfo.embedUrl,
+        originalUrl: url,
+        label,
+      }
+    }
+  }
+
+  // Try matching plain URL format: url
+  const urlMatch = trimmed.match(/^(https?:\/\/[^\s)<>"]+)$/)
+  if (urlMatch) {
+    const url = urlMatch[1]!
+    const videoInfo = getVideoEmbedUrl(url)
+    if (videoInfo) {
+      return {
+        type: videoInfo.type,
+        embedUrl: videoInfo.embedUrl,
+        originalUrl: url,
+      }
+    }
+  }
+
+  return null
 }
 
 function renderParagraph(lines: string[]): string {
@@ -243,6 +441,13 @@ export function renderMarkdownPreview(markdown: string): string {
         index += 1
       }
       blocks.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`)
+      index += 1
+      continue
+    }
+
+    const soloVideo = parseSoloVideoLink(trimmed)
+    if (soloVideo) {
+      blocks.push(createVideoIframeHtml(soloVideo.type, soloVideo.embedUrl, soloVideo.originalUrl, soloVideo.label))
       index += 1
       continue
     }
@@ -281,7 +486,14 @@ export function renderMarkdownPreview(markdown: string): string {
     index += 1
     while (index < lines.length) {
       const next = lines[index]!.trim()
-      if (!next || next.startsWith("```") || /^>\s?/.test(next) || /^(#{1,6})\s+/.test(next) || /^([-*+]\s+|\d+\.\s+)/.test(next)) {
+      if (
+        !next ||
+        next.startsWith("```") ||
+        /^>\s?/.test(next) ||
+        /^(#{1,6})\s+/.test(next) ||
+        /^([-*+]\s+|\d+\.\s+)/.test(next) ||
+        parseSoloVideoLink(next)
+      ) {
         break
       }
       paragraphLines.push(next)

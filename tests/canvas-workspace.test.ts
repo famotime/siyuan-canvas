@@ -419,6 +419,55 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find(".canvas-node--text .canvas-node__header-title").text()).toBe("定义")
   })
 
+  it("renders Bilibili link cards with the desktop player and iframe permissions", () => {
+    currentEditor = createEditorMock(createLinkNode({
+      url: "https://www.bilibili.com/video/BV1ijLQ67EWd/?share_source=copy_web",
+      height: 360,
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const iframe = wrapper.find(".canvas-node--link .link-card__iframe")
+    expect(iframe.attributes("src")).toBe("https://player.bilibili.com/player.html?bvid=BV1ijLQ67EWd&p=1&autoplay=0&high_quality=1&danmaku=0&as_wide=1")
+    expect(iframe.classes()).toContain("link-card__iframe--bilibili")
+    expect(iframe.attributes("style")).toContain("width: 320px")
+    expect(iframe.attributes("style")).toContain("height: 180px")
+    expect(iframe.attributes("style")).toContain("transform: scaleY(1.8055555555555556)")
+    expect(iframe.attributes("style")).toContain("transform-origin: left top")
+    expect(iframe.attributes("allow")).toBe("autoplay; encrypted-media; fullscreen; picture-in-picture")
+    expect(iframe.attributes("allowfullscreen")).toBeUndefined()
+    expect(iframe.attributes("height")).toBe("100%")
+  })
+
+  it("remounts Bilibili link iframes when the card is resized", async () => {
+    const node = createLinkNode({
+      url: "https://www.bilibili.com/video/BV1ijLQ67EWd/?share_source=copy_web",
+      width: 320,
+      height: 180,
+    })
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const firstIframe = wrapper.find(".canvas-node--link .link-card__iframe").element
+    currentEditor.displayNodes[0].height = 420
+    await nextTick()
+
+    expect(wrapper.find(".canvas-node--link .link-card__iframe").element).not.toBe(firstIframe)
+  })
+
   it("loads workspace storage images in text markdown through object URLs", async () => {
     const imagePath = "/data/storage/petal/siyuan-canvas/未命名.assets/1779613060426.png"
     const node = createTextNode({
@@ -1330,6 +1379,32 @@ describe("CanvasWorkspace", () => {
     expect(stylesheet).toContain("text-decoration-color: color-mix(in srgb, var(--canvas-search-highlight-color) 68%, black 32%);")
     expect(stylesheet).toContain("text-decoration-thickness: 3px;")
     expect(stylesheet).toContain("text-decoration-skip-ink: none;")
+  })
+
+  it("lets embedded video iframes fill resized text card height", () => {
+    const stylesheet = readFileSync(resolve(__dirname, "../src/components/canvas/canvas-workspace.scss"), "utf-8")
+    const cardRule = stylesheet.match(/:deep\(\.video-card\)\s*\{[^}]+\}/)?.[0] ?? ""
+    const containerRule = stylesheet.match(/:deep\(\.video-card__iframe-container\)\s*\{[^}]+\}/)?.[0] ?? ""
+    const iframeRule = stylesheet.match(/:deep\(\.video-card__iframe\)\s*\{[^}]+\}/)?.[0] ?? ""
+
+    expect(cardRule).toContain("display: flex;")
+    expect(cardRule).toContain("flex: 1;")
+    expect(containerRule).toContain("flex: 1;")
+    expect(containerRule).toContain("height: 100%;")
+    expect(containerRule).not.toContain("aspect-ratio")
+    expect(iframeRule).toContain("position: absolute;")
+    expect(iframeRule).toContain("height: 100%;")
+  })
+
+  it("does not crop Bilibili markdown iframes injected with v-html", () => {
+    const stylesheet = readFileSync(resolve(__dirname, "../src/components/canvas/canvas-workspace.scss"), "utf-8")
+    const bilibiliRule = stylesheet.match(/:deep\(\.video-card--bilibili \.video-card__iframe\)\s*\{[^}]+\}/)?.[0] ?? ""
+
+    expect(bilibiliRule).toContain("left: 0;")
+    expect(bilibiliRule).toContain("top: 0;")
+    expect(bilibiliRule).toContain("width: 100%;")
+    expect(bilibiliRule).toContain("height: 100%;")
+    expect(bilibiliRule).not.toContain("translate(-50%, -50%)")
   })
 
   it("renders the canvas minimap when enabled", () => {

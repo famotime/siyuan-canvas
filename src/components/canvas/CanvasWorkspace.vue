@@ -568,9 +568,15 @@
                 >
                   <div class="link-card__iframe-wrapper">
                     <iframe
-                      :src="node.url"
+                      :key="getLinkIframeKey(node)"
+                      :src="getLinkNodeUrl(node)"
                       class="link-card__iframe"
+                      :class="{ 'link-card__iframe--bilibili': isBilibiliLinkNode(node) }"
+                      :style="getLinkIframeStyle(node)"
+                      width="100%"
+                      height="100%"
                       sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+                      allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                       loading="lazy"
                       @error="onLinkIframeError(node.id)"
                     />
@@ -1716,6 +1722,7 @@ import {
   getNextFilePreviewImageSource,
 } from "@/canvas/file-preview-fallbacks"
 import type { CanvasFilePickerOption } from "@/canvas/file-picker-dialog"
+import { getVideoEmbedUrl } from "@/canvas/markdown-preview"
 
 const props = defineProps<{
   bootstrap: CanvasTabBootstrap
@@ -2390,6 +2397,50 @@ function renderCanvasTextNodeContent(node: CanvasNode) {
     void loadTextMarkdownImageBlobUrl(source)
   }
   return applyTextMarkdownImageBlobUrls(html)
+}
+
+function getLinkNodeUrl(node: CanvasNode): string {
+  if (node.type !== "link" || !node.url) {
+    return ""
+  }
+  const videoInfo = getVideoEmbedUrl(node.url)
+  return videoInfo ? videoInfo.embedUrl : node.url
+}
+
+function getLinkIframeKey(node: CanvasNode): string {
+  if (node.type !== "link" || !node.url) {
+    return node.id
+  }
+  const videoInfo = getVideoEmbedUrl(node.url)
+  if (videoInfo?.type === "bilibili") {
+    return `${node.id}:${node.width}x${node.height}:${videoInfo.embedUrl}`
+  }
+  return `${node.id}:${videoInfo?.embedUrl ?? node.url}`
+}
+
+function isBilibiliLinkNode(node: CanvasNode): boolean {
+  return node.type === "link" && !!node.url && getVideoEmbedUrl(node.url)?.type === "bilibili"
+}
+
+function getLinkIframeStyle(node: CanvasNode): Record<string, string> | undefined {
+  if (!isBilibiliLinkNode(node)) {
+    return undefined
+  }
+
+  const headerHeight = showNodeHeader.value ? 35 : 0
+  const viewportWidth = Math.max(1, node.width)
+  const viewportHeight = Math.max(1, node.height - headerHeight)
+  const playerHeight = Math.max(1, viewportWidth * 9 / 16)
+  const scaleY = viewportHeight / playerHeight
+
+  return {
+    height: `${playerHeight}px`,
+    left: '0',
+    top: '0',
+    transform: `scaleY(${scaleY})`,
+    transformOrigin: 'left top',
+    width: `${viewportWidth}px`,
+  }
 }
 
 /**

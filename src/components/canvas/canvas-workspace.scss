@@ -1007,6 +1007,8 @@
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
+  display: flex;
+  flex-direction: column;
 }
 
 .canvas-node--link .canvas-node__body {
@@ -1028,6 +1030,18 @@
 .canvas-node__content {
   white-space: pre-wrap;
   line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+
+  & > p:only-child {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+  }
 }
 
 .canvas-node__group-label {
@@ -2070,6 +2084,98 @@
   font-size: 13px;
   color: var(--canvas-text-muted);
   text-align: center;
+}
+
+:deep(.video-card) {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--canvas-border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 12px 0;
+  background: var(--canvas-surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+:deep(.video-card__header) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--canvas-border);
+  background: var(--canvas-surface-secondary, rgba(0, 0, 0, 0.02));
+  min-height: 30px;
+  box-sizing: border-box;
+}
+
+:deep(.video-card__platform-icon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+:deep(.video-card__title) {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--canvas-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:deep(.video-card__open-link) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--canvas-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+:deep(.video-card__open-link:hover) {
+  background: var(--canvas-floating-button-bg-hover);
+  color: var(--canvas-accent);
+}
+
+:deep(.video-card__iframe-container) {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  height: 100%;
+  min-height: 160px;
+  background: #000;
+  overflow: hidden;
+}
+
+:deep(.video-card__iframe) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+:deep(.video-card--bilibili .video-card__iframe) {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pointer events behavior: prevent iframe clicks unless the node is selected */
+:deep(.canvas-node:not(.canvas-node--selected) .video-card__iframe) {
+  pointer-events: none;
 }
 
 .inspector__sort-dropdown {
