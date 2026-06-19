@@ -14,6 +14,7 @@ import type {
   CanvasSide,
 } from '@/canvas/types'
 import type { CanvasI18nTranslator } from '@/canvas/use-canvas-editor-shared'
+import type { CanvasPluginSettings } from '@/canvas/plugin-data'
 
 import { ref } from 'vue'
 import { showMessage } from 'siyuan'
@@ -55,6 +56,7 @@ interface CanvasEditorNodeEdgeActionsOptions {
   editingEdgeLabelId: Ref<string>
   edgeToolbarPopover: Ref<'closed' | 'color' | 'direction'>
   fileFieldRefresh: () => Promise<void>
+  getSettings?: () => CanvasPluginSettings
   newEdgeFromSide: Ref<CanvasSide>
   newEdgeLabel: Ref<string>
   newEdgeSourceId: Ref<string>
@@ -289,8 +291,12 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
       height: node.height,
     }
 
+    const isPresentation = options.presentationActive?.value
+    const autoRatio = options.getSettings?.().presentationAutoRatio ?? true
+    const targetScale = (isPresentation && autoRatio) ? 1.0 : viewport.scale
+
     const nextViewport = centerViewportOnBounds(
-      viewport,
+      { ...viewport, scale: targetScale },
       {
         height: stage.clientHeight,
         width: stage.clientWidth,
@@ -303,11 +309,11 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     )
 
     // Offset viewport Y by 40px when presentation is active to account for bottom controller
-    if (options.presentationActive?.value) {
+    if (isPresentation) {
       nextViewport.y -= 40
     }
 
-    viewport.scale = nextViewport.scale
+    viewport.scale = targetScale
     viewport.x = nextViewport.x
     viewport.y = nextViewport.y
     closeSelectionPopover()

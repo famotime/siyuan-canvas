@@ -316,6 +316,10 @@
   "settingsPresentationStyleDescription": "Select the visual effect when playing a presentation.",
   "settingsPresentationStyleZoom": "Zoom & Center Only",
   "settingsPresentationStyleMask": "Dark Background Mask",
+  "settingsPresentationAutoRatioTitle": "Auto Presentation Scale (100%)",
+  "settingsPresentationAutoRatioDescription": "When checked, forces zoom scale to 100% when focusing nodes; otherwise, uses current zoom scale.",
+  "settingsPresentationMaskOpacityTitle": "Dark Background Mask Opacity",
+  "settingsPresentationMaskOpacityDescription": "Mask opacity applied in 'Dark Background Mask' style (0% to 100%).",
   "settingsPresentationAutoPlayIntervalTitle": "Auto Play Interval",
   "settingsPresentationAutoPlayIntervalDescription": "Time in seconds before automatically transitioning to the next card.",
   "selectionToolbarPlay": "Play Presentation"

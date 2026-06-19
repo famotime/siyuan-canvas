@@ -960,6 +960,7 @@ export function useCanvasEditor(
     editingEdgeLabelId,
     edgeToolbarPopover,
     fileFieldRefresh: refreshFileNodeMetadata,
+    getSettings: getPluginSettings,
     newEdgeFromSide,
     newEdgeLabel,
     newEdgeSourceId,

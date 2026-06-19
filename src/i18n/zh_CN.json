@@ -316,6 +316,10 @@
   "settingsPresentationStyleDescription": "选择在播放演示时的画布背景表现。",
   "settingsPresentationStyleZoom": "仅居中放大",
   "settingsPresentationStyleMask": "背景暗色遮罩",
+  "settingsPresentationAutoRatioTitle": "播放自动比例 (100%)",
+  "settingsPresentationAutoRatioDescription": "勾选后定位到节点时比例强制设为 100%；若不勾选，则按用户当前浏览比例播放。",
+  "settingsPresentationMaskOpacityTitle": "背景暗色遮罩不透明度",
+  "settingsPresentationMaskOpacityDescription": "在“背景暗色遮罩”模式下应用的不透明度，范围为 0% 到 100%。",
   "settingsPresentationAutoPlayIntervalTitle": "自动播放间隔时间",
   "settingsPresentationAutoPlayIntervalDescription": "在混合模式下，卡片自动切换到下一张的时间（秒）。",
   "selectionToolbarPlay": "播放演示"

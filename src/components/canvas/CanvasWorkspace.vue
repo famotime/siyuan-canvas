@@ -319,6 +319,9 @@
           'stage--readonly': editor.readonly,
           'stage--presentation-mask': editor.presentation.isActive && plugin.getCanvasSettings().presentationStyle === 'mask'
         }"
+        :style="{
+          '--presentation-mask-opacity': (plugin.getCanvasSettings?.()?.presentationMaskOpacity ?? 60) / 100
+        }"
         @pointerdown="handleStagePointerDown"
         @dblclick="handleStageDoubleClick"
         @paste="handleStagePaste"

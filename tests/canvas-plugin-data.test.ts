@@ -19,6 +19,8 @@ describe("canvas plugin data", () => {
     expect(data.settings.recentFilesLimit).toBe(8)
     expect(data.settings.showCanvasThumbnails).toBe(false)
     expect(data.settings.showNodeHeader).toBe(true)
+    expect(data.settings.presentationAutoRatio).toBe(true)
+    expect(data.settings.presentationMaskOpacity).toBe(60)
     expect(data.recentFiles).toEqual([])
     expect(data.ui.inspectorSections).toEqual({
       createEdge: true,
@@ -130,5 +132,31 @@ describe("colorTheme in plugin settings", () => {
       settings: {},
     })
     expect(data.settings.colorTheme).toBe("classic")
+  })
+})
+
+describe("presentation settings normalization", () => {
+  it("normalizes valid presentation settings", () => {
+    const data = normalizeCanvasPluginData({
+      version: 1,
+      settings: {
+        presentationAutoRatio: false,
+        presentationMaskOpacity: 45,
+      },
+    })
+    expect(data.settings.presentationAutoRatio).toBe(false)
+    expect(data.settings.presentationMaskOpacity).toBe(45)
+  })
+
+  it("falls back to default for invalid presentation settings", () => {
+    const data = normalizeCanvasPluginData({
+      version: 1,
+      settings: {
+        presentationAutoRatio: "not-a-boolean",
+        presentationMaskOpacity: 150, // out of range 0-100
+      },
+    })
+    expect(data.settings.presentationAutoRatio).toBe(true) // default
+    expect(data.settings.presentationMaskOpacity).toBe(60) // default
   })
 })

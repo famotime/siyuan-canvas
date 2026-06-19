@@ -16,6 +16,8 @@ export interface CanvasPluginSettings {
   showNodeHeader: boolean
   presentationStyle: "zoom" | "mask"
   presentationAutoPlayInterval: number
+  presentationAutoRatio: boolean
+  presentationMaskOpacity: number
 }
 
 export interface CanvasInspectorSectionsState {
@@ -58,6 +60,8 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     showNodeHeader: true,
     presentationStyle: "zoom",
     presentationAutoPlayInterval: 3,
+    presentationAutoRatio: true,
+    presentationMaskOpacity: 60,
   }
 }
 
@@ -159,6 +163,14 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     presentationAutoPlayInterval: typeof candidate.settings?.presentationAutoPlayInterval === "number" && candidate.settings.presentationAutoPlayInterval >= 1
       ? candidate.settings.presentationAutoPlayInterval
       : defaults.settings.presentationAutoPlayInterval,
+    presentationAutoRatio: typeof candidate.settings?.presentationAutoRatio === "boolean"
+      ? candidate.settings.presentationAutoRatio
+      : defaults.settings.presentationAutoRatio,
+    presentationMaskOpacity: typeof candidate.settings?.presentationMaskOpacity === "number"
+      && candidate.settings.presentationMaskOpacity >= 0
+      && candidate.settings.presentationMaskOpacity <= 100
+      ? candidate.settings.presentationMaskOpacity
+      : defaults.settings.presentationMaskOpacity,
   }
 
   const defaultInspectorSections = defaults.ui.inspectorSections

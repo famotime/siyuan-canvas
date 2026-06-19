@@ -188,6 +188,39 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     },
   })
   setting.addItem({
+    title: t("settingsPresentationAutoRatioTitle"),
+    description: t("settingsPresentationAutoRatioDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.type = "checkbox"
+      input.checked = draft.presentationAutoRatio !== false
+      input.addEventListener("change", () => {
+        draft.presentationAutoRatio = input.checked
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
+    title: t("settingsPresentationMaskOpacityTitle"),
+    description: t("settingsPresentationMaskOpacityDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.className = "b3-text-field fn__flex-center"
+      input.type = "number"
+      input.min = "0"
+      input.max = "100"
+      input.value = (draft.presentationMaskOpacity !== undefined ? draft.presentationMaskOpacity : 60).toString()
+      input.addEventListener("change", () => {
+        const nextValue = Number.parseInt(input.value, 10)
+        draft.presentationMaskOpacity = Number.isNaN(nextValue) ? 60 : Math.min(100, Math.max(0, nextValue))
+        input.value = draft.presentationMaskOpacity.toString()
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
     title: t("settingsPresentationAutoPlayIntervalTitle"),
     description: t("settingsPresentationAutoPlayIntervalDescription"),
     createActionElement: () => {
