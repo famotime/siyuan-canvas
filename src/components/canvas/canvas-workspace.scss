@@ -51,8 +51,6 @@
   --canvas-code-bg: color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
 
   /* 妫€鏌ュ櫒 */
-  --canvas-inspector-bg: var(--canvas-surface-elevated);
-  --canvas-inspector-section-bg: var(--canvas-surface-overlay);
 
   /* 閿氱偣 / 璋冩暣灏哄 */
   --canvas-anchor-bg: var(--canvas-surface);
@@ -865,7 +863,6 @@
 
 .stage__edge--draft {
   stroke: var(--canvas-accent);
-  stroke-dasharray: 8 6;
   pointer-events: none;
 }
 
@@ -888,7 +885,7 @@
   flex-direction: column;
   border: 1px solid var(--canvas-border);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: var(--canvas-shadow);
   background: var(--canvas-card-bg);
   color: var(--canvas-text);
@@ -901,6 +898,10 @@
 
   &:active {
     cursor: grabbing;
+  }
+
+  .canvas-node__body {
+    padding: 14px;
   }
 
   .canvas-node__body,
@@ -1343,9 +1344,7 @@
 }
 
 .canvas-node:hover .canvas-node__resize-handle,
-.canvas-node--selected .canvas-node__resize-handle,
-.canvas-node:hover .canvas-node__resize-corner,
-.canvas-node--selected .canvas-node__resize-corner {
+.canvas-node--selected .canvas-node__resize-handle {
   opacity: 1;
 }
 
@@ -1359,15 +1358,6 @@
   .canvas-node--selected .canvas-node__anchor {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
-  }
-
-  .canvas-node__resize-corner {
-    width: 22px;
-    height: 22px;
-  }
-
-  .canvas-node--selected .canvas-node__resize-corner {
-    opacity: 1;
   }
 
   /* 瑙﹀睆娌℃湁 hover 鏄剧ず tooltip 鐨勮涔夛紝骞茶剢绂佺敤 ::after 鐨?tooltip 娴眰閬垮厤 tap 鎶栧姩 */
@@ -1447,32 +1437,10 @@
   bottom: 14px;
 }
 
-.canvas-node__resize-corner {
-  position: absolute;
-  z-index: 2;
-  right: 10px;
-  bottom: 10px;
-  width: 16px;
-  height: 16px;
-  border: 0;
-  border-radius: 4px;
-  background: var(--canvas-resize-handle);
-  cursor: nwse-resize;
-  opacity: 0;
-  transition:
-    opacity 0.16s ease,
-    background 0.16s ease;
-}
-
-.canvas-node__resize-corner:hover {
-  background: var(--canvas-resize-handle-hover);
-}
-
 .inspector {
   overflow: auto;
   padding: 18px;
   border-left: 1px solid var(--canvas-border);
-  background: var(--canvas-inspector-bg);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1493,7 +1461,6 @@
   width: 320px;
   height: 100%;
   box-sizing: border-box;
-  background: var(--canvas-inspector-bg);
   border-left: 1px solid var(--canvas-border);
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
@@ -1527,7 +1494,6 @@
   height: 32px;
   border: 1px solid var(--canvas-border);
   border-radius: 8px;
-  background: var(--canvas-inspector-section-bg);
   color: var(--canvas-text-muted);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
@@ -1571,7 +1537,6 @@
   height: 28px;
   border: 1px solid var(--canvas-border);
   border-radius: 6px;
-  background: var(--canvas-inspector-section-bg);
   color: var(--canvas-text-muted);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1656,7 +1621,6 @@
   padding: 16px;
   border: 1px solid var(--canvas-border);
   border-radius: 16px;
-  background: var(--canvas-inspector-section-bg);
 }
 
 .inspector__section-toggle {

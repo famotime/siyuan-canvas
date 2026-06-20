@@ -66,6 +66,7 @@ import {
   type CanvasEditorConnectionDraftState,
   type CanvasEditorEdgeReconnectDraftState,
   type CanvasEditorSelectionBoxState,
+  type PendingCardCreation,
 } from "@/canvas/use-canvas-editor-gestures"
 import { initializeCanvasEditor, syncCanvasEditorSelectionUi } from "@/canvas/use-canvas-editor-lifecycle"
 import { createCanvasEditorNodeActivationActions } from "@/canvas/use-canvas-editor-node-activation"
@@ -241,6 +242,12 @@ export function useCanvasEditor(
     toX: 0,
     toY: 0,
     visible: false,
+  })
+  const pendingCardCreation = reactive<PendingCardCreation>({
+    canvasX: 0,
+    canvasY: 0,
+    fromNodeId: "",
+    fromSide: "left",
   })
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
@@ -982,6 +989,9 @@ export function useCanvasEditor(
 
   focusNodeByIdFn = focusNodeById
 
+  // 文件选择器回调 — 用于从添加笔记菜单进入文件选择流程
+  const fileSelectCallback = ref<((option: { blockId?: string, kind: string, path: string }) => void) | null>(null)
+
   const {
     closeFilePickerDialog,
     handleClipboardImagePaste,
@@ -993,6 +1003,19 @@ export function useCanvasEditor(
     commitDocument,
     filePickerDialog,
     fileSource,
+    onFileSelect: (option) => {
+      const cb = fileSelectCallback.value
+      if (cb) {
+        try {
+          cb(option)
+        }
+        catch (e) {
+          console.error('Canvas file select callback error:', e)
+        }
+        return true
+      }
+      return false
+    },
     refreshFileNodeMetadata,
     resolveBlockById: findSiyuanBlockById,
     resolveBlocksByQuery: findSiyuanBlocksByQuery,
@@ -1047,12 +1070,15 @@ export function useCanvasEditor(
     clearEdgeReconnectDraft,
     clearSelectionBox,
     finishConnectionDrag,
+    finishPendingCardCreation,
+    clearPendingCardCreation,
     getConnectionDraftPath,
     getEdgeReconnectDraftPath,
     handleNodePointerDown,
     handleWheelZoom,
     isConnectionTarget,
     startEdgeEndpointDrag,
+    startEdgePointerDown,
     startConnectionDrag,
     startCornerResize,
     startDrag,
@@ -1064,6 +1090,7 @@ export function useCanvasEditor(
     connectionDraft,
     edgeReconnectDraft,
     getAnchor,
+    pendingCardCreation,
     readonly,
     selectionBox,
     selectedEdge,
@@ -1286,6 +1313,7 @@ export function useCanvasEditor(
       expandAllInspectorSections,
       removeRecentFileRecord,
       connectionDraft,
+      pendingCardCreation,
       edgeColorOptions: selectionColors,
       edgeLabelDraft,
       edgeLabelEditorPosition,
@@ -1299,6 +1327,8 @@ export function useCanvasEditor(
       exportCanvasPng,
       fileInputRef,
       finishConnectionDrag,
+      finishPendingCardCreation,
+      clearPendingCardCreation,
       getEdgeLabelPosition,
       getEdgePath,
       getConnectionDraftPath,
@@ -1323,6 +1353,7 @@ export function useCanvasEditor(
       newEdgeToSide,
       openCreateEdgeDialog,
       openFilePickerDialog,
+      fileSelectCallback,
       openPath,
       openRecentFile,
       resetViewport,
@@ -1417,6 +1448,7 @@ export function useCanvasEditor(
       setSelectionToolbarSize,
       setEdgeToolbarSize,
       startEdgeEndpointDrag,
+      startEdgePointerDown,
       startEdgeLabelEditing,
       submitEdgeLabelEditing,
       cancelEdgeLabelEditing,

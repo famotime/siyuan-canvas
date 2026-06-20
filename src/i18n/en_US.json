@@ -322,5 +322,11 @@
   "settingsPresentationMaskOpacityDescription": "Mask opacity applied in 'Dark Background Mask' style (0% to 100%).",
   "settingsPresentationAutoPlayIntervalTitle": "Auto Play Interval",
   "settingsPresentationAutoPlayIntervalDescription": "Time in seconds before automatically transitioning to the next card.",
-  "selectionToolbarPlay": "Play Presentation"
+  "selectionToolbarPlay": "Play Presentation",
+  "addTextCard": "Add Text Card",
+  "addNoteCard": "Add Note Card",
+  "sidebarTitle": "Canvas Files",
+  "sidebarRefresh": "Refresh",
+  "sidebarNoFiles": "No canvas files in workspace",
+  "sidebarNoRecentFiles": "No recent files"
 }

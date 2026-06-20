@@ -122,6 +122,10 @@ const DEFAULT_WORKSPACE_TREE_LABELS: WorkspaceTreeLabels = {
   unableToSaveMessage: "Unable to save",
 }
 
+function notifyWorkspaceChanged() {
+  window.dispatchEvent(new CustomEvent("siyuan-canvas:workspace-changed"))
+}
+
 export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies) {
   const labels = {
     ...DEFAULT_WORKSPACE_TREE_LABELS,
@@ -148,6 +152,7 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     try {
       const tree = await readDirectoryTree(directory)
       workspaceDocuments.value = sortWorkspaceTree(tree)
+      notifyWorkspaceChanged()
     } catch {
       workspaceDocuments.value = []
     }
@@ -372,6 +377,7 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     await deps.plugin.removeRecentCanvasFile?.(oldPath)
     deps.refreshRecentFiles()
     await refreshWorkspaceDocuments()
+    window.dispatchEvent(new CustomEvent("siyuan-canvas:file-saved", { detail: { path: newPath } }))
     deps.showMessage(labels.messageFileRenamed(sanitized))
   }
 
@@ -462,6 +468,7 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
       const blob = new Blob([content], { type: "application/json" })
       await deps.putFile(newPath, false, blob)
       await refreshWorkspaceDocuments()
+      window.dispatchEvent(new CustomEvent("siyuan-canvas:file-saved", { detail: { path: newPath } }))
       deps.showMessage(labels.messageFileCopied(sanitized))
     } catch {
       deps.showMessage(labels.unableToCopyFileMessage, 4000, "error")

@@ -322,5 +322,11 @@
   "settingsPresentationMaskOpacityDescription": "在“背景暗色遮罩”模式下应用的不透明度，范围为 0% 到 100%。",
   "settingsPresentationAutoPlayIntervalTitle": "自动播放间隔时间",
   "settingsPresentationAutoPlayIntervalDescription": "在混合模式下，卡片自动切换到下一张的时间（秒）。",
-  "selectionToolbarPlay": "播放演示"
+  "selectionToolbarPlay": "播放演示",
+  "addTextCard": "添加文本卡片",
+  "addNoteCard": "添加笔记卡片",
+  "sidebarTitle": "无界文件",
+  "sidebarRefresh": "刷新",
+  "sidebarNoFiles": "工作区暂无画布文件",
+  "sidebarNoRecentFiles": "暂无最近文件"
 }

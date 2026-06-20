@@ -56,7 +56,10 @@ export function sortWorkspaceTreeNodes(
 
     const aVal = a.type === 'file' ? (a[field] ?? 0) : 0
     const bVal = b.type === 'file' ? (b[field] ?? 0) : 0
-    return dir * (aVal - bVal)
+    const primary = aVal - bVal
+    if (primary !== 0) return dir * primary
+    // 主排序键值相同时，按名称排序作为 tiebreaker
+    return dir * a.name.localeCompare(b.name, 'zh-CN')
   })
 
   return sorted.map((node) =>

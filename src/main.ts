@@ -20,7 +20,7 @@ export function bindPlugin(plugin: Plugin): void {
   pluginInstance = plugin
 }
 
-function requirePlugin(): Plugin {
+export function requirePlugin(): Plugin {
   if (!pluginInstance) {
     throw new Error("Plugin instance has not been bound.")
   }
@@ -84,7 +84,7 @@ function applyThemeMode(element: HTMLElement, mode: CanvasThemeMode): void {
   }
 }
 
-function bindThemeSync(element: HTMLElement, plugin: Plugin): void {
+export function bindThemeSync(element: HTMLElement, plugin: Plugin): void {
   const syncThemeMode = () => {
     applyThemeMode(element, detectHostThemeMode(element))
   }

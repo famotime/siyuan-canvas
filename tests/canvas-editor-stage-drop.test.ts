@@ -231,9 +231,9 @@ describe('canvas editor stage drop', () => {
     const node = committed[0].nodes.find((n: any) => n.type === 'file')!
     expect(node.file).toMatch(/^\/data\/storage\/maps\/roadmap\.assets\/\d+\.png$/)
     expect(node).toMatchObject({
-      height: 240,
+      height: 180,
       type: 'file',
-      width: 320,
+      width: 250,
       x: 400,
       y: 300,
     })

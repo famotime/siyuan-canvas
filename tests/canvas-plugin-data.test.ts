@@ -18,7 +18,7 @@ describe("canvas plugin data", () => {
     expect(data.settings.detectExternalChanges).toBe(true)
     expect(data.settings.recentFilesLimit).toBe(8)
     expect(data.settings.showCanvasThumbnails).toBe(false)
-    expect(data.settings.showNodeHeader).toBe(true)
+    expect(data.settings.showNodeHeader).toBe(false)
     expect(data.settings.presentationAutoRatio).toBe(true)
     expect(data.settings.presentationMaskOpacity).toBe(60)
     expect(data.recentFiles).toEqual([])
@@ -100,7 +100,7 @@ describe("canvas plugin data", () => {
       selection: true,
     })
     expect(data.settings.showCanvasThumbnails).toBe(false)
-    expect(data.settings.showNodeHeader).toBe(true)
+    expect(data.settings.showNodeHeader).toBe(false)
   })
 })
 

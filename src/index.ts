@@ -36,13 +36,19 @@ import {
 import {
   CANVAS_TAB_ICON_BODY,
   CANVAS_TAB_ICON_ID,
+  CANVAS_DOCK_ICON_BODY,
+  CANVAS_DOCK_ICON_ID,
   TOPBAR_ICON_SVG,
 } from "@/icons"
 import { createCanvasI18n } from "@/i18n/canvas"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 import {
   bindPlugin,
+  bindThemeSync,
+  requirePlugin,
 } from "@/main"
+import { createApp } from "vue"
+import CanvasSidebar from "@/components/canvas/CanvasSidebar.vue"
 import { setCanvasEmbedDebugEnabled, startCanvasEmbedObserver, stopCanvasEmbedObserver } from "@/canvas/canvas-embed-observer"
 import { insertCanvasEmbed } from "@/canvas/canvas-embed-insert"
 import { getFileText } from "@/api"
@@ -87,6 +93,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
 
     bindPlugin(this)
     this.addIcons(`<symbol id="${CANVAS_TAB_ICON_ID}" viewBox="0 0 48 48">${CANVAS_TAB_ICON_BODY}</symbol>`)
+    this.addIcons(`<symbol id="${CANVAS_DOCK_ICON_ID}" viewBox="0 0 48 48">${CANVAS_DOCK_ICON_BODY}</symbol>`)
     registerCanvasEditorTab(this, CANVAS_EDITOR_TAB_TYPE)
 
     this.addTopBar({
@@ -94,6 +101,33 @@ export default class SiyuanCanvasPlugin extends Plugin {
       title: this.t("addTopBarIcon"),
       callback: () => {
         void this.openCanvasTab()
+      },
+    })
+
+    this.addDock({
+      config: {
+        position: "RightTop",
+        size: { width: 280 },
+        icon: CANVAS_DOCK_ICON_ID,
+        title: this.t("sidebarTitle"),
+      },
+      data: {},
+      type: "siyuan-canvas-dock",
+      init() {
+        const host = this.element as HTMLElement
+        host.innerHTML = ""
+        host.classList.add("siyuan-canvas__sidebar")
+        const app = createApp(CanvasSidebar, { plugin: requirePlugin() })
+        app.mount(host)
+        bindThemeSync(host, requirePlugin())
+        ;(host as any).__canvasSidebarApp = app
+      },
+      destroy() {
+        const host = this.element as HTMLElement
+        const app = (host as any).__canvasSidebarApp
+        app?.unmount()
+        delete (host as any).__canvasSidebarApp
+        host.innerHTML = ""
       },
     })
 
@@ -204,11 +238,13 @@ export default class SiyuanCanvasPlugin extends Plugin {
       title: title || getCanvasFileName(path) || path,
     })
     await this.persistCanvasData()
+    window.dispatchEvent(new CustomEvent("siyuan-canvas:recent-changed"))
   }
 
   public async removeRecentCanvasFile(path: string): Promise<void> {
     this.canvasData = removeRecentCanvasFile(this.canvasData, path)
     await this.persistCanvasData()
+    window.dispatchEvent(new CustomEvent("siyuan-canvas:recent-changed"))
   }
 
   public async updateCanvasSettings(settings: Partial<CanvasPluginSettings>): Promise<void> {

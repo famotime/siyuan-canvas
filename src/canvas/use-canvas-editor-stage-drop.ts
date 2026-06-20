@@ -89,7 +89,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
       if (ids.length === 0)
         return
 
-      const verticalGap = 360 * viewport.scale
+      const verticalGap = 100 * viewport.scale
       const startY = stageY - ((ids.length - 1) * verticalGap) / 2
 
       for (let i = 0; i < ids.length; i++) {
@@ -126,7 +126,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
       const stageX = event.clientX - rect.left
       const stageY = event.clientY - rect.top
 
-      const verticalGap = 260 * viewport.scale
+      const verticalGap = 100 * viewport.scale
       const startY = stageY - ((imageFiles.length - 1) * verticalGap) / 2
 
       for (let i = 0; i < imageFiles.length; i++) {
@@ -140,8 +140,8 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
             { x: stageX, y: startY + i * verticalGap },
           )
           node.file = imagePath
-          node.width = 320
-          node.height = 240
+          node.width = 250
+          node.height = 180
 
           commitDocument(upsertCanvasNode(state.document, node))
           if (i === imageFiles.length - 1)

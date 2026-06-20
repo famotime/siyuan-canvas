@@ -971,7 +971,7 @@ Preview body
     const taskA1 = createdNodes.find((node: any) => node.file === "20260412000000-taska01")!
     expect(phaseA.x).toBe(documentNode.x + documentNode.width + 120)
     expect(phaseB.x).toBe(phaseA.x)
-    expect(taskA1.x).toBe(phaseA.x + phaseA.width + 120)
+    expect(taskA1.x).toBe(documentNode.x + 2 * (documentNode.width + 120))
     expect(phaseB.y).toBeGreaterThan(phaseA.y)
 
     expect(editor.state.document.edges).toEqual(expect.arrayContaining([
@@ -1095,9 +1095,9 @@ B intro`,
     const phaseB = createdNodes.find((node: any) => node.text.startsWith("## Phase B"))!
     const taskA1 = createdNodes.find((node: any) => node.text.startsWith("### Task A1"))!
     expect(roadmap.x).toBe(textNode.x + textNode.width + 120)
-    expect(phaseA.x).toBe(roadmap.x + roadmap.width + 120)
+    expect(phaseA.x).toBe(textNode.x + 2 * (textNode.width + 120))
     expect(phaseB.x).toBe(phaseA.x)
-    expect(taskA1.x).toBe(phaseA.x + phaseA.width + 120)
+    expect(taskA1.x).toBe(textNode.x + 3 * (textNode.width + 120))
 
     expect(editor.state.document.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -1586,8 +1586,8 @@ New body`)
       text: "New note",
       type: "text",
       x: 180,
-      width: 320,
-      height: 180,
+      width: 250,
+      height: 50,
     })
     expect(createdNode!.y).toBeGreaterThanOrEqual(140)
     expect(editor.state.document.edges).toHaveLength(1)
@@ -1690,8 +1690,8 @@ New body`)
       text: "New note",
       type: "text",
       x: 180,
-      width: 320,
-      height: 180,
+      width: 250,
+      height: 50,
     })
     expect(createdNode!.y).toBeGreaterThanOrEqual(280)
     expect(editor.state.document.edges).toHaveLength(2)
