@@ -176,7 +176,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
     let initialPinchDistance = 0
     let initialScale = 1
-    let pinchCenter = { x: 0, y: 0 }
+    let initialWorldCenter = { x: 0, y: 0 }
 
     stage.addEventListener("touchstart", (e) => {
       if (e.touches.length === 2) {
@@ -187,9 +187,13 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         initialScale = viewport.scale
         
         const rect = stage.getBoundingClientRect()
-        pinchCenter = {
+        const initialPinchCenter = {
           x: (t1.clientX + t2.clientX) / 2 - rect.left,
           y: (t1.clientY + t2.clientY) / 2 - rect.top,
+        }
+        initialWorldCenter = {
+          x: (initialPinchCenter.x - viewport.x) / viewport.scale,
+          y: (initialPinchCenter.y - viewport.y) / viewport.scale,
         }
       }
     }, { passive: false })
@@ -204,11 +208,16 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         if (initialPinchDistance > 0) {
           const scaleRatio = distance / initialPinchDistance
           const nextScale = clampViewportScale(Number((initialScale * scaleRatio).toFixed(2)))
-          const nextViewport = scaleViewportAtPoint(viewport, pinchCenter, nextScale)
           
-          viewport.scale = nextViewport.scale
-          viewport.x = nextViewport.x
-          viewport.y = nextViewport.y
+          const rect = stage.getBoundingClientRect()
+          const currentPinchCenter = {
+            x: (t1.clientX + t2.clientX) / 2 - rect.left,
+            y: (t1.clientY + t2.clientY) / 2 - rect.top,
+          }
+          
+          viewport.scale = nextScale
+          viewport.x = currentPinchCenter.x - initialWorldCenter.x * nextScale
+          viewport.y = currentPinchCenter.y - initialWorldCenter.y * nextScale
         }
       }
     }, { passive: false })
@@ -218,7 +227,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         initialPinchDistance = 0
       }
     })
-  })
+  }, { immediate: true })
 
   function isAdditiveSelectionGesture(event: MouseEvent | PointerEvent): boolean {
     return Boolean(event.ctrlKey || event.metaKey || event.shiftKey)

@@ -243,4 +243,101 @@ describe('canvas editor gesture handlers', () => {
     expect(commitDocument).not.toHaveBeenCalled()
     expect(viewport.x).toBe(0)
   })
+
+  it('performs pinch-to-zoom and pan correctly on touch devices', () => {
+    const stage = document.createElement('div')
+    stage.getBoundingClientRect = vi.fn(() => ({
+      bottom: 400,
+      height: 400,
+      left: 0,
+      right: 400,
+      top: 0,
+      width: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }))
+
+    const viewport = ref({ scale: 1, x: 0, y: 0 })
+
+    createCanvasEditorGestureHandlers({
+      board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
+      commitDocument: vi.fn(),
+      connectionDraft: {} as any,
+      edgeReconnectDraft: {} as any,
+      getAnchor: vi.fn(),
+      readonly: computed(() => false),
+      selectionBox: {} as any,
+      selectedEdge: computed(() => null),
+      stageRef: ref(stage),
+      state: {
+        document: {
+          nodes: [],
+          edges: [],
+        },
+        selectNode: vi.fn(),
+        selectedNodeIds: [],
+      } as any,
+      viewport: viewport.value,
+      showNodeHeader: computed(() => true),
+    })
+
+    // 1. Simulate TouchStart with 2 fingers
+    const touchStartEvent = new Event('touchstart', { bubbles: true }) as any
+    touchStartEvent.touches = [
+      { clientX: 100, clientY: 100 },
+      { clientX: 200, clientY: 200 },
+    ]
+    touchStartEvent.preventDefault = vi.fn()
+    stage.dispatchEvent(touchStartEvent)
+
+    expect(touchStartEvent.preventDefault).toHaveBeenCalled()
+
+    // 2. Simulate TouchMove moving fingers apart (scale up from distance ~141.42 to ~282.84, which is ratio 2.0)
+    // Keep fingers center at (150, 150)
+    const touchMoveEvent1 = new Event('touchmove', { bubbles: true }) as any
+    touchMoveEvent1.touches = [
+      { clientX: 50, clientY: 50 },
+      { clientX: 250, clientY: 250 },
+    ]
+    touchMoveEvent1.preventDefault = vi.fn()
+    stage.dispatchEvent(touchMoveEvent1)
+
+    expect(touchMoveEvent1.preventDefault).toHaveBeenCalled()
+    expect(viewport.value.scale).toBe(2)
+    // initialWorldCenter was (150, 150). currentCenter is (150, 150).
+    // viewport.x = 150 - 150 * 2 = -150
+    expect(viewport.value.x).toBe(-150)
+    expect(viewport.value.y).toBe(-150)
+
+    // 3. Simulate TouchMove moving fingers apart AND panning (shift center to (200, 200))
+    // fingers at (100, 100) and (300, 300), distance ~282.84, center (200, 200)
+    const touchMoveEvent2 = new Event('touchmove', { bubbles: true }) as any
+    touchMoveEvent2.touches = [
+      { clientX: 100, clientY: 100 },
+      { clientX: 300, clientY: 300 },
+    ]
+    stage.dispatchEvent(touchMoveEvent2)
+
+    expect(viewport.value.scale).toBe(2)
+    // viewport.x = currentCenter.x - initialWorldCenter.x * scale = 200 - 150 * 2 = -100
+    expect(viewport.value.x).toBe(-100)
+    expect(viewport.value.y).toBe(-100)
+
+    // 4. Simulate TouchEnd releasing fingers
+    const touchEndEvent = new Event('touchend', { bubbles: true }) as any
+    touchEndEvent.touches = []
+    stage.dispatchEvent(touchEndEvent)
+
+    // No longer scaling if fingers touched again in single touch
+    const touchMoveEvent3 = new Event('touchmove', { bubbles: true }) as any
+    touchMoveEvent3.touches = [
+      { clientX: 100, clientY: 100 },
+    ]
+    stage.dispatchEvent(touchMoveEvent3)
+    // Viewport should remain same since it's not 2 touches
+    expect(viewport.value.scale).toBe(2)
+    expect(viewport.value.x).toBe(-100)
+  })
 })
+
