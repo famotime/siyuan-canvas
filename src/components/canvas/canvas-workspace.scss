@@ -1026,7 +1026,39 @@
 .canvas-node__body {
   flex: 1;
   padding: 12px 14px 16px;
-  overflow: auto;
+  overflow: overlay;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* 滚动条仅滚动时显示，不占用内部空间 */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.canvas-node__body:hover {
+  scrollbar-color: color-mix(in srgb, var(--b3-theme-on-surface) 20%, transparent) transparent;
+}
+
+.canvas-node__body::-webkit-scrollbar {
+  width: 4px;
+  height: 0;
+}
+
+.canvas-node__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.canvas-node__body::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 2px;
+}
+
+.canvas-node__body:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--b3-theme-on-surface) 20%, transparent);
+}
+
+/* 非 hover 时彻底隐藏滚动条，避免占据空间导致换行 */
+.canvas-node__body:not(:hover)::-webkit-scrollbar-thumb {
+  background: transparent;
 }
 
 /* 鏂囨湰/閾炬帴鑺傜偣鐨?body 鏄敤鎴峰唴瀹瑰尯锛屽彲閫夋嫨鏂囨湰/涓嶈Е鍙戞嫋鍔?*/
