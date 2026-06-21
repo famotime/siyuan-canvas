@@ -3,6 +3,7 @@ import type {
   Ref,
 } from "vue"
 import { watch } from "vue"
+import { CANVAS_GRID_SIZE, snapCanvasCoordinate } from "@/canvas/use-canvas-editor"
 import type { CanvasBoardMetrics } from "@/canvas/board"
 import type { CanvasEditorState } from "@/canvas/editor-state"
 import type {
@@ -88,6 +89,7 @@ interface CanvasEditorGestureOptions {
   connectionDraft: CanvasEditorConnectionDraftState
   edgeReconnectDraft: CanvasEditorEdgeReconnectDraftState
   getAnchor: (node: CanvasNode, side: CanvasSide) => { x: number, y: number }
+  gridEnabled: Ref<boolean>
   pendingCardCreation: PendingCardCreation
   readonly: ComputedRef<boolean>
   selectionBox: CanvasEditorSelectionBoxState
@@ -109,6 +111,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     connectionDraft,
     edgeReconnectDraft,
     getAnchor,
+    gridEnabled,
     pendingCardCreation,
     readonly,
     selectionBox,
@@ -237,7 +240,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   })
 
   function isAdditiveSelectionGesture(event: MouseEvent | PointerEvent): boolean {
-    return Boolean(event.ctrlKey || event.metaKey || event.shiftKey)
+    // Shift 不在 pointerdown 阶段拦截：Shift+拖拽需要能启动拖拽（move 阶段约束轴向）
+    return Boolean(event.ctrlKey || event.metaKey)
   }
 
   function isNodeGestureTarget(target: EventTarget | null): boolean {
@@ -421,6 +425,25 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return
     }
 
+    // Shift + 点击/拖拽：切换多选（不阻止拖拽启动，move 阶段约束轴向）
+    if (event.shiftKey) {
+      if (state.selectedNodeIds.includes(node.id)) {
+        state.selectNodes(state.selectedNodeIds.filter(id => id !== node.id))
+      } else {
+        state.selectNode(node.id, { additive: true })
+      }
+    }
+
+    // Alt/Option + 拖拽：复制出一张相同的卡片（原位复制，拖拽即分离）
+    if (event.altKey) {
+      const clonedNode = { ...node }
+      clonedNode.id = `${node.id}-dup-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      commitDocument(upsertCanvasNode(state.document, clonedNode))
+      state.selectNode(clonedNode.id)
+      startDrag(clonedNode, event)
+      return
+    }
+
     startDrag(node, event)
   }
 
@@ -438,9 +461,21 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     if (!state.selectedNodeIds.includes(node.id)) {
       state.selectNode(node.id)
     }
-    startPointerGesture(event, (dx, dy) => {
-      const deltaX = Math.round(dx / viewport.scale)
-      const deltaY = Math.round(dy / viewport.scale)
+    startPointerGesture(event, (dx, dy, moveEvent) => {
+      let deltaX = Math.round(dx / viewport.scale)
+      let deltaY = Math.round(dy / viewport.scale)
+      // Shift 约束：仅支持垂直/水平方向移动
+      if (moveEvent?.shiftKey) {
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          deltaY = 0
+        } else {
+          deltaX = 0
+        }
+      }
+      if (gridEnabled.value) {
+        deltaX = snapCanvasCoordinate(deltaX, CANVAS_GRID_SIZE)
+        deltaY = snapCanvasCoordinate(deltaY, CANVAS_GRID_SIZE)
+      }
       const movedDocument = state.document.nodes.reduce((document, candidate) => {
         const initial = initialPositions.get(candidate.id)
         if (!initial) {
@@ -709,11 +744,17 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
     event.preventDefault?.()
     startPointerGesture(event, (dx, dy) => {
+      let scaleDeltaX = dx / viewport.scale
+      let scaleDeltaY = dy / viewport.scale
+      if (gridEnabled.value) {
+        scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, CANVAS_GRID_SIZE)
+        scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, CANVAS_GRID_SIZE)
+      }
       commitDocument(
         setCanvasNodeGeometry(
           state.document,
           node.id,
-          resizeCanvasNodeFromSide(node, side, dx / viewport.scale, dy / viewport.scale),
+          resizeCanvasNodeFromSide(node, side, scaleDeltaX, scaleDeltaY),
         ),
         { coalesceKey: `resize-${node.id}-${side}` },
       )
@@ -727,11 +768,17 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
     event.preventDefault?.()
     startPointerGesture(event, (dx, dy) => {
+      let scaleDeltaX = dx / viewport.scale
+      let scaleDeltaY = dy / viewport.scale
+      if (gridEnabled.value) {
+        scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, CANVAS_GRID_SIZE)
+        scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, CANVAS_GRID_SIZE)
+      }
       commitDocument(
         setCanvasNodeGeometry(
           state.document,
           node.id,
-          resizeCanvasNodeFromCorner(node, dx / viewport.scale, dy / viewport.scale),
+          resizeCanvasNodeFromCorner(node, scaleDeltaX, scaleDeltaY),
         ),
         { coalesceKey: `resize-corner-${node.id}` },
       )

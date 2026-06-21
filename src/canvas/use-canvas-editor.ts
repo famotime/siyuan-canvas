@@ -120,6 +120,11 @@ import { useCanvasPresentation } from "@/canvas/use-canvas-presentation"
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
 const SELECTION_COLORS = ["1", "2", "3", "4", "5", "6"] as const
+export const CANVAS_GRID_SIZE = 20
+
+export function snapCanvasCoordinate(value: number, gridSize = CANVAS_GRID_SIZE): number {
+  return Math.round(value / gridSize) * gridSize
+}
 
 export function useCanvasEditor(
   plugin: CanvasPluginBridge,
@@ -134,6 +139,7 @@ export function useCanvasEditor(
   // Vue 反应式不能感知 class 内部状态，这里靠版本号触发 canUndo/canRedo 的 computed 重算
   const historyVersion = ref(0)
   const isSaving = ref(false)
+  const gridEnabled = ref(false)
   const viewport = reactive({
     scale: 1,
     x: 0,
@@ -636,6 +642,10 @@ export function useCanvasEditor(
     viewport.y = stage.clientHeight / 2 - centerY
   }
 
+  function toggleGrid() {
+    gridEnabled.value = !gridEnabled.value
+  }
+
   function commitDocument(nextDocument: CanvasDocument, options: { coalesceKey?: string } = {}) {
     // 在变更前抓快照入历史栈，undo 时可还原文档与选区
     history.record(
@@ -1090,6 +1100,7 @@ export function useCanvasEditor(
     connectionDraft,
     edgeReconnectDraft,
     getAnchor,
+    gridEnabled,
     pendingCardCreation,
     readonly,
     selectionBox,
@@ -1396,6 +1407,8 @@ export function useCanvasEditor(
       zoomIn,
       zoomOut,
       zoomToActualSize,
+      gridEnabled,
+      toggleGrid,
       zoomToFit,
       undo,
       redo,

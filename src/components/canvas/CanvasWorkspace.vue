@@ -180,6 +180,21 @@
             name="reset-viewport"
           />
         </button>
+        <button
+          class="toolbar__button toolbar__button--icon"
+          :class="{ 'toolbar__button--active': editor.gridEnabled }"
+          data-testid="top-toolbar-grid"
+          :aria-label="t('toolbarGridSnap')"
+          :data-tooltip="t('toolbarGridSnap')"
+          :title="t('toolbarGridSnap')"
+          type="button"
+          @click="editor.toggleGrid"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="arrange-grid"
+          />
+        </button>
       </div>
       <span class="toolbar__divider" aria-hidden="true" />
       <div class="toolbar__group">
@@ -2159,6 +2174,11 @@ function showHelpDialog() {
     { key: t("helpShortcutDragSecondary"), action: t("helpActionDragSecondary") },
     { key: t("helpShortcutDragNode"), action: t("helpActionDragNode") },
     { key: t("helpShortcutDragAnchor"), action: t("helpActionDragAnchor") },
+    { key: t("helpShortcutShiftDrag"), action: t("helpActionShiftDrag") },
+    { key: t("helpShortcutAltDrag"), action: t("helpActionAltDrag") },
+    { key: t("helpShortcutCornerResize"), action: t("helpActionCornerResize") },
+    { key: t("helpShortcutGridSnap"), action: t("helpActionGridSnap") },
+    { key: t("helpShortcutSidebarDrag"), action: t("helpActionSidebarDrag") },
     { key: t("helpShortcutRenameDocument"), action: t("helpActionRenameDocument") },
   ]
   openHelpDialog(t("helpDialogTitle"), shortcuts)

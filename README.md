@@ -99,7 +99,10 @@ After selecting multiple cards, a floating toolbar provides various layout opera
 - **Right sidebar file browser (New)**: Browse workspace canvas files, create/copy/rename/delete, sort by name or edit time with auto-refresh, open containing folder from context menu.
 - Activate the canvas surface to reveal the bottom toolbar for adding text, file, connect, and group actions.
 - Drag any part of a card to move it (title bars are hidden by default; toggle them back in settings).
-- Drag card edge handles to resize.
+- Hold `Shift` while dragging to constrain movement to horizontal or vertical axis only.
+- Hold `Alt` (Windows) or `Option` (macOS) while dragging to duplicate the card and drag the copy.
+- Drag card edge handles to resize, or drag the bottom-right corner to resize width and height simultaneously.
+- Toggle Grid Snap in the toolbar to snap cards to a 20px grid for precise alignment.
 - **Drag from a card's anchor point** to create a new edge — release on another card to connect, or release on empty space for a popup menu (Add Text Card / Add Note Card).
 - **Click near an edge endpoint** to start reconnecting it to a different card.
 - **Add Note Card**: Opens the SiYuan file picker; after selecting a document, the card is created and the edge connects automatically.
@@ -116,14 +119,20 @@ After selecting multiple cards, a floating toolbar provides various layout opera
 | Left-click card | Select |
 | `Ctrl`/`Shift` + Click | Multi-select |
 | Drag any part of card | Move card (title bars hidden by default, drag card directly) |
-| Drag card edge handles | Resize |
+| `Shift` + Drag card | Constrain movement to horizontal/vertical axis |
+| `Alt`/`Option` + Drag card | Duplicate card and drag the copy |
+| `Alt` + `Shift` + Drag card | Duplicate card with axis-constrained movement |
+| Drag card edge handles | Resize from any side |
+| Drag bottom-right corner | Resize width and height simultaneously |
 | Drag card anchor point | Create edge (release on empty space for card type menu) |
 | Click near edge endpoint | Start endpoint reconnection dragging |
 | Drag-select on empty space | Batch-select cards and edges within the selection rectangle |
+| Drag file/folder in sidebar | Move to another folder to reorganize hierarchy |
 | Right-drag canvas | Pan view |
 | Scroll to zoom | Zoom centered on cursor position (0.1x ~ 2.5x), mobile supports pinch-to-zoom |
 | Double-click text card | Enter edit mode |
 | Double-click file card | Open the corresponding document or canvas |
+| Click Grid Snap button | Toggle snap-to-grid for precise alignment |
 | `Ctrl+Shift+Alt+C` | Quick-insert Canvas preview popup at cursor in current document |
 | Right sidebar "Canvas Files" | Browse workspace canvas files, create/sort/context menu |
 
