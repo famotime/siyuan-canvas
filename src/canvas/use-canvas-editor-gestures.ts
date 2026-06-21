@@ -4,6 +4,8 @@ import type {
 } from "vue"
 import { watch } from "vue"
 import { CANVAS_GRID_SIZE, snapCanvasCoordinate } from "@/canvas/use-canvas-editor"
+
+const RESIZE_STEP = 25
 import { computeAlignment } from "@/canvas/alignment-guides"
 import type { AlignmentGuideLine } from "@/canvas/alignment-guides"
 import { computeResizeGuides } from "@/canvas/resize-guides"
@@ -819,7 +821,13 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, CANVAS_GRID_SIZE)
         scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, CANVAS_GRID_SIZE)
       }
+      // 每次增减以 25px 为步长
+      scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, RESIZE_STEP)
+      scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, RESIZE_STEP)
       const geom = resizeCanvasNodeFromSide(node, side, scaleDeltaX, scaleDeltaY)
+      // 缩小时最后一步不足 25px，直接到最小值 50px
+      if (geom.width > 50 && geom.width < 75) geom.width = 50
+      if (geom.height > 50 && geom.height < 75) geom.height = 50
       // 等宽/等高参考线检测
       const result = computeResizeGuides(state.document, node, geom.width, geom.height, board.value)
       resizeGuides.matchNodeIds = result.matchNodeIds
@@ -856,7 +864,11 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, CANVAS_GRID_SIZE)
         scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, CANVAS_GRID_SIZE)
       }
+      scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, RESIZE_STEP)
+      scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, RESIZE_STEP)
       const geom = resizeCanvasNodeFromCorner(node, scaleDeltaX, scaleDeltaY)
+      if (geom.width > 50 && geom.width < 75) geom.width = 50
+      if (geom.height > 50 && geom.height < 75) geom.height = 50
       // 等宽/等高参考线检测
       const result = computeResizeGuides(state.document, node, geom.width, geom.height, board.value)
       resizeGuides.matchNodeIds = result.matchNodeIds
