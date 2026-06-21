@@ -145,7 +145,6 @@
             type="button"
             @click="openRecentFile(recent)"
           >
-            <CanvasIcon name="canvas-file" :size="14" />
             <span class="canvas-sidebar__recent-name">{{ recent.title || getFileName(recent.path) }}</span>
             <button
               class="canvas-sidebar__recent-remove"

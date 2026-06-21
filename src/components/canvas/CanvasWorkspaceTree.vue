@@ -33,11 +33,6 @@
             name="chevron-right"
             :size="12"
           />
-          <CanvasIcon
-            class="workspace-tree__folder-icon"
-            :name="expandedFolders.has(node.path) ? 'folder-open' : 'folder'"
-            :size="14"
-          />
           <span class="workspace-tree__name">{{ node.name }}</span>
         </button>
         <div
@@ -62,11 +57,6 @@
                 type="button"
                 @click="$emit('open-file', child.path)"
               >
-                <CanvasIcon
-                  class="workspace-tree__file-icon"
-                  name="canvas-file"
-                  :size="16"
-                />
                 <span class="workspace-tree__name">{{ child.name }}</span>
               </button>
               <button
@@ -103,11 +93,6 @@
                   name="chevron-right"
                   :size="12"
                 />
-                <CanvasIcon
-                  class="workspace-tree__folder-icon"
-                  :name="expandedFolders.has(child.path) ? 'folder-open' : 'folder'"
-                  :size="14"
-                />
                 <span class="workspace-tree__name">{{ child.name }}</span>
               </button>
               <div
@@ -132,11 +117,6 @@
                       type="button"
                       @click="$emit('open-file', grandchild.path)"
                     >
-                      <CanvasIcon
-                        class="workspace-tree__file-icon"
-                        name="canvas-file"
-                        :size="16"
-                      />
                       <span class="workspace-tree__name">{{ grandchild.name }}</span>
                     </button>
                     <button
@@ -168,11 +148,6 @@
           type="button"
           @click="$emit('open-file', node.path)"
         >
-          <CanvasIcon
-            class="workspace-tree__file-icon"
-            name="canvas-file"
-            :size="16"
-          />
           <span class="workspace-tree__name">{{ node.name }}</span>
         </button>
         <button
