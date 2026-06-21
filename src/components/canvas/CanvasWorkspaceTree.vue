@@ -65,7 +65,7 @@
                 <CanvasIcon
                   class="workspace-tree__file-icon"
                   name="canvas-file"
-                  :size="14"
+                  :size="16"
                 />
                 <span class="workspace-tree__name">{{ child.name }}</span>
               </button>
@@ -135,7 +135,7 @@
                       <CanvasIcon
                         class="workspace-tree__file-icon"
                         name="canvas-file"
-                        :size="14"
+                        :size="16"
                       />
                       <span class="workspace-tree__name">{{ grandchild.name }}</span>
                     </button>
@@ -171,7 +171,7 @@
           <CanvasIcon
             class="workspace-tree__file-icon"
             name="canvas-file"
-            :size="14"
+            :size="16"
           />
           <span class="workspace-tree__name">{{ node.name }}</span>
         </button>
@@ -237,7 +237,7 @@ defineEmits<{
   background: transparent;
   color: var(--canvas-text);
   font-size: 13px;
-  cursor: pointer;
+  cursor: default;
   transition: background 0.15s ease, color 0.15s ease;
   text-align: left;
 }
@@ -256,13 +256,13 @@ defineEmits<{
 
 .workspace-tree__file[draggable="true"],
 .workspace-tree__folder-header[draggable="true"] {
-  cursor: grab;
+  cursor: default;
 }
 
 .workspace-tree__file[draggable="true"]:active,
 .workspace-tree__folder-header[draggable="true"]:active {
   opacity: 0.5;
-  cursor: grabbing;
+  cursor: default;
 }
 
 .workspace-tree__chevron {
@@ -341,7 +341,7 @@ defineEmits<{
   border: 0;
   background: transparent;
   color: var(--canvas-text);
-  cursor: pointer;
+  cursor: default;
   text-align: left;
   min-width: 0;
   font: inherit;
@@ -359,7 +359,7 @@ defineEmits<{
   border-radius: 4px;
   background: transparent;
   color: var(--canvas-text-muted);
-  cursor: pointer;
+  cursor: default;
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }

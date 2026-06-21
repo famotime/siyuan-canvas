@@ -1,6 +1,8 @@
-# 画布“无界”，思考有方 —— 一个兼容 Obsidian Canvas 的思源笔记插件
+# 画布”无界”，思考有方 —— 一个兼容 Obsidian Canvas 的思源笔记插件
 
 > 画布无界，思考有方。拆解、关联、汇聚，打破边界连节点，汇聚思路成蓝图。
+
+> **注意：** 此版本为基于原作 [famotime/siyuan-canvas](https://github.com/famotime/siyuan-canvas) 的二次开发分支，增加了多项功能增强与 UI 优化。
 
 ## 楔子
 

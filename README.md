@@ -4,6 +4,8 @@
 
 > Canvas unbounded, thinking structured. Deconstruct, connect, converge — break boundaries to link nodes, gather thoughts into blueprints.
 
+> **Note:** This is a secondary development fork based on the original [famotime/siyuan-canvas](https://github.com/famotime/siyuan-canvas), with numerous feature enhancements and UI improvements.
+
 ## Preface
 
 I don't actually use canvas features that often. It's just that I had some Obsidian Canvas files shared by others, and my original intent was simply to open and read them directly in SiYuan Notes without switching back to Obsidian. I still have an obsession with "All-in-One" — since I've already gone through the trouble of migrating to SiYuan Notes, I want all my notes to converge in one place, all operations completed in one workbench. I don't want to be a multi-tool user constantly switching back and forth.

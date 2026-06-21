@@ -38,7 +38,6 @@ import {
   CANVAS_TAB_ICON_ID,
   CANVAS_DOCK_ICON_BODY,
   CANVAS_DOCK_ICON_ID,
-  TOPBAR_ICON_SVG,
 } from "@/icons"
 import { createCanvasI18n } from "@/i18n/canvas"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
@@ -96,14 +95,6 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addIcons(`<symbol id="${CANVAS_TAB_ICON_ID}" viewBox="0 0 48 48">${CANVAS_TAB_ICON_BODY}</symbol>`)
     this.addIcons(`<symbol id="${CANVAS_DOCK_ICON_ID}" viewBox="0 0 48 48">${CANVAS_DOCK_ICON_BODY}</symbol>`)
     registerCanvasEditorTab(this, CANVAS_EDITOR_TAB_TYPE)
-
-    this.addTopBar({
-      icon: TOPBAR_ICON_SVG,
-      title: this.t("addTopBarIcon"),
-      callback: () => {
-        void this.openCanvasTab()
-      },
-    })
 
     this.addDock({
       config: {

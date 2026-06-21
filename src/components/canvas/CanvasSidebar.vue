@@ -145,7 +145,7 @@
             type="button"
             @click="openRecentFile(recent)"
           >
-            <CanvasIcon name="canvas-file" :size="12" />
+            <CanvasIcon name="canvas-file" :size="14" />
             <span class="canvas-sidebar__recent-name">{{ recent.title || getFileName(recent.path) }}</span>
             <button
               class="canvas-sidebar__recent-remove"
@@ -581,7 +581,7 @@ onBeforeUnmount(() => {
   color: var(--b3-theme-on-surface);
   font-size: 12px;
   font-weight: 500;
-  cursor: pointer;
+  cursor: default;
 }
 
 .inspector__tab--active {
@@ -605,7 +605,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: transparent;
   color: var(--b3-theme-on-surface);
-  cursor: pointer;
+  cursor: default;
   transition: background 0.15s ease;
 }
 
@@ -633,7 +633,7 @@ onBeforeUnmount(() => {
   color: var(--b3-theme-on-surface);
   font-size: 12px;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
 
 .inspector__sort-option:hover {
@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: transparent;
   color: var(--b3-theme-on-surface);
-  cursor: pointer;
+  cursor: default;
   transition: background 0.15s ease;
 }
 
@@ -718,7 +718,7 @@ onBeforeUnmount(() => {
   color: var(--b3-theme-on-surface);
   font-size: 12px;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
   box-sizing: border-box;
 }
 
@@ -750,7 +750,7 @@ onBeforeUnmount(() => {
   color: var(--b3-theme-on-surface);
   font-size: 14px;
   line-height: 1;
-  cursor: pointer;
+  cursor: default;
   opacity: 0;
   transition: opacity 0.1s;
 }
@@ -798,7 +798,7 @@ onBeforeUnmount(() => {
   color: var(--b3-theme-on-surface);
   font-size: 12px;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
 
 .canvas-sidebar__context-item:hover {
