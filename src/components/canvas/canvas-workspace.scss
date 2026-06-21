@@ -500,6 +500,22 @@
   pointer-events: none;
 }
 
+/* 智能对齐参考线 */
+.stage__alignment-guides {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.alignment-guide {
+  stroke: var(--canvas-accent, #3b82f6);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.9;
+}
+
 .selection-toolbar {
   --selection-toolbar-bg: var(--canvas-floating-bg);
   --selection-toolbar-border: var(--canvas-floating-border);
@@ -1288,9 +1304,11 @@
   pointer-events: auto;
 }
 
-.canvas-node:hover .canvas-node__anchor,
+/* 选中/激活/悬停端点/悬停卡片边时显示就近锚点 */
 .canvas-node--selected .canvas-node__anchor,
-.canvas-node__anchor--active {
+.canvas-node__anchor--active,
+.canvas-node__anchor:hover,
+.canvas-node:hover .canvas-node__anchor--nearby {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
 }

@@ -103,6 +103,7 @@ After selecting multiple cards, a floating toolbar provides various layout opera
 - Hold `Alt` (Windows) or `Option` (macOS) while dragging to duplicate the card and drag the copy.
 - Drag card edge handles to resize, or drag the bottom-right corner to resize width and height simultaneously.
 - Toggle Grid Snap in the toolbar to snap cards to a 20px grid for precise alignment.
+- **Smart Alignment Guides**: When dragging cards, alignment guides appear and snap when edges or centers align with other cards.
 - **Drag from a card's anchor point** to create a new edge — release on another card to connect, or release on empty space for a popup menu (Add Text Card / Add Note Card).
 - **Click near an edge endpoint** to start reconnecting it to a different card.
 - **Add Note Card**: Opens the SiYuan file picker; after selecting a document, the card is created and the edge connects automatically.
@@ -124,6 +125,7 @@ After selecting multiple cards, a floating toolbar provides various layout opera
 | `Alt` + `Shift` + Drag card | Duplicate card with axis-constrained movement |
 | Drag card edge handles | Resize from any side |
 | Drag bottom-right corner | Resize width and height simultaneously |
+| Hover near card edge | Nearest anchor point appears for quick connection |
 | Drag card anchor point | Create edge (release on empty space for card type menu) |
 | Click near edge endpoint | Start endpoint reconnection dragging |
 | Drag-select on empty space | Batch-select cards and edges within the selection rectangle |
@@ -133,6 +135,7 @@ After selecting multiple cards, a floating toolbar provides various layout opera
 | Double-click text card | Enter edit mode |
 | Double-click file card | Open the corresponding document or canvas |
 | Click Grid Snap button | Toggle snap-to-grid for precise alignment |
+| Drag card near other cards | Smart alignment guides appear for edge/center snapping |
 | `Ctrl+Shift+Alt+C` | Quick-insert Canvas preview popup at cursor in current document |
 | Right sidebar "Canvas Files" | Browse workspace canvas files, create/sort/context menu |
 

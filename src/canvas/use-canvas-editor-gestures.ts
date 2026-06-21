@@ -4,6 +4,8 @@ import type {
 } from "vue"
 import { watch } from "vue"
 import { CANVAS_GRID_SIZE, snapCanvasCoordinate } from "@/canvas/use-canvas-editor"
+import { computeAlignment } from "@/canvas/alignment-guides"
+import type { AlignmentGuideLine } from "@/canvas/alignment-guides"
 import type { CanvasBoardMetrics } from "@/canvas/board"
 import type { CanvasEditorState } from "@/canvas/editor-state"
 import type {
@@ -84,6 +86,11 @@ export interface PendingCardCreation {
 }
 
 interface CanvasEditorGestureOptions {
+  alignmentGuides: {
+    horizontal: AlignmentGuideLine[]
+    vertical: AlignmentGuideLine[]
+    visible: boolean
+  }
   board: ComputedRef<CanvasBoardMetrics>
   commitDocument: (document: CanvasDocument, options?: { coalesceKey?: string }) => void
   connectionDraft: CanvasEditorConnectionDraftState
@@ -106,6 +113,7 @@ interface CanvasEditorGestureOptions {
 
 export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOptions) {
   const {
+    alignmentGuides,
     board,
     commitDocument,
     connectionDraft,
@@ -472,6 +480,52 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
           deltaX = 0
         }
       }
+
+      // 智能对齐参考线：计算拖拽节点的合并边界，与静态节点对齐
+      const draggedSet = new Set(selectedNodeIds)
+      let draggedLeft = Infinity, draggedRight = -Infinity
+      let draggedTop = Infinity, draggedBottom = -Infinity
+      for (const candidate of state.document.nodes) {
+        if (!draggedSet.has(candidate.id)) continue
+        const initial = initialPositions.get(candidate.id)
+        if (!initial) continue
+        const nx = initial.x + deltaX
+        const ny = initial.y + deltaY
+        if (nx < draggedLeft) draggedLeft = nx
+        if (nx + candidate.width > draggedRight) draggedRight = nx + candidate.width
+        if (ny < draggedTop) draggedTop = ny
+        if (ny + candidate.height > draggedBottom) draggedBottom = ny + candidate.height
+      }
+      if (Number.isFinite(draggedLeft)) {
+        const draggedBounds = {
+          bottom: draggedBottom,
+          centerX: (draggedLeft + draggedRight) / 2,
+          centerY: (draggedTop + draggedBottom) / 2,
+          height: draggedBottom - draggedTop,
+          left: draggedLeft,
+          right: draggedRight,
+          top: draggedTop,
+          width: draggedRight - draggedLeft,
+        }
+        const result = computeAlignment(
+          state.document, draggedBounds, draggedSet,
+          board.value.left, board.value.top,
+          deltaX, deltaY,
+        )
+        // 仅在未启用网格吸附时应用对齐吸附（网格吸附优先级更高）
+        if (!gridEnabled.value) {
+          deltaX = result.deltaX
+          deltaY = result.deltaY
+        }
+        alignmentGuides.horizontal = result.horizontal
+        alignmentGuides.vertical = result.vertical
+        alignmentGuides.visible = result.horizontal.length > 0 || result.vertical.length > 0
+      } else {
+        alignmentGuides.visible = false
+        alignmentGuides.horizontal = []
+        alignmentGuides.vertical = []
+      }
+
       if (gridEnabled.value) {
         deltaX = snapCanvasCoordinate(deltaX, CANVAS_GRID_SIZE)
         deltaY = snapCanvasCoordinate(deltaY, CANVAS_GRID_SIZE)
@@ -489,6 +543,12 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       }, state.document)
 
       commitDocument(movedDocument, { coalesceKey: `drag-${node.id}` })
+    }, {
+      onEnd: () => {
+        alignmentGuides.visible = false
+        alignmentGuides.horizontal = []
+        alignmentGuides.vertical = []
+      },
     })
   }
 

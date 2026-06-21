@@ -48,6 +48,8 @@ import {
   toBoardX,
   toBoardY,
 } from "@/canvas/board"
+import { computeAlignment } from "@/canvas/alignment-guides"
+import type { AlignmentGuideLine } from "@/canvas/alignment-guides"
 import {
   getCanvasSelectionBounds,
   setCanvasEdgeEndpoint,
@@ -230,6 +232,15 @@ export function useCanvasEditor(
     width: 0,
     x: 0,
     y: 0,
+  })
+  const alignmentGuides = reactive<{
+    horizontal: Array<{ position: number, spanStart: number, spanEnd: number }>
+    vertical: Array<{ position: number, spanStart: number, spanEnd: number }>
+    visible: boolean
+  }>({
+    horizontal: [],
+    vertical: [],
+    visible: false,
   })
   const connectionDraft = reactive<CanvasEditorConnectionDraftState>({
     fromNodeId: "",
@@ -1095,6 +1106,7 @@ export function useCanvasEditor(
     startPan,
     startResize,
   } = createCanvasEditorGestureHandlers({
+    alignmentGuides,
     board,
     commitDocument,
     connectionDraft,
@@ -1407,6 +1419,7 @@ export function useCanvasEditor(
       zoomIn,
       zoomOut,
       zoomToActualSize,
+      alignmentGuides,
       gridEnabled,
       toggleGrid,
       zoomToFit,

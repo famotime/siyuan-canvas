@@ -517,6 +517,8 @@
             ]"
             :style="getCanvasNodeStyle(node)"
             @pointerdown.stop="handleNodePointerDown(node, $event)"
+            @pointermove="updateHoveredSide(node, $event)"
+            @pointerleave="delete hoveredNodeSides[node.id]"
             @click.stop="handleNodeClick(node, $event)"
             @dblclick.stop="handleNodeDoubleClick(node)"
             @wheel.passive="handleNodeWheel(node, $event)"
@@ -638,7 +640,10 @@
               class="canvas-node__anchor"
               :class="[
                 `canvas-node__anchor--${side}`,
-                { 'canvas-node__anchor--active': editor.isConnectionTarget(node.id, side) },
+                {
+                  'canvas-node__anchor--active': editor.isConnectionTarget(node.id, side),
+                  'canvas-node__anchor--nearby': hoveredNodeSides[node.id] === side,
+                },
               ]"
               :data-testid="`node-anchor-${side}`"
               type="button"
@@ -700,6 +705,33 @@
                 @click.stop="handleEdgeClick(edge.id)"
               />
             </g>
+          </svg>
+
+          <svg
+            v-if="editor.alignmentGuides.visible"
+            class="stage__alignment-guides"
+            :height="editor.board.height"
+            :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
+            :width="editor.board.width"
+          >
+            <line
+              v-for="(guide, index) in editor.alignmentGuides.vertical"
+              :key="`vg-${index}`"
+              :x1="guide.position"
+              :y1="guide.spanStart"
+              :x2="guide.position"
+              :y2="guide.spanEnd"
+              class="alignment-guide"
+            />
+            <line
+              v-for="(guide, index) in editor.alignmentGuides.horizontal"
+              :key="`hg-${index}`"
+              :x1="guide.spanStart"
+              :y1="guide.position"
+              :x2="guide.spanEnd"
+              :y2="guide.position"
+              class="alignment-guide"
+            />
           </svg>
         </div>
 
@@ -1485,6 +1517,7 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  reactive,
   ref,
   watch,
 } from "vue"
@@ -1567,6 +1600,7 @@ const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>
 const fileCardImageBlobUrls = ref<Record<string, string>>({})
 const textMarkdownImageBlobUrls = ref<Record<string, string>>({})
 const hoveredEdgeId = ref("")
+const hoveredNodeSides = reactive<Record<string, string>>({})
 const pngExportBackgroundMode = ref<CanvasPngExportBackgroundMode>("white")
 const pngExportCustomColor = ref("#ffffff")
 const pngExportDialogVisible = ref(false)
@@ -2078,6 +2112,23 @@ function handleStagePaste(event: ClipboardEvent) {
 
   event.preventDefault()
   void editor.handleClipboardImagePaste(file)
+}
+
+function updateHoveredSide(node: CanvasNode, event: PointerEvent) {
+  const card = (event.target as HTMLElement)?.closest(".canvas-node")
+  if (!card) return
+  const rect = card.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+  const distTop = y
+  const distBottom = rect.height - y
+  const distLeft = x
+  const distRight = rect.width - x
+  const min = Math.min(distTop, distBottom, distLeft, distRight)
+  if (min === distTop) hoveredNodeSides[node.id] = "top"
+  else if (min === distBottom) hoveredNodeSides[node.id] = "bottom"
+  else if (min === distLeft) hoveredNodeSides[node.id] = "left"
+  else hoveredNodeSides[node.id] = "right"
 }
 
 function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
