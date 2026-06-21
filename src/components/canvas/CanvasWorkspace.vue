@@ -2114,6 +2114,8 @@ function handleStagePaste(event: ClipboardEvent) {
   void editor.handleClipboardImagePaste(file)
 }
 
+const EDGE_THRESHOLD = 20 // px，仅鼠标在边框附近时显示锚点
+
 function updateHoveredSide(node: CanvasNode, event: PointerEvent) {
   const card = (event.target as HTMLElement)?.closest(".canvas-node")
   if (!card) return
@@ -2125,6 +2127,10 @@ function updateHoveredSide(node: CanvasNode, event: PointerEvent) {
   const distLeft = x
   const distRight = rect.width - x
   const min = Math.min(distTop, distBottom, distLeft, distRight)
+  if (min > EDGE_THRESHOLD) {
+    delete hoveredNodeSides[node.id]
+    return
+  }
   if (min === distTop) hoveredNodeSides[node.id] = "top"
   else if (min === distBottom) hoveredNodeSides[node.id] = "bottom"
   else if (min === distLeft) hoveredNodeSides[node.id] = "left"
