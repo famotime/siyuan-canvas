@@ -692,7 +692,7 @@ onBeforeUnmount(() => {
 
 .inspector__empty {
   margin: 0;
-  padding: 8px 0;
+  padding: 8px;
   color: var(--b3-theme-on-surface);
   opacity: 0.4;
   font-size: 11px;
@@ -710,7 +710,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 4px 6px;
+  padding: 4px 8px;
   border: 0;
   border-radius: 6px;
   background: transparent;
