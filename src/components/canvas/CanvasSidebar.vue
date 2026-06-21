@@ -1,118 +1,177 @@
 <template>
   <div class="canvas-sidebar" data-theme-mode="light">
+    <!-- 标签栏 -->
+    <nav class="inspector__tabs" role="tablist">
+      <button class="inspector__tab inspector__tab--active" role="tab" aria-selected="true" type="button">
+        {{ t('sidebarTabLabel') }}
+      </button>
+    </nav>
+
     <!-- 工具栏 -->
-    <div class="canvas-sidebar__toolbar">
+    <div class="inspector__toolbar">
       <button
-        class="canvas-sidebar__toolbar-btn"
+        class="inspector__toolbar-button"
         :title="t('toolbarNew')"
         data-testid="sidebar-new-canvas"
         type="button"
         @click="newCanvas"
       >
-        <CanvasIcon name="new-canvas" :size="14" />
+        <CanvasIcon name="new-canvas" :size="16" />
       </button>
       <button
-        class="canvas-sidebar__toolbar-btn"
+        class="inspector__toolbar-button"
         :title="t('inspectorNewFolder')"
         data-testid="sidebar-new-folder"
         type="button"
         @click="tree.createWorkspaceFolder"
       >
-        <CanvasIcon name="new-folder" :size="14" />
+        <CanvasIcon name="new-folder" :size="16" />
       </button>
       <button
-        class="canvas-sidebar__toolbar-btn"
+        class="inspector__toolbar-button"
         :title="t('sidebarRefresh')"
         data-testid="sidebar-refresh"
         type="button"
         @click="refresh"
       >
-        <CanvasIcon name="refresh" :size="14" />
+        <CanvasIcon name="refresh" :size="16" />
+      </button>
+      <button
+        class="inspector__toolbar-button"
+        :title="t('inspectorSort')"
+        data-testid="sidebar-sort"
+        type="button"
+        aria-haspopup="menu"
+        :aria-expanded="sortMenuOpen"
+        @click="sortMenuOpen = !sortMenuOpen"
+      >
+        <CanvasIcon name="sort" :size="16" />
+      </button>
+      <button
+        class="inspector__toolbar-button"
+        :title="tree.allFoldersExpanded ? t('inspectorCollapseAll') : t('inspectorExpandAll')"
+        data-testid="sidebar-expand-all"
+        type="button"
+        @click="tree.allFoldersExpanded ? tree.collapseAllFolders() : tree.expandAllFolders()"
+      >
+        <CanvasIcon name="expand-all" :size="16" />
       </button>
     </div>
 
-    <!-- 排序工具栏 -->
-    <div class="canvas-sidebar__sortbar">
+    <!-- 排序弹出菜单 -->
+    <div v-if="sortMenuOpen" class="inspector__sort-menu">
       <button
-        class="canvas-sidebar__sort-btn"
-        :class="{ 'canvas-sidebar__sort-btn--active': tree.workspaceSortField === 'name' }"
+        class="inspector__sort-option"
+        :class="{ 'inspector__sort-option--active': tree.workspaceSortField === 'name' }"
         type="button"
-        @click="tree.setWorkspaceSortField('name')"
+        @click="tree.setWorkspaceSortField('name'); sortMenuOpen = false"
       >
         {{ t('inspectorSortByName') }}
       </button>
       <button
-        class="canvas-sidebar__sort-btn"
-        :class="{ 'canvas-sidebar__sort-btn--active': tree.workspaceSortField === 'updated' }"
+        class="inspector__sort-option"
+        :class="{ 'inspector__sort-option--active': tree.workspaceSortField === 'updated' }"
         type="button"
-        @click="tree.setWorkspaceSortField('updated')"
+        @click="tree.setWorkspaceSortField('updated'); sortMenuOpen = false"
       >
         {{ t('inspectorSortByUpdated') }}
       </button>
+      <div class="inspector__sort-divider" />
       <button
-        class="canvas-sidebar__sort-dir"
+        class="inspector__sort-option"
         type="button"
-        @click="tree.setWorkspaceSortDirection(tree.workspaceSortDirection === 'asc' ? 'desc' : 'asc')"
+        @click="tree.setWorkspaceSortDirection(tree.workspaceSortDirection === 'asc' ? 'desc' : 'asc'); sortMenuOpen = false"
       >
         {{ tree.workspaceSortDirection === 'asc' ? t('inspectorSortAsc') : t('inspectorSortDesc') }}
       </button>
     </div>
 
-    <!-- 工作区文件树 -->
-    <section class="canvas-sidebar__section">
-      <h3 class="canvas-sidebar__section-title">{{ t('inspectorTabDocuments') }}</h3>
-      <CanvasWorkspaceTree
-        v-if="tree.workspaceDocuments.length > 0"
-        :workspace-documents="tree.workspaceDocuments"
-        :expanded-folders="tree.expandedFolders"
-        :current-file-path="''"
-        :drag-over-folder-path="dragOverFolderPath"
-        :delete-title="t('selectionToolbarDelete')"
-        data-testid="sidebar-workspace-tree"
-        @toggle-folder="tree.toggleFolderExpand"
-        @open-file="openFile"
-        @delete-document="tree.deleteWorkspaceDocument"
-        @context-menu="onContextMenu"
-        @file-drag-start="onFileDragStart"
-        @folder-drag-start="onFolderDragStart"
-        @drag-end="onDragEnd"
-        @folder-drag-over="onFolderDragOver"
-        @folder-drag-enter="onFolderDragEnter"
-        @folder-drag-leave="onFolderDragLeave"
-        @folder-drop="onFolderDrop"
-        @root-drop="onRootDrop"
-      />
-      <p v-else class="canvas-sidebar__empty">
-        {{ t('sidebarNoFiles') }}
-      </p>
+    <!-- 文档 section -->
+    <section class="inspector__section">
+      <button
+        class="inspector__section-toggle"
+        :title="docSectionCollapsed ? t('inspectorExpand') : t('inspectorCollapse')"
+        type="button"
+        @click="docSectionCollapsed = !docSectionCollapsed"
+      >
+        <h2>{{ t('inspectorTabDocuments') }}</h2>
+        <span>{{ docSectionCollapsed ? '+' : '−' }}</span>
+      </button>
+      <div v-if="!docSectionCollapsed">
+        <CanvasWorkspaceTree
+          v-if="tree.workspaceDocuments.length > 0"
+          :workspace-documents="tree.workspaceDocuments"
+          :expanded-folders="tree.expandedFolders"
+          :current-file-path="''"
+          :drag-over-folder-path="dragOverFolderPath"
+          :delete-title="t('selectionToolbarDelete')"
+          data-testid="sidebar-workspace-tree"
+          @toggle-folder="tree.toggleFolderExpand"
+          @open-file="openFile"
+          @delete-document="tree.deleteWorkspaceDocument"
+          @context-menu="onContextMenu"
+          @file-drag-start="onFileDragStart"
+          @folder-drag-start="onFolderDragStart"
+          @drag-end="onDragEnd"
+          @folder-drag-over="onFolderDragOver"
+          @folder-drag-enter="onFolderDragEnter"
+          @folder-drag-leave="onFolderDragLeave"
+          @folder-drop="onFolderDrop"
+          @root-drop="onRootDrop"
+        />
+        <p v-else class="inspector__empty">
+          {{ t('sidebarNoFiles') }}
+        </p>
+      </div>
     </section>
 
-    <!-- 最近文件 -->
-    <section class="canvas-sidebar__section">
-      <h3 class="canvas-sidebar__section-title">{{ t('inspectorRecent') }}</h3>
-      <div v-if="recentFiles.length > 0" class="canvas-sidebar__recent">
-        <button
-          v-for="recent in recentFiles"
-          :key="recent.path"
-          class="canvas-sidebar__recent-item"
-          type="button"
-          @click="openRecentFile(recent)"
-        >
-          <CanvasIcon name="canvas-file" :size="12" />
-          <span class="canvas-sidebar__recent-name">{{ recent.title || getFileName(recent.path) }}</span>
+    <!-- 最近打开 section -->
+    <section class="inspector__section">
+      <button
+        class="inspector__section-toggle"
+        :title="recentSectionCollapsed ? t('inspectorExpand') : t('inspectorCollapse')"
+        type="button"
+        @click="recentSectionCollapsed = !recentSectionCollapsed"
+      >
+        <h2>{{ t('inspectorRecent') }}</h2>
+        <span>{{ recentSectionCollapsed ? '+' : '−' }}</span>
+      </button>
+      <div v-if="!recentSectionCollapsed">
+        <div v-if="recentFiles.length > 0" class="canvas-sidebar__recent">
           <button
-            class="canvas-sidebar__recent-remove"
+            v-for="recent in recentFiles"
+            :key="recent.path"
+            class="canvas-sidebar__recent-item"
             type="button"
-            @click.stop="removeRecentFile(recent.path)"
+            @click="openRecentFile(recent)"
           >
-            ×
+            <CanvasIcon name="canvas-file" :size="12" />
+            <span class="canvas-sidebar__recent-name">{{ recent.title || getFileName(recent.path) }}</span>
+            <button
+              class="canvas-sidebar__recent-remove"
+              type="button"
+              @click.stop="removeRecentFile(recent.path)"
+            >
+              ×
+            </button>
           </button>
-        </button>
+        </div>
+        <p v-else class="inspector__empty">
+          {{ t('sidebarNoRecentFiles') }}
+        </p>
       </div>
-      <p v-else class="canvas-sidebar__empty">
-        {{ t('sidebarNoRecentFiles') }}
-      </p>
     </section>
+
+    <!-- 拖拽移动目标预览 -->
+    <Teleport to="body">
+      <div
+        v-if="draggedPath && dragOverFolderPath"
+        class="canvas-sidebar__drag-indicator"
+        :style="{ left: `${dragPointerX + 12}px`, top: `${dragPointerY - 36}px` }"
+      >
+        {{ t('sidebarDragToFolder', { folder: getFolderDisplayName(dragOverFolderPath) }) }}
+      </div>
+    </Teleport>
 
     <!-- 右键菜单 -->
     <Teleport to="body">
@@ -201,6 +260,8 @@ const lastSavedTimes = reactive<Record<string, number>>({})
 const draggedPath = ref("")
 const draggedType = ref<"file" | "folder">("file")
 const dragOverFolderPath = ref<string | null>(null)
+const dragPointerX = ref(0)
+const dragPointerY = ref(0)
 
 function refreshRecentFiles() {
   recentFiles.value = (props.plugin.getRecentCanvasFiles?.() ?? []).slice(0, 20)
@@ -322,33 +383,53 @@ function onFolderDragStart(event: DragEvent, path: string) {
   }
 }
 
+function getFolderDisplayName(path: string): string {
+  const parts = path.split("/")
+  return parts[parts.length - 1] || path
+}
+
 function onDragEnd() {
   draggedPath.value = ""
   draggedType.value = "file"
   dragOverFolderPath.value = null
+  dragPointerX.value = 0
+  dragPointerY.value = 0
+  dragEnterCounter.value = 0
 }
 
 function onFolderDragOver(event: DragEvent) {
+  dragPointerX.value = event.clientX
+  dragPointerY.value = event.clientY
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = "move"
   }
 }
 
+const sortMenuOpen = ref(false)
+const docSectionCollapsed = ref(false)
+const recentSectionCollapsed = ref(false)
+const dragEnterCounter = ref(0)
+
 function onFolderDragEnter(_event: DragEvent, path: string) {
-  // 不能拖入自身
   if (path === draggedPath.value) return
+  dragEnterCounter.value++
   dragOverFolderPath.value = path
 }
 
 function onFolderDragLeave(_event: DragEvent, path: string) {
-  if (dragOverFolderPath.value === path) {
-    dragOverFolderPath.value = null
+  dragEnterCounter.value--
+  if (dragEnterCounter.value <= 0) {
+    dragEnterCounter.value = 0
+    if (dragOverFolderPath.value === path) {
+      dragOverFolderPath.value = null
+    }
   }
 }
 
 async function onFolderDrop(_event: DragEvent, targetFolderPath: string) {
   const sourcePath = draggedPath.value
   dragOverFolderPath.value = null
+  dragEnterCounter.value = 0
   if (!sourcePath || sourcePath === targetFolderPath) return
 
   // 不能拖入自身的子目录中
@@ -361,6 +442,7 @@ async function onFolderDrop(_event: DragEvent, targetFolderPath: string) {
 async function onRootDrop(_event: DragEvent) {
   const sourcePath = draggedPath.value
   dragOverFolderPath.value = null
+  dragEnterCounter.value = 0
   if (!sourcePath) return
 
   const settings = props.plugin.getCanvasSettings?.() ?? { defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas" }
@@ -476,79 +558,140 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   padding: 8px;
   gap: 8px;
-  background: var(--b3-theme-background);
+  background: var(--canvas-inspector-bg, var(--b3-theme-background));
   color: var(--b3-theme-on-background);
   font-size: 12px;
   box-sizing: border-box;
 }
 
-.canvas-sidebar__toolbar {
+/* Tabs */
+.inspector__tabs {
   display: flex;
-  gap: 4px;
-  padding: 4px 0;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
 }
 
-.canvas-sidebar__toolbar-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
+.inspector__tab {
+  flex: 1;
+  padding: 4px 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.canvas-sidebar__toolbar-btn:hover {
-  background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+.inspector__tab--active {
+  color: var(--b3-theme-on-background);
 }
 
-.canvas-sidebar__sortbar {
+/* Toolbar */
+.inspector__toolbar {
   display: flex;
   gap: 2px;
-  flex-wrap: wrap;
 }
 
-.canvas-sidebar__sort-btn,
-.canvas-sidebar__sort-dir {
-  padding: 2px 6px;
+.inspector__toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: 8px;
   background: transparent;
   color: var(--b3-theme-on-surface);
-  font-size: 11px;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
-.canvas-sidebar__sort-btn:hover,
-.canvas-sidebar__sort-dir:hover {
+.inspector__toolbar-button:hover {
   background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
 }
 
-.canvas-sidebar__sort-btn--active {
-  background: color-mix(in srgb, var(--b3-theme-on-surface) 12%, transparent);
-}
-
-.canvas-sidebar__section {
+/* Sort menu */
+.inspector__sort-menu {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 8px;
+  background: var(--b3-theme-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
-.canvas-sidebar__section-title {
+.inspector__sort-option {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inspector__sort-option:hover {
+  background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+}
+
+.inspector__sort-option--active {
+  background: color-mix(in srgb, var(--b3-theme-primary) 14%, transparent);
+  color: var(--b3-theme-primary);
+}
+
+.inspector__sort-divider {
+  height: 1px;
+  margin: 2px 0;
+  background: var(--b3-border-color);
+}
+
+/* Section */
+.inspector__section {
+  display: flex;
+  flex-direction: column;
+}
+
+.inspector__section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--b3-theme-on-surface);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.inspector__section-toggle:hover {
+  background: color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
+}
+
+.inspector__section-toggle h2 {
   margin: 0;
-  padding: 4px 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--b3-theme-on-surface);
-  opacity: 0.6;
+  opacity: 0.7;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
-.canvas-sidebar__empty {
+.inspector__section-toggle span {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.5;
+}
+
+.inspector__empty {
   margin: 0;
   padding: 8px 0;
   color: var(--b3-theme-on-surface);
@@ -556,6 +699,7 @@ onBeforeUnmount(() => {
   font-size: 11px;
 }
 
+/* Recent files */
 .canvas-sidebar__recent {
   display: flex;
   flex-direction: column;
@@ -569,7 +713,7 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 4px 6px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--b3-theme-on-surface);
   font-size: 12px;
@@ -601,7 +745,7 @@ onBeforeUnmount(() => {
   height: 18px;
   padding: 0;
   border: 0;
-  border-radius: 3px;
+  border-radius: 4px;
   background: transparent;
   color: var(--b3-theme-on-surface);
   font-size: 14px;
@@ -616,6 +760,22 @@ onBeforeUnmount(() => {
   color: var(--b3-theme-error);
 }
 
+/* Drag indicator */
+.canvas-sidebar__drag-indicator {
+  position: fixed;
+  z-index: 10001;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--canvas-accent);
+  color: var(--canvas-accent-contrast);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Context menu */
 .canvas-sidebar__context-menu {
   position: fixed;
   z-index: 10000;

@@ -109,6 +109,8 @@
   "inspectorSortDesc": "Descending",
   "inspectorExpandAll": "Expand All",
   "inspectorCollapseAll": "Collapse All",
+  "inspectorExpand": "Expand",
+  "inspectorCollapse": "Collapse",
   "inspectorRenamePrompt": "Rename File",
   "inspectorFolderNamePrompt": "New Folder",
   "inspectorUnsavedWorkspacePath": "Unsaved workspace path",
@@ -339,7 +341,9 @@
   "addTextCard": "Add Text Card",
   "addNoteCard": "Add Note Card",
   "sidebarTitle": "Canvas Files",
+  "sidebarTabLabel": "Canvas Files",
   "sidebarRefresh": "Refresh",
+  "sidebarDragToFolder": "Move to {folder}",
   "sidebarNoFiles": "No canvas files in workspace",
   "sidebarNoRecentFiles": "No recent files"
 }

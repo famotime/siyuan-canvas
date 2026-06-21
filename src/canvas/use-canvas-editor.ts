@@ -273,7 +273,7 @@ export function useCanvasEditor(
   const newEdgeTargetId = ref("")
   const newEdgeTargetQuery = ref("")
   const newEdgeToSide = ref<CanvasSide>("left")
-  const inspectorExpanded = ref(true)
+  const inspectorExpanded = ref(false)
   const editingEdgeLabelId = ref("")
   const edgeLabelDraft = ref("")
 

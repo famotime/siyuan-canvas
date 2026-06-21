@@ -32,5 +32,5 @@ export const CANVAS_TAB_ICON_BODY = '<g transform="translate(48,0) scale(-1,1)">
 /** 思源 Dock 侧边栏图标 sprite ID */
 export const CANVAS_DOCK_ICON_ID = 'iconCanvasDock'
 
-/** 思源 Dock 侧边栏图标 sprite 体：文件夹 + 文档图形，通过 currentColor 继承 dock 按钮颜色 */
-export const CANVAS_DOCK_ICON_BODY = '<path d="M8 10h10l3 4h15a2 2 0 012 2v16a2 2 0 01-2 2H8a2 2 0 01-2-2V12a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M22 22h10M22 28h10M22 34h6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>'
+/** 思源 Dock 侧边栏图标 sprite 体：与 topbar/tab 统一使用画布图标 */
+export const CANVAS_DOCK_ICON_BODY = CANVAS_TAB_ICON_BODY

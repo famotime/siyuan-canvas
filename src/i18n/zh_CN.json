@@ -109,6 +109,8 @@
   "inspectorSortDesc": "降序",
   "inspectorExpandAll": "全部展开",
   "inspectorCollapseAll": "全部折叠",
+  "inspectorExpand": "展开",
+  "inspectorCollapse": "折叠",
   "inspectorRenamePrompt": "重命名文件",
   "inspectorFolderNamePrompt": "新建文件夹",
   "inspectorUnsavedWorkspacePath": "未保存的工作区路径",
@@ -339,7 +341,9 @@
   "addTextCard": "添加文本卡片",
   "addNoteCard": "添加笔记卡片",
   "sidebarTitle": "无界文件",
+  "sidebarTabLabel": "Canvas文档",
   "sidebarRefresh": "刷新",
+  "sidebarDragToFolder": "移至 {folder}",
   "sidebarNoFiles": "工作区暂无画布文件",
   "sidebarNoRecentFiles": "暂无最近文件"
 }

@@ -247,8 +247,11 @@ defineEmits<{
 }
 
 .workspace-tree__folder-header--drop-target {
-  background: var(--canvas-accent-soft);
-  box-shadow: inset 2px 0 0 var(--canvas-accent);
+  background: color-mix(in srgb, var(--b3-theme-primary) 14%, transparent);
+  box-shadow:
+    inset 2px 0 0 var(--b3-theme-primary),
+    inset 0 0 0 1.5px color-mix(in srgb, var(--b3-theme-primary) 72%, transparent);
+  border-radius: 6px;
 }
 
 .workspace-tree__file[draggable="true"],
