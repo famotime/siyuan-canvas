@@ -6,6 +6,7 @@ import { watch } from "vue"
 import { CANVAS_GRID_SIZE, snapCanvasCoordinate } from "@/canvas/use-canvas-editor"
 import { computeAlignment } from "@/canvas/alignment-guides"
 import type { AlignmentGuideLine } from "@/canvas/alignment-guides"
+import { computeResizeGuides } from "@/canvas/resize-guides"
 import type { CanvasBoardMetrics } from "@/canvas/board"
 import type { CanvasEditorState } from "@/canvas/editor-state"
 import type {
@@ -98,6 +99,13 @@ interface CanvasEditorGestureOptions {
   getAnchor: (node: CanvasNode, side: CanvasSide) => { x: number, y: number }
   gridEnabled: Ref<boolean>
   pendingCardCreation: PendingCardCreation
+  resizeGuides: {
+    matchNodeIds: string[]
+    labels: Array<{ nodeId: string, boardX: number, boardY: number, text: string }>
+    widthLines: Array<{ nodeId: string, leftX: number, rightX: number, topY: number, bottomY: number }>
+    heightLines: Array<{ nodeId: string, leftX: number, rightX: number, topY: number, bottomY: number }>
+    visible: boolean
+  }
   readonly: ComputedRef<boolean>
   selectionBox: CanvasEditorSelectionBoxState
   selectedEdge: ComputedRef<CanvasEdge | null>
@@ -122,6 +130,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     gridEnabled,
     pendingCardCreation,
     readonly,
+    resizeGuides,
     selectionBox,
     selectedEdge,
     stageRef,
@@ -810,14 +819,27 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, CANVAS_GRID_SIZE)
         scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, CANVAS_GRID_SIZE)
       }
+      const geom = resizeCanvasNodeFromSide(node, side, scaleDeltaX, scaleDeltaY)
+      // 等宽/等高参考线检测
+      const result = computeResizeGuides(state.document, node, geom.width, geom.height, board.value)
+      resizeGuides.matchNodeIds = result.matchNodeIds
+      resizeGuides.labels = result.labels
+      resizeGuides.widthLines = result.widthLines
+      resizeGuides.heightLines = result.heightLines
+      resizeGuides.visible = result.matchNodeIds.length > 0
+
       commitDocument(
-        setCanvasNodeGeometry(
-          state.document,
-          node.id,
-          resizeCanvasNodeFromSide(node, side, scaleDeltaX, scaleDeltaY),
-        ),
+        setCanvasNodeGeometry(state.document, node.id, geom),
         { coalesceKey: `resize-${node.id}-${side}` },
       )
+    }, {
+      onEnd: () => {
+        resizeGuides.visible = false
+        resizeGuides.matchNodeIds = []
+        resizeGuides.labels = []
+        resizeGuides.widthLines = []
+        resizeGuides.heightLines = []
+      },
     })
   }
 
@@ -834,14 +856,27 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, CANVAS_GRID_SIZE)
         scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, CANVAS_GRID_SIZE)
       }
+      const geom = resizeCanvasNodeFromCorner(node, scaleDeltaX, scaleDeltaY)
+      // 等宽/等高参考线检测
+      const result = computeResizeGuides(state.document, node, geom.width, geom.height, board.value)
+      resizeGuides.matchNodeIds = result.matchNodeIds
+      resizeGuides.labels = result.labels
+      resizeGuides.widthLines = result.widthLines
+      resizeGuides.heightLines = result.heightLines
+      resizeGuides.visible = result.matchNodeIds.length > 0
+
       commitDocument(
-        setCanvasNodeGeometry(
-          state.document,
-          node.id,
-          resizeCanvasNodeFromCorner(node, scaleDeltaX, scaleDeltaY),
-        ),
+        setCanvasNodeGeometry(state.document, node.id, geom),
         { coalesceKey: `resize-corner-${node.id}` },
       )
+    }, {
+      onEnd: () => {
+        resizeGuides.visible = false
+        resizeGuides.matchNodeIds = []
+        resizeGuides.labels = []
+        resizeGuides.widthLines = []
+        resizeGuides.heightLines = []
+      },
     })
   }
 

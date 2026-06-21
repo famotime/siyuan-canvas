@@ -50,6 +50,7 @@ import {
 } from "@/canvas/board"
 import { computeAlignment } from "@/canvas/alignment-guides"
 import type { AlignmentGuideLine } from "@/canvas/alignment-guides"
+import { computeResizeGuides } from "@/canvas/resize-guides"
 import {
   getCanvasSelectionBounds,
   setCanvasEdgeEndpoint,
@@ -240,6 +241,19 @@ export function useCanvasEditor(
   }>({
     horizontal: [],
     vertical: [],
+    visible: false,
+  })
+  const resizeGuides = reactive<{
+    matchNodeIds: string[]
+    labels: Array<{ nodeId: string, boardX: number, boardY: number, text: string }>
+    widthLines: Array<{ nodeId: string, leftX: number, rightX: number, topY: number, bottomY: number }>
+    heightLines: Array<{ nodeId: string, leftX: number, rightX: number, topY: number, bottomY: number }>
+    visible: boolean
+  }>({
+    matchNodeIds: [],
+    labels: [],
+    widthLines: [],
+    heightLines: [],
     visible: false,
   })
   const connectionDraft = reactive<CanvasEditorConnectionDraftState>({
@@ -1115,6 +1129,7 @@ export function useCanvasEditor(
     gridEnabled,
     pendingCardCreation,
     readonly,
+    resizeGuides,
     selectionBox,
     selectedEdge,
     stageRef,
@@ -1420,6 +1435,7 @@ export function useCanvasEditor(
       zoomOut,
       zoomToActualSize,
       alignmentGuides,
+      resizeGuides,
       gridEnabled,
       toggleGrid,
       zoomToFit,

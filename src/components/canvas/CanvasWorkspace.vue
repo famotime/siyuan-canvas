@@ -513,6 +513,7 @@
                 'canvas-node--presentation-current': editor.presentation.currentNodeId === node.id,
                 'canvas-node--presentation-history': editor.presentation.pathHistory.includes(node.id),
                 'canvas-node--presentation-next': editor.presentation.availableNextNodes.includes(node.id),
+                'canvas-node--resize-match': editor.resizeGuides.visible && editor.resizeGuides.matchNodeIds.includes(node.id),
               },
             ]"
             :style="getCanvasNodeStyle(node)"
@@ -732,6 +733,61 @@
               :y2="guide.position"
               class="alignment-guide"
             />
+          </svg>
+
+          <!-- 调整大小时等宽/等高参考线 -->
+          <svg
+            v-if="editor.resizeGuides.visible"
+            class="stage__resize-guides"
+            :height="editor.board.height"
+            :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
+            :width="editor.board.width"
+          >
+            <line
+              v-for="(wl, index) in editor.resizeGuides.widthLines"
+              :key="`rwl-${index}`"
+              :x1="wl.leftX" :y1="wl.topY"
+              :x2="wl.leftX" :y2="wl.bottomY"
+              class="resize-guide--width"
+            />
+            <line
+              v-for="(wl, index) in editor.resizeGuides.widthLines"
+              :key="`rwr-${index}`"
+              :x1="wl.rightX" :y1="wl.topY"
+              :x2="wl.rightX" :y2="wl.bottomY"
+              class="resize-guide--width"
+            />
+            <line
+              v-for="(hl, index) in editor.resizeGuides.heightLines"
+              :key="`rht-${index}`"
+              :x1="hl.leftX" :y1="hl.topY"
+              :x2="hl.rightX" :y2="hl.topY"
+              class="resize-guide--height"
+            />
+            <line
+              v-for="(hl, index) in editor.resizeGuides.heightLines"
+              :key="`rhb-${index}`"
+              :x1="hl.leftX" :y1="hl.bottomY"
+              :x2="hl.rightX" :y2="hl.bottomY"
+              class="resize-guide--height"
+            />
+            <g
+              v-for="(label, index) in editor.resizeGuides.labels"
+              :key="`rl-${index}`"
+              :transform="`translate(${label.boardX}, ${label.boardY})`"
+            >
+              <rect
+                class="resize-guide__label-bg"
+                x="0" y="0"
+                :width="label.text.length * 7 + 10"
+                height="18"
+                rx="4"
+              />
+              <text
+                class="resize-guide__label-text"
+                x="5" y="13"
+              >{{ label.text }}</text>
+            </g>
           </svg>
         </div>
 
