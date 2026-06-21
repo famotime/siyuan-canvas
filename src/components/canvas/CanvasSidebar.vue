@@ -174,7 +174,6 @@ import {
 } from "@/canvas/workspace-tree-core"
 import { createCanvasEditorWorkspaceTree } from "@/canvas/use-canvas-editor-workspace-tree"
 import { createCanvasI18n } from "@/i18n/canvas"
-import { bindThemeSync } from "@/main"
 
 const props = defineProps<{
   plugin: Plugin & {
@@ -355,7 +354,7 @@ function onWorkspaceChanged() {
   if (workspaceRefreshTimer) return
   workspaceRefreshTimer = setTimeout(() => {
     workspaceRefreshTimer = null
-    void tree.refreshWorkspaceDocuments()
+    void tree.refreshWorkspaceDocuments({ silent: true })
   }, 300)
 }
 
@@ -373,10 +372,6 @@ function onRecentChanged() {
 
 // 生命周期
 onMounted(() => {
-  const host = getCurrentHost()
-  if (host) {
-    bindThemeSync(host, props.plugin as Plugin)
-  }
   void tree.refreshWorkspaceDocuments()
   refreshRecentFiles()
   window.addEventListener("siyuan-canvas:workspace-changed", onWorkspaceChanged)
@@ -390,13 +385,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("siyuan-canvas:file-saved", onFileSaved)
   window.removeEventListener("siyuan-canvas:recent-changed", onRecentChanged)
 })
-
-// 获取当前宿主元素
-function getCurrentHost(): HTMLElement | null {
-  // 通过 DOM 向上查找 sidebar 容器
-  const el = document.querySelector(".canvas-sidebar")
-  return el as HTMLElement | null
-}
 </script>
 
 <style scoped>

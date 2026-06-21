@@ -84,6 +84,11 @@ function applyThemeMode(element: HTMLElement, mode: CanvasThemeMode): void {
   }
 }
 
+export function unbindThemeSync(element: HTMLElement): void {
+  themeCleanupMap.get(element)?.()
+  themeCleanupMap.delete(element)
+}
+
 export function bindThemeSync(element: HTMLElement, plugin: Plugin): void {
   const syncThemeMode = () => {
     applyThemeMode(element, detectHostThemeMode(element))

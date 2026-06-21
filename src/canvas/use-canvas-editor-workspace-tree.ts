@@ -146,13 +146,15 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     return sortWorkspaceTreeNodes(nodes, workspaceSortField.value, workspaceSortDirection.value)
   }
 
-  async function refreshWorkspaceDocuments() {
+  async function refreshWorkspaceDocuments(options?: { silent?: boolean }) {
     const directory = deps.getSettings().defaultCanvasDirectory
 
     try {
       const tree = await readDirectoryTree(directory)
       workspaceDocuments.value = sortWorkspaceTree(tree)
-      notifyWorkspaceChanged()
+      if (!options?.silent) {
+        notifyWorkspaceChanged()
+      }
     } catch {
       workspaceDocuments.value = []
     }

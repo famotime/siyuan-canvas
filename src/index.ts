@@ -46,6 +46,7 @@ import {
   bindPlugin,
   bindThemeSync,
   requirePlugin,
+  unbindThemeSync,
 } from "@/main"
 import { createApp } from "vue"
 import CanvasSidebar from "@/components/canvas/CanvasSidebar.vue"
@@ -127,6 +128,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
         const app = (host as any).__canvasSidebarApp
         app?.unmount()
         delete (host as any).__canvasSidebarApp
+        unbindThemeSync(host)
         host.innerHTML = ""
       },
     })
