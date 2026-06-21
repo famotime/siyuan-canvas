@@ -17,8 +17,11 @@
           type="button"
           :title="node.path"
           :aria-expanded="expandedFolders.has(node.path)"
+          draggable="true"
           @click="$emit('toggle-folder', node.path)"
           @contextmenu.prevent="$emit('context-menu', $event, node.path, 'folder')"
+          @dragstart="$emit('folder-drag-start', $event, node.path)"
+          @dragend="$emit('drag-end')"
           @dragover.prevent="$emit('folder-drag-over', $event)"
           @dragenter.prevent="$emit('folder-drag-enter', $event, node.path)"
           @dragleave="$emit('folder-drag-leave', $event, node.path)"
@@ -84,8 +87,11 @@
                 type="button"
                 :title="child.path"
                 :aria-expanded="expandedFolders.has(child.path)"
+                draggable="true"
                 @click="$emit('toggle-folder', child.path)"
                 @contextmenu.prevent="$emit('context-menu', $event, child.path, 'folder')"
+                @dragstart="$emit('folder-drag-start', $event, child.path)"
+                @dragend="$emit('drag-end')"
                 @dragover.prevent="$emit('folder-drag-over', $event)"
                 @dragenter.prevent="$emit('folder-drag-enter', $event, child.path)"
                 @dragleave="$emit('folder-drag-leave', $event, child.path)"
@@ -209,6 +215,7 @@ defineEmits<{
   (e: 'folder-drag-leave', event: DragEvent, path: string): void
   (e: 'folder-drop', event: DragEvent, path: string): void
   (e: 'file-drag-start', event: DragEvent, path: string): void
+  (e: 'folder-drag-start', event: DragEvent, path: string): void
   (e: 'drag-end'): void
 }>()
 </script>
@@ -244,11 +251,13 @@ defineEmits<{
   box-shadow: inset 2px 0 0 var(--canvas-accent);
 }
 
-.workspace-tree__file[draggable="true"] {
+.workspace-tree__file[draggable="true"],
+.workspace-tree__folder-header[draggable="true"] {
   cursor: grab;
 }
 
-.workspace-tree__file[draggable="true"]:active {
+.workspace-tree__file[draggable="true"]:active,
+.workspace-tree__folder-header[draggable="true"]:active {
   opacity: 0.5;
   cursor: grabbing;
 }

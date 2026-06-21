@@ -27,6 +27,7 @@ import {
 import {
   CONNECTION_SNAP_DISTANCE,
   findNearestCanvasAnchor,
+  getCanvasNodeAnchor,
   resizeCanvasNodeFromCorner,
   resizeCanvasNodeFromSide,
 } from "@/canvas/node-interaction"
@@ -599,13 +600,13 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     event.preventDefault?.()
-    const anchor = getAnchor(node, side)
+    const canvasAnchor = getCanvasNodeAnchor(node, side)
     connectionDraft.fromNodeId = node.id
     connectionDraft.fromSide = side
     connectionDraft.toNodeId = ""
     connectionDraft.toSide = "left"
-    connectionDraft.toX = anchor.x
-    connectionDraft.toY = anchor.y
+    connectionDraft.toX = canvasAnchor.x
+    connectionDraft.toY = canvasAnchor.y
     connectionDraft.visible = true
 
     startPointerGesture(

@@ -214,6 +214,8 @@
   "messageInvalidCanvasFile": "Invalid canvas file.",
   "messageCanvasFileChangedOnDisk": "Canvas file changed on disk. Review the conflict panel before saving again.",
   "messageUnableSaveCanvas": "Unable to save canvas.",
+  "messageEntryMoved": "Moved {name} to {folder}",
+  "messageEntryMovedToRoot": "Moved {name} to root",
   "messageFileMoved": "Moved {name} to {folder}",
   "messageUnableMoveFile": "Unable to move file.",
   "messageFileRenamed": "Renamed to {name}",

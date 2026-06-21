@@ -214,6 +214,8 @@
   "messageInvalidCanvasFile": "无效的 Canvas 文件。",
   "messageCanvasFileChangedOnDisk": "磁盘上的 Canvas 文件已变化，请先检查冲突面板后再保存。",
   "messageUnableSaveCanvas": "无法保存 Canvas。",
+  "messageEntryMoved": "已将 {name} 移动到 {folder}",
+  "messageEntryMovedToRoot": "已将 {name} 移动到根目录",
   "messageFileMoved": "已将 {name} 移动到 {folder}",
   "messageUnableMoveFile": "无法移动文件。",
   "messageFileRenamed": "已重命名为 {name}",

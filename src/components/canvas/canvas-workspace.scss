@@ -1437,6 +1437,40 @@
   bottom: 14px;
 }
 
+/* 右下角宽高拖拽角手柄 */
+.canvas-node__resize-corner {
+  position: absolute;
+  z-index: 3;
+  right: -4px;
+  bottom: -4px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.canvas-node__resize-corner::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--canvas-accent);
+  border-bottom: 2px solid var(--canvas-accent);
+  border-radius: 0 0 2px 0;
+}
+
+.canvas-node:hover .canvas-node__resize-corner,
+.canvas-node--selected .canvas-node__resize-corner {
+  opacity: 1;
+}
+
 .inspector {
   overflow: auto;
   padding: 18px;

@@ -9,7 +9,7 @@
         type="button"
         @click="newCanvas"
       >
-        <CanvasIcon name="canvas-file" :size="14" />
+        <CanvasIcon name="new-canvas" :size="14" />
       </button>
       <button
         class="canvas-sidebar__toolbar-btn"
@@ -18,9 +18,7 @@
         type="button"
         @click="tree.createWorkspaceFolder"
       >
-        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M2 4h4l2 2h6v7H2z" /><line x1="8" y1="8.5" x2="8" y2="12.5" /><line x1="6" y1="10.5" x2="10" y2="10.5" />
-        </svg>
+        <CanvasIcon name="new-folder" :size="14" />
       </button>
       <button
         class="canvas-sidebar__toolbar-btn"
@@ -29,10 +27,7 @@
         type="button"
         @click="refresh"
       >
-        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M2 8a6 6 0 0110.47-4M14 8a6 6 0 01-10.47 4" />
-          <polyline points="10.5,2.5 13,2.5 13,5" /><polyline points="5.5,13.5 3,13.5 3,11" />
-        </svg>
+        <CanvasIcon name="refresh" :size="14" />
       </button>
     </div>
 
@@ -71,13 +66,21 @@
         :workspace-documents="tree.workspaceDocuments"
         :expanded-folders="tree.expandedFolders"
         :current-file-path="''"
-        :drag-over-folder-path="null"
+        :drag-over-folder-path="dragOverFolderPath"
         :delete-title="t('selectionToolbarDelete')"
         data-testid="sidebar-workspace-tree"
         @toggle-folder="tree.toggleFolderExpand"
         @open-file="openFile"
         @delete-document="tree.deleteWorkspaceDocument"
         @context-menu="onContextMenu"
+        @file-drag-start="onFileDragStart"
+        @folder-drag-start="onFolderDragStart"
+        @drag-end="onDragEnd"
+        @folder-drag-over="onFolderDragOver"
+        @folder-drag-enter="onFolderDragEnter"
+        @folder-drag-leave="onFolderDragLeave"
+        @folder-drop="onFolderDrop"
+        @root-drop="onRootDrop"
       />
       <p v-else class="canvas-sidebar__empty">
         {{ t('sidebarNoFiles') }}
@@ -194,6 +197,11 @@ const recentFiles = ref<Array<{ path: string, title?: string, openedAt?: number 
 // API 返回的 updated 字段不随保存而变化，自行跟踪文件的最后保存时间
 const lastSavedTimes = reactive<Record<string, number>>({})
 
+// 拖拽状态
+const draggedPath = ref("")
+const draggedType = ref<"file" | "folder">("file")
+const dragOverFolderPath = ref<string | null>(null)
+
 function refreshRecentFiles() {
   recentFiles.value = (props.plugin.getRecentCanvasFiles?.() ?? []).slice(0, 20)
 }
@@ -215,6 +223,9 @@ const tree = reactive(createCanvasEditorWorkspaceTree({
     },
   putFile,
   removeFile,
+  renameFile: async (path: string, newPath: string) => {
+    await fetchSyncPost("/api/file/renameFile", { path, newPath })
+  },
   showMessage: (msg: string, timeout?: number, type?: string) => showMessage(msg, timeout, type as any),
   getSettings: () => props.plugin.getCanvasSettings?.() ?? { defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas" },
   plugin: {
@@ -244,6 +255,8 @@ const tree = reactive(createCanvasEditorWorkspaceTree({
     unableToRenameFileMessage: t("messageUnableRenameFile"),
     unableToRenameFolderMessage: t("workspaceUnableRenameFolder"),
     unableToSaveMessage: t("messageUnableSaveCanvas"),
+    messageEntryMoved: (name: string, folder: string) => t("messageEntryMoved", { folder, name }),
+    messageEntryMovedToRoot: (name: string) => t("messageEntryMovedToRoot", { name }),
     messageFileRenamed: (name: string) => t("messageFileRenamed", { name }),
     messageFileMoved: (name: string, folder: string) => t("messageFileMoved", { folder, name }),
     unableToMoveFileMessage: t("messageUnableMoveFile"),
@@ -287,6 +300,74 @@ async function newCanvas() {
 
 async function refresh() {
   await tree.refreshWorkspaceDocuments()
+  refreshRecentFiles()
+}
+
+// 拖拽移动
+function onFileDragStart(event: DragEvent, path: string) {
+  draggedPath.value = path
+  draggedType.value = "file"
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", path)
+  }
+}
+
+function onFolderDragStart(event: DragEvent, path: string) {
+  draggedPath.value = path
+  draggedType.value = "folder"
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", path)
+  }
+}
+
+function onDragEnd() {
+  draggedPath.value = ""
+  draggedType.value = "file"
+  dragOverFolderPath.value = null
+}
+
+function onFolderDragOver(event: DragEvent) {
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move"
+  }
+}
+
+function onFolderDragEnter(_event: DragEvent, path: string) {
+  // 不能拖入自身
+  if (path === draggedPath.value) return
+  dragOverFolderPath.value = path
+}
+
+function onFolderDragLeave(_event: DragEvent, path: string) {
+  if (dragOverFolderPath.value === path) {
+    dragOverFolderPath.value = null
+  }
+}
+
+async function onFolderDrop(_event: DragEvent, targetFolderPath: string) {
+  const sourcePath = draggedPath.value
+  dragOverFolderPath.value = null
+  if (!sourcePath || sourcePath === targetFolderPath) return
+
+  // 不能拖入自身的子目录中
+  if (draggedType.value === "folder" && targetFolderPath.startsWith(sourcePath + "/")) return
+
+  await tree.moveWorkspaceEntry(sourcePath, targetFolderPath)
+  refreshRecentFiles()
+}
+
+async function onRootDrop(_event: DragEvent) {
+  const sourcePath = draggedPath.value
+  dragOverFolderPath.value = null
+  if (!sourcePath) return
+
+  const settings = props.plugin.getCanvasSettings?.() ?? { defaultCanvasDirectory: "/data/storage/petal/siyuan-canvas" }
+  const sourceDir = sourcePath.substring(0, sourcePath.lastIndexOf('/'))
+  if (sourceDir === settings.defaultCanvasDirectory) return // 已在根目录
+
+  await tree.moveWorkspaceEntryToRoot(sourcePath)
   refreshRecentFiles()
 }
 

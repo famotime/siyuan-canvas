@@ -638,6 +638,13 @@
               type="button"
               @pointerdown.stop.prevent="editor.startResize(node, segment.side, $event)"
             />
+            <button
+              v-if="!editor.readonly"
+              class="canvas-node__resize-corner"
+              data-testid="node-resize-corner-br"
+              type="button"
+              @pointerdown.stop.prevent="editor.startCornerResize(node, $event)"
+            />
           </article>
 
           <svg
