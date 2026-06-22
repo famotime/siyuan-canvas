@@ -180,6 +180,21 @@
             name="reset-viewport"
           />
         </button>
+        <button
+          class="toolbar__button toolbar__button--icon"
+          :class="{ 'toolbar__button--active': editor.gridEnabled }"
+          data-testid="top-toolbar-grid"
+          :aria-label="t('toolbarGridSnap')"
+          :data-tooltip="t('toolbarGridSnap')"
+          :title="t('toolbarGridSnap')"
+          type="button"
+          @click="editor.toggleGrid"
+        >
+          <CanvasIcon
+            class="toolbar__icon"
+            name="arrange-grid"
+          />
+        </button>
       </div>
       <span class="toolbar__divider" aria-hidden="true" />
       <div class="toolbar__group">
@@ -498,10 +513,13 @@
                 'canvas-node--presentation-current': editor.presentation.currentNodeId === node.id,
                 'canvas-node--presentation-history': editor.presentation.pathHistory.includes(node.id),
                 'canvas-node--presentation-next': editor.presentation.availableNextNodes.includes(node.id),
+                'canvas-node--resize-match': editor.resizeGuides.visible && editor.resizeGuides.matchNodeIds.includes(node.id),
               },
             ]"
             :style="getCanvasNodeStyle(node)"
             @pointerdown.stop="handleNodePointerDown(node, $event)"
+            @pointermove="updateHoveredSide(node, $event)"
+            @pointerleave="delete hoveredNodeSides[node.id]"
             @click.stop="handleNodeClick(node, $event)"
             @dblclick.stop="handleNodeDoubleClick(node)"
             @wheel.passive="handleNodeWheel(node, $event)"
@@ -623,7 +641,10 @@
               class="canvas-node__anchor"
               :class="[
                 `canvas-node__anchor--${side}`,
-                { 'canvas-node__anchor--active': editor.isConnectionTarget(node.id, side) },
+                {
+                  'canvas-node__anchor--active': editor.isConnectionTarget(node.id, side),
+                  'canvas-node__anchor--nearby': hoveredNodeSides[node.id] === side,
+                },
               ]"
               :data-testid="`node-anchor-${side}`"
               type="button"
@@ -639,8 +660,9 @@
               @pointerdown.stop.prevent="editor.startResize(node, segment.side, $event)"
             />
             <button
+              v-if="!editor.readonly"
               class="canvas-node__resize-corner"
-              data-testid="node-resize-corner"
+              data-testid="node-resize-corner-br"
               type="button"
               @pointerdown.stop.prevent="editor.startCornerResize(node, $event)"
             />
@@ -680,9 +702,91 @@
                 :data-testid="`edge-hit-area-${edge.id}`"
                 @mouseenter="setHoveredEdge(edge.id)"
                 @mouseleave="clearHoveredEdge(edge.id)"
-                @pointerdown.stop
+                @pointerdown.stop="handleEdgePointerDown(edge, $event)"
                 @click.stop="handleEdgeClick(edge.id)"
               />
+            </g>
+          </svg>
+
+          <svg
+            v-if="editor.alignmentGuides.visible"
+            class="stage__alignment-guides"
+            :height="editor.board.height"
+            :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
+            :width="editor.board.width"
+          >
+            <line
+              v-for="(guide, index) in editor.alignmentGuides.vertical"
+              :key="`vg-${index}`"
+              :x1="guide.position"
+              :y1="guide.spanStart"
+              :x2="guide.position"
+              :y2="guide.spanEnd"
+              class="alignment-guide"
+            />
+            <line
+              v-for="(guide, index) in editor.alignmentGuides.horizontal"
+              :key="`hg-${index}`"
+              :x1="guide.spanStart"
+              :y1="guide.position"
+              :x2="guide.spanEnd"
+              :y2="guide.position"
+              class="alignment-guide"
+            />
+          </svg>
+
+          <!-- 调整大小时等宽/等高参考线 -->
+          <svg
+            v-if="editor.resizeGuides.visible"
+            class="stage__resize-guides"
+            :height="editor.board.height"
+            :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
+            :width="editor.board.width"
+          >
+            <line
+              v-for="(wl, index) in editor.resizeGuides.widthLines"
+              :key="`rwl-${index}`"
+              :x1="wl.leftX" :y1="wl.topY"
+              :x2="wl.leftX" :y2="wl.bottomY"
+              class="resize-guide--width"
+            />
+            <line
+              v-for="(wl, index) in editor.resizeGuides.widthLines"
+              :key="`rwr-${index}`"
+              :x1="wl.rightX" :y1="wl.topY"
+              :x2="wl.rightX" :y2="wl.bottomY"
+              class="resize-guide--width"
+            />
+            <line
+              v-for="(hl, index) in editor.resizeGuides.heightLines"
+              :key="`rht-${index}`"
+              :x1="hl.leftX" :y1="hl.topY"
+              :x2="hl.rightX" :y2="hl.topY"
+              class="resize-guide--height"
+            />
+            <line
+              v-for="(hl, index) in editor.resizeGuides.heightLines"
+              :key="`rhb-${index}`"
+              :x1="hl.leftX" :y1="hl.bottomY"
+              :x2="hl.rightX" :y2="hl.bottomY"
+              class="resize-guide--height"
+            />
+            <g
+              v-for="(label, index) in editor.resizeGuides.labels"
+              :key="`rl-${index}`"
+              :transform="`translate(${label.boardX}, ${label.boardY})`"
+            >
+              <rect
+                class="resize-guide__label-bg"
+                x="0" y="0"
+                :width="label.text.length * 7 + 10"
+                height="18"
+                rx="4"
+              />
+              <text
+                class="resize-guide__label-text"
+                x="5" y="13"
+              >{{ label.text }}</text>
             </g>
           </svg>
         </div>
@@ -1311,45 +1415,10 @@
         <div
           v-if="editor.inspectorExpanded"
           class="inspector__content"
-          @click="sortDropdownOpen = false; closeContextMenu()"
+          @click="closeContextMenu()"
         >
           <div class="inspector__header">
-            <nav
-              class="inspector__tabs"
-              role="tablist"
-              data-testid="inspector-tabs"
-            >
-              <button
-                class="inspector__tab"
-                :class="{ 'inspector__tab--active': activeInspectorTab === 'documents' }"
-                data-testid="inspector-tab-documents"
-                role="tab"
-                :aria-selected="activeInspectorTab === 'documents'"
-                type="button"
-                @click="activeInspectorTab = 'documents'"
-              >
-                {{ t('inspectorTabDocuments') }}
-                <span
-                  v-if="totalInspectorIssueCount > 0"
-                  class="inspector__tab-badge inspector__tab-badge--danger"
-                >{{ totalInspectorIssueCount }}</span>
-              </button>
-              <button
-                class="inspector__tab"
-                :class="{ 'inspector__tab--active': activeInspectorTab === 'selection' }"
-                data-testid="inspector-tab-selection"
-                role="tab"
-                :aria-selected="activeInspectorTab === 'selection'"
-                type="button"
-                @click="activeInspectorTab = 'selection'"
-              >
-                {{ t('inspectorTabSelection') }}
-                <span
-                  v-if="editor.selectedNodeCount > 0 || editor.selectedEdge"
-                  class="inspector__tab-badge"
-                >{{ editor.selectedNodeCount > 0 ? editor.selectedNodeCount : '·' }}</span>
-              </button>
-            </nav>
+            <h2 class="inspector__title">{{ t('inspectorTabSelection') }}</h2>
             <button
               class="inspector__pin-btn"
               :class="{ 'inspector__pin-btn--pinned': pinned }"
@@ -1365,232 +1434,7 @@
               />
             </button>
           </div>
-          <template v-if="activeInspectorTab === 'documents'">
-          <div class="inspector__toolbar">
-            <button
-              class="inspector__toolbar-button"
-              data-testid="inspector-toolbar-new-canvas"
-              :title="t('inspectorNewCanvas')"
-              type="button"
-              @click="editor.newCanvas"
-            >
-              <CanvasIcon
-                name="new-canvas"
-                :size="16"
-              />
-            </button>
-            <button
-              class="inspector__toolbar-button"
-              data-testid="inspector-toolbar-new-folder"
-              :title="t('inspectorNewFolder')"
-              type="button"
-              @click="editor.createWorkspaceFolder"
-            >
-              <CanvasIcon
-                name="new-folder"
-                :size="16"
-              />
-            </button>
-            <button
-              class="inspector__toolbar-button"
-              :class="{ 'inspector__toolbar-button--active': sortDropdownOpen }"
-              data-testid="inspector-toolbar-sort"
-              :title="t('inspectorSort')"
-              type="button"
-              :aria-haspopup="'menu'"
-              :aria-expanded="sortDropdownOpen"
-              @click.stop="sortDropdownOpen = !sortDropdownOpen"
-            >
-              <CanvasIcon
-                name="sort"
-                :size="16"
-              />
-            </button>
-            <button
-              class="inspector__toolbar-button"
-              data-testid="inspector-toolbar-expand-all"
-              :title="editor.allFoldersExpanded ? t('inspectorCollapseAll') : t('inspectorExpandAll')"
-              type="button"
-              @click="editor.expandAllInspectorSections"
-            >
-              <CanvasIcon
-                name="expand-all"
-                :size="16"
-              />
-            </button>
-            <div
-              v-if="sortDropdownOpen"
-              class="inspector__sort-dropdown"
-              role="menu"
-              @click.stop
-            >
-              <div class="inspector__sort-dropdown-group">
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'name' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortField('name'); sortDropdownOpen = false"
-                >{{ t('inspectorSortByName') }}</button>
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'updated' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortField('updated'); sortDropdownOpen = false"
-                >{{ t('inspectorSortByUpdated') }}</button>
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'created' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortField('created'); sortDropdownOpen = false"
-                >{{ t('inspectorSortByCreated') }}</button>
-              </div>
-              <div class="inspector__sort-dropdown-divider" />
-              <div class="inspector__sort-dropdown-group">
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortDirection === 'asc' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortDirection('asc'); sortDropdownOpen = false"
-                >{{ t('inspectorSortAsc') }}</button>
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortDirection === 'desc' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortDirection('desc'); sortDropdownOpen = false"
-                >{{ t('inspectorSortDesc') }}</button>
-              </div>
-            </div>
-          </div>
-          <section class="inspector__section">
-            <button
-              class="inspector__section-toggle"
-              data-testid="inspector-section-document-toggle"
-              :title="getInspectorSectionToggleTitle('document')"
-              type="button"
-              @click="editor.toggleInspectorSection('document')"
-            >
-              <h2>{{ t("inspectorDocument") }}</h2>
-              <span>{{ getInspectorSectionChevron('document') }}</span>
-            </button>
-            <div
-              v-if="editor.inspectorSectionState.document"
-              data-testid="inspector-section-document-body"
-            >
-              <CanvasWorkspaceTree
-                v-if="editor.workspaceDocuments.length"
-                :workspace-documents="editor.workspaceDocuments"
-                :expanded-folders="editor.expandedFolders"
-                :current-file-path="editor.state.filePath"
-                :drag-over-folder-path="dragOverFolderPath"
-                :delete-title="t('selectionToolbarDelete')"
-                @toggle-folder="editor.toggleFolderExpand"
-                @open-file="editor.openWorkspacePath"
-                @delete-document="editor.deleteWorkspaceDocument"
-                @context-menu="onContextMenu"
-                @root-drop="onRootDrop"
-                @folder-drag-over="onFolderDragOver"
-                @folder-drag-enter="onFolderDragEnter"
-                @folder-drag-leave="onFolderDragLeave"
-                @folder-drop="onFolderDrop"
-                @file-drag-start="onFileDragStart"
-                @drag-end="onDragEnd"
-              />
-              <p v-else class="workspace-tree__empty">
-                {{ t("inspectorNoWorkspaceCanvasFiles") }}<br>
-                <code>{{ editor.defaultCanvasDirectory }}/</code>
-              </p>
-            </div>
-          </section>
-
-          <section class="inspector__section">
-            <button
-              class="inspector__section-toggle"
-              :title="getInspectorSectionToggleTitle('recent')"
-              type="button"
-              @click="editor.toggleInspectorSection('recent')"
-            >
-              <h2>{{ t("inspectorRecent") }}</h2>
-              <span>{{ getInspectorSectionChevron('recent') }}</span>
-            </button>
-            <div v-if="editor.inspectorSectionState.recent">
-              <div
-                v-if="editor.recentFiles.length"
-                class="recent-list"
-              >
-                <div
-                  v-for="recent in editor.recentFiles"
-                  :key="recent.path"
-                  class="recent-list__item"
-                  :title="recent.path"
-                >
-                  <button
-                    class="recent-list__item-open"
-                    type="button"
-                    @click="editor.openRecentFile(recent)"
-                  >
-                    <CanvasIcon
-                      class="recent-list__item-icon"
-                      name="canvas-file"
-                      :size="14"
-                    />
-                    <span class="workspace-tree__name">{{ recent.title }}</span>
-                  </button>
-                  <button
-                    class="recent-list__item-delete"
-                    :title="t('selectionToolbarDelete')"
-                    type="button"
-                    @click.stop="editor.removeRecentFileRecord(recent.path)"
-                  >
-                    <CanvasIcon name="close" :size="12" />
-                  </button>
-                </div>
-              </div>
-              <p v-else>
-                {{ t("inspectorNoRecentWorkspaceFiles") }}
-              </p>
-            </div>
-          </section>
-
-          <section
-            v-if="editor.state.conflict"
-            class="inspector__section"
-            data-testid="inspector-conflict-section"
-          >
-            <h2>{{ t("inspectorExternalChangeDetected") }}</h2>
-            <p>{{ t("inspectorExternalChangeDescription") }}</p>
-            <div class="conflict-panel__actions">
-              <button
-                class="toolbar__button"
-                type="button"
-                @click="editor.loadConflictVersion"
-              >
-                {{ t("inspectorLoadDiskVersion") }}
-              </button>
-              <button
-                class="toolbar__button toolbar__button--primary"
-                type="button"
-                @click="editor.overwriteConflictVersion"
-              >
-                {{ t("inspectorOverwriteDiskVersion") }}
-              </button>
-            </div>
-          </section>
-          <section
-            v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
-            class="inspector__section"
-            data-testid="inspector-issues-section"
-          >
-            <h2>{{ t("inspectorTabIssues") }}</h2>
-            <div class="issues">
-              <div
-                v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
-                :key="issue.code + issue.path"
-                :class="['issues__item', `issues__item--${issue.level}`]"
-              >
-                <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
-                <span>{{ issue.message }}</span>
-              </div>
-            </div>
-          </section>
-          </template>
-
           <CanvasInspector
-            v-if="activeInspectorTab === 'selection'"
             :editor="(editor as Record<string, unknown>)"
             :get-side-label="getSideLabel"
             :t="t"
@@ -1664,6 +1508,32 @@
       </div>
     </Teleport>
 
+    <Teleport to="body">
+      <div
+        v-if="cardCreationMenuVisible"
+        class="card-creation-menu"
+        :style="{ left: cardCreationMenuX + 'px', top: cardCreationMenuY + 'px' }"
+        @click.stop
+      >
+        <button
+          class="card-creation-menu__item"
+          type="button"
+          @click="finishCardCreation('text')"
+        >
+          <CanvasIcon name="text" :size="14" />
+          <span>{{ t('addTextCard') }}</span>
+        </button>
+        <button
+          class="card-creation-menu__item"
+          type="button"
+          @click="finishCardCreation('file')"
+        >
+          <CanvasIcon name="canvas-file" :size="14" />
+          <span>{{ t('addNoteCard') }}</span>
+        </button>
+      </div>
+    </Teleport>
+
     <CanvasCreateEdgeDialog
       v-if="editor.createEdgeDialog.visible"
       :editor="editor"
@@ -1703,6 +1573,7 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  reactive,
   ref,
   watch,
 } from "vue"
@@ -1722,7 +1593,7 @@ import CanvasCommandPalette from "@/components/canvas/CanvasCommandPalette.vue"
 import { openHelpDialog } from "@/canvas/help-dialog"
 import CanvasFileCard from "@/components/canvas/CanvasFileCard.vue"
 import CanvasMinimap from "@/components/canvas/CanvasMinimap.vue"
-import CanvasWorkspaceTree from "@/components/canvas/CanvasWorkspaceTree.vue"
+
 import CanvasInspector from "@/components/canvas/CanvasInspector.vue"
 import CanvasPresentationController from "@/components/canvas/CanvasPresentationController.vue"
 import CanvasPngExportDialog from "@/components/canvas/CanvasPngExportDialog.vue"
@@ -1785,12 +1656,12 @@ const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>
 const fileCardImageBlobUrls = ref<Record<string, string>>({})
 const textMarkdownImageBlobUrls = ref<Record<string, string>>({})
 const hoveredEdgeId = ref("")
+const hoveredNodeSides = reactive<Record<string, string>>({})
 const pngExportBackgroundMode = ref<CanvasPngExportBackgroundMode>("white")
 const pngExportCustomColor = ref("#ffffff")
 const pngExportDialogVisible = ref(false)
 const pngExportLoading = ref(false)
 const pngExportRange = ref<CanvasPngExportRange>("full")
-const sortDropdownOpen = ref(false)
 const colorThemePopoverOpen = ref(false)
 const colorThemeButtonRef = ref<HTMLElement>()
 const colorThemePopoverStyle = ref<Record<string, string>>({})
@@ -1827,6 +1698,73 @@ const {
   },
 })
 
+// 卡片创建菜单 — 从边端点拖出到空白区域后弹出
+const cardCreationMenuVisible = ref(false)
+const cardCreationMenuX = ref(0)
+const cardCreationMenuY = ref(0)
+
+watch(
+  () => editor.pendingCardCreation.fromNodeId,
+  (nodeId) => {
+    if (!nodeId) {
+      cardCreationMenuVisible.value = false
+      return
+    }
+
+    const stage = stageRef.value
+    if (!stage) return
+
+    const rect = stage.getBoundingClientRect()
+    const pc = editor.pendingCardCreation
+    // 将 canvas 坐标转换为屏幕坐标
+    cardCreationMenuX.value = (pc.canvasX - editor.board.left) * editor.viewport.scale + editor.viewport.x + rect.left
+    cardCreationMenuY.value = (pc.canvasY - editor.board.top) * editor.viewport.scale + editor.viewport.y + rect.top
+    cardCreationMenuVisible.value = true
+  },
+)
+
+function finishCardCreation(type: "file" | "text") {
+  if (type === "text") {
+    editor.finishPendingCardCreation("text")
+    cardCreationMenuVisible.value = false
+    return
+  }
+
+  // 添加笔记卡片：打开文件选择器，选中文件后创建
+  cardCreationMenuVisible.value = false
+  editor.fileSelectCallback = (option) => {
+    const filePath = option.kind === "block" && option.blockId
+      ? option.blockId
+      : option.path
+    editor.finishPendingCardCreation("file", filePath)
+    editor.fileSelectCallback = null
+  }
+  editor.openFilePickerDialog()
+}
+
+// 文件选择器关闭但未选择时清理草稿
+watch(
+  () => editor.filePickerDialog.visible,
+  (visible, wasVisible) => {
+    if (wasVisible && !visible && editor.fileSelectCallback) {
+      // 用户关闭了文件选择器但未选择文件
+      editor.clearPendingCardCreation()
+      editor.fileSelectCallback = null
+    }
+  },
+)
+
+// 点击画布其他位置关闭菜单
+watch(
+  () => editor.state.selectedNodeIds,
+  () => {
+    if (cardCreationMenuVisible.value) {
+      editor.clearPendingCardCreation()
+      cardCreationMenuVisible.value = false
+    }
+  },
+)
+
 const presentationPathNodeIds = computed(() => [
   ...editor.presentation.pathHistory,
   ...(editor.presentation.currentNodeId ? [editor.presentation.currentNodeId] : []),
@@ -1855,16 +1793,6 @@ const settingsRevision = ref(0)
 let dragExpandTimer: ReturnType<typeof setTimeout> | null = null
 const fileCardImageBlobUrlLoads = new Set<string>()
 const textMarkdownImageBlobUrlLoads = new Set<string>()
-
-type InspectorTab = 'documents' | 'selection'
-const activeInspectorTab = ref<InspectorTab>('documents')
-
-const totalInspectorIssueCount = computed(() => {
-  const errors = editor.state.issues.errors.length
-  const warnings = editor.state.issues.warnings.length
-  const conflict = editor.state.conflict ? 1 : 0
-  return errors + warnings + conflict
-})
 
 function isWorkspaceStorageImageSource(source: string): boolean {
   return /^\/data\/storage\/.+\.(?:avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(source.trim())
@@ -2015,18 +1943,6 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", onContextMenuKeydown)
   document.removeEventListener("pointerdown", closeColorThemePopover)
 })
-
-// 选区/边变更时若用户尚停留在文档 tab，自动切到选区 tab，避免反复手动切换
-watch(
-  () => `${editor.state.selectedEdgeId}|${editor.state.selectedNodeIds.length}`,
-  (next, prev) => {
-    if (next === prev) return
-    const hasSelection = editor.state.selectedEdgeId !== '' || editor.state.selectedNodeIds.length > 0
-    if (hasSelection && activeInspectorTab.value === 'documents') {
-      activeInspectorTab.value = 'selection'
-    }
-  },
-)
 
 function onFileDragStart(event: DragEvent, filePath: string) {
   if (!event.dataTransfer) return
@@ -2219,6 +2135,11 @@ function getIssueLevelLabel(level: "error" | "warning"): string {
 }
 
 function handleStagePointerDown(event: PointerEvent) {
+  // 点击画布空白区域关闭卡片创建菜单
+  if (cardCreationMenuVisible.value) {
+    editor.clearPendingCardCreation()
+    cardCreationMenuVisible.value = false
+  }
   if (editor.presentation.isActive) {
     editor.startPan(event)
     return
@@ -2247,6 +2168,29 @@ function handleStagePaste(event: ClipboardEvent) {
 
   event.preventDefault()
   void editor.handleClipboardImagePaste(file)
+}
+
+const EDGE_THRESHOLD = 20 // px，仅鼠标在边框附近时显示锚点
+
+function updateHoveredSide(node: CanvasNode, event: PointerEvent) {
+  const card = (event.target as HTMLElement)?.closest(".canvas-node")
+  if (!card) return
+  const rect = card.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+  const distTop = y
+  const distBottom = rect.height - y
+  const distLeft = x
+  const distRight = rect.width - x
+  const min = Math.min(distTop, distBottom, distLeft, distRight)
+  if (min > EDGE_THRESHOLD) {
+    delete hoveredNodeSides[node.id]
+    return
+  }
+  if (min === distTop) hoveredNodeSides[node.id] = "top"
+  else if (min === distBottom) hoveredNodeSides[node.id] = "bottom"
+  else if (min === distLeft) hoveredNodeSides[node.id] = "left"
+  else hoveredNodeSides[node.id] = "right"
 }
 
 function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
@@ -2305,6 +2249,10 @@ function handleEdgeClick(edgeId: string) {
   editor.selectEdge(edgeId)
 }
 
+function handleEdgePointerDown(edge: CanvasEdge, event: PointerEvent) {
+  editor.startEdgePointerDown(edge, event)
+}
+
 function setHoveredEdge(edgeId: string) {
   hoveredEdgeId.value = edgeId
 }
@@ -2339,19 +2287,14 @@ function showHelpDialog() {
     { key: t("helpShortcutDragSecondary"), action: t("helpActionDragSecondary") },
     { key: t("helpShortcutDragNode"), action: t("helpActionDragNode") },
     { key: t("helpShortcutDragAnchor"), action: t("helpActionDragAnchor") },
+    { key: t("helpShortcutShiftDrag"), action: t("helpActionShiftDrag") },
+    { key: t("helpShortcutAltDrag"), action: t("helpActionAltDrag") },
+    { key: t("helpShortcutCornerResize"), action: t("helpActionCornerResize") },
+    { key: t("helpShortcutGridSnap"), action: t("helpActionGridSnap") },
+    { key: t("helpShortcutSidebarDrag"), action: t("helpActionSidebarDrag") },
     { key: t("helpShortcutRenameDocument"), action: t("helpActionRenameDocument") },
   ]
   openHelpDialog(t("helpDialogTitle"), shortcuts)
-}
-
-function getInspectorSectionChevron(section: keyof typeof editor.inspectorSectionState): string {
-  return editor.inspectorSectionState[section] ? "−" : "+"
-}
-
-function getInspectorSectionToggleTitle(section: keyof typeof editor.inspectorSectionState): string {
-  return editor.inspectorSectionState[section]
-    ? t("inspectorCollapseSection")
-    : t("inspectorExpandSection")
 }
 
 function getSideLabel(side: string): string {
@@ -2812,6 +2755,38 @@ watch(
   height: 1px;
   margin: 4px;
   background: var(--b3-border-color);
+}
+
+.card-creation-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 160px;
+  padding: 4px 0;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 8px;
+  background: var(--b3-theme-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+}
+
+.card-creation-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 8px);
+  margin: 0 4px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+
+  &:hover {
+    background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+  }
 }
 
 .canvas-relayout-overlay {

@@ -37,8 +37,8 @@ export interface CanvasPoint {
 
 const TOOLBAR_MARGIN = 12
 const TOOLBAR_OFFSET = 8
-const EDGE_CURVE_FACTOR = 0.35
-const EDGE_CURVE_MAX_OFFSET = 160
+const EDGE_CURVE_FACTOR = 0.5
+const EDGE_CURVE_MAX_OFFSET = 120
 const EDGE_CURVE_MIN_OFFSET = 40
 
 export function centerViewportOnBounds(
@@ -135,8 +135,11 @@ export function getEdgeCurveControlPoints(
   fromControl: CanvasPoint
   toControl: CanvasPoint
 } {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const distance = Math.sqrt(dx * dx + dy * dy)
   const offset = clampEdgeCurveOffset(
-    Math.round(Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y)) * EDGE_CURVE_FACTOR),
+    Math.round(distance * EDGE_CURVE_FACTOR),
   )
   const fromVector = getSideVector(fromSide)
   const toVector = getSideVector(toSide)

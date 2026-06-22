@@ -1,0 +1,46 @@
+{
+  "name": "siyuan",
+  "version": "1.2.2-alpha.0",
+  "contributors": [
+    "zuoez02",
+    "Vanessa",
+    "Zuoqiu-Yingyi"
+  ],
+  "types": "siyuan.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./siyuan.d.ts"
+      },
+      "require": {
+        "types": "./siyuan.d.ts"
+      }
+    },
+    "./kernel": {
+      "import": {
+        "types": "./kernel.d.ts"
+      },
+      "require": {
+        "types": "./kernel.d.ts"
+      }
+    }
+  },
+  "files": [
+    "types",
+    "CHANGELOG.md",
+    "kernel.d.ts",
+    "package.json",
+    "README.md",
+    "siyuan.d.ts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/siyuan-note/petal.git"
+  },
+  "dependencies": {
+    "@dop251/types-goja_nodejs-buffer": "latest",
+    "@dop251/types-goja_nodejs-global": "latest",
+    "@dop251/types-goja_nodejs-url": "latest",
+    "zod": "latest"
+  }
+}

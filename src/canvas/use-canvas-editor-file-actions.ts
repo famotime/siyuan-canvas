@@ -330,6 +330,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     suggestedFilename.value = getCanvasFileName(path)
     fileSource.value = "local"
     await rememberRecentPath(path, "local")
+    window.dispatchEvent(new CustomEvent("siyuan-canvas:file-saved", { detail: { path } }))
   }
 
   async function saveWorkspace(path: string) {
@@ -340,6 +341,7 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     suggestedFilename.value = getCanvasFileName(path)
     fileSource.value = "workspace"
     await rememberRecentPath(path, "workspace")
+    window.dispatchEvent(new CustomEvent("siyuan-canvas:file-saved", { detail: { path } }))
     await refreshWorkspaceDocuments()
   }
 

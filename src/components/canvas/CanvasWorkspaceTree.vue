@@ -17,8 +17,11 @@
           type="button"
           :title="node.path"
           :aria-expanded="expandedFolders.has(node.path)"
+          draggable="true"
           @click="$emit('toggle-folder', node.path)"
           @contextmenu.prevent="$emit('context-menu', $event, node.path, 'folder')"
+          @dragstart="$emit('folder-drag-start', $event, node.path)"
+          @dragend="$emit('drag-end')"
           @dragover.prevent="$emit('folder-drag-over', $event)"
           @dragenter.prevent="$emit('folder-drag-enter', $event, node.path)"
           @dragleave="$emit('folder-drag-leave', $event, node.path)"
@@ -29,11 +32,6 @@
             :class="{ 'workspace-tree__chevron--expanded': expandedFolders.has(node.path) }"
             name="chevron-right"
             :size="12"
-          />
-          <CanvasIcon
-            class="workspace-tree__folder-icon"
-            :name="expandedFolders.has(node.path) ? 'folder-open' : 'folder'"
-            :size="14"
           />
           <span class="workspace-tree__name">{{ node.name }}</span>
         </button>
@@ -59,11 +57,6 @@
                 type="button"
                 @click="$emit('open-file', child.path)"
               >
-                <CanvasIcon
-                  class="workspace-tree__file-icon"
-                  name="canvas-file"
-                  :size="14"
-                />
                 <span class="workspace-tree__name">{{ child.name }}</span>
               </button>
               <button
@@ -84,8 +77,11 @@
                 type="button"
                 :title="child.path"
                 :aria-expanded="expandedFolders.has(child.path)"
+                draggable="true"
                 @click="$emit('toggle-folder', child.path)"
                 @contextmenu.prevent="$emit('context-menu', $event, child.path, 'folder')"
+                @dragstart="$emit('folder-drag-start', $event, child.path)"
+                @dragend="$emit('drag-end')"
                 @dragover.prevent="$emit('folder-drag-over', $event)"
                 @dragenter.prevent="$emit('folder-drag-enter', $event, child.path)"
                 @dragleave="$emit('folder-drag-leave', $event, child.path)"
@@ -96,11 +92,6 @@
                   :class="{ 'workspace-tree__chevron--expanded': expandedFolders.has(child.path) }"
                   name="chevron-right"
                   :size="12"
-                />
-                <CanvasIcon
-                  class="workspace-tree__folder-icon"
-                  :name="expandedFolders.has(child.path) ? 'folder-open' : 'folder'"
-                  :size="14"
                 />
                 <span class="workspace-tree__name">{{ child.name }}</span>
               </button>
@@ -126,11 +117,6 @@
                       type="button"
                       @click="$emit('open-file', grandchild.path)"
                     >
-                      <CanvasIcon
-                        class="workspace-tree__file-icon"
-                        name="canvas-file"
-                        :size="14"
-                      />
                       <span class="workspace-tree__name">{{ grandchild.name }}</span>
                     </button>
                     <button
@@ -162,11 +148,6 @@
           type="button"
           @click="$emit('open-file', node.path)"
         >
-          <CanvasIcon
-            class="workspace-tree__file-icon"
-            name="canvas-file"
-            :size="14"
-          />
           <span class="workspace-tree__name">{{ node.name }}</span>
         </button>
         <button
@@ -209,6 +190,7 @@ defineEmits<{
   (e: 'folder-drag-leave', event: DragEvent, path: string): void
   (e: 'folder-drop', event: DragEvent, path: string): void
   (e: 'file-drag-start', event: DragEvent, path: string): void
+  (e: 'folder-drag-start', event: DragEvent, path: string): void
   (e: 'drag-end'): void
 }>()
 </script>
@@ -230,7 +212,7 @@ defineEmits<{
   background: transparent;
   color: var(--canvas-text);
   font-size: 13px;
-  cursor: pointer;
+  cursor: default;
   transition: background 0.15s ease, color 0.15s ease;
   text-align: left;
 }
@@ -240,17 +222,22 @@ defineEmits<{
 }
 
 .workspace-tree__folder-header--drop-target {
-  background: var(--canvas-accent-soft);
-  box-shadow: inset 2px 0 0 var(--canvas-accent);
+  background: color-mix(in srgb, var(--b3-theme-primary) 14%, transparent);
+  box-shadow:
+    inset 2px 0 0 var(--b3-theme-primary),
+    inset 0 0 0 1.5px color-mix(in srgb, var(--b3-theme-primary) 72%, transparent);
+  border-radius: 6px;
 }
 
-.workspace-tree__file[draggable="true"] {
-  cursor: grab;
+.workspace-tree__file[draggable="true"],
+.workspace-tree__folder-header[draggable="true"] {
+  cursor: default;
 }
 
-.workspace-tree__file[draggable="true"]:active {
+.workspace-tree__file[draggable="true"]:active,
+.workspace-tree__folder-header[draggable="true"]:active {
   opacity: 0.5;
-  cursor: grabbing;
+  cursor: default;
 }
 
 .workspace-tree__chevron {
@@ -329,7 +316,7 @@ defineEmits<{
   border: 0;
   background: transparent;
   color: var(--canvas-text);
-  cursor: pointer;
+  cursor: default;
   text-align: left;
   min-width: 0;
   font: inherit;
@@ -347,7 +334,7 @@ defineEmits<{
   border-radius: 4px;
   background: transparent;
   color: var(--canvas-text-muted);
-  cursor: pointer;
+  cursor: default;
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }

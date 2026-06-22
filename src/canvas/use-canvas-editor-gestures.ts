@@ -3,6 +3,12 @@ import type {
   Ref,
 } from "vue"
 import { watch } from "vue"
+import { CANVAS_GRID_SIZE, snapCanvasCoordinate } from "@/canvas/use-canvas-editor"
+
+const RESIZE_STEP = 25
+import { computeAlignment } from "@/canvas/alignment-guides"
+import type { AlignmentGuideLine } from "@/canvas/alignment-guides"
+import { computeResizeGuides } from "@/canvas/resize-guides"
 import type { CanvasBoardMetrics } from "@/canvas/board"
 import type { CanvasEditorState } from "@/canvas/editor-state"
 import type {
@@ -18,19 +24,22 @@ import {
 } from "@/canvas/board"
 import {
   createCanvasEdge,
-  removeCanvasEdge,
+  createCanvasNode,
   setCanvasEdgeEndpoint,
   setCanvasNodeGeometry,
   upsertCanvasEdge,
+  upsertCanvasNode,
 } from "@/canvas/document"
 import {
   CONNECTION_SNAP_DISTANCE,
   findNearestCanvasAnchor,
+  getCanvasNodeAnchor,
   resizeCanvasNodeFromCorner,
   resizeCanvasNodeFromSide,
 } from "@/canvas/node-interaction"
 import {
   createBoundsFromPoints,
+  createEdgeCurvePath,
   resolveDragNodeIds,
   resolveMarqueeSelectionEdgeIds,
   resolveMarqueeSelectionNodeIds,
@@ -68,12 +77,37 @@ export interface CanvasEditorEdgeReconnectDraftState {
   visible: boolean
 }
 
+export interface PendingCardCreation {
+  canvasX: number
+  canvasY: number
+  fromNodeId: string
+  fromSide: CanvasSide
+  /** 边端点重连时的边 ID */
+  reconnectEdgeId?: string
+  /** 边端点重连时被拖拽的端点 */
+  reconnectEndpoint?: "from" | "to"
+}
+
 interface CanvasEditorGestureOptions {
+  alignmentGuides: {
+    horizontal: AlignmentGuideLine[]
+    vertical: AlignmentGuideLine[]
+    visible: boolean
+  }
   board: ComputedRef<CanvasBoardMetrics>
   commitDocument: (document: CanvasDocument, options?: { coalesceKey?: string }) => void
   connectionDraft: CanvasEditorConnectionDraftState
   edgeReconnectDraft: CanvasEditorEdgeReconnectDraftState
   getAnchor: (node: CanvasNode, side: CanvasSide) => { x: number, y: number }
+  gridEnabled: Ref<boolean>
+  pendingCardCreation: PendingCardCreation
+  resizeGuides: {
+    matchNodeIds: string[]
+    labels: Array<{ nodeId: string, boardX: number, boardY: number, text: string }>
+    widthLines: Array<{ nodeId: string, leftX: number, rightX: number, topY: number, bottomY: number }>
+    heightLines: Array<{ nodeId: string, leftX: number, rightX: number, topY: number, bottomY: number }>
+    visible: boolean
+  }
   readonly: ComputedRef<boolean>
   selectionBox: CanvasEditorSelectionBoxState
   selectedEdge: ComputedRef<CanvasEdge | null>
@@ -89,12 +123,16 @@ interface CanvasEditorGestureOptions {
 
 export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOptions) {
   const {
+    alignmentGuides,
     board,
     commitDocument,
     connectionDraft,
     edgeReconnectDraft,
     getAnchor,
+    gridEnabled,
+    pendingCardCreation,
     readonly,
+    resizeGuides,
     selectionBox,
     selectedEdge,
     stageRef,
@@ -221,7 +259,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   })
 
   function isAdditiveSelectionGesture(event: MouseEvent | PointerEvent): boolean {
-    return Boolean(event.ctrlKey || event.metaKey || event.shiftKey)
+    // Shift 不在 pointerdown 阶段拦截：Shift+拖拽需要能启动拖拽（move 阶段约束轴向）
+    return Boolean(event.ctrlKey || event.metaKey)
   }
 
   function isNodeGestureTarget(target: EventTarget | null): boolean {
@@ -405,6 +444,25 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return
     }
 
+    // Shift + 点击/拖拽：切换多选（不阻止拖拽启动，move 阶段约束轴向）
+    if (event.shiftKey) {
+      if (state.selectedNodeIds.includes(node.id)) {
+        state.selectNodes(state.selectedNodeIds.filter(id => id !== node.id))
+      } else {
+        state.selectNode(node.id, { additive: true })
+      }
+    }
+
+    // Alt/Option + 拖拽：复制出一张相同的卡片（原位复制，拖拽即分离）
+    if (event.altKey) {
+      const clonedNode = { ...node }
+      clonedNode.id = `${node.id}-dup-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      commitDocument(upsertCanvasNode(state.document, clonedNode))
+      state.selectNode(clonedNode.id)
+      startDrag(clonedNode, event)
+      return
+    }
+
     startDrag(node, event)
   }
 
@@ -422,9 +480,67 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     if (!state.selectedNodeIds.includes(node.id)) {
       state.selectNode(node.id)
     }
-    startPointerGesture(event, (dx, dy) => {
-      const deltaX = Math.round(dx / viewport.scale)
-      const deltaY = Math.round(dy / viewport.scale)
+    startPointerGesture(event, (dx, dy, moveEvent) => {
+      let deltaX = Math.round(dx / viewport.scale)
+      let deltaY = Math.round(dy / viewport.scale)
+      // Shift 约束：仅支持垂直/水平方向移动
+      if (moveEvent?.shiftKey) {
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          deltaY = 0
+        } else {
+          deltaX = 0
+        }
+      }
+
+      // 智能对齐参考线：计算拖拽节点的合并边界，与静态节点对齐
+      const draggedSet = new Set(selectedNodeIds)
+      let draggedLeft = Infinity, draggedRight = -Infinity
+      let draggedTop = Infinity, draggedBottom = -Infinity
+      for (const candidate of state.document.nodes) {
+        if (!draggedSet.has(candidate.id)) continue
+        const initial = initialPositions.get(candidate.id)
+        if (!initial) continue
+        const nx = initial.x + deltaX
+        const ny = initial.y + deltaY
+        if (nx < draggedLeft) draggedLeft = nx
+        if (nx + candidate.width > draggedRight) draggedRight = nx + candidate.width
+        if (ny < draggedTop) draggedTop = ny
+        if (ny + candidate.height > draggedBottom) draggedBottom = ny + candidate.height
+      }
+      if (Number.isFinite(draggedLeft)) {
+        const draggedBounds = {
+          bottom: draggedBottom,
+          centerX: (draggedLeft + draggedRight) / 2,
+          centerY: (draggedTop + draggedBottom) / 2,
+          height: draggedBottom - draggedTop,
+          left: draggedLeft,
+          right: draggedRight,
+          top: draggedTop,
+          width: draggedRight - draggedLeft,
+        }
+        const result = computeAlignment(
+          state.document, draggedBounds, draggedSet,
+          board.value.left, board.value.top,
+          deltaX, deltaY,
+        )
+        // 仅在未启用网格吸附时应用对齐吸附（网格吸附优先级更高）
+        if (!gridEnabled.value) {
+          deltaX = result.deltaX
+          deltaY = result.deltaY
+        }
+        alignmentGuides.horizontal = result.horizontal
+        alignmentGuides.vertical = result.vertical
+        alignmentGuides.visible = result.horizontal.length > 0 || result.vertical.length > 0
+      } else {
+        alignmentGuides.visible = false
+        alignmentGuides.horizontal = []
+        alignmentGuides.vertical = []
+      }
+
+      if (gridEnabled.value) {
+        deltaX = snapCanvasCoordinate(deltaX, CANVAS_GRID_SIZE)
+        deltaY = snapCanvasCoordinate(deltaY, CANVAS_GRID_SIZE)
+      }
       const movedDocument = state.document.nodes.reduce((document, candidate) => {
         const initial = initialPositions.get(candidate.id)
         if (!initial) {
@@ -438,6 +554,12 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       }, state.document)
 
       commitDocument(movedDocument, { coalesceKey: `drag-${node.id}` })
+    }, {
+      onEnd: () => {
+        alignmentGuides.visible = false
+        alignmentGuides.horizontal = []
+        alignmentGuides.vertical = []
+      },
     })
   }
 
@@ -494,9 +616,11 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       x: toBoardX(board.value, connectionDraft.toX),
       y: toBoardY(board.value, connectionDraft.toY),
     }
-    const midX = (from.x + to.x) / 2
+    const toSide = connectionDraft.toNodeId
+      ? connectionDraft.toSide
+      : oppositeSide(connectionDraft.fromSide)
 
-    return `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`
+    return createEdgeCurvePath(from, connectionDraft.fromSide, to, toSide)
   }
 
   function isConnectionTarget(nodeId: string, side: CanvasSide) {
@@ -528,6 +652,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     const fixedSide = edgeReconnectDraft.endpoint === "from" ? edge.toSide : edge.fromSide
+    const movingSide = edgeReconnectDraft.endpoint === "from" ? edge.fromSide : edge.toSide
     const fixedPoint = getAnchor(fixedNode, fixedSide)
     const movingPoint = {
       x: edgeReconnectDraft.toX,
@@ -535,15 +660,35 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     if (edgeReconnectDraft.endpoint === "from") {
-      return `M ${movingPoint.x} ${movingPoint.y} C ${(movingPoint.x + fixedPoint.x) / 2} ${movingPoint.y}, ${(movingPoint.x + fixedPoint.x) / 2} ${fixedPoint.y}, ${fixedPoint.x} ${fixedPoint.y}`
+      return createEdgeCurvePath(movingPoint, movingSide, fixedPoint, fixedSide)
     }
 
-    return `M ${fixedPoint.x} ${fixedPoint.y} C ${(fixedPoint.x + movingPoint.x) / 2} ${fixedPoint.y}, ${(fixedPoint.x + movingPoint.x) / 2} ${movingPoint.y}, ${movingPoint.x} ${movingPoint.y}`
+    return createEdgeCurvePath(fixedPoint, fixedSide, movingPoint, movingSide)
+  }
+
+  function oppositeSide(side: CanvasSide): CanvasSide {
+    switch (side) {
+      case "top": return "bottom"
+      case "bottom": return "top"
+      case "left": return "right"
+      case "right": return "left"
+    }
   }
 
   function finishConnectionDrag() {
-    if (!connectionDraft.fromNodeId || !connectionDraft.toNodeId) {
+    if (!connectionDraft.fromNodeId) {
       clearConnectionDraft()
+      return
+    }
+
+    if (!connectionDraft.toNodeId) {
+      // 释放到空白画布：弹出菜单选择卡片类型，连线草稿保持可见
+      pendingCardCreation.canvasX = connectionDraft.toX
+      pendingCardCreation.canvasY = connectionDraft.toY
+      pendingCardCreation.fromNodeId = connectionDraft.fromNodeId
+      pendingCardCreation.fromSide = connectionDraft.fromSide
+      pendingCardCreation.reconnectEdgeId = undefined
+      pendingCardCreation.reconnectEndpoint = undefined
       return
     }
 
@@ -561,13 +706,13 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     event.preventDefault?.()
-    const anchor = getAnchor(node, side)
+    const canvasAnchor = getCanvasNodeAnchor(node, side)
     connectionDraft.fromNodeId = node.id
     connectionDraft.fromSide = side
     connectionDraft.toNodeId = ""
     connectionDraft.toSide = "left"
-    connectionDraft.toX = anchor.x
-    connectionDraft.toY = anchor.y
+    connectionDraft.toX = canvasAnchor.x
+    connectionDraft.toY = canvasAnchor.y
     connectionDraft.visible = true
 
     startPointerGesture(
@@ -617,9 +762,14 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
   function finishEdgeEndpointDrag(edge: CanvasEdge, endpoint: "from" | "to") {
     if (!edgeReconnectDraft.targetNodeId || !edgeReconnectDraft.targetSide) {
-      commitDocument(removeCanvasEdge(state.document, edge.id))
-      state.selectEdge()
-      clearEdgeReconnectDraft()
+      // 释放到空白画布：弹出菜单选择卡片类型
+      pendingCardCreation.canvasX = edgeReconnectDraft.toX + board.value.left
+      pendingCardCreation.canvasY = edgeReconnectDraft.toY + board.value.top
+      pendingCardCreation.fromNodeId = endpoint === "from" ? edge.toNode : edge.fromNode
+      pendingCardCreation.fromSide = endpoint === "from" ? edge.toSide : edge.fromSide
+      pendingCardCreation.reconnectEdgeId = edge.id
+      pendingCardCreation.reconnectEndpoint = endpoint
+      // 连线草稿保持可见，菜单选择后再清理
       return
     }
 
@@ -665,14 +815,39 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
     event.preventDefault?.()
     startPointerGesture(event, (dx, dy) => {
+      let scaleDeltaX = dx / viewport.scale
+      let scaleDeltaY = dy / viewport.scale
+      if (gridEnabled.value) {
+        scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, CANVAS_GRID_SIZE)
+        scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, CANVAS_GRID_SIZE)
+      }
+      // 每次增减以 25px 为步长
+      scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, RESIZE_STEP)
+      scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, RESIZE_STEP)
+      const geom = resizeCanvasNodeFromSide(node, side, scaleDeltaX, scaleDeltaY)
+      // 缩小时最后一步不足 25px，直接到最小值 50px
+      if (geom.width > 50 && geom.width < 75) geom.width = 50
+      if (geom.height > 50 && geom.height < 75) geom.height = 50
+      // 等宽/等高参考线检测
+      const result = computeResizeGuides(state.document, node, geom.width, geom.height, board.value)
+      resizeGuides.matchNodeIds = result.matchNodeIds
+      resizeGuides.labels = result.labels
+      resizeGuides.widthLines = result.widthLines
+      resizeGuides.heightLines = result.heightLines
+      resizeGuides.visible = result.matchNodeIds.length > 0
+
       commitDocument(
-        setCanvasNodeGeometry(
-          state.document,
-          node.id,
-          resizeCanvasNodeFromSide(node, side, dx / viewport.scale, dy / viewport.scale),
-        ),
+        setCanvasNodeGeometry(state.document, node.id, geom),
         { coalesceKey: `resize-${node.id}-${side}` },
       )
+    }, {
+      onEnd: () => {
+        resizeGuides.visible = false
+        resizeGuides.matchNodeIds = []
+        resizeGuides.labels = []
+        resizeGuides.widthLines = []
+        resizeGuides.heightLines = []
+      },
     })
   }
 
@@ -683,15 +858,88 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
     event.preventDefault?.()
     startPointerGesture(event, (dx, dy) => {
+      let scaleDeltaX = dx / viewport.scale
+      let scaleDeltaY = dy / viewport.scale
+      if (gridEnabled.value) {
+        scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, CANVAS_GRID_SIZE)
+        scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, CANVAS_GRID_SIZE)
+      }
+      scaleDeltaX = snapCanvasCoordinate(scaleDeltaX, RESIZE_STEP)
+      scaleDeltaY = snapCanvasCoordinate(scaleDeltaY, RESIZE_STEP)
+      const geom = resizeCanvasNodeFromCorner(node, scaleDeltaX, scaleDeltaY)
+      if (geom.width > 50 && geom.width < 75) geom.width = 50
+      if (geom.height > 50 && geom.height < 75) geom.height = 50
+      // 等宽/等高参考线检测
+      const result = computeResizeGuides(state.document, node, geom.width, geom.height, board.value)
+      resizeGuides.matchNodeIds = result.matchNodeIds
+      resizeGuides.labels = result.labels
+      resizeGuides.widthLines = result.widthLines
+      resizeGuides.heightLines = result.heightLines
+      resizeGuides.visible = result.matchNodeIds.length > 0
+
       commitDocument(
-        setCanvasNodeGeometry(
-          state.document,
-          node.id,
-          resizeCanvasNodeFromCorner(node, dx / viewport.scale, dy / viewport.scale),
-        ),
+        setCanvasNodeGeometry(state.document, node.id, geom),
         { coalesceKey: `resize-corner-${node.id}` },
       )
+    }, {
+      onEnd: () => {
+        resizeGuides.visible = false
+        resizeGuides.matchNodeIds = []
+        resizeGuides.labels = []
+        resizeGuides.widthLines = []
+        resizeGuides.heightLines = []
+      },
     })
+  }
+
+  function startEdgePointerDown(edge: CanvasEdge, event: PointerEvent): boolean {
+    if (event.button !== 0 || readonly.value) {
+      return false
+    }
+
+    const fromNode = state.document.nodes.find((n) => n.id === edge.fromNode)
+    const toNode = state.document.nodes.find((n) => n.id === edge.toNode)
+    if (!fromNode || !toNode) {
+      return false
+    }
+
+    const stage = stageRef.value
+    if (!stage) {
+      return false
+    }
+
+    const rect = stage.getBoundingClientRect()
+    const stageX = event.clientX - rect.left
+    const stageY = event.clientY - rect.top
+
+    // 转换为 board 坐标
+    const boardPoint = {
+      x: (stageX - viewport.x) / viewport.scale,
+      y: (stageY - viewport.y) / viewport.scale,
+    }
+
+    const fromBoard = getAnchor(fromNode, edge.fromSide)
+    const toBoard = getAnchor(toNode, edge.toSide)
+
+    const distToFrom = Math.hypot(boardPoint.x - fromBoard.x, boardPoint.y - fromBoard.y)
+    const distToTo = Math.hypot(boardPoint.x - toBoard.x, boardPoint.y - toBoard.y)
+    const totalDist = Math.hypot(toBoard.x - fromBoard.x, toBoard.y - fromBoard.y)
+    const threshold = Math.max(50, totalDist * 0.3)
+
+    // 参考 siyuan-canvas-widget：点击靠近端点时直接启动端点拖拽重连
+    if (distToFrom < threshold && distToFrom <= distToTo) {
+      state.selectEdge(edge.id)
+      startEdgeEndpointDrag("from", event)
+      return true
+    }
+
+    if (distToTo < threshold) {
+      state.selectEdge(edge.id)
+      startEdgeEndpointDrag("to", event)
+      return true
+    }
+
+    return false
   }
 
   return {
@@ -705,10 +953,68 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     handleWheelZoom,
     isConnectionTarget,
     startEdgeEndpointDrag,
+    startEdgePointerDown,
     startConnectionDrag,
     startCornerResize,
     startDrag,
     startPan,
     startResize,
+    finishPendingCardCreation(type: "file" | "text", filePath?: string) {
+      if (!pendingCardCreation.fromNodeId) {
+        return
+      }
+
+      const newNode = createCanvasNode(type)
+      newNode.x = Math.round(pendingCardCreation.canvasX - newNode.width / 2)
+      newNode.y = Math.round(pendingCardCreation.canvasY - newNode.height / 2)
+      if (type === "file" && filePath) {
+        newNode.file = filePath
+      }
+
+      if (pendingCardCreation.reconnectEdgeId) {
+        // 边端点重连
+        const edge = state.document.edges.find((e) => e.id === pendingCardCreation.reconnectEdgeId)
+        if (!edge) {
+          clearPendingCardCreation()
+          return
+        }
+        const newNodeSide = oppositeSide(
+          pendingCardCreation.reconnectEndpoint === "from" ? edge.toSide : edge.fromSide,
+        )
+        commitDocument(setCanvasEdgeEndpoint(
+          upsertCanvasNode(state.document, newNode),
+          edge.id,
+          pendingCardCreation.reconnectEndpoint!,
+          { nodeId: newNode.id, side: newNodeSide },
+        ))
+      } else {
+        // 新连线
+        const edge = createCanvasEdge(pendingCardCreation.fromNodeId, newNode.id)
+        edge.fromSide = pendingCardCreation.fromSide
+        edge.toSide = oppositeSide(pendingCardCreation.fromSide)
+        commitDocument(upsertCanvasEdge(
+          upsertCanvasNode(state.document, newNode),
+          edge,
+        ))
+      }
+      state.selectNode(newNode.id)
+      const wasReconnect = !!pendingCardCreation.reconnectEdgeId
+      clearPendingCardCreation()
+      if (wasReconnect) {
+        clearEdgeReconnectDraft()
+      } else {
+        clearConnectionDraft()
+      }
+    },
+    clearPendingCardCreation() {
+      clearConnectionDraft()
+      clearEdgeReconnectDraft()
+      pendingCardCreation.canvasX = 0
+      pendingCardCreation.canvasY = 0
+      pendingCardCreation.fromNodeId = ""
+      pendingCardCreation.fromSide = "left"
+      pendingCardCreation.reconnectEdgeId = undefined
+      pendingCardCreation.reconnectEndpoint = undefined
+    },
   }
 }

@@ -634,8 +634,8 @@ describe("useCanvasEditor selection toolbar integration", () => {
     await nextTick()
 
     expect(editor.state.document.nodes[0]).toMatchObject({
-      x: 120,
-      width: 180,
+      x: 140,
+      width: 160,
       y: 100,
       height: 120,
     })

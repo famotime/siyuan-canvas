@@ -57,7 +57,7 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     recentFilesLimit: 8,
     noteCreationDirectory: "",
     showCanvasThumbnails: false,
-    showNodeHeader: true,
+    showNodeHeader: false,
     presentationStyle: "zoom",
     presentationAutoPlayInterval: 3,
     presentationAutoRatio: true,

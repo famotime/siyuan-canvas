@@ -29,8 +29,8 @@ export function createCanvasNode(type: CanvasNodeType): CanvasNode {
     type,
     x: 80,
     y: 80,
-    width: type === "group" ? 640 : 320,
-    height: type === "group" ? 360 : 180,
+    width: type === "group" ? 400 : 250,
+    height: type === "group" ? 200 : 50,
   } as const
 
   switch (type) {
@@ -272,7 +272,9 @@ export function getCanvasSelectionBounds(
 
   for (const node of selectedNodes) {
     minX = Math.min(minX, node.x)
-    minY = Math.min(minY, node.y)
+    // 分组节点的标签使用 bottom:100% + margin-bottom:10px 渲染在节点上方，
+    // 需将标签区域纳入包围盒，避免浮动工具栏遮挡标签
+    minY = Math.min(minY, node.type === 'group' ? node.y - 44 : node.y)
     maxX = Math.max(maxX, node.x + node.width)
     maxY = Math.max(maxY, node.y + node.height)
   }

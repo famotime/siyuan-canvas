@@ -80,6 +80,7 @@ interface CanvasEditorFilePickerActionsOptions {
     | { type: 'file', path: string, name: string, updated?: number, created?: number }
     | { type: 'folder', path: string, name: string, children: any[] }
   >>
+  onFileSelect?: (option: CanvasFilePickerOption) => boolean
 }
 
 const SIYUAN_BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
@@ -109,6 +110,7 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
     commitDocument,
     filePickerDialog,
     fileSource,
+    onFileSelect,
     refreshFileNodeMetadata,
     resolveBlockById,
     resolveBlocksByQuery,
@@ -240,6 +242,26 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
   }
 
   async function selectFilePickerResult(option: CanvasFilePickerOption) {
+    // 先检查是否有自定义回调（从边端点拖拽添加笔记卡片流程）
+    let handledByCallback = false
+    if (onFileSelect) {
+      try {
+        handledByCallback = onFileSelect(option)
+      }
+      catch (e) {
+        console.error('Canvas file select callback error:', e)
+      }
+    }
+
+    // 始终先关闭文件选择器对话框
+    closeFilePickerDialog()
+
+    // 如果回调已处理（创建了节点和边），无需再创建节点
+    if (handledByCallback) {
+      return
+    }
+
+    // 工具栏路径：创建文件节点
     const node = createFileNodeAtViewport(board.value, viewport)
     node.file = option.kind === 'block' && option.blockId
       ? option.blockId
@@ -247,7 +269,6 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
 
     commitDocument(upsertCanvasNode(state.document, node))
     selectNode(node.id)
-    closeFilePickerDialog()
     await refreshFileNodeMetadata()
   }
 

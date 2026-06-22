@@ -48,6 +48,9 @@ import {
   toBoardX,
   toBoardY,
 } from "@/canvas/board"
+import { computeAlignment } from "@/canvas/alignment-guides"
+import type { AlignmentGuideLine } from "@/canvas/alignment-guides"
+import { computeResizeGuides } from "@/canvas/resize-guides"
 import {
   getCanvasSelectionBounds,
   setCanvasEdgeEndpoint,
@@ -66,6 +69,7 @@ import {
   type CanvasEditorConnectionDraftState,
   type CanvasEditorEdgeReconnectDraftState,
   type CanvasEditorSelectionBoxState,
+  type PendingCardCreation,
 } from "@/canvas/use-canvas-editor-gestures"
 import { initializeCanvasEditor, syncCanvasEditorSelectionUi } from "@/canvas/use-canvas-editor-lifecycle"
 import { createCanvasEditorNodeActivationActions } from "@/canvas/use-canvas-editor-node-activation"
@@ -119,6 +123,11 @@ import { useCanvasPresentation } from "@/canvas/use-canvas-presentation"
 
 const SIDES: CanvasSide[] = ["top", "right", "bottom", "left"]
 const SELECTION_COLORS = ["1", "2", "3", "4", "5", "6"] as const
+export const CANVAS_GRID_SIZE = 20
+
+export function snapCanvasCoordinate(value: number, gridSize = CANVAS_GRID_SIZE): number {
+  return Math.round(value / gridSize) * gridSize
+}
 
 export function useCanvasEditor(
   plugin: CanvasPluginBridge,
@@ -133,6 +142,7 @@ export function useCanvasEditor(
   // Vue 反应式不能感知 class 内部状态，这里靠版本号触发 canUndo/canRedo 的 computed 重算
   const historyVersion = ref(0)
   const isSaving = ref(false)
+  const gridEnabled = ref(false)
   const viewport = reactive({
     scale: 1,
     x: 0,
@@ -224,6 +234,28 @@ export function useCanvasEditor(
     x: 0,
     y: 0,
   })
+  const alignmentGuides = reactive<{
+    horizontal: Array<{ position: number, spanStart: number, spanEnd: number }>
+    vertical: Array<{ position: number, spanStart: number, spanEnd: number }>
+    visible: boolean
+  }>({
+    horizontal: [],
+    vertical: [],
+    visible: false,
+  })
+  const resizeGuides = reactive<{
+    matchNodeIds: string[]
+    labels: Array<{ nodeId: string, boardX: number, boardY: number, text: string }>
+    widthLines: Array<{ nodeId: string, leftX: number, rightX: number, topY: number, bottomY: number }>
+    heightLines: Array<{ nodeId: string, leftX: number, rightX: number, topY: number, bottomY: number }>
+    visible: boolean
+  }>({
+    matchNodeIds: [],
+    labels: [],
+    widthLines: [],
+    heightLines: [],
+    visible: false,
+  })
   const connectionDraft = reactive<CanvasEditorConnectionDraftState>({
     fromNodeId: "",
     fromSide: "right" as CanvasSide,
@@ -242,6 +274,12 @@ export function useCanvasEditor(
     toY: 0,
     visible: false,
   })
+  const pendingCardCreation = reactive<PendingCardCreation>({
+    canvasX: 0,
+    canvasY: 0,
+    fromNodeId: "",
+    fromSide: "left",
+  })
   const newEdgeFromSide = ref<CanvasSide>("right")
   const newEdgeLabel = ref("")
   const newEdgeSourceId = ref("")
@@ -249,7 +287,7 @@ export function useCanvasEditor(
   const newEdgeTargetId = ref("")
   const newEdgeTargetQuery = ref("")
   const newEdgeToSide = ref<CanvasSide>("left")
-  const inspectorExpanded = ref(true)
+  const inspectorExpanded = ref(false)
   const editingEdgeLabelId = ref("")
   const edgeLabelDraft = ref("")
 
@@ -629,6 +667,10 @@ export function useCanvasEditor(
     viewport.y = stage.clientHeight / 2 - centerY
   }
 
+  function toggleGrid() {
+    gridEnabled.value = !gridEnabled.value
+  }
+
   function commitDocument(nextDocument: CanvasDocument, options: { coalesceKey?: string } = {}) {
     // 在变更前抓快照入历史栈，undo 时可还原文档与选区
     history.record(
@@ -982,6 +1024,9 @@ export function useCanvasEditor(
 
   focusNodeByIdFn = focusNodeById
 
+  // 文件选择器回调 — 用于从添加笔记菜单进入文件选择流程
+  const fileSelectCallback = ref<((option: { blockId?: string, kind: string, path: string }) => void) | null>(null)
+
   const {
     closeFilePickerDialog,
     handleClipboardImagePaste,
@@ -993,6 +1038,19 @@ export function useCanvasEditor(
     commitDocument,
     filePickerDialog,
     fileSource,
+    onFileSelect: (option) => {
+      const cb = fileSelectCallback.value
+      if (cb) {
+        try {
+          cb(option)
+        }
+        catch (e) {
+          console.error('Canvas file select callback error:', e)
+        }
+        return true
+      }
+      return false
+    },
     refreshFileNodeMetadata,
     resolveBlockById: findSiyuanBlockById,
     resolveBlocksByQuery: findSiyuanBlocksByQuery,
@@ -1047,24 +1105,31 @@ export function useCanvasEditor(
     clearEdgeReconnectDraft,
     clearSelectionBox,
     finishConnectionDrag,
+    finishPendingCardCreation,
+    clearPendingCardCreation,
     getConnectionDraftPath,
     getEdgeReconnectDraftPath,
     handleNodePointerDown,
     handleWheelZoom,
     isConnectionTarget,
     startEdgeEndpointDrag,
+    startEdgePointerDown,
     startConnectionDrag,
     startCornerResize,
     startDrag,
     startPan,
     startResize,
   } = createCanvasEditorGestureHandlers({
+    alignmentGuides,
     board,
     commitDocument,
     connectionDraft,
     edgeReconnectDraft,
     getAnchor,
+    gridEnabled,
+    pendingCardCreation,
     readonly,
+    resizeGuides,
     selectionBox,
     selectedEdge,
     stageRef,
@@ -1286,6 +1351,7 @@ export function useCanvasEditor(
       expandAllInspectorSections,
       removeRecentFileRecord,
       connectionDraft,
+      pendingCardCreation,
       edgeColorOptions: selectionColors,
       edgeLabelDraft,
       edgeLabelEditorPosition,
@@ -1299,6 +1365,8 @@ export function useCanvasEditor(
       exportCanvasPng,
       fileInputRef,
       finishConnectionDrag,
+      finishPendingCardCreation,
+      clearPendingCardCreation,
       getEdgeLabelPosition,
       getEdgePath,
       getConnectionDraftPath,
@@ -1323,6 +1391,7 @@ export function useCanvasEditor(
       newEdgeToSide,
       openCreateEdgeDialog,
       openFilePickerDialog,
+      fileSelectCallback,
       openPath,
       openRecentFile,
       resetViewport,
@@ -1365,6 +1434,10 @@ export function useCanvasEditor(
       zoomIn,
       zoomOut,
       zoomToActualSize,
+      alignmentGuides,
+      resizeGuides,
+      gridEnabled,
+      toggleGrid,
       zoomToFit,
       undo,
       redo,
@@ -1417,6 +1490,7 @@ export function useCanvasEditor(
       setSelectionToolbarSize,
       setEdgeToolbarSize,
       startEdgeEndpointDrag,
+      startEdgePointerDown,
       startEdgeLabelEditing,
       submitEdgeLabelEditing,
       cancelEdgeLabelEditing,

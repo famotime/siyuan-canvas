@@ -139,6 +139,11 @@ class PluginMock {
     this.topBars.push(config)
   })
 
+  addDock = vi.fn((config: any) => {
+    // Dock mock — no-op
+    return { config, model: {} as any }
+  })
+
   async loadData(_key: string): Promise<unknown> {
     return this.storedData
   }
@@ -710,7 +715,7 @@ describe("canvas plugin lifecycle", () => {
     expect(recentFilesLimitInput.value).toBe("8")
     expect(detectExternalChangesInput.checked).toBe(true)
     expect(showCanvasThumbnailsInput.checked).toBe(false)
-    expect(showNodeHeaderInput.checked).toBe(true)
+    expect(showNodeHeaderInput.checked).toBe(false)
 
     recentFilesLimitInput.value = "1"
     recentFilesLimitInput.dispatchEvent(new Event("change"))
@@ -736,7 +741,7 @@ describe("canvas plugin lifecycle", () => {
       presentationStyle: "zoom",
       recentFilesLimit: 1,
       showCanvasThumbnails: true,
-      showNodeHeader: true,
+      showNodeHeader: false,
     })
   })
 
@@ -781,7 +786,7 @@ describe("canvas plugin lifecycle", () => {
       presentationStyle: "zoom",
       recentFilesLimit: 3,
       showCanvasThumbnails: false,
-      showNodeHeader: true,
+      showNodeHeader: false,
     })
     expect(plugin.getRecentCanvasFiles()).toEqual([
       expect.objectContaining({
@@ -803,7 +808,8 @@ describe("canvas plugin lifecycle", () => {
     expect(plugin.addTab).toHaveBeenCalledTimes(1)
     expect(plugin.addTopBar).toHaveBeenCalledTimes(1)
     expect(plugin.addCommand).toHaveBeenCalledTimes(4)
-    expect(plugin.addIcons).toHaveBeenCalledTimes(1)
+    expect(plugin.addIcons).toHaveBeenCalledTimes(2)
+    expect(plugin.addDock).toHaveBeenCalledTimes(1)
   })
 
   it("updates persisted inspector section UI state", async () => {

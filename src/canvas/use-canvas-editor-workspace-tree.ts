@@ -53,6 +53,7 @@ export interface WorkspaceTreeDependencies {
   readDir: (path: string) => Promise<WorkspaceEntry[]>
   putFile: (path: string, isDir: boolean, file: Blob) => Promise<unknown>
   removeFile: (path: string) => Promise<unknown>
+  renameFile: (path: string, newPath: string) => Promise<unknown>
   showMessage: (msg: string, timeout?: number, type?: string) => void
   getSettings: () => CanvasPluginSettings
   plugin: Pick<CanvasPluginBridge, "removeRecentCanvasFile" | "updateCanvasUiState">
@@ -79,6 +80,8 @@ export interface WorkspaceTreeLabels {
   fileAlreadyExistsMessage: string
   folderNameTitle: string
   messageFileCopied: (name: string) => string
+  messageEntryMoved: (name: string, folder: string) => string
+  messageEntryMovedToRoot: (name: string) => string
   messageFileMoved: (name: string, folder: string) => string
   messageFileRenamed: (name: string) => string
   messageFolderRenamed: (name: string) => string
@@ -105,6 +108,8 @@ const DEFAULT_WORKSPACE_TREE_LABELS: WorkspaceTreeLabels = {
   dialogConfirm: "Confirm",
   fileAlreadyExistsMessage: "File already exists",
   folderNameTitle: "Folder name",
+  messageEntryMoved: (name, folder) => `Moved ${name} to ${folder}`,
+  messageEntryMovedToRoot: name => `Moved ${name} to root`,
   messageFileCopied: name => `Copied to ${name}`,
   messageFileMoved: (name, folder) => `Moved ${name} to ${folder}`,
   messageFileRenamed: name => `Renamed to ${name}`,
@@ -120,6 +125,10 @@ const DEFAULT_WORKSPACE_TREE_LABELS: WorkspaceTreeLabels = {
   unableToRenameFileMessage: "Unable to rename file",
   unableToRenameFolderMessage: "Unable to rename folder",
   unableToSaveMessage: "Unable to save",
+}
+
+function notifyWorkspaceChanged() {
+  window.dispatchEvent(new CustomEvent("siyuan-canvas:workspace-changed"))
 }
 
 export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies) {
@@ -142,12 +151,15 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     return sortWorkspaceTreeNodes(nodes, workspaceSortField.value, workspaceSortDirection.value)
   }
 
-  async function refreshWorkspaceDocuments() {
+  async function refreshWorkspaceDocuments(options?: { silent?: boolean }) {
     const directory = deps.getSettings().defaultCanvasDirectory
 
     try {
       const tree = await readDirectoryTree(directory)
       workspaceDocuments.value = sortWorkspaceTree(tree)
+      if (!options?.silent) {
+        notifyWorkspaceChanged()
+      }
     } catch {
       workspaceDocuments.value = []
     }
@@ -258,16 +270,27 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
       const dirToOpen = filePath.includes('/')
         ? filePath.substring(0, filePath.lastIndexOf('/'))
         : filePath
-      const absolutePath = `${workspaceDir.replace(/[/\\]+$/, '')}/${dirToOpen.replace(/^[/\\]+/, '')}`.replace(/\//g, '\\')
+      const absolutePath = `${workspaceDir.replace(/[/\\]+$/, '')}/${dirToOpen.replace(/^[/\\]+/, '')}`
 
-      const remote = (window as any).require?.("@electron/remote")
-      const electronShell = remote?.require?.("electron")?.shell
-      if (electronShell?.openPath) {
-        const result = await electronShell.openPath(absolutePath)
+      // petal-main 新 API：优先使用内核原生 shell，无需 @electron/remote
+      const electronModule = (window as any).require?.("electron")
+      const shell = electronModule?.shell
+      if (shell?.openPath) {
+        const result = await shell.openPath(absolutePath)
         if (result) deps.showMessage(result, 4000, "error")
-      } else {
-        deps.showMessage(labels.notAvailableInBrowserMessage, 4000, "error")
+        return
       }
+
+      // 回退：旧版 @electron/remote
+      const remote = (window as any).require?.("@electron/remote")
+      const remoteShell = remote?.require?.("electron")?.shell
+      if (remoteShell?.openPath) {
+        const result = await remoteShell.openPath(absolutePath.replace(/\//g, '\\'))
+        if (result) deps.showMessage(result, 4000, "error")
+        return
+      }
+
+      deps.showMessage(labels.notAvailableInBrowserMessage, 4000, "error")
     } catch {
       deps.showMessage(labels.unableToOpenFolderMessage, 4000, "error")
     }
@@ -324,6 +347,44 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     return true
   }
 
+  async function moveWorkspaceEntry(sourcePath: string, targetFolderPath: string): Promise<boolean> {
+    const entryName = sourcePath.substring(sourcePath.lastIndexOf('/') + 1)
+    const sourceDir = sourcePath.substring(0, sourcePath.lastIndexOf('/'))
+
+    if (sourceDir === targetFolderPath) return false
+
+    const targetPath = `${targetFolderPath}/${entryName}`
+
+    try {
+      const entries = await deps.readDir(targetFolderPath)
+      if (Array.isArray(entries) && entries.some((e) => e.name === entryName)) {
+        deps.showMessage(labels.fileAlreadyExistsMessage, 4000, "error")
+        return false
+      }
+    } catch {
+      // directory may not exist or be unreadable
+    }
+
+    try {
+      await deps.renameFile(sourcePath, targetPath)
+    } catch {
+      deps.showMessage(labels.unableToMoveFileMessage, 4000, "error")
+      return false
+    }
+
+    deps.onFilePathUpdate?.(targetPath)
+    await deps.plugin.removeRecentCanvasFile?.(sourcePath)
+    deps.refreshRecentFiles()
+    await refreshWorkspaceDocuments()
+    deps.showMessage(labels.messageEntryMoved(entryName, targetFolderPath))
+    return true
+  }
+
+  async function moveWorkspaceEntryToRoot(sourcePath: string): Promise<boolean> {
+    const directory = deps.getSettings().defaultCanvasDirectory
+    return moveWorkspaceEntry(sourcePath, directory)
+  }
+
   async function renameWorkspaceDocument(oldPath: string) {
     const dir = oldPath.substring(0, oldPath.lastIndexOf('/'))
     const currentFullName = oldPath.substring(oldPath.lastIndexOf('/') + 1)
@@ -372,6 +433,7 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     await deps.plugin.removeRecentCanvasFile?.(oldPath)
     deps.refreshRecentFiles()
     await refreshWorkspaceDocuments()
+    window.dispatchEvent(new CustomEvent("siyuan-canvas:file-saved", { detail: { path: newPath } }))
     deps.showMessage(labels.messageFileRenamed(sanitized))
   }
 
@@ -462,6 +524,7 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
       const blob = new Blob([content], { type: "application/json" })
       await deps.putFile(newPath, false, blob)
       await refreshWorkspaceDocuments()
+      window.dispatchEvent(new CustomEvent("siyuan-canvas:file-saved", { detail: { path: newPath } }))
       deps.showMessage(labels.messageFileCopied(sanitized))
     } catch {
       deps.showMessage(labels.unableToCopyFileMessage, 4000, "error")
@@ -491,6 +554,8 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     deleteWorkspaceDocument,
     deleteWorkspaceFolder,
     openInExplorer,
+    moveWorkspaceEntry,
+    moveWorkspaceEntryToRoot,
     moveWorkspaceFile,
     renameWorkspaceDocument,
     renameWorkspaceFolder,

@@ -28,3 +28,9 @@ export const CANVAS_TAB_ICON_ID = 'iconCanvasTab'
  * 与 topbar 图标共用同一图形（铅笔 + 横线），但通过 currentColor 继承 tab 的高亮态颜色。
  */
 export const CANVAS_TAB_ICON_BODY = '<g transform="translate(48,0) scale(-1,1)"><path d="M40 12C42.2091 12 44 10.2091 44 8C44 5.79086 42.2091 4 40 4C37.7909 4 36 5.79086 36 8C36 10.2091 37.7909 12 40 12Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M40 44C42.2091 44 44 42.2091 44 40C44 37.7909 42.2091 36 40 36C37.7909 36 36 37.7909 36 40C36 42.2091 37.7909 44 40 44Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M8 12C10.2091 12 12 10.2091 12 8C12 5.79086 10.2091 4 8 4C5.79086 4 4 5.79086 4 8C4 10.2091 5.79086 12 8 12Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M8 44C10.2091 44 12 42.2091 12 40C12 37.7909 10.2091 36 8 36C5.79086 36 4 37.7909 4 40C4 42.2091 5.79086 44 8 44Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M20 8H28" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M32 16L16 32L32 16Z" fill="none"/><path d="M32 16L16 32" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 20V28" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></g>'
+
+/** 思源 Dock 侧边栏图标 sprite ID */
+export const CANVAS_DOCK_ICON_ID = 'iconCanvasDock'
+
+/** 思源 Dock 侧边栏图标 sprite 体：与 topbar/tab 统一使用画布图标 */
+export const CANVAS_DOCK_ICON_BODY = CANVAS_TAB_ICON_BODY
