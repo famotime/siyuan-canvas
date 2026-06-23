@@ -206,16 +206,16 @@
             :placeholder="t('fieldSearchNodePlaceholder')"
           >
           <div class="insp-node-picker__options">
-            <button
+            <div
               v-for="node in editor.edgeSources"
               :key="node.id"
               class="insp-node-picker__option"
-              type="button"
+              role="button"
               :title="editor.getNodeTitle(node)"
               @click="selectInspNode('source', node.id)"
             >
               {{ editor.getNodeTitle(node) }}
-            </button>
+            </div>
             <p
               v-if="editor.edgeSources.length === 0"
               class="insp-node-picker__empty"
@@ -267,16 +267,16 @@
             :placeholder="t('fieldSearchNodePlaceholder')"
           >
           <div class="insp-node-picker__options">
-            <button
+            <div
               v-for="node in editor.edgeTargets"
               :key="node.id"
               class="insp-node-picker__option"
-              type="button"
+              role="button"
               :title="editor.getNodeTitle(node)"
               @click="selectInspNode('target', node.id)"
             >
               {{ editor.getNodeTitle(node) }}
-            </button>
+            </div>
             <p
               v-if="editor.edgeTargets.length === 0"
               class="insp-node-picker__empty"

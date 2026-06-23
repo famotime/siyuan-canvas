@@ -38,17 +38,17 @@
               class="canvas-node-picker__options"
               data-testid="create-edge-source-options"
             >
-              <button
+              <div
                 v-for="node in editor.edgeSources"
                 :key="node.id"
                 class="canvas-node-picker__option"
                 data-testid="create-edge-source-option"
-                type="button"
+                role="button"
                 :title="editor.getNodeTitle(node)"
                 @click="selectEdgeNodeOption('source', node.id)"
               >
                 {{ editor.getNodeTitle(node) }}
-              </button>
+              </div>
               <p
                 v-if="editor.edgeSources.length === 0"
                 class="canvas-node-picker__empty"
@@ -89,17 +89,17 @@
               class="canvas-node-picker__options"
               data-testid="create-edge-target-options"
             >
-              <button
+              <div
                 v-for="node in editor.edgeTargets"
                 :key="node.id"
                 class="canvas-node-picker__option"
                 data-testid="create-edge-target-option"
-                type="button"
+                role="button"
                 :title="editor.getNodeTitle(node)"
                 @click="selectEdgeNodeOption('target', node.id)"
               >
                 {{ editor.getNodeTitle(node) }}
-              </button>
+              </div>
               <p
                 v-if="editor.edgeTargets.length === 0"
                 class="canvas-node-picker__empty"
