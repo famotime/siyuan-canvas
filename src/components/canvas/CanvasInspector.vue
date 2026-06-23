@@ -20,54 +20,51 @@
       >
         {{ t("selectionCount", { count: editor.selectedNodeCount }) }}
       </p>
-      <label>
-        {{ t("fieldX") }}
-        <input
-          data-testid="inspector-node-x"
-          :value="isNaN(getDraftValue('x')) ? '' : getDraftValue('x')"
-          :placeholder="isNaN(getDraftValue('x')) ? '--' : ''"
-          type="number"
-          @input="handleNumberInput('x', $event)"
-        />
-      </label>
-      <label>
-        {{ t("fieldY") }}
-        <input
-          data-testid="inspector-node-y"
-          :value="isNaN(getDraftValue('y')) ? '' : getDraftValue('y')"
-          :placeholder="isNaN(getDraftValue('y')) ? '--' : ''"
-          type="number"
-          @input="handleNumberInput('y', $event)"
-        />
-      </label>
-      <label>
-        {{ t("fieldWidth") }}
-        <input
-          data-testid="inspector-node-width"
-          :value="isNaN(getDraftValue('width')) ? '' : getDraftValue('width')"
-          :placeholder="isNaN(getDraftValue('width')) ? '--' : ''"
-          type="number"
-          @input="handleNumberInput('width', $event)"
-        />
-      </label>
-      <label>
-        {{ t("fieldHeight") }}
-        <input
-          data-testid="inspector-node-height"
-          :value="isNaN(getDraftValue('height')) ? '' : getDraftValue('height')"
-          :placeholder="isNaN(getDraftValue('height')) ? '--' : ''"
-          type="number"
-          @input="handleNumberInput('height', $event)"
-        />
-      </label>
-      <label v-if="'color' in editor.selectedNode">
-        {{ t("fieldColor") }}
-        <input
-          data-testid="inspector-node-color"
-          :value="editor.selectedNode.color || ''"
-          @input="editor.updateNodeField('color', valueFromEvent($event))"
-        />
-      </label>
+      <div class="inspector__field-row">
+        <label>
+          {{ t("fieldX") }}
+          <input
+            data-testid="inspector-node-x"
+            :value="isNaN(getDraftValue('x')) ? '' : getDraftValue('x')"
+            :placeholder="isNaN(getDraftValue('x')) ? '--' : ''"
+            type="number"
+            @input="handleNumberInput('x', $event)"
+          />
+        </label>
+        <label>
+          {{ t("fieldY") }}
+          <input
+            data-testid="inspector-node-y"
+            :value="isNaN(getDraftValue('y')) ? '' : getDraftValue('y')"
+            :placeholder="isNaN(getDraftValue('y')) ? '--' : ''"
+            type="number"
+            @input="handleNumberInput('y', $event)"
+          />
+        </label>
+      </div>
+      <div class="inspector__field-row">
+        <label>
+          {{ t("fieldWidth") }}
+          <input
+            data-testid="inspector-node-width"
+            :value="isNaN(getDraftValue('width')) ? '' : getDraftValue('width')"
+            :placeholder="isNaN(getDraftValue('width')) ? '--' : ''"
+            type="number"
+            @input="handleNumberInput('width', $event)"
+          />
+        </label>
+        <label>
+          {{ t("fieldHeight") }}
+          <input
+            data-testid="inspector-node-height"
+            :value="isNaN(getDraftValue('height')) ? '' : getDraftValue('height')"
+            :placeholder="isNaN(getDraftValue('height')) ? '--' : ''"
+            type="number"
+            @input="handleNumberInput('height', $event)"
+          />
+        </label>
+      </div>
+
       <label v-if="editor.selectedNode.type === 'text'">
         {{ t("fieldText") }}
         <textarea
@@ -749,7 +746,7 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   border-radius: 16px;
   background: var(--canvas-inspector-section-bg);
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .inspector__action-button {
@@ -829,6 +826,18 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   gap: 10px;
 }
 
+.inspector__field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.inspector__field-stack {
+  display: grid;
+  gap: 10px;
+}
+
 .inspector__section input,
 .inspector__section select,
 .inspector__section textarea {
@@ -846,6 +855,7 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .inspector__section textarea {
   min-height: 120px;
   resize: vertical;
+  field-sizing: content;
 }
 
 .inspector__readonly-field {

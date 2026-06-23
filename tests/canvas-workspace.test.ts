@@ -1639,6 +1639,46 @@ describe("CanvasWorkspace", () => {
     expect(source).toContain("text-overflow: ellipsis;")
   })
 
+  it("lays out inspector node geometry fields in compact two-column rows", () => {
+    const source = readFileSync(resolve(__dirname, "../src/components/canvas/CanvasInspector.vue"), "utf-8")
+
+    expect(source).toContain("class=\"inspector__field-row\"")
+    expect(source).toContain("inspector-node-x")
+    expect(source).toContain("inspector-node-y")
+    expect(source).toContain("inspector-node-width")
+    expect(source).toContain("inspector-node-height")
+    expect(source).toContain(".inspector__field-row")
+    expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));")
+  })
+
+  it("allows the inspector content area to scroll when sections exceed the viewport", () => {
+    const stylesheet = readFileSync(resolve(__dirname, "../src/components/canvas/canvas-workspace.scss"), "utf-8")
+    const rootStylesheet = readFileSync(resolve(__dirname, "../src/index.scss"), "utf-8")
+    const pluginTabsSource = readFileSync(resolve(__dirname, "../src/canvas/plugin-tabs.ts"), "utf-8")
+
+    expect(rootStylesheet).toContain(".siyuan-canvas__tab")
+    expect(rootStylesheet).toContain("position: absolute;")
+    expect(rootStylesheet).toContain("inset: 0;")
+    expect(rootStylesheet).toContain("height: 100%;")
+    expect(rootStylesheet).toContain("min-height: 0;")
+    expect(rootStylesheet).toContain("overflow: hidden;")
+    expect(pluginTabsSource).toContain("Object.assign(host.style")
+    expect(pluginTabsSource).toContain("position: \"relative\"")
+    expect(pluginTabsSource).toContain("height: \"100%\"")
+    expect(pluginTabsSource).toContain("overflow: \"hidden\"")
+    expect(stylesheet).toContain("grid-template-rows: auto minmax(0, 1fr);")
+    expect(stylesheet).toContain(".inspector__content")
+    expect(stylesheet).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, 320px);")
+    expect(stylesheet).toContain(".inspector {\n  overflow: hidden;")
+    expect(stylesheet).toContain("box-sizing: border-box;")
+    expect(stylesheet).toContain("min-height: 0;")
+    expect(stylesheet).toContain("flex: 1 1 auto;")
+    expect(stylesheet).toContain("overflow-y: auto;")
+    expect(stylesheet).toContain("overscroll-behavior: contain;")
+    expect(stylesheet).toContain("scrollbar-gutter: stable;")
+    expect(stylesheet).toContain(".inspector__content::-webkit-scrollbar-thumb")
+  })
+
   it("opens the embedded source search field inside the dropdown panel", async () => {
     currentEditor = createEditorMock()
     currentEditor.createEdgeDialog.visible = true

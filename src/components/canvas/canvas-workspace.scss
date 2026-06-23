@@ -1469,13 +1469,15 @@
 }
 
 .inspector {
-  overflow: auto;
+  overflow: hidden;
+  box-sizing: border-box;
   padding: 18px;
   border-left: 1px solid var(--canvas-border);
   background: var(--canvas-inspector-bg);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
 .inspector--collapsed {
@@ -1508,9 +1510,39 @@
 
 .inspector__content {
   display: grid;
+  align-content: start;
   gap: 12px;
+  flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  scrollbar-color: color-mix(in srgb, var(--canvas-text-muted) 42%, transparent) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.inspector__content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.inspector__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inspector__content::-webkit-scrollbar-thumb {
+  min-height: 48px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas-text-muted) 42%, transparent);
+  background-clip: content-box;
+}
+
+.inspector__content::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--canvas-text-muted) 62%, transparent);
+  background-clip: content-box;
 }
 
 .inspector__toolbar {
@@ -1712,6 +1744,7 @@
 .inspector__section textarea {
   min-height: 96px;
   resize: vertical;
+  field-sizing: content;
 }
 
 .issues {
