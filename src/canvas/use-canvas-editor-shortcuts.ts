@@ -12,7 +12,7 @@ interface CanvasEditorKeyboardHandlerOptions {
   getEditingEdgeLabelId: () => string
   getSelectionToolbarPopover: () => 'closed' | 'color' | 'layout'
   hasFloatLayer?: () => boolean
-  nudgeSelection?: (dx: number, dy: number) => void
+  nudgeSelection?: (dx: number, dy: number) => boolean
   openFilePickerDialog?: () => void
   redo?: () => void
   save: () => void | Promise<void>
@@ -99,25 +99,21 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       return
     }
 
-    // 方向键移动选中卡片（Ctrl/Cmd 加速）
+    // 方向键移动选中卡片（Ctrl/Cmd 加速为 25px 步长）
     if (!event.shiftKey && !event.altKey && nudgeSelection) {
       const step = isAccelerator ? 25 : 1
       switch (key) {
         case 'arrowup':
-          event.preventDefault()
-          nudgeSelection(0, -step)
+          if (nudgeSelection(0, -step)) event.preventDefault()
           return
         case 'arrowdown':
-          event.preventDefault()
-          nudgeSelection(0, step)
+          if (nudgeSelection(0, step)) event.preventDefault()
           return
         case 'arrowleft':
-          event.preventDefault()
-          nudgeSelection(-step, 0)
+          if (nudgeSelection(-step, 0)) event.preventDefault()
           return
         case 'arrowright':
-          event.preventDefault()
-          nudgeSelection(step, 0)
+          if (nudgeSelection(step, 0)) event.preventDefault()
           return
       }
     }

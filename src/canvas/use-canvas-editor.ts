@@ -54,6 +54,7 @@ import { computeResizeGuides } from "@/canvas/resize-guides"
 import {
   getCanvasSelectionBounds,
   setCanvasEdgeEndpoint,
+  setCanvasNodeGeometry,
   upsertCanvasEdge,
 } from "@/canvas/document"
 import { createCanvasEditorBindings } from "@/canvas/editor-bindings"
@@ -763,8 +764,8 @@ export function useCanvasEditor(
     viewport.scale = 1
   }
 
-  function nudgeSelection(dx: number, dy: number) {
-    if (state.selectedNodeIds.length === 0) return
+  function nudgeSelection(dx: number, dy: number): boolean {
+    if (state.selectedNodeIds.length === 0) return false
     let doc = state.document
     for (const nodeId of state.selectedNodeIds) {
       const node = doc.nodes.find(n => n.id === nodeId)
@@ -775,6 +776,7 @@ export function useCanvasEditor(
       })
     }
     commitDocument(doc, { coalesceKey: `nudge-${dx}-${dy}` })
+    return true
   }
 
   function zoomToFit() {
