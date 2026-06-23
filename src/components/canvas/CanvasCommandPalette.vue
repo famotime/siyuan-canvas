@@ -130,9 +130,9 @@ const commandItems = computed<PaletteItem[]>(() => {
     { id: "cmd:export", kind: "command", title: props.t("toolbarExport"), keywords: ["export", "导出"], run: () => e.exportCanvas() },
     ...(e.undo ? [{ id: "cmd:undo", kind: "command" as const, title: props.t("toolbarUndo"), keywords: ["undo", "撤销"], shortcut: `${accel}+Z`, run: () => e.undo!() }] : []),
     ...(e.redo ? [{ id: "cmd:redo", kind: "command" as const, title: props.t("toolbarRedo"), keywords: ["redo", "重做"], shortcut: `${accel}+Y`, run: () => e.redo!() }] : []),
-    { id: "cmd:zoom-in", kind: "command", title: props.t("toolbarZoomIn"), keywords: ["zoom in", "放大"], shortcut: `${accel}++`, run: () => e.zoomIn() },
-    { id: "cmd:zoom-out", kind: "command", title: props.t("toolbarZoomOut"), keywords: ["zoom out", "缩小"], shortcut: `${accel}+-`, run: () => e.zoomOut() },
-    ...(e.zoomToActualSize ? [{ id: "cmd:zoom-actual", kind: "command" as const, title: props.t("toolbarZoomActual"), keywords: ["actual", "实际"], shortcut: `${accel}+0`, run: () => e.zoomToActualSize!() }] : []),
+    { id: "cmd:zoom-in", kind: "command", title: props.t("toolbarZoomIn"), keywords: ["zoom in", "放大"], shortcut: `${accel}+Shift++`, run: () => e.zoomIn() },
+    { id: "cmd:zoom-out", kind: "command", title: props.t("toolbarZoomOut"), keywords: ["zoom out", "缩小"], shortcut: `${accel}+Shift+-`, run: () => e.zoomOut() },
+    ...(e.zoomToActualSize ? [{ id: "cmd:zoom-actual", kind: "command" as const, title: props.t("toolbarZoomActual"), keywords: ["actual", "实际"], shortcut: `${accel}+Shift+0`, run: () => e.zoomToActualSize!() }] : []),
     ...(e.zoomToFit ? [{ id: "cmd:zoom-fit", kind: "command" as const, title: props.t("toolbarZoomFit"), keywords: ["fit", "适应"], shortcut: "F", run: () => e.zoomToFit!() }] : []),
     { id: "cmd:reset-viewport", kind: "command", title: props.t("toolbarResetViewport"), keywords: ["reset", "重置"], run: () => e.resetViewport() },
   ]

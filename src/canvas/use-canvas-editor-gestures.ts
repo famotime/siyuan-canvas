@@ -31,6 +31,7 @@ import {
 } from "@/canvas/node-interaction"
 import {
   createBoundsFromPoints,
+  createEdgeCurvePath,
   resolveDragNodeIds,
   resolveMarqueeSelectionEdgeIds,
   resolveMarqueeSelectionNodeIds,
@@ -503,9 +504,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       x: toBoardX(board.value, connectionDraft.toX),
       y: toBoardY(board.value, connectionDraft.toY),
     }
-    const midX = (from.x + to.x) / 2
 
-    return `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`
+    return createEdgeCurvePath(from, connectionDraft.fromSide, to, connectionDraft.toSide)
   }
 
   function isConnectionTarget(nodeId: string, side: CanvasSide) {
@@ -537,6 +537,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     const fixedSide = edgeReconnectDraft.endpoint === "from" ? edge.toSide : edge.fromSide
+    const movingSide = edgeReconnectDraft.targetSide || "left"
     const fixedPoint = getAnchor(fixedNode, fixedSide)
     const movingPoint = {
       x: edgeReconnectDraft.toX,
@@ -544,10 +545,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     if (edgeReconnectDraft.endpoint === "from") {
-      return `M ${movingPoint.x} ${movingPoint.y} C ${(movingPoint.x + fixedPoint.x) / 2} ${movingPoint.y}, ${(movingPoint.x + fixedPoint.x) / 2} ${fixedPoint.y}, ${fixedPoint.x} ${fixedPoint.y}`
+      return createEdgeCurvePath(movingPoint, movingSide, fixedPoint, fixedSide)
     }
 
-    return `M ${fixedPoint.x} ${fixedPoint.y} C ${(fixedPoint.x + movingPoint.x) / 2} ${fixedPoint.y}, ${(fixedPoint.x + movingPoint.x) / 2} ${movingPoint.y}, ${movingPoint.x} ${movingPoint.y}`
+    return createEdgeCurvePath(fixedPoint, fixedSide, movingPoint, movingSide)
   }
 
   function finishConnectionDrag() {
