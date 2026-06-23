@@ -37,7 +37,7 @@ import {
 import { renderMarkdownPreview } from '@/canvas/markdown-preview'
 import { isWebUrl } from '@/canvas/url-detection'
 import { centerViewportOnBounds } from '@/canvas/selection-toolbar'
-import { clampViewportScale } from '@/canvas/viewport'
+import { clampViewportScale, scaleViewportAtPoint } from '@/canvas/viewport'
 import { findNonOverlappingPosition } from '@/canvas/node-overlap'
 
 const MIND_MAP_HORIZONTAL_GAP = 80

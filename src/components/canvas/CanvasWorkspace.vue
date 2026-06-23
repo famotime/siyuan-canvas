@@ -2339,7 +2339,6 @@ function showHelpDialog() {
     { key: t("helpShortcutDragSecondary"), action: t("helpActionDragSecondary") },
     { key: t("helpShortcutDragNode"), action: t("helpActionDragNode") },
     { key: t("helpShortcutDragAnchor"), action: t("helpActionDragAnchor") },
-    { key: t("helpShortcutRenameDocument"), action: t("helpActionRenameDocument") },
   ]
   openHelpDialog(t("helpDialogTitle"), shortcuts)
 }

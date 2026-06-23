@@ -783,9 +783,9 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("另存为")
     expect(wrapper.find("[data-testid='top-toolbar-export']").attributes("data-tooltip")).toBe("导出")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Shift+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Shift++)")
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("aria-label")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("aria-label")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("另存为")
@@ -908,10 +908,6 @@ describe("CanvasWorkspace", () => {
         {
           key: "拖拽节点锚点",
           action: "创建连线",
-        },
-        {
-          key: "文档树中右键文档",
-          action: "重命名文档",
         },
       ]),
     )
@@ -2334,9 +2330,9 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("另存为")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Shift+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Shift++)")
     expect(toolbarText).toContain("1 节点 · 0 连线")
     expect(toolbarText).toContain("已保存")
     expect(toolbarText).not.toContain("未命名.canvas")

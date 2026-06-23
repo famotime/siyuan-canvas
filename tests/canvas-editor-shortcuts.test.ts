@@ -14,10 +14,12 @@ function createKeyboardEvent(key: string, options: {
   metaKey?: boolean
   shiftKey?: boolean
   altKey?: boolean
+  code?: string
   target?: EventTarget | null
 } = {}) {
   const event = {
     altKey: options.altKey ?? false,
+    code: options.code ?? '',
     ctrlKey: options.ctrlKey ?? false,
     key,
     metaKey: options.metaKey ?? false,
@@ -243,7 +245,7 @@ describe('canvas editor keyboard handler', () => {
     expect(duplicateSelection).toHaveBeenCalledOnce()
   })
 
-  it('zooms in on accelerator+= and out on accelerator+-', () => {
+  it('zooms in on Shift++ and out on Shift+-', () => {
     const zoomIn = vi.fn()
     const zoomOut = vi.fn()
     const handler = createCanvasEditorKeyboardHandler({
@@ -252,14 +254,21 @@ describe('canvas editor keyboard handler', () => {
       zoomOut,
     })
 
-    handler.handleKeydown(createKeyboardEvent('=', { ctrlKey: true, shiftKey: true }))
-    handler.handleKeydown(createKeyboardEvent('-', { ctrlKey: true, shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent('=', { shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent('+', { shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent('=', { shiftKey: true, code: 'Equal' }))
+    handler.handleKeydown(createKeyboardEvent('+', { ctrlKey: true, shiftKey: true }))
 
-    expect(zoomIn).toHaveBeenCalledOnce()
-    expect(zoomOut).toHaveBeenCalledOnce()
+    handler.handleKeydown(createKeyboardEvent('-', { shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent('_', { shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent('-', { shiftKey: true, code: 'Minus' }))
+    handler.handleKeydown(createKeyboardEvent('_', { ctrlKey: true, shiftKey: true }))
+
+    expect(zoomIn).toHaveBeenCalledTimes(3)
+    expect(zoomOut).toHaveBeenCalledTimes(3)
   })
 
-  it('returns to actual size on accelerator+0 and fits on F', () => {
+  it('returns to actual size on Shift+0 and fits on F', () => {
     const zoomToActualSize = vi.fn()
     const zoomToFit = vi.fn()
     const handler = createCanvasEditorKeyboardHandler({
@@ -268,10 +277,17 @@ describe('canvas editor keyboard handler', () => {
       zoomToFit,
     })
 
+    // Ctrl + Shift + 0
     handler.handleKeydown(createKeyboardEvent('0', { ctrlKey: true, shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent(')', { ctrlKey: true, shiftKey: true }))
+
+    // Shift + 0
+    handler.handleKeydown(createKeyboardEvent(')', { shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent('0', { shiftKey: true, code: 'Digit0' }))
+
     handler.handleKeydown(createKeyboardEvent('f'))
 
-    expect(zoomToActualSize).toHaveBeenCalledOnce()
+    expect(zoomToActualSize).toHaveBeenCalledTimes(2)
     expect(zoomToFit).toHaveBeenCalledOnce()
   })
 

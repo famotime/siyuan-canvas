@@ -168,8 +168,8 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       return
     }
 
-    // 缩放快捷键（Ctrl+Shift 避免与思源内置快捷键冲突）
-    if (isAccelerator && event.shiftKey && (key === '=' || key === '+')) {
+    // 缩放快捷键（使用 Shift 避免与思源/系统内置快捷键冲突）
+    if (!isAccelerator && event.shiftKey && (key === '=' || key === '+' || event.code === 'Equal' || event.code === 'NumpadAdd')) {
       if (zoomIn) {
         event.preventDefault()
         zoomIn()
@@ -177,7 +177,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       return
     }
 
-    if (isAccelerator && event.shiftKey && key === '-') {
+    if (!isAccelerator && event.shiftKey && (key === '-' || key === '_' || event.code === 'Minus' || event.code === 'NumpadSubtract')) {
       if (zoomOut) {
         event.preventDefault()
         zoomOut()
@@ -185,7 +185,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       return
     }
 
-    if (isAccelerator && event.shiftKey && key === '0') {
+    if (!isAccelerator && event.shiftKey && (key === '0' || key === ')' || event.code === 'Digit0' || event.code === 'Numpad0')) {
       if (zoomToActualSize) {
         event.preventDefault()
         zoomToActualSize()
