@@ -386,6 +386,8 @@ watch(activeEdgeNodePicker, async (kind) => {
   display: block;
   width: 100%;
   min-width: 0;
+  height: auto;
+  line-height: 1.5;
   border: 0;
   border-radius: 10px;
   background: var(--canvas-floating-button-bg);

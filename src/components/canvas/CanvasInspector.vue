@@ -958,6 +958,8 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   display: block;
   width: 100%;
   min-width: 0;
+  height: auto;
+  line-height: 1.5;
   border: 0;
   border-radius: 8px;
   background: var(--canvas-floating-button-bg);
