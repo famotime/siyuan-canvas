@@ -956,7 +956,7 @@
         </div>
 
         <div
-          v-if="editor.selectionToolbar.visible && !editor.readonly"
+          v-if="editor.selectionToolbar.visible && !editor.readonly && !editingNodeId"
           :ref="setSelectionToolbarRef"
           class="selection-toolbar"
           :class="[
