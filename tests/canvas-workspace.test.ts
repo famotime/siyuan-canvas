@@ -1629,6 +1629,16 @@ describe("CanvasWorkspace", () => {
     expect(stylesheet).toContain("new ResizeObserver")
   })
 
+  it("keeps inspector create-edge dropdown option titles on one clipped line", () => {
+    const source = readFileSync(resolve(__dirname, "../src/components/canvas/CanvasInspector.vue"), "utf-8")
+
+    expect(source).toContain("class=\"insp-node-picker__option-label\"")
+    expect(source).toContain(".insp-node-picker__option-label")
+    expect(source).toContain("height: 28px;")
+    expect(source).toContain("white-space: nowrap;")
+    expect(source).toContain("text-overflow: ellipsis;")
+  })
+
   it("opens the embedded source search field inside the dropdown panel", async () => {
     currentEditor = createEditorMock()
     currentEditor.createEdgeDialog.visible = true

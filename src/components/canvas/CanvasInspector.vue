@@ -214,7 +214,7 @@
               :title="editor.getNodeTitle(node)"
               @click="selectInspNode('source', node.id)"
             >
-              {{ editor.getNodeTitle(node) }}
+              <span class="insp-node-picker__option-label">{{ editor.getNodeTitle(node) }}</span>
             </div>
             <p
               v-if="editor.edgeSources.length === 0"
@@ -275,7 +275,7 @@
               :title="editor.getNodeTitle(node)"
               @click="selectInspNode('target', node.id)"
             >
-              {{ editor.getNodeTitle(node) }}
+              <span class="insp-node-picker__option-label">{{ editor.getNodeTitle(node) }}</span>
             </div>
             <p
               v-if="editor.edgeTargets.length === 0"
@@ -955,11 +955,11 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 }
 
 .insp-node-picker__option {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
   min-width: 0;
-  height: auto;
-  line-height: 1.5;
+  height: 28px;
   border: 0;
   border-radius: 8px;
   background: var(--canvas-floating-button-bg);
@@ -968,10 +968,17 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   font-size: 12px;
   text-align: left;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   cursor: pointer;
   box-sizing: border-box;
+}
+
+.insp-node-picker__option-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 16px;
 }
 
 .insp-node-picker__option:hover {
