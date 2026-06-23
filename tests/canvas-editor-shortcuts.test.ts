@@ -252,8 +252,8 @@ describe('canvas editor keyboard handler', () => {
       zoomOut,
     })
 
-    handler.handleKeydown(createKeyboardEvent('=', { ctrlKey: true }))
-    handler.handleKeydown(createKeyboardEvent('-', { ctrlKey: true }))
+    handler.handleKeydown(createKeyboardEvent('=', { ctrlKey: true, shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent('-', { ctrlKey: true, shiftKey: true }))
 
     expect(zoomIn).toHaveBeenCalledOnce()
     expect(zoomOut).toHaveBeenCalledOnce()
@@ -268,7 +268,7 @@ describe('canvas editor keyboard handler', () => {
       zoomToFit,
     })
 
-    handler.handleKeydown(createKeyboardEvent('0', { ctrlKey: true }))
+    handler.handleKeydown(createKeyboardEvent('0', { ctrlKey: true, shiftKey: true }))
     handler.handleKeydown(createKeyboardEvent('f'))
 
     expect(zoomToActualSize).toHaveBeenCalledOnce()

@@ -760,11 +760,33 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
   }
 
   function zoomIn() {
-    viewport.scale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
+    const stage = stageRef.value
+    if (!stage) {
+      viewport.scale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
+      return
+    }
+    const rect = stage.getBoundingClientRect()
+    const center = { x: rect.width / 2, y: rect.height / 2 }
+    const nextScale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
+    const nextViewport = scaleViewportAtPoint(viewport, center, nextScale)
+    viewport.scale = nextViewport.scale
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
   }
 
   function zoomOut() {
-    viewport.scale = clampViewportScale(Number((viewport.scale - 0.1).toFixed(2)))
+    const stage = stageRef.value
+    if (!stage) {
+      viewport.scale = clampViewportScale(Number((viewport.scale - 0.1).toFixed(2)))
+      return
+    }
+    const rect = stage.getBoundingClientRect()
+    const center = { x: rect.width / 2, y: rect.height / 2 }
+    const nextScale = clampViewportScale(Number((viewport.scale - 0.1).toFixed(2)))
+    const nextViewport = scaleViewportAtPoint(viewport, center, nextScale)
+    viewport.scale = nextViewport.scale
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
   }
 
   return {

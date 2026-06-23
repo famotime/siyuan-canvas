@@ -48,6 +48,7 @@ import {
   toBoardX,
   toBoardY,
 } from "@/canvas/board"
+import { clampViewportScale, scaleViewportAtPoint } from "@/canvas/viewport"
 import {
   getCanvasSelectionBounds,
   setCanvasEdgeEndpoint,
@@ -622,11 +623,21 @@ export function useCanvasEditor(
     const minY = Math.min(...state.document.nodes.map((node) => node.y))
     const maxX = Math.max(...state.document.nodes.map((node) => node.x + node.width))
     const maxY = Math.max(...state.document.nodes.map((node) => node.y + node.height))
+    const contentWidth = maxX - minX
+    const contentHeight = maxY - minY
     const centerX = toBoardX(board.value, (minX + maxX) / 2)
     const centerY = toBoardY(board.value, (minY + maxY) / 2)
-    viewport.scale = 1
-    viewport.x = stage.clientWidth / 2 - centerX
-    viewport.y = stage.clientHeight / 2 - centerY
+
+    const padding = 0.9
+    const fitScale = Math.min(
+      (stage.clientWidth * padding) / contentWidth,
+      (stage.clientHeight * padding) / contentHeight,
+      1,
+    )
+    const scale = clampViewportScale(Number(fitScale.toFixed(2)))
+    viewport.scale = scale
+    viewport.x = stage.clientWidth / 2 - centerX * scale
+    viewport.y = stage.clientHeight / 2 - centerY * scale
   }
 
   function commitDocument(nextDocument: CanvasDocument, options: { coalesceKey?: string } = {}) {
@@ -718,7 +729,17 @@ export function useCanvasEditor(
   }
 
   function zoomToActualSize() {
-    viewport.scale = 1
+    const stage = stageRef.value
+    if (!stage) {
+      viewport.scale = 1
+      return
+    }
+    const rect = stage.getBoundingClientRect()
+    const center = { x: rect.width / 2, y: rect.height / 2 }
+    const nextViewport = scaleViewportAtPoint(viewport, center, 1)
+    viewport.scale = nextViewport.scale
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
   }
 
   function zoomToFit() {
