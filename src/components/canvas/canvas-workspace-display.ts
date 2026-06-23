@@ -72,7 +72,9 @@ export function getCanvasNodeStyle(
   node: CanvasNode,
   baseStyle: Record<string, string>,
   options: {
+    presentationMaskActive?: boolean
     selected?: boolean
+    themeMode?: "dark" | "light"
   } = {},
   colorStyles?: Record<string, { background: string, border: string, swatch: string }>,
 ) {
@@ -86,7 +88,9 @@ export function getCanvasNodeStyle(
     ...baseStyle,
     zIndex,
     ...(colorStyle ? {
-      backgroundColor: colorStyle.background,
+      ...(options.presentationMaskActive && options.themeMode !== "dark"
+        ? { background: `linear-gradient(${colorStyle.background}, ${colorStyle.background}), #fff` }
+        : { backgroundColor: colorStyle.background }),
       borderColor: colorStyle.border,
     } : {}),
   }

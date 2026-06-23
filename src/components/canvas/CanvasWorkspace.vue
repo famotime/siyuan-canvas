@@ -1465,7 +1465,11 @@
               @click="editor.toggleInspectorSection('document')"
             >
               <h2>{{ t("inspectorDocument") }}</h2>
-              <span>{{ getInspectorSectionChevron('document') }}</span>
+              <CanvasIcon
+                name="chevron-right"
+                class="inspector__section-chevron"
+                :class="{'inspector__section-chevron--expanded': editor.inspectorSectionState.document}"
+              />
             </button>
             <div
               v-if="editor.inspectorSectionState.document"
@@ -1505,7 +1509,11 @@
               @click="editor.toggleInspectorSection('recent')"
             >
               <h2>{{ t("inspectorRecent") }}</h2>
-              <span>{{ getInspectorSectionChevron('recent') }}</span>
+              <CanvasIcon
+                name="chevron-right"
+                class="inspector__section-chevron"
+                :class="{'inspector__section-chevron--expanded': editor.inspectorSectionState.recent}"
+              />
             </button>
             <div v-if="editor.inspectorSectionState.recent">
               <div
@@ -2343,9 +2351,6 @@ function showHelpDialog() {
   openHelpDialog(t("helpDialogTitle"), shortcuts)
 }
 
-function getInspectorSectionChevron(section: keyof typeof editor.inspectorSectionState): string {
-  return editor.inspectorSectionState[section] ? "−" : "+"
-}
 
 function getInspectorSectionToggleTitle(section: keyof typeof editor.inspectorSectionState): string {
   return editor.inspectorSectionState[section]
@@ -2394,7 +2399,9 @@ function getEdgeLabelStyle(edge: CanvasEdge) {
 
 function getCanvasNodeStyle(node: CanvasNode) {
   return buildCanvasNodeStyle(node, editor.getNodeStyle(node), {
+    presentationMaskActive: editor.presentation.isActive && props.plugin.getCanvasSettings().presentationStyle === 'mask',
     selected: editor.state.selectedNodeIds.includes(node.id),
+    themeMode: selectionToolbarThemeMode.value,
   }, editor.currentColorStyles)
 }
 

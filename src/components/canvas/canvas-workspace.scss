@@ -90,6 +90,8 @@
   border-bottom: 1px solid var(--canvas-border);
   background: var(--canvas-toolbar-bg);
   backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  z-index: 10;
 }
 
 .toolbar__group {
@@ -178,7 +180,8 @@
   transition:
     border-color 120ms ease,
     background-color 120ms ease,
-    color 120ms ease;
+    color 120ms ease,
+    transform 120ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .toolbar__button--icon {
@@ -192,6 +195,10 @@
 
 .toolbar__button:hover:not(:disabled) {
   background: var(--canvas-floating-button-bg-hover);
+}
+
+.toolbar__button:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .toolbar__button:disabled {
@@ -1682,13 +1689,17 @@
 }
 
 .inspector__section {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  margin-bottom: 0;
-  padding: 16px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
   border: 1px solid var(--canvas-border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--canvas-inspector-section-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  min-width: 0;
+  overflow: visible;
 }
 
 .inspector__section-toggle {
@@ -1705,12 +1716,21 @@
   cursor: pointer;
 }
 
+.inspector__section-chevron {
+  color: var(--canvas-text-muted);
+  transition: transform 0.2s ease;
+}
+
+.inspector__section-chevron--expanded {
+  transform: rotate(90deg);
+}
+
 .inspector__section h2 {
   margin: 0;
   font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--canvas-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--canvas-text);
 }
 
 .inspector__section label {

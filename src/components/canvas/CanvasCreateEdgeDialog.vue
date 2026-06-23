@@ -21,7 +21,11 @@
             @click="toggleEdgeNodePicker('source')"
           >
             <span class="canvas-node-picker__trigger-label" :title="getEdgeNodeTriggerLabel('source')">{{ getEdgeNodeTriggerLabel('source') }}</span>
-            <span class="canvas-node-picker__trigger-chevron">{{ activeEdgeNodePicker === 'source' ? '▴' : '▾' }}</span>
+            <CanvasIcon
+              name="chevron-right"
+              class="canvas-node-picker__trigger-chevron"
+              :class="{'canvas-node-picker__trigger-chevron--expanded': activeEdgeNodePicker === 'source'}"
+            />
           </button>
           <div
             v-if="activeEdgeNodePicker === 'source'"
@@ -72,7 +76,11 @@
             @click="toggleEdgeNodePicker('target')"
           >
             <span class="canvas-node-picker__trigger-label" :title="getEdgeNodeTriggerLabel('target')">{{ getEdgeNodeTriggerLabel('target') }}</span>
-            <span class="canvas-node-picker__trigger-chevron">{{ activeEdgeNodePicker === 'target' ? '▴' : '▾' }}</span>
+            <CanvasIcon
+              name="chevron-right"
+              class="canvas-node-picker__trigger-chevron"
+              :class="{'canvas-node-picker__trigger-chevron--expanded': activeEdgeNodePicker === 'target'}"
+            />
           </button>
           <div
             v-if="activeEdgeNodePicker === 'target'"
@@ -354,6 +362,12 @@ watch(activeEdgeNodePicker, async (kind) => {
 .canvas-node-picker__trigger-chevron {
   flex: 0 0 auto;
   color: var(--canvas-text-muted);
+  font-size: 14px;
+  transition: transform 0.2s ease;
+}
+
+.canvas-node-picker__trigger-chevron--expanded {
+  transform: rotate(90deg);
 }
 
 .canvas-node-picker__panel {

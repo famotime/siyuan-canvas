@@ -246,4 +246,19 @@ describe("theme-aware color styles", () => {
     expect(result.backgroundColor).toBe("rgba(249, 115, 22, 0.18)")
     expect(result.borderColor).toBe("#f97316")
   })
+
+  it("adds a white backing to translucent color cards in light mask presentation mode", () => {
+    const result = getCanvasNodeStyle(
+      { color: "2", height: 100, id: "n1", text: "x", type: "text", width: 200, x: 0, y: 0 },
+      { height: "100px", left: "0px", top: "0px", width: "200px" },
+      {
+        presentationMaskActive: true,
+        themeMode: "light",
+      },
+    )
+
+    expect(result.background).toBe("linear-gradient(rgba(249, 115, 22, 0.18), rgba(249, 115, 22, 0.18)), #fff")
+    expect(result.backgroundColor).toBeUndefined()
+    expect(result.borderColor).toBe("#f97316")
+  })
 })

@@ -11,7 +11,11 @@
       @click="editor.toggleInspectorSection('selection')"
     >
       <h2>{{ t("inspectorNode") }}</h2>
-      <span>{{ getSectionChevron('selection') }}</span>
+      <CanvasIcon
+        name="chevron-right"
+        class="inspector__section-chevron"
+        :class="{'inspector__section-chevron--expanded': editor.inspectorSectionState.selection}"
+      />
     </button>
     <div v-if="editor.inspectorSectionState.selection">
       <p
@@ -124,7 +128,11 @@
       @click="editor.toggleInspectorSection('nodeEdges')"
     >
       <h2>{{ t("inspectorNodeEdges") }}</h2>
-      <span>{{ getSectionChevron('nodeEdges') }}</span>
+      <CanvasIcon
+        name="chevron-right"
+        class="inspector__section-chevron"
+        :class="{'inspector__section-chevron--expanded': editor.inspectorSectionState.nodeEdges}"
+      />
     </button>
     <div v-if="editor.inspectorSectionState.nodeEdges">
       <div
@@ -164,7 +172,11 @@
       @click="editor.toggleInspectorSection('createEdge')"
     >
       <h2>{{ t("inspectorCreateEdge") }}</h2>
-      <span>{{ getSectionChevron('createEdge') }}</span>
+      <CanvasIcon
+        name="chevron-right"
+        class="inspector__section-chevron"
+        :class="{'inspector__section-chevron--expanded': editor.inspectorSectionState.createEdge}"
+      />
     </button>
     <div
       v-if="editor.inspectorSectionState.createEdge"
@@ -187,10 +199,11 @@
             :style="getInspPickerLabelStyle('source')"
             :title="getInspPickerLabel('source')"
           >{{ getInspPickerLabel('source') }}</span>
-          <span
-            ref="inspSourceChevronRef"
+          <CanvasIcon
+            name="chevron-right"
             class="insp-node-picker__trigger-chevron"
-          >{{ activeInspPicker === 'source' ? '▴' : '▾' }}</span>
+            :class="{'insp-node-picker__trigger-chevron--expanded': activeInspPicker === 'source'}"
+          />
         </button>
         <div
           v-if="activeInspPicker === 'source'"
@@ -248,10 +261,11 @@
             :style="getInspPickerLabelStyle('target')"
             :title="getInspPickerLabel('target')"
           >{{ getInspPickerLabel('target') }}</span>
-          <span
-            ref="inspTargetChevronRef"
+          <CanvasIcon
+            name="chevron-right"
             class="insp-node-picker__trigger-chevron"
-          >{{ activeInspPicker === 'target' ? '▴' : '▾' }}</span>
+            :class="{'insp-node-picker__trigger-chevron--expanded': activeInspPicker === 'target'}"
+          />
         </button>
         <div
           v-if="activeInspPicker === 'target'"
@@ -317,7 +331,11 @@
       @click="editor.toggleInspectorSection('edge')"
     >
       <h2>{{ t("inspectorEdge") }}</h2>
-      <span>{{ getSectionChevron('edge') }}</span>
+      <CanvasIcon
+        name="chevron-right"
+        class="inspector__section-chevron"
+        :class="{'inspector__section-chevron--expanded': editor.inspectorSectionState.edge}"
+      />
     </button>
     <div
       v-if="editor.inspectorSectionState.edge"
@@ -393,6 +411,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { CanvasIcon } from '@/components/canvas/canvas-icon'
 
 const props = defineProps<{
   editor: Record<string, any>
@@ -498,13 +517,12 @@ function updateInspPickerLabelMaxWidth(kind: InspPickerKind): void {
     return
   }
 
-  const chevron = kind === 'source' ? inspSourceChevronRef.value : inspTargetChevronRef.value
   const styles = window.getComputedStyle(trigger)
   const availableWidth = trigger.clientWidth
     - getNumericStyleValue(styles, 'padding-left')
     - getNumericStyleValue(styles, 'padding-right')
     - getNumericStyleValue(styles, 'column-gap')
-    - (chevron?.offsetWidth ?? 0)
+    - 24
 
   inspPickerLabelMaxWidths[kind] = Math.max(0, Math.floor(availableWidth))
 }
@@ -725,10 +743,6 @@ function focusConnectedNode(nodeId: string): void {
   props.editor.centerSelectionInViewport()
 }
 
-function getSectionChevron(section: keyof typeof props.editor.inspectorSectionState): string {
-  return props.editor.inspectorSectionState[section] ? "−" : "+"
-}
-
 function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSectionState): string {
   return props.editor.inspectorSectionState[section]
     ? props.t("inspectorCollapseSection")
@@ -738,13 +752,15 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 
 <style scoped>
 .inspector__section {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  margin-bottom: 0;
-  padding: 16px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
   border: 1px solid var(--canvas-border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--canvas-inspector-section-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   min-width: 0;
   overflow: visible;
 }
@@ -806,12 +822,21 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   cursor: pointer;
 }
 
+.inspector__section-chevron {
+  color: var(--canvas-text-muted);
+  transition: transform 0.2s ease;
+}
+
+.inspector__section-chevron--expanded {
+  transform: rotate(90deg);
+}
+
 .inspector__section h2 {
   margin: 0;
   font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--canvas-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--canvas-text);
 }
 
 .inspector__section label {
@@ -829,7 +854,7 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .inspector__field-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
 }
 
