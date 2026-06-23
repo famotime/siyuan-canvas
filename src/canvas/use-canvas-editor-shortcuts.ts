@@ -12,6 +12,7 @@ interface CanvasEditorKeyboardHandlerOptions {
   getEditingEdgeLabelId: () => string
   getSelectionToolbarPopover: () => 'closed' | 'color' | 'layout'
   hasFloatLayer?: () => boolean
+  nudgeSelection?: (dx: number, dy: number) => void
   openFilePickerDialog?: () => void
   redo?: () => void
   save: () => void | Promise<void>
@@ -50,6 +51,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     getEditingEdgeLabelId,
     getSelectionToolbarPopover,
     hasFloatLayer,
+    nudgeSelection,
     openFilePickerDialog,
     redo,
     save,
@@ -95,6 +97,29 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       event.preventDefault()
       deleteSelection()
       return
+    }
+
+    // 方向键移动选中卡片（Ctrl/Cmd 加速）
+    if (!event.shiftKey && !event.altKey && nudgeSelection) {
+      const step = isAccelerator ? 25 : 1
+      switch (key) {
+        case 'arrowup':
+          event.preventDefault()
+          nudgeSelection(0, -step)
+          return
+        case 'arrowdown':
+          event.preventDefault()
+          nudgeSelection(0, step)
+          return
+        case 'arrowleft':
+          event.preventDefault()
+          nudgeSelection(-step, 0)
+          return
+        case 'arrowright':
+          event.preventDefault()
+          nudgeSelection(step, 0)
+          return
+      }
     }
 
     // Space：浮窗预览选中的思源文档/块节点

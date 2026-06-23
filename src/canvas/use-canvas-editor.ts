@@ -763,6 +763,20 @@ export function useCanvasEditor(
     viewport.scale = 1
   }
 
+  function nudgeSelection(dx: number, dy: number) {
+    if (state.selectedNodeIds.length === 0) return
+    let doc = state.document
+    for (const nodeId of state.selectedNodeIds) {
+      const node = doc.nodes.find(n => n.id === nodeId)
+      if (!node) continue
+      doc = setCanvasNodeGeometry(doc, nodeId, {
+        x: node.x + dx,
+        y: node.y + dy,
+      })
+    }
+    commitDocument(doc, { coalesceKey: `nudge-${dx}-${dy}` })
+  }
+
   function zoomToFit() {
     resetViewport()
   }
@@ -1148,6 +1162,7 @@ export function useCanvasEditor(
     createMindMapSiblingNode,
     deleteSelection,
     duplicateSelection,
+    nudgeSelection,
     getEdgeToolbarPopover: () => edgeToolbarPopover.value,
     getEditingEdgeLabelId: () => editingEdgeLabelId.value,
     getSelectionToolbarPopover: () => selectionToolbarPopover.value,
