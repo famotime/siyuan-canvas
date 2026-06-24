@@ -759,17 +759,6 @@
               @pointerdown.stop
             >
               <button
-                class="selection-toolbar__swatch selection-toolbar__swatch--clear"
-                :class="{ 'selection-toolbar__swatch--active': activeEdgeColor === CLEAR_SELECTION_COLOR }"
-                data-testid="edge-color-clear"
-                :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
-                :aria-label="t('selectionToolbarClearColor')"
-                :aria-pressed="activeEdgeColor === CLEAR_SELECTION_COLOR"
-                :title="t('selectionToolbarClearColor')"
-                type="button"
-                @click.stop="editor.applyEdgeColor(CLEAR_SELECTION_COLOR)"
-              />
-              <button
                 v-for="color in editor.edgeColorOptions"
                 :key="`edge-color-${color}`"
                 class="selection-toolbar__swatch"
@@ -780,6 +769,17 @@
                 :aria-pressed="activeEdgeColor === color"
                 type="button"
                 @click.stop="editor.applyEdgeColor(color)"
+              />
+              <button
+                class="selection-toolbar__swatch selection-toolbar__swatch--clear"
+                :class="{ 'selection-toolbar__swatch--active': activeEdgeColor === CLEAR_SELECTION_COLOR }"
+                data-testid="edge-color-clear"
+                :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
+                :aria-label="t('selectionToolbarClearColor')"
+                :aria-pressed="activeEdgeColor === CLEAR_SELECTION_COLOR"
+                :title="t('selectionToolbarClearColor')"
+                type="button"
+                @click.stop="editor.applyEdgeColor(CLEAR_SELECTION_COLOR)"
               />
               <button
                 v-if="lastCustomColor"
@@ -798,7 +798,7 @@
                 data-testid="edge-color-custom-empty"
                 :aria-label="t('selectionToolbarCustomColorEmpty') || '未设置自定义颜色'"
                 type="button"
-                @click.stop="triggerCustomColorPicker('edge')"
+                @click.stop="triggerCustomColorPicker('edge', $event)"
               >
                 +
               </button>
@@ -807,7 +807,7 @@
                 data-testid="edge-color-picker"
                 :aria-label="t('selectionToolbarCustomColorPicker') || '自定义选色器'"
                 type="button"
-                @click.stop="triggerCustomColorPicker('edge')"
+                @click.stop="triggerCustomColorPicker('edge', $event)"
               />
             </div>
           </div>
@@ -1048,17 +1048,6 @@
               @pointerdown.stop
             >
               <button
-                class="selection-toolbar__swatch selection-toolbar__swatch--clear"
-                :class="{ 'selection-toolbar__swatch--active': activeSelectionColor === CLEAR_SELECTION_COLOR }"
-                data-testid="selection-color-clear"
-                :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
-                :aria-label="t('selectionToolbarClearColor')"
-                :aria-pressed="activeSelectionColor === CLEAR_SELECTION_COLOR"
-                :title="t('selectionToolbarClearColor')"
-                type="button"
-                @click.stop="editor.applySelectionColor(CLEAR_SELECTION_COLOR)"
-              />
-              <button
                 v-for="color in editor.selectionColors"
                 :key="color"
                 class="selection-toolbar__swatch"
@@ -1069,6 +1058,17 @@
                 :aria-pressed="activeSelectionColor === color"
                 type="button"
                 @click.stop="editor.applySelectionColor(color)"
+              />
+              <button
+                class="selection-toolbar__swatch selection-toolbar__swatch--clear"
+                :class="{ 'selection-toolbar__swatch--active': activeSelectionColor === CLEAR_SELECTION_COLOR }"
+                data-testid="selection-color-clear"
+                :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
+                :aria-label="t('selectionToolbarClearColor')"
+                :aria-pressed="activeSelectionColor === CLEAR_SELECTION_COLOR"
+                :title="t('selectionToolbarClearColor')"
+                type="button"
+                @click.stop="editor.applySelectionColor(CLEAR_SELECTION_COLOR)"
               />
               <button
                 v-if="lastCustomColor"
@@ -1087,7 +1087,7 @@
                 data-testid="selection-color-custom-empty"
                 :aria-label="t('selectionToolbarCustomColorEmpty') || '未设置自定义颜色'"
                 type="button"
-                @click.stop="triggerCustomColorPicker('selection')"
+                @click.stop="triggerCustomColorPicker('selection', $event)"
               >
                 +
               </button>
@@ -1096,7 +1096,7 @@
                 data-testid="selection-color-picker"
                 :aria-label="t('selectionToolbarCustomColorPicker') || '自定义选色器'"
                 type="button"
-                @click.stop="triggerCustomColorPicker('selection')"
+                @click.stop="triggerCustomColorPicker('selection', $event)"
               />
             </div>
           </div>
@@ -1774,7 +1774,7 @@
     <input
       ref="customColorInputRef"
       type="color"
-      style="display: none"
+      :style="customColorInputStyle"
       @change="onCustomColorChange"
     >
   </div>
@@ -1895,13 +1895,38 @@ function setLastCustomColor(color: string) {
 
 const customColorContext = ref<'selection' | 'edge' | null>(null)
 const customColorInputRef = ref<HTMLInputElement | null>(null)
+const customColorInputStyle = ref<Record<string, string>>({
+  position: 'fixed',
+  left: '0px',
+  top: '0px',
+  width: '0px',
+  height: '0px',
+  opacity: '0',
+  pointerEvents: 'none',
+  zIndex: '-1000',
+})
 
-function triggerCustomColorPicker(context: 'selection' | 'edge') {
+function triggerCustomColorPicker(context: 'selection' | 'edge', event?: Event) {
   customColorContext.value = context
-  if (customColorInputRef.value) {
-    customColorInputRef.value.value = lastCustomColor.value || '#3575f0'
-    customColorInputRef.value.click()
+  if (event && event.currentTarget && customColorInputRef.value) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    customColorInputStyle.value = {
+      position: 'fixed',
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: '1px',
+      height: '1px',
+      opacity: '0',
+      pointerEvents: 'none',
+      zIndex: '-1000',
+    }
   }
+  nextTick(() => {
+    if (customColorInputRef.value) {
+      customColorInputRef.value.value = lastCustomColor.value || '#3575f0'
+      customColorInputRef.value.click()
+    }
+  })
 }
 
 function onCustomColorChange(event: Event) {

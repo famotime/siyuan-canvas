@@ -2014,7 +2014,7 @@ describe("CanvasWorkspace", () => {
     expect(label.style.color).toBe("rgb(255, 255, 255)")
   })
 
-  it("renders a clear swatch first and marks the current selection color as active", async () => {
+  it("renders selection swatches with clear swatch on the third row and marks current color active", async () => {
     const node = createTextNode({ color: "1" })
     currentEditor = createEditorMock(node)
     currentEditor.selectionColors = ["1", "2", "3", "4", "5", "6"]
@@ -2038,7 +2038,7 @@ describe("CanvasWorkspace", () => {
     const swatches = wrapper.findAll(".selection-toolbar__swatch")
 
     expect(swatches).toHaveLength(9)
-    expect(swatches[0]?.attributes("data-testid")).toBe("selection-color-clear")
+    expect(swatches[6]?.attributes("data-testid")).toBe("selection-color-clear")
     expect(wrapper.find("[data-testid='selection-color-clear']").classes()).not.toContain("selection-toolbar__swatch--active")
     expect(wrapper.find("[data-testid='selection-color-clear']").attributes("aria-label")).toBe("清除颜色")
     expect(wrapper.find("[data-testid='selection-color-clear']").attributes("aria-pressed")).toBe("false")
