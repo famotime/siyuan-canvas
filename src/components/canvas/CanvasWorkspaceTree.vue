@@ -1,9 +1,11 @@
 <template>
   <div
+    ref="treeRef"
     class="workspace-tree"
     role="tree"
     @dragover.prevent
     @drop.prevent="$emit('root-drop', $event)"
+    @keydown="handleKeyDown"
   >
     <WorkspaceTreeNodeView
       v-for="node in workspaceDocuments"
@@ -13,6 +15,8 @@
       :current-file-path="currentFilePath"
       :drag-over-folder-path="dragOverFolderPath"
       :delete-title="deleteTitle"
+      :focused-path="focusedPath"
+      :default-tab-path="defaultTabPath"
       @toggle-folder="$emit('toggle-folder', $event)"
       @open-file="$emit('open-file', $event)"
       @delete-document="$emit('delete-document', $event)"
@@ -23,6 +27,7 @@
       @folder-drop="forwardFolderDrop"
       @file-drag-start="forwardFileDragStart"
       @drag-end="$emit('drag-end')"
+      @update-focused-path="focusedPath = $event"
     />
   </div>
 </template>
@@ -36,6 +41,8 @@ import {
   defineComponent,
   h,
   type PropType,
+  ref,
+  computed,
 } from 'vue'
 import type { WorkspaceTreeNode } from '@/canvas/use-canvas-editor-workspace-tree'
 import { CanvasIcon } from '@/components/canvas/canvas-icon'
@@ -82,6 +89,104 @@ function forwardFileDragStart(event: DragEvent, path: string) {
   emit('file-drag-start', event, path)
 }
 
+const treeRef = ref<HTMLElement | null>(null)
+const focusedPath = ref<string | null>(null)
+
+const defaultTabPath = computed(() => {
+  if (props.currentFilePath) {
+    return props.currentFilePath
+  }
+  return props.workspaceDocuments[0]?.path || null
+})
+
+function getVisibleItems() {
+  if (!treeRef.value) return []
+  return Array.from(
+    treeRef.value.querySelectorAll('.workspace-tree__folder-header, .workspace-tree__file-open')
+  ) as HTMLElement[]
+}
+
+function getParentFolderHeader(el: HTMLElement) {
+  const childrenContainer = el.closest('.workspace-tree__folder-children')
+  if (!childrenContainer) return null
+  const parentFolder = childrenContainer.closest('.workspace-tree__folder')
+  if (!parentFolder) return null
+  return parentFolder.querySelector('.workspace-tree__folder-header') as HTMLElement | null
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  const activeEl = document.activeElement as HTMLElement
+  if (!activeEl) return
+
+  const items = getVisibleItems()
+  const idx = items.indexOf(activeEl)
+  if (idx === -1) return
+
+  let handled = false
+
+  switch (event.key) {
+    case 'ArrowDown':
+      if (idx + 1 < items.length) {
+        items[idx + 1].focus()
+        handled = true
+      }
+      break
+    case 'ArrowUp':
+      if (idx - 1 >= 0) {
+        items[idx - 1].focus()
+        handled = true
+      }
+      break
+    case 'ArrowRight':
+      if (activeEl.classList.contains('workspace-tree__folder-header')) {
+        const isExpanded = activeEl.getAttribute('aria-expanded') === 'true'
+        if (!isExpanded) {
+          activeEl.click()
+        } else if (idx + 1 < items.length) {
+          items[idx + 1].focus()
+        }
+        handled = true
+      }
+      break
+    case 'ArrowLeft':
+      if (activeEl.classList.contains('workspace-tree__folder-header')) {
+        const isExpanded = activeEl.getAttribute('aria-expanded') === 'true'
+        if (isExpanded) {
+          activeEl.click()
+        } else {
+          const parentHeader = getParentFolderHeader(activeEl)
+          if (parentHeader) {
+            parentHeader.focus()
+          }
+        }
+        handled = true
+      } else if (activeEl.classList.contains('workspace-tree__file-open')) {
+        const parentHeader = getParentFolderHeader(activeEl)
+        if (parentHeader) {
+          parentHeader.focus()
+        }
+        handled = true
+      }
+      break
+    case 'Home':
+      if (items.length > 0) {
+        items[0].focus()
+        handled = true
+      }
+      break
+    case 'End':
+      if (items.length > 0) {
+        items[items.length - 1].focus()
+        handled = true
+      }
+      break
+  }
+
+  if (handled) {
+    event.preventDefault()
+  }
+}
+
 const WorkspaceTreeNodeView = defineComponent({
   name: 'WorkspaceTreeNodeView',
   props: {
@@ -105,6 +210,14 @@ const WorkspaceTreeNodeView = defineComponent({
       required: true,
       type: String,
     },
+    focusedPath: {
+      required: true,
+      type: String as PropType<string | null>,
+    },
+    defaultTabPath: {
+      required: true,
+      type: String as PropType<string | null>,
+    },
   },
   emits: [
     'toggle-folder',
@@ -117,8 +230,17 @@ const WorkspaceTreeNodeView = defineComponent({
     'folder-drop',
     'file-drag-start',
     'drag-end',
+    'update-focused-path',
   ],
   setup(nodeProps, { emit }) {
+    const isFocusable = computed(() => {
+      if (nodeProps.focusedPath) {
+        return nodeProps.focusedPath === nodeProps.node.path
+      }
+      return nodeProps.defaultTabPath === nodeProps.node.path
+    })
+    const tabIndex = computed(() => isFocusable.value ? 0 : -1)
+
     function renderFolder(node: Extract<WorkspaceTreeNode, { type: 'folder' }>) {
       const expanded = nodeProps.expandedFolders.has(node.path)
 
@@ -135,7 +257,9 @@ const WorkspaceTreeNodeView = defineComponent({
           type: 'button',
           title: node.path,
           'aria-expanded': expanded,
+          tabindex: tabIndex.value,
           onClick: () => emit('toggle-folder', node.path),
+          onFocus: () => emit('update-focused-path', node.path),
           onContextmenu: (event: MouseEvent) => {
             event.preventDefault()
             emit('context-menu', event, node.path, 'folder')
@@ -180,6 +304,8 @@ const WorkspaceTreeNodeView = defineComponent({
               currentFilePath: nodeProps.currentFilePath,
               dragOverFolderPath: nodeProps.dragOverFolderPath,
               deleteTitle: nodeProps.deleteTitle,
+              focusedPath: nodeProps.focusedPath,
+              defaultTabPath: nodeProps.defaultTabPath,
               onToggleFolder: (path: string) => emit('toggle-folder', path),
               onOpenFile: (path: string) => emit('open-file', path),
               onDeleteDocument: (path: string) => emit('delete-document', path),
@@ -190,6 +316,7 @@ const WorkspaceTreeNodeView = defineComponent({
               onFolderDrop: (event: DragEvent, path: string) => emit('folder-drop', event, path),
               onFileDragStart: (event: DragEvent, path: string) => emit('file-drag-start', event, path),
               onDragEnd: () => emit('drag-end'),
+              onUpdateFocusedPath: (path: string) => emit('update-focused-path', path),
             })))
           : null,
       ])
@@ -217,7 +344,9 @@ const WorkspaceTreeNodeView = defineComponent({
         h('button', {
           class: 'workspace-tree__file-open',
           type: 'button',
+          tabindex: tabIndex.value,
           onClick: () => emit('open-file', node.path),
+          onFocus: () => emit('update-focused-path', node.path),
         }, [
           h(CanvasIcon, {
             class: 'workspace-tree__file-icon',
@@ -231,6 +360,7 @@ const WorkspaceTreeNodeView = defineComponent({
           type: 'button',
           'aria-label': nodeProps.deleteTitle,
           'data-tooltip': nodeProps.deleteTitle,
+          tabindex: -1,
           onClick: (event: MouseEvent) => {
             event.stopPropagation()
             emit('delete-document', node.path)
