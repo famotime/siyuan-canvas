@@ -11,7 +11,7 @@
       @click="editor.toggleInspectorSection('selection')"
     >
       <h2>{{ t("inspectorNode") }}</h2>
-      <span>{{ getSectionChevron('selection') }}</span>
+      <CanvasIcon name="chevron-right" class="inspector__section-chevron" :class="{ 'inspector__section-chevron--expanded': editor.inspectorSectionState.selection }" />
     </button>
     <div v-if="editor.inspectorSectionState.selection">
       <p
@@ -20,46 +20,50 @@
       >
         {{ t("selectionCount", { count: editor.selectedNodeCount }) }}
       </p>
-      <label>
-        {{ t("fieldX") }}
-        <input
-          data-testid="inspector-node-x"
-          :value="isNaN(getDraftValue('x')) ? '' : getDraftValue('x')"
-          :placeholder="isNaN(getDraftValue('x')) ? '--' : ''"
-          type="number"
-          @input="handleNumberInput('x', $event)"
-        />
-      </label>
-      <label>
-        {{ t("fieldY") }}
-        <input
-          data-testid="inspector-node-y"
-          :value="isNaN(getDraftValue('y')) ? '' : getDraftValue('y')"
-          :placeholder="isNaN(getDraftValue('y')) ? '--' : ''"
-          type="number"
-          @input="handleNumberInput('y', $event)"
-        />
-      </label>
-      <label>
-        {{ t("fieldWidth") }}
-        <input
-          data-testid="inspector-node-width"
-          :value="isNaN(getDraftValue('width')) ? '' : getDraftValue('width')"
-          :placeholder="isNaN(getDraftValue('width')) ? '--' : ''"
-          type="number"
-          @input="handleNumberInput('width', $event)"
-        />
-      </label>
-      <label>
-        {{ t("fieldHeight") }}
-        <input
-          data-testid="inspector-node-height"
-          :value="isNaN(getDraftValue('height')) ? '' : getDraftValue('height')"
-          :placeholder="isNaN(getDraftValue('height')) ? '--' : ''"
-          type="number"
-          @input="handleNumberInput('height', $event)"
-        />
-      </label>
+      <div class="inspector__field-row">
+        <label>
+          {{ t("fieldX") }}
+          <input
+            data-testid="inspector-node-x"
+            :value="isNaN(getDraftValue('x')) ? '' : getDraftValue('x')"
+            :placeholder="isNaN(getDraftValue('x')) ? '--' : ''"
+            type="number"
+            @input="handleNumberInput('x', $event)"
+          />
+        </label>
+        <label>
+          {{ t("fieldY") }}
+          <input
+            data-testid="inspector-node-y"
+            :value="isNaN(getDraftValue('y')) ? '' : getDraftValue('y')"
+            :placeholder="isNaN(getDraftValue('y')) ? '--' : ''"
+            type="number"
+            @input="handleNumberInput('y', $event)"
+          />
+        </label>
+      </div>
+      <div class="inspector__field-row">
+        <label>
+          {{ t("fieldWidth") }}
+          <input
+            data-testid="inspector-node-width"
+            :value="isNaN(getDraftValue('width')) ? '' : getDraftValue('width')"
+            :placeholder="isNaN(getDraftValue('width')) ? '--' : ''"
+            type="number"
+            @input="handleNumberInput('width', $event)"
+          />
+        </label>
+        <label>
+          {{ t("fieldHeight") }}
+          <input
+            data-testid="inspector-node-height"
+            :value="isNaN(getDraftValue('height')) ? '' : getDraftValue('height')"
+            :placeholder="isNaN(getDraftValue('height')) ? '--' : ''"
+            type="number"
+            @input="handleNumberInput('height', $event)"
+          />
+        </label>
+      </div>
       <label v-if="'color' in editor.selectedNode">
         {{ t("fieldColor") }}
         <input
@@ -127,7 +131,7 @@
       @click="editor.toggleInspectorSection('nodeEdges')"
     >
       <h2>{{ t("inspectorNodeEdges") }}</h2>
-      <span>{{ getSectionChevron('nodeEdges') }}</span>
+      <CanvasIcon name="chevron-right" class="inspector__section-chevron" :class="{ 'inspector__section-chevron--expanded': editor.inspectorSectionState.nodeEdges }" />
     </button>
     <div v-if="editor.inspectorSectionState.nodeEdges">
       <div
@@ -167,7 +171,7 @@
       @click="editor.toggleInspectorSection('createEdge')"
     >
       <h2>{{ t("inspectorCreateEdge") }}</h2>
-      <span>{{ getSectionChevron('createEdge') }}</span>
+      <CanvasIcon name="chevron-right" class="inspector__section-chevron" :class="{ 'inspector__section-chevron--expanded': editor.inspectorSectionState.createEdge }" />
     </button>
     <div
       v-if="editor.inspectorSectionState.createEdge"
@@ -190,10 +194,7 @@
             :style="getInspPickerLabelStyle('source')"
             :title="getInspPickerLabel('source')"
           >{{ getInspPickerLabel('source') }}</span>
-          <span
-            ref="inspSourceChevronRef"
-            class="insp-node-picker__trigger-chevron"
-          >{{ activeInspPicker === 'source' ? '▴' : '▾' }}</span>
+          <CanvasIcon name="chevron-right" class="insp-node-picker__trigger-chevron" :class="{ 'insp-node-picker__trigger-chevron--expanded': activeInspPicker === 'source' }" />
         </button>
         <div
           v-if="activeInspPicker === 'source'"
@@ -206,16 +207,16 @@
             :placeholder="t('fieldSearchNodePlaceholder')"
           >
           <div class="insp-node-picker__options">
-            <button
+            <div
               v-for="node in editor.edgeSources"
               :key="node.id"
               class="insp-node-picker__option"
-              type="button"
+              role="button"
               :title="editor.getNodeTitle(node)"
               @click="selectInspNode('source', node.id)"
             >
-              {{ editor.getNodeTitle(node) }}
-            </button>
+              <span class="insp-node-picker__option-label">{{ editor.getNodeTitle(node) }}</span>
+            </div>
             <p
               v-if="editor.edgeSources.length === 0"
               class="insp-node-picker__empty"
@@ -251,10 +252,7 @@
             :style="getInspPickerLabelStyle('target')"
             :title="getInspPickerLabel('target')"
           >{{ getInspPickerLabel('target') }}</span>
-          <span
-            ref="inspTargetChevronRef"
-            class="insp-node-picker__trigger-chevron"
-          >{{ activeInspPicker === 'target' ? '▴' : '▾' }}</span>
+          <CanvasIcon name="chevron-right" class="insp-node-picker__trigger-chevron" :class="{ 'insp-node-picker__trigger-chevron--expanded': activeInspPicker === 'target' }" />
         </button>
         <div
           v-if="activeInspPicker === 'target'"
@@ -267,16 +265,16 @@
             :placeholder="t('fieldSearchNodePlaceholder')"
           >
           <div class="insp-node-picker__options">
-            <button
+            <div
               v-for="node in editor.edgeTargets"
               :key="node.id"
               class="insp-node-picker__option"
-              type="button"
+              role="button"
               :title="editor.getNodeTitle(node)"
               @click="selectInspNode('target', node.id)"
             >
-              {{ editor.getNodeTitle(node) }}
-            </button>
+              <span class="insp-node-picker__option-label">{{ editor.getNodeTitle(node) }}</span>
+            </div>
             <p
               v-if="editor.edgeTargets.length === 0"
               class="insp-node-picker__empty"
@@ -320,7 +318,7 @@
       @click="editor.toggleInspectorSection('edge')"
     >
       <h2>{{ t("inspectorEdge") }}</h2>
-      <span>{{ getSectionChevron('edge') }}</span>
+      <CanvasIcon name="chevron-right" class="inspector__section-chevron" :class="{ 'inspector__section-chevron--expanded': editor.inspectorSectionState.edge }" />
     </button>
     <div
       v-if="editor.inspectorSectionState.edge"
@@ -387,6 +385,7 @@ export default { name: "CanvasInspector" }
 </script>
 
 <script setup lang="ts">
+import { CanvasIcon } from '@/components/canvas/canvas-icon'
 import {
   computed,
   nextTick,
@@ -461,11 +460,9 @@ const activeInspPicker = ref<InspPickerKind | null>(null)
 const inspSourcePickerRef = ref<HTMLElement>()
 const inspSourceSearchRef = ref<HTMLInputElement>()
 const inspSourceTriggerRef = ref<HTMLButtonElement>()
-const inspSourceChevronRef = ref<HTMLElement>()
 const inspTargetPickerRef = ref<HTMLElement>()
 const inspTargetSearchRef = ref<HTMLInputElement>()
 const inspTargetTriggerRef = ref<HTMLButtonElement>()
-const inspTargetChevronRef = ref<HTMLElement>()
 
 const inspPickerLabelMaxWidths = reactive<Record<InspPickerKind, number>>({
   source: 0,
@@ -501,13 +498,12 @@ function updateInspPickerLabelMaxWidth(kind: InspPickerKind): void {
     return
   }
 
-  const chevron = kind === 'source' ? inspSourceChevronRef.value : inspTargetChevronRef.value
   const styles = window.getComputedStyle(trigger)
   const availableWidth = trigger.clientWidth
     - getNumericStyleValue(styles, 'padding-left')
     - getNumericStyleValue(styles, 'padding-right')
     - getNumericStyleValue(styles, 'column-gap')
-    - (chevron?.offsetWidth ?? 0)
+    - 24
 
   inspPickerLabelMaxWidths[kind] = Math.max(0, Math.floor(availableWidth))
 }
@@ -728,10 +724,6 @@ function focusConnectedNode(nodeId: string): void {
   props.editor.centerSelectionInViewport()
 }
 
-function getSectionChevron(section: keyof typeof props.editor.inspectorSectionState): string {
-  return props.editor.inspectorSectionState[section] ? "−" : "+"
-}
-
 function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSectionState): string {
   return props.editor.inspectorSectionState[section]
     ? props.t("inspectorCollapseSection")
@@ -749,7 +741,13 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   border-radius: 16px;
   background: var(--canvas-inspector-section-bg);
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.inspector__field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .inspector__action-button {
@@ -795,6 +793,14 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   box-shadow: none;
 }
 
+.inspector__section-chevron {
+  color: var(--canvas-text-muted);
+  transition: transform 0.2s ease;
+}
+.inspector__section-chevron--expanded {
+  transform: rotate(90deg);
+}
+
 .inspector__section-toggle {
   display: flex;
   align-items: center;
@@ -812,9 +818,9 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .inspector__section h2 {
   margin: 0;
   font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--canvas-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--canvas-text);
 }
 
 .inspector__section label {
@@ -917,6 +923,10 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .insp-node-picker__trigger-chevron {
   flex: 0 0 auto;
   color: var(--canvas-text-muted);
+  transition: transform 0.2s ease;
+}
+.insp-node-picker__trigger-chevron--expanded {
+  transform: rotate(90deg);
 }
 
 .insp-node-picker__panel {
@@ -955,24 +965,29 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 }
 
 .insp-node-picker__option {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
   min-width: 0;
-  min-height: 28px;
+  height: 28px;
   border: 0;
   border-radius: 8px;
   background: var(--canvas-floating-button-bg);
   padding: 6px 8px;
   color: var(--canvas-text);
   font-size: 12px;
-  line-height: 1.4;
   text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.insp-node-picker__option-label {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  white-space: nowrap;
-  cursor: pointer;
-  box-sizing: border-box;
+  line-height: 16px;
 }
 
 .insp-node-picker__option:hover {

@@ -189,8 +189,8 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       return
     }
 
-    // 缩放快捷键
-    if (isAccelerator && (key === '=' || key === '+')) {
+    // 缩放快捷键（使用 Shift 避免与思源/系统内置快捷键冲突）
+    if (!isAccelerator && event.shiftKey && (key === '=' || key === '+' || event.code === 'Equal')) {
       if (zoomIn) {
         event.preventDefault()
         zoomIn()
@@ -198,7 +198,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       return
     }
 
-    if (isAccelerator && key === '-') {
+    if (!isAccelerator && event.shiftKey && (key === '-' || event.code === 'Minus')) {
       if (zoomOut) {
         event.preventDefault()
         zoomOut()
@@ -206,7 +206,7 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
       return
     }
 
-    if (isAccelerator && key === '0') {
+    if (!isAccelerator && event.shiftKey && (key === '0' || event.code === 'Digit0')) {
       if (zoomToActualSize) {
         event.preventDefault()
         zoomToActualSize()

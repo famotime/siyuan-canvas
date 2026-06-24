@@ -48,6 +48,7 @@ import {
   toBoardX,
   toBoardY,
 } from "@/canvas/board"
+import { clampViewportScale, scaleViewportAtPoint } from '@/canvas/viewport'
 import { computeAlignment } from "@/canvas/alignment-guides"
 import type { AlignmentGuideLine } from "@/canvas/alignment-guides"
 import { computeResizeGuides } from "@/canvas/resize-guides"
@@ -761,7 +762,17 @@ export function useCanvasEditor(
   }
 
   function zoomToActualSize() {
-    viewport.scale = 1
+    const stage = stageRef.value
+    if (!stage) {
+      viewport.scale = 1
+      return
+    }
+    const rect = stage.getBoundingClientRect()
+    const center = { x: rect.width / 2, y: rect.height / 2 }
+    const nextViewport = scaleViewportAtPoint(viewport, center, 1)
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
+    viewport.scale = nextViewport.scale
   }
 
   function nudgeSelection(dx: number, dy: number): boolean {

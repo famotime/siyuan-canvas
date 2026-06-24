@@ -204,8 +204,8 @@ describe("selection toolbar helpers", () => {
       { x: 240, y: 340 },
       "top",
     )).toEqual({
-      fromControl: { x: 200, y: 184 },
-      toControl: { x: 240, y: 256 },
+      fromControl: { x: 200, y: 220 },
+      toControl: { x: 240, y: 220 },
     })
 
     expect(getEdgeCurveControlPoints(
@@ -214,8 +214,8 @@ describe("selection toolbar helpers", () => {
       { x: 360, y: 260 },
       "left",
     )).toEqual({
-      fromControl: { x: 191, y: 220 },
-      toControl: { x: 269, y: 260 },
+      fromControl: { x: 220, y: 220 },
+      toControl: { x: 240, y: 260 },
     })
   })
 
@@ -623,19 +623,19 @@ describe("useCanvasEditor selection toolbar integration", () => {
 
     window.dispatchEvent(new PointerEvent("pointermove", {
       bubbles: true,
-      clientX: 140,
+      clientX: 125,
       clientY: 100,
     }))
     window.dispatchEvent(new PointerEvent("pointerup", {
       bubbles: true,
-      clientX: 140,
+      clientX: 125,
       clientY: 100,
     }))
     await nextTick()
 
     expect(editor.state.document.nodes[0]).toMatchObject({
-      x: 140,
-      width: 160,
+      x: 125,
+      width: 175,
       y: 100,
       height: 120,
     })
@@ -919,7 +919,7 @@ describe("useCanvasEditor selection toolbar integration", () => {
     wrapper.unmount()
   })
 
-  it("deletes a selected edge when its endpoint is dropped on blank space", async () => {
+  it("sets pending card creation when an edge endpoint is dropped on blank space", async () => {
     let editor!: ReturnType<typeof useCanvasEditor>
 
     const plugin = { app: {} }
@@ -986,8 +986,11 @@ describe("useCanvasEditor selection toolbar integration", () => {
     }))
     await nextTick()
 
-    expect(editor.state.document.edges).toEqual([])
-    expect(editor.state.selectedEdgeId).toBe("")
+    // Edge is preserved and pendingCardCreation is set for on-the-fly card creation
+    expect(editor.state.document.edges).toHaveLength(1)
+    expect(editor.pendingCardCreation.reconnectEdgeId).toBe("e1")
+    expect(editor.pendingCardCreation.reconnectEndpoint).toBe("to")
+    expect(editor.state.selectedEdgeId).toBe("e1")
 
     wrapper.unmount()
   })

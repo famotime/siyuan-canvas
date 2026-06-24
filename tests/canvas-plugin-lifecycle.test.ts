@@ -806,7 +806,7 @@ describe("canvas plugin lifecycle", () => {
       },
     })
     expect(plugin.addTab).toHaveBeenCalledTimes(1)
-    expect(plugin.addTopBar).toHaveBeenCalledTimes(1)
+    expect(plugin.addTopBar).toHaveBeenCalledTimes(0)
     expect(plugin.addCommand).toHaveBeenCalledTimes(4)
     expect(plugin.addIcons).toHaveBeenCalledTimes(2)
     expect(plugin.addDock).toHaveBeenCalledTimes(1)

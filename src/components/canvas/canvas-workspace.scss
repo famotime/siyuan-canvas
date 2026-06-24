@@ -1,40 +1,40 @@
-/* 璁捐 token 鍏ㄩ儴浠庢€濇簮 --b3-* 娲剧敓锛沜olor-mix 缁熶竴澶勭悊閫忔槑/娣疯壊锛屼富棰樺垏鎹㈤浂澶遍厤 */
+/* 设计 token 全部从思源 --b3-* 派生，color-mix 统一处理透明/混色，主题切换零适配 */
 .canvas-shell {
-  /* 琛ㄩ潰灞?*/
+  /* 表面层 */
   --canvas-bg: var(--b3-theme-background);
   --canvas-surface: var(--b3-theme-surface);
   --canvas-surface-elevated: var(--b3-theme-surface);
   --canvas-surface-overlay: color-mix(in srgb, var(--b3-theme-surface) 82%, transparent);
   --canvas-toolbar-bg: color-mix(in srgb, var(--b3-theme-surface) 92%, transparent);
 
-  /* 杈规 */
+  /* 边框 */
   --canvas-border: var(--b3-border-color);
   --canvas-border-strong: color-mix(in srgb, var(--b3-theme-on-surface) 16%, transparent);
 
-  /* 鏂囧瓧 */
+  /* 文字 */
   --canvas-text: var(--b3-theme-on-surface);
   --canvas-text-muted: var(--b3-theme-on-surface-light);
 
-  /* 寮鸿皟鑹?*/
+  /* 强调色 */
   --canvas-accent: var(--b3-theme-primary);
   --canvas-accent-contrast: var(--b3-theme-on-primary);
   --canvas-accent-soft: color-mix(in srgb, var(--b3-theme-primary) 14%, transparent);
   --canvas-accent-strong: color-mix(in srgb, var(--b3-theme-primary) 72%, transparent);
   --canvas-search-highlight-color: var(--sfsr-highlight-color, var(--b3-theme-primary));
 
-  /* 璇箟鑹?*/
+  /* 语义色 */
   --canvas-success: var(--b3-card-success-color, #2f7d4e);
   --canvas-success-soft: color-mix(in srgb, var(--canvas-success) 16%, transparent);
   --canvas-danger: var(--b3-card-error-color, #c04f2a);
   --canvas-danger-soft: color-mix(in srgb, var(--canvas-danger) 16%, transparent);
   --canvas-warning: var(--b3-card-warning-color, #d68f2c);
 
-  /* 鏍呮牸涓庨槾褰?*/
+  /* 网格与阴影 */
   --canvas-grid: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
   --canvas-shadow: 0 8px 20px color-mix(in srgb, var(--b3-theme-on-surface) 12%, transparent);
   --canvas-shadow-strong: 0 12px 28px color-mix(in srgb, var(--b3-theme-on-surface) 18%, transparent);
 
-  /* 娴眰 */
+  /* 浮层 */
   --canvas-floating-bg: color-mix(in srgb, var(--b3-theme-surface) 94%, transparent);
   --canvas-floating-border: color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent);
   --canvas-floating-button-bg: color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
@@ -43,22 +43,22 @@
   --canvas-floating-tooltip-bg: color-mix(in srgb, var(--b3-theme-on-surface) 92%, var(--b3-theme-surface));
   --canvas-floating-tooltip-text: var(--b3-theme-surface);
 
-  /* 閫夊尯 / 鑺傜偣 */
+  /* 选区 / 节点 */
   --canvas-selection-border: var(--canvas-accent-strong);
   --canvas-selection-fill: var(--canvas-accent-soft);
   --canvas-card-bg: var(--canvas-surface);
   --canvas-group-bg: color-mix(in srgb, var(--b3-theme-primary) 8%, transparent);
   --canvas-code-bg: color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
 
-  /* 妫€鏌ュ櫒 */
+  /* 检查器 */
 
-  /* 閿氱偣 / 璋冩暣灏哄 */
+  /* 锚点 / 调整尺寸 */
   --canvas-anchor-bg: var(--canvas-surface);
   --canvas-anchor-shadow: 0 0 0 1px color-mix(in srgb, var(--b3-theme-on-surface) 12%, transparent);
   --canvas-resize-handle: color-mix(in srgb, var(--b3-theme-on-surface) 18%, transparent);
   --canvas-resize-handle-hover: color-mix(in srgb, var(--b3-theme-on-surface) 26%, transparent);
 
-  /* 鏁翠綋姘涘洿 */
+  /* 整体氛围 */
   --canvas-shell-highlight: color-mix(in srgb, var(--b3-theme-primary) 8%, transparent);
 
   position: relative;
@@ -72,7 +72,7 @@
     linear-gradient(135deg, var(--canvas-bg), var(--canvas-surface));
 }
 
-/* 鏆楄壊妯″紡涓?color-mix 鑷姩閫傞厤锛屼粎璋冩暣灏戦噺娴眰閫忔槑搴?*/
+/* 暗色模式下 color-mix 自动适配，仅调整少量浮层透明度 */
 .canvas-shell[data-theme-mode="dark"] {
   --canvas-surface-overlay: color-mix(in srgb, var(--b3-theme-surface) 68%, transparent);
   --canvas-toolbar-bg: color-mix(in srgb, var(--b3-theme-surface) 92%, transparent);
@@ -942,7 +942,7 @@
   box-shadow: var(--canvas-shadow);
   background: var(--canvas-card-bg);
   color: var(--canvas-text);
-  /* cursor: grab 绉诲埌 header锛沚ody 鍖哄煙鍙€変腑鏂囨湰 */
+  /* cursor: grab 移动到 header，body 区域可选中文本 */
   touch-action: none;
 }
 
@@ -1003,7 +1003,7 @@
   z-index: 3;
 }
 
-/* 鑺傜偣椤堕儴 header锛氬敮涓€鎷栨嫿鎵嬫焺锛涘寘鍚被鍨嬪浘鏍?+ 鏍囬 + 鍙€夋搷浣?*/
+/* 节点顶部 header：唯一拖拽手柄；包含类型图标 + 标题 + 可选操作 */
 .canvas-node__header {
   display: flex;
   align-items: center;
@@ -1098,7 +1098,7 @@
   background: transparent;
 }
 
-/* 鏂囨湰/閾炬帴鑺傜偣鐨?body 鏄敤鎴峰唴瀹瑰尯锛屽彲閫夋嫨鏂囨湰/涓嶈Е鍙戞嫋鍔?*/
+/* 文本/链接节点的 body 是用户内容区，可选择文本/不触发拖动 */
 .canvas-node__body--selectable {
   user-select: text;
   -webkit-user-select: text;
@@ -1435,7 +1435,7 @@
   opacity: 1;
 }
 
-/* 瑙﹀睆鐜锛堟棤 hover銆佺矖鎸囬拡锛夛細鏀惧ぇ鍛戒腑鍖哄煙銆乻elected 鑺傜偣鐨勯敋鐐瑰父椹?*/
+/* 触屏环境（无 hover、粗指针）：放大命中区域、selected 节点的锚点常驻 */
 @media (hover: none) and (pointer: coarse) {
   .canvas-node__anchor {
     width: 44px;
@@ -1447,7 +1447,7 @@
     transform: translate(-50%, -50%) scale(1);
   }
 
-  /* 瑙﹀睆娌℃湁 hover 鏄剧ず tooltip 鐨勮涔夛紝骞茶剢绂佺敤 ::after 鐨?tooltip 娴眰閬垮厤 tap 鎶栧姩 */
+  /* 触屏没有 hover 显示 tooltip 的语义，干脆禁用 ::after 的 tooltip 浮层避免 tap 抖动 */
   .toolbar__button[data-tooltip]::after,
   .toolbar__stat[data-tooltip]::after,
   .bottom-toolbar__button[data-tooltip]::after,
@@ -1456,7 +1456,7 @@
     display: none;
   }
 
-  /* 搴曟爮鎸夐挳 hover 鎶崌瀵硅Е灞忔棤鎰忎箟涓斾細闂儊锛屽叧鎺?*/
+  /* 底栏按钮 hover 抬升对触屏无意义且会闪烁，关闭 */
   .bottom-toolbar__button:hover,
   .selection-toolbar__button:hover,
   .selection-toolbar__menu-button:hover {
@@ -1559,7 +1559,9 @@
 }
 
 .inspector {
-  overflow: auto;
+  overflow: hidden;
+  box-sizing: border-box;
+  min-height: 0;
   padding: 18px;
   border-left: 1px solid var(--canvas-border);
   display: flex;
@@ -1595,10 +1597,17 @@
 }
 
 .inspector__content {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   gap: 12px;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .inspector__toolbar {
@@ -2227,7 +2236,7 @@
   left: 0;
 }
 
-/* 鏈€変腑鏃剁洊涓€灞傞€忔槑閬僵锛岀‘淇濇嫋鍔ㄤ簨浠惰兘钀藉湪鑺傜偣涓婅€屼笉鏄?iframe锛涢€変腑鍚庤鍑烘寚閽堟潈 */
+/* 未选中时盖上一层透明遮罩，确保拖动事件能落在节点上而不是 iframe；选中后让出指针权 */
 .link-card__shield {
   position: absolute;
   inset: 0;
@@ -2482,7 +2491,7 @@
   position: relative;
 }
 
-/* 鏍戝舰宸︿晶寮曞绾匡紝璁╁眰绾ф洿娓呮櫚 */
+/* 树形左侧引导线，让层级更清晰 */
 .workspace-tree__folder-children::before {
   content: '';
   position: absolute;

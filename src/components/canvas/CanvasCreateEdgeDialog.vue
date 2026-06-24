@@ -38,17 +38,17 @@
               class="canvas-node-picker__options"
               data-testid="create-edge-source-options"
             >
-              <button
+              <div
                 v-for="node in editor.edgeSources"
                 :key="node.id"
                 class="canvas-node-picker__option"
                 data-testid="create-edge-source-option"
-                type="button"
+                role="button"
                 :title="editor.getNodeTitle(node)"
                 @click="selectEdgeNodeOption('source', node.id)"
               >
-                {{ editor.getNodeTitle(node) }}
-              </button>
+                <span class="canvas-node-picker__option-label">{{ editor.getNodeTitle(node) }}</span>
+              </div>
               <p
                 v-if="editor.edgeSources.length === 0"
                 class="canvas-node-picker__empty"
@@ -89,17 +89,17 @@
               class="canvas-node-picker__options"
               data-testid="create-edge-target-options"
             >
-              <button
+              <div
                 v-for="node in editor.edgeTargets"
                 :key="node.id"
                 class="canvas-node-picker__option"
                 data-testid="create-edge-target-option"
-                type="button"
+                role="button"
                 :title="editor.getNodeTitle(node)"
                 @click="selectEdgeNodeOption('target', node.id)"
               >
-                {{ editor.getNodeTitle(node) }}
-              </button>
+                <span class="canvas-node-picker__option-label">{{ editor.getNodeTitle(node) }}</span>
+              </div>
               <p
                 v-if="editor.edgeTargets.length === 0"
                 class="canvas-node-picker__empty"
@@ -383,20 +383,28 @@ watch(activeEdgeNodePicker, async (kind) => {
 }
 
 .canvas-node-picker__option {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
   min-width: 0;
+  height: 28px;
   border: 0;
   border-radius: 10px;
   background: var(--canvas-floating-button-bg);
   padding: 8px 10px;
   color: var(--canvas-text);
   text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.canvas-node-picker__option-label {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer;
-  box-sizing: border-box;
+  line-height: 16px;
 }
 
 .canvas-node-picker__option:hover {

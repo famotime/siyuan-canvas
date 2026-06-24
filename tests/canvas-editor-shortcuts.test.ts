@@ -14,10 +14,12 @@ function createKeyboardEvent(key: string, options: {
   metaKey?: boolean
   shiftKey?: boolean
   altKey?: boolean
+  code?: string
   target?: EventTarget | null
 } = {}) {
   const event = {
     altKey: options.altKey ?? false,
+    code: options.code ?? '',
     ctrlKey: options.ctrlKey ?? false,
     key,
     metaKey: options.metaKey ?? false,
@@ -243,7 +245,7 @@ describe('canvas editor keyboard handler', () => {
     expect(duplicateSelection).toHaveBeenCalledOnce()
   })
 
-  it('zooms in on accelerator+= and out on accelerator+-', () => {
+  it('zooms in on shift+= and out on shift+-', () => {
     const zoomIn = vi.fn()
     const zoomOut = vi.fn()
     const handler = createCanvasEditorKeyboardHandler({
@@ -252,14 +254,14 @@ describe('canvas editor keyboard handler', () => {
       zoomOut,
     })
 
-    handler.handleKeydown(createKeyboardEvent('=', { ctrlKey: true }))
-    handler.handleKeydown(createKeyboardEvent('-', { ctrlKey: true }))
+    handler.handleKeydown(createKeyboardEvent('=', { code: 'Equal', shiftKey: true }))
+    handler.handleKeydown(createKeyboardEvent('-', { code: 'Minus', shiftKey: true }))
 
     expect(zoomIn).toHaveBeenCalledOnce()
     expect(zoomOut).toHaveBeenCalledOnce()
   })
 
-  it('returns to actual size on accelerator+0 and fits on F', () => {
+  it('returns to actual size on shift+0 and fits on F', () => {
     const zoomToActualSize = vi.fn()
     const zoomToFit = vi.fn()
     const handler = createCanvasEditorKeyboardHandler({
@@ -268,7 +270,7 @@ describe('canvas editor keyboard handler', () => {
       zoomToFit,
     })
 
-    handler.handleKeydown(createKeyboardEvent('0', { ctrlKey: true }))
+    handler.handleKeydown(createKeyboardEvent('0', { code: 'Digit0', shiftKey: true }))
     handler.handleKeydown(createKeyboardEvent('f'))
 
     expect(zoomToActualSize).toHaveBeenCalledOnce()

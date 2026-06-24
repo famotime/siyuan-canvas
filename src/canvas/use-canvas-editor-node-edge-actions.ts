@@ -37,7 +37,7 @@ import {
 import { renderMarkdownPreview } from '@/canvas/markdown-preview'
 import { isWebUrl } from '@/canvas/url-detection'
 import { centerViewportOnBounds } from '@/canvas/selection-toolbar'
-import { clampViewportScale } from '@/canvas/viewport'
+import { clampViewportScale, scaleViewportAtPoint } from '@/canvas/viewport'
 import { findNonOverlappingPosition } from '@/canvas/node-overlap'
 
 const MIND_MAP_HORIZONTAL_GAP = 80
@@ -760,11 +760,33 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
   }
 
   function zoomIn() {
-    viewport.scale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
+    const stage = stageRef.value
+    if (!stage) {
+      viewport.scale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
+      return
+    }
+    const rect = stage.getBoundingClientRect()
+    const center = { x: rect.width / 2, y: rect.height / 2 }
+    const nextScale = clampViewportScale(Number((viewport.scale + 0.1).toFixed(2)))
+    const nextViewport = scaleViewportAtPoint(viewport, center, nextScale)
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
+    viewport.scale = nextViewport.scale
   }
 
   function zoomOut() {
-    viewport.scale = clampViewportScale(Number((viewport.scale - 0.1).toFixed(2)))
+    const stage = stageRef.value
+    if (!stage) {
+      viewport.scale = clampViewportScale(Number((viewport.scale - 0.1).toFixed(2)))
+      return
+    }
+    const rect = stage.getBoundingClientRect()
+    const center = { x: rect.width / 2, y: rect.height / 2 }
+    const nextScale = clampViewportScale(Number((viewport.scale - 0.1).toFixed(2)))
+    const nextViewport = scaleViewportAtPoint(viewport, center, nextScale)
+    viewport.x = nextViewport.x
+    viewport.y = nextViewport.y
+    viewport.scale = nextViewport.scale
   }
 
   return {

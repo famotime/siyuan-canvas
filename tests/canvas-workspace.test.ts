@@ -16,6 +16,12 @@ import {
 } from "vue"
 import zhCN from "@/i18n/zh_CN.json"
 
+vi.stubGlobal("localStorage", {
+  getItem: vi.fn(() => null),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+})
+
 vi.mock("@/canvas/help-dialog", () => ({
   openHelpDialog: vi.fn(),
 }))
@@ -72,6 +78,11 @@ function createEditorMock(node = createTextNode()) {
   return reactive({
     addNode: vi.fn(),
     activateNode: vi.fn(),
+    alignmentGuides: {
+      horizontal: [],
+      vertical: [],
+      visible: false,
+    },
     activateCanvasSurface: vi.fn(),
     applySelectionColor: vi.fn(),
     applySelectionLayout: vi.fn(),
@@ -185,6 +196,14 @@ function createEditorMock(node = createTextNode()) {
     newEdgeToSide: "left",
     openCreateEdgeDialog: vi.fn(),
     openFilePickerDialog: vi.fn(),
+    pendingCardCreation: {
+      canvasX: 0,
+      canvasY: 0,
+      fromNodeId: '',
+      fromSide: 'left',
+      reconnectEdgeId: '',
+      reconnectEndpoint: 'to',
+    },
     openRecentFile: vi.fn(),
     openPath: vi.fn(),
     openRecentPath: vi.fn(),
@@ -194,6 +213,13 @@ function createEditorMock(node = createTextNode()) {
     recentFiles: [],
     searchDecorations: [],
     refreshSelectedSiyuanNode: vi.fn(),
+    resizeGuides: {
+      matchNodeIds: [],
+      labels: [],
+      widthLines: [],
+      heightLines: [],
+      visible: false,
+    },
     resetViewport: vi.fn(),
     save: vi.fn(),
     selectedEdgeHandlePositions: null,
@@ -732,7 +758,7 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='node-resize-left-top']").exists()).toBe(true)
     expect(wrapper.find("[data-testid='node-resize-left-bottom']").exists()).toBe(true)
     expect(wrapper.findAll("[data-testid^='node-anchor-']")).toHaveLength(4)
-    expect(wrapper.find("[data-testid='node-resize-corner']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='node-resize-corner-br']").exists()).toBe(true)
   })
 
   it("wires edge handles and anchors to the side-aware editor actions", async () => {
@@ -751,7 +777,7 @@ describe("CanvasWorkspace", () => {
     await wrapper.find("[data-testid='node-resize-top-right']").trigger("pointerdown")
     await wrapper.find("[data-testid='node-resize-left-top']").trigger("pointerdown")
     await wrapper.find("[data-testid='node-resize-right-bottom']").trigger("pointerdown")
-    await wrapper.find("[data-testid='node-resize-corner']").trigger("pointerdown")
+    await wrapper.find("[data-testid='node-resize-corner-br']").trigger("pointerdown")
     await wrapper.find("[data-testid='node-anchor-top']").trigger("pointerdown")
     await wrapper.find("[data-testid='node-anchor-bottom']").trigger("pointerdown")
 
@@ -783,9 +809,9 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("另存为")
     expect(wrapper.find("[data-testid='top-toolbar-export']").attributes("data-tooltip")).toBe("导出")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Shift+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Shift++)")
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("aria-label")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("aria-label")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("另存为")
@@ -1577,9 +1603,6 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    await wrapper.find("[data-testid='inspector-tab-selection']").trigger("click")
-    await wrapper.vm.$nextTick()
-
     const createEdgeText = wrapper.find("[data-testid='inspector-create-edge-body']").text()
     expect(createEdgeText.indexOf("起始节点")).toBeLessThan(createEdgeText.indexOf("起点位置"))
     expect(createEdgeText.indexOf("起点位置")).toBeLessThan(createEdgeText.indexOf("目标节点"))
@@ -1613,9 +1636,6 @@ describe("CanvasWorkspace", () => {
         setTitle: vi.fn(),
       },
     })
-
-    await wrapper.find("[data-testid='inspector-tab-selection']").trigger("click")
-    await wrapper.vm.$nextTick()
 
     const selectedEdgeText = wrapper.find("[data-testid='inspector-selected-edge-body']").text()
     expect(selectedEdgeText.indexOf("起始节点")).toBeLessThan(selectedEdgeText.indexOf("起点位置"))
@@ -1660,7 +1680,9 @@ describe("CanvasWorkspace", () => {
 
   it("hides a collapsed inspector section body and wires the section toggle", async () => {
     currentEditor = createEditorMock()
-    currentEditor.inspectorSectionState.document = false
+    currentEditor.selectedNode = null
+    currentEditor.selectedNodeCount = 1
+    currentEditor.inspectorSectionState.createEdge = false
 
     const wrapper = mount(CanvasWorkspace, {
       props: {
@@ -1670,11 +1692,12 @@ describe("CanvasWorkspace", () => {
       },
     })
 
-    expect(wrapper.find("[data-testid='inspector-section-document-body']").exists()).toBe(false)
+    expect(wrapper.find("[data-testid='inspector-create-edge-body']").exists()).toBe(false)
 
-    await wrapper.find("[data-testid='inspector-section-document-toggle']").trigger("click")
+    // Only the createEdge section renders when selectedNodeCount=1 and no node/edge selected
+    await wrapper.find(".inspector__section-toggle").trigger("click")
 
-    expect(currentEditor.toggleInspectorSection).toHaveBeenCalledWith("document")
+    expect(currentEditor.toggleInspectorSection).toHaveBeenCalledWith("createEdge")
   })
 
   it("renders a single-selection floating toolbar with edit and no create-group action", async () => {
@@ -2334,9 +2357,9 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("data-tooltip")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("data-tooltip")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("data-tooltip")).toBe("另存为")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Ctrl+-)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Shift+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
-    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Ctrl++)")
+    expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Shift++)")
     expect(toolbarText).toContain("1 节点 · 0 连线")
     expect(toolbarText).toContain("已保存")
     expect(toolbarText).not.toContain("未命名.canvas")
@@ -2352,18 +2375,10 @@ describe("CanvasWorkspace", () => {
     expect(bottomToolbarStyle.getPropertyValue("--selection-toolbar-tooltip-bg").trim()).not.toBe("")
     expect(bottomToolbarStyle.getPropertyValue("--selection-toolbar-tooltip-border").trim()).not.toBe("")
     expect(wrapper.find(".workspace__inspector-handle").attributes("title")).toBe("收起侧栏")
-    expect(inspectorText).toContain("文档")
-    expect(inspectorText).not.toContain("未保存的工作区路径")
-    expect(inspectorText).not.toContain("已同步")
-    expect(inspectorText).toContain("当前工作区目录下暂无 Canvas 文件。")
-    expect(inspectorText).toContain("最近打开")
-    expect(inspectorText).toContain("暂无最近打开的工作区文件。")
+    expect(inspectorText).toContain("选区")
+    expect(inspectorText).toContain("节点")
+    expect(inspectorText).toContain("创建连线")
 
-    // 切到"选区"tab 后，节点/创建连线相关标签应出现
-    await wrapper.find("[data-testid='inspector-tab-selection']").trigger("click")
-    await wrapper.vm.$nextTick()
-    const selectionTabText = wrapper.find(".inspector").text()
-    expect(selectionTabText).toContain("节点")
-    expect(selectionTabText).toContain("创建连线")
+    expect(wrapper.find(".inspector").text()).toContain("创建连线")
   })
 })
