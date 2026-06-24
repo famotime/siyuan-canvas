@@ -14,17 +14,24 @@
         v-model="query"
         class="command-palette__input"
         :placeholder="t('commandPalettePlaceholder')"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-controls="command-palette-listbox"
+        :aria-activedescendant="filtered[activeIndex] ? `command-palette-option-${activeIndex}` : undefined"
+        :aria-expanded="open"
         autocomplete="off"
         spellcheck="false"
         @keydown="onInputKeyDown"
       >
       <ul
+        id="command-palette-listbox"
         ref="listRef"
         class="command-palette__list"
         role="listbox"
       >
         <li
           v-for="(item, idx) in filtered"
+          :id="`command-palette-option-${idx}`"
           :key="item.id"
           :class="['command-palette__item', { 'command-palette__item--active': idx === activeIndex }]"
           role="option"

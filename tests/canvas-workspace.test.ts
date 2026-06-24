@@ -787,6 +787,8 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='top-toolbar-zoom-out']").attributes("data-tooltip")).toBe("缩小 (Shift+-)")
     expect(wrapper.find("[data-testid='top-toolbar-reset-viewport']").attributes("data-tooltip")).toBe("适应内容 (F)")
     expect(wrapper.find("[data-testid='top-toolbar-zoom-in']").attributes("data-tooltip")).toBe("放大 (Shift++)")
+    expect(wrapper.find("[data-testid='top-toolbar-color-theme']").attributes("aria-haspopup")).toBe("menu")
+    expect(wrapper.find("[data-testid='top-toolbar-color-theme']").attributes("aria-expanded")).toBe("false")
     expect(wrapper.find("[data-testid='top-toolbar-new']").attributes("aria-label")).toBe("新建")
     expect(wrapper.find("[data-testid='top-toolbar-open']").attributes("aria-label")).toBe("打开")
     expect(wrapper.find("[data-testid='top-toolbar-save']").attributes("aria-label")).toBe("另存为")
@@ -2037,11 +2039,50 @@ describe("CanvasWorkspace", () => {
     expect(swatches).toHaveLength(7)
     expect(swatches[0]?.attributes("data-testid")).toBe("selection-color-clear")
     expect(wrapper.find("[data-testid='selection-color-clear']").classes()).not.toContain("selection-toolbar__swatch--active")
+    expect(wrapper.find("[data-testid='selection-color-clear']").attributes("aria-label")).toBe("清除颜色")
+    expect(wrapper.find("[data-testid='selection-color-clear']").attributes("aria-pressed")).toBe("false")
     expect(wrapper.find("[data-testid='selection-color-1']").classes()).toContain("selection-toolbar__swatch--active")
+    expect(wrapper.find("[data-testid='selection-color-1']").attributes("aria-label")).toBe("颜色 1")
+    expect(wrapper.find("[data-testid='selection-color-1']").attributes("aria-pressed")).toBe("true")
 
     await wrapper.find("[data-testid='selection-color-clear']").trigger("click")
 
     expect(currentEditor.applySelectionColor).toHaveBeenCalledWith("")
+  })
+
+  it("renders workspace context menu items with icons and menu roles", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.workspaceDocuments = [
+      { type: "file", name: "Project.canvas", path: "/data/storage/canvas/Project.canvas" },
+    ]
+    currentEditor.inspectorExpanded = true
+    currentEditor.inspectorSectionState.document = true
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    await wrapper.find(".workspace-tree__file").trigger("contextmenu", {
+      clientX: 24,
+      clientY: 32,
+    })
+    await wrapper.vm.$nextTick()
+
+    const menu = document.body.querySelector(".workspace-context-menu")
+    expect(menu?.getAttribute("role")).toBe("menu")
+    expect(menu?.querySelectorAll("[role='menuitem']").length).toBeGreaterThan(0)
+    const icon = menu?.querySelector<HTMLElement>(".workspace-context-menu__icon")
+    expect(icon).not.toBeNull()
+    expect(icon?.style.fontSize).toBe("14px")
+    expect(menu?.textContent).toContain("重命名")
+    expect(menu?.textContent).toContain("删除")
+
+    wrapper.unmount()
   })
 
   it("closes the open selection popover when clicking outside the toolbar", async () => {

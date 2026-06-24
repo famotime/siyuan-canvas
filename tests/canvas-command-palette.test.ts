@@ -48,8 +48,15 @@ describe("CanvasCommandPalette", () => {
       props: { open: true, editor: makeEditor(), t },
     })
 
+    const input = wrapper.find(".command-palette__input")
+    const list = wrapper.find(".command-palette__list")
     const items = wrapper.findAll(".command-palette__item")
     expect(items.length).toBeGreaterThan(0)
+    expect(input.attributes("role")).toBe("combobox")
+    expect(input.attributes("aria-controls")).toBe("command-palette-listbox")
+    expect(input.attributes("aria-activedescendant")).toBe("command-palette-option-0")
+    expect(list.attributes("id")).toBe("command-palette-listbox")
+    expect(items[0]?.attributes("id")).toBe("command-palette-option-0")
 
     const text = wrapper.find("[data-testid='command-palette']").text()
     expect(text).toContain("toolbarSave")

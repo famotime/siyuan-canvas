@@ -266,12 +266,12 @@ function onCustomColorClick() {
 
 .png-export-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
 }
 
 .png-export-options--3col {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 }
 
 .png-export-option {

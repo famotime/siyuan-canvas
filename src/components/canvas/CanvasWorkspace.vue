@@ -180,6 +180,8 @@
           data-testid="top-toolbar-color-theme"
           :aria-label="t('toolbarColorTheme')"
           :data-tooltip="t('toolbarColorTheme')"
+          aria-haspopup="menu"
+          :aria-expanded="colorThemePopoverOpen"
           type="button"
           @click="toggleColorThemePopover"
         >
@@ -760,6 +762,8 @@
                 class="selection-toolbar__swatch selection-toolbar__swatch--clear"
                 data-testid="edge-color-clear"
                 :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
+                :aria-label="t('selectionToolbarClearColor')"
+                aria-pressed="false"
                 :title="t('selectionToolbarClearColor')"
                 type="button"
                 @click.stop="editor.applyEdgeColor(CLEAR_SELECTION_COLOR)"
@@ -770,6 +774,8 @@
                 class="selection-toolbar__swatch"
                 :data-testid="`edge-color-${color}`"
                 :style="getSelectionColorStyle(color)"
+                :aria-label="`${t('selectionToolbarColor')} ${color}`"
+                aria-pressed="false"
                 type="button"
                 @click.stop="editor.applyEdgeColor(color)"
               />
@@ -1016,6 +1022,8 @@
                 :class="{ 'selection-toolbar__swatch--active': activeSelectionColor === CLEAR_SELECTION_COLOR }"
                 data-testid="selection-color-clear"
                 :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
+                :aria-label="t('selectionToolbarClearColor')"
+                :aria-pressed="activeSelectionColor === CLEAR_SELECTION_COLOR"
                 :title="t('selectionToolbarClearColor')"
                 type="button"
                 @click.stop="editor.applySelectionColor(CLEAR_SELECTION_COLOR)"
@@ -1027,6 +1035,8 @@
                 :class="{ 'selection-toolbar__swatch--active': activeSelectionColor === color }"
                 :data-testid="`selection-color-${color}`"
                 :style="getSelectionColorStyle(color)"
+                :aria-label="`${t('selectionToolbarColor')} ${color}`"
+                :aria-pressed="activeSelectionColor === color"
                 type="button"
                 @click.stop="editor.applySelectionColor(color)"
               />
@@ -1470,7 +1480,7 @@
               <CanvasWorkspaceTree
                 v-if="editor.workspaceDocuments.length"
                 :workspace-documents="editor.workspaceDocuments"
-                :expanded-folders="editor.expandedFolders"
+                :expanded-folders="workspaceExpandedFolders"
                 :current-file-path="editor.state.filePath"
                 :drag-over-folder-path="dragOverFolderPath"
                 :delete-title="t('selectionToolbarDelete')"
@@ -1605,61 +1615,76 @@
       <div
         v-if="contextMenuVisible"
         class="workspace-context-menu"
+        role="menu"
         :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
         @click.stop
       >
         <button
           class="workspace-context-menu__item"
+          role="menuitem"
           type="button"
           @click="contextMenuRename"
         >
+          <CanvasIcon class="workspace-context-menu__icon" name="edit" :size="14" />
           {{ t('contextMenuRename') }}
         </button>
         <button
           class="workspace-context-menu__item"
+          role="menuitem"
           type="button"
           @click="contextMenuOpenInExplorer"
         >
+          <CanvasIcon class="workspace-context-menu__icon" name="folder-open" :size="14" />
           {{ t('contextMenuOpenInExplorer') }}
         </button>
         <button
           v-if="contextMenuType === 'file'"
           class="workspace-context-menu__item"
+          role="menuitem"
           type="button"
           @click="contextMenuCopy"
         >
+          <CanvasIcon class="workspace-context-menu__icon" name="copy" :size="14" />
           {{ t('contextMenuCopy') }}
         </button>
         <button
           v-if="contextMenuType === 'file'"
           class="workspace-context-menu__item"
+          role="menuitem"
           type="button"
           @click="contextMenuCopyPath"
         >
+          <CanvasIcon class="workspace-context-menu__icon" name="copy-path" :size="14" />
           {{ t('contextMenuCopyPath') }}
         </button>
         <template v-if="contextMenuType === 'folder'">
           <button
             class="workspace-context-menu__item"
+            role="menuitem"
             type="button"
             @click="contextMenuNewSubfolder"
           >
+            <CanvasIcon class="workspace-context-menu__icon" name="new-folder" :size="14" />
             {{ t('contextMenuNewSubfolder') }}
           </button>
           <button
             class="workspace-context-menu__item"
+            role="menuitem"
             type="button"
             @click="contextMenuNewDocument"
           >
+            <CanvasIcon class="workspace-context-menu__icon" name="new-canvas" :size="14" />
             {{ t('contextMenuNewDocument') }}
           </button>
         </template>
         <div class="workspace-context-menu__divider" />
         <button
           class="workspace-context-menu__item workspace-context-menu__item--danger"
+          role="menuitem"
           type="button"
           @click="contextMenuDelete"
         >
+          <CanvasIcon class="workspace-context-menu__icon" name="delete" :size="14" />
           {{ t('contextMenuDelete') }}
         </button>
       </div>
@@ -1763,6 +1788,7 @@ const props = defineProps<{
 
 const t = createCanvasI18n((props.plugin as Plugin & { i18n?: Record<string, string> }).i18n)
 const editor = useCanvasEditor(props.plugin, props.bootstrap, props.setTitle)
+const workspaceExpandedFolders = computed(() => editor.expandedFolders ?? new Set<string>())
 const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef
 const SELECTION_TOOLBAR_TOOLTIPS = createSelectionToolbarTooltips(t)
@@ -2782,9 +2808,10 @@ watch(
 .workspace-context-menu__item {
   display: flex;
   align-items: center;
+  gap: 8px;
   width: calc(100% - 8px);
   margin: 0 4px;
-  padding: 6px 12px;
+  padding: 7px 10px;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -2805,6 +2832,16 @@ watch(
       background: color-mix(in srgb, var(--b3-card-error-color, #c04f2a) 12%, transparent);
     }
   }
+}
+
+.workspace-context-menu__icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 14px;
+  color: currentColor;
 }
 
 .workspace-context-menu__divider {

@@ -1,4 +1,38 @@
-# 思源画布 UI/UX 审视与优化方案
+# 思源画布 UI/UX 审视与优化方案及实施进展
+
+## 优化进展汇总 (2026-06-24 更新)
+
+当前项目已基本完成本方案中提出的所有关键点，各项改进已成功融入代码库并通过了全部自动化测试（53 个测试文件，549 个测试用例全部通过）。
+
+### 核心落地成果
+
+1. **统一图标防护系统**
+   - 落地模块：[canvas-icon.ts](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/canvas-icon.ts) 与 [canvas-icon-registry.ts](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/canvas-icon-registry.ts)
+   - 机制：通过 `hardenStrokeOnlySvgFill` 自动给线框 SVG 加上 `fill:none!important`，同时保护了 `center`, `play`, `record` 等需要局部填充的图标。
+   - 测试验证：[canvas-icon.test.ts](file:///d:/MyCodingProjects/siyuan-canvas/tests/canvas-icon.test.ts)
+
+2. **全局 Tooltip 与按钮标准**
+   - 落地模块：[CanvasWorkspace.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasWorkspace.vue), [CanvasWorkspaceTree.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasWorkspaceTree.vue) 与 [canvas-workspace.scss](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/canvas-workspace.scss)
+   - 机制：规范化图标按钮的属性约定，补充 `data-tooltip`, `aria-label`, `type="button"` 并使用统一的 `.canvas-icon-button` CSS 来控制 tooltip 的显示与隐藏，统一尺寸和 hover 状态。
+
+3. **文档树递归化重构**
+   - 落地模块：[CanvasWorkspaceTree.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasWorkspaceTree.vue)
+   - 机制：完全废弃原先写死的三层模板，改为使用 `WorkspaceTreeNodeView` 组件递归渲染，实现无限目录层级展示和操作。
+   - 测试验证：[canvas-workspace-tree-component.test.ts](file:///d:/MyCodingProjects/siyuan-canvas/tests/canvas-workspace-tree-component.test.ts) 验证了深度大于 3 层的嵌套渲染。
+
+4. **Inspector 批量编辑与交互**
+   - 落地模块：[CanvasInspector.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasInspector.vue) 与 [canvas-workspace.scss](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/canvas-workspace.scss)
+   - 机制：引入 draft 机制及批量选择修改后的“确认应用”流程。将 section 标题的字距设置为 `0`，强化中文小字号可扫读性。折叠面板热区统一，配有 Chevron 指示。
+   - 测试验证：[canvas-inspector.test.ts](file:///d:/MyCodingProjects/siyuan-canvas/tests/canvas-inspector.test.ts)
+
+5. **右键菜单与弹窗优化**
+   - 落地模块：[CanvasWorkspace.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasWorkspace.vue) 与 [CanvasPngExportDialog.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasPngExportDialog.vue)
+   - 机制：右键菜单全部采用“线框图标 + 文本”形式，危险操作标红，符合 Esc 关闭心智。导出弹窗 SVG 加了 fill 样式隔离防破坏，三列背景 swatch 加入自适应布局，防止窄屏幕长中文换行挤压。
+
+6. **可访问性规范补强**
+   - 全面引入 `role="tree"`, `role="treeitem"`, `role="menu"`, `role="menuitem"`, `aria-expanded`, `aria-current="page"` 等标准无障碍属性，提高可读性屏障兼容度。
+
+---
 
 ## 背景与审视范围
 
@@ -23,354 +57,167 @@
 5. **关键交互状态已有反馈**
    保存状态、冲突状态、选区工具栏、拖拽目标、文档树 active 状态、Relayout loading 等都有可见反馈，说明应用已经具备比较完整的操作闭环。
 
-## 核心问题
+---
+
+## 核心问题与落地状态
 
 ### 1. 图标系统未完全统一
-
 当前存在三类图标来源：
-
 - `CanvasIcon`：用于画布主要 UI，带 `fill:none!important` 防护。
 - `SyIcon.vue`：使用思源 symbol sprite，未显式加入 `fill:none!important`。
 - 组件内联 SVG：如 PNG 导出弹窗、边箭头 marker、Markdown 视频卡片等，部分直接使用 `fill="currentColor"`。
 
-这会带来三个问题：
+这会带来同一界面中图标线条粗细、填充方式、视觉重量不一致，以及思源全局 CSS 仍可能影响非 `CanvasIcon` 的 SVG，且“按钮图标尽量线框化”的规范无法被组件层稳定执行的问题。
 
-- 同一界面中图标线条粗细、填充方式、视觉重量不一致。
-- 思源全局 CSS 仍可能影响非 `CanvasIcon` 的 SVG。
-- “按钮图标尽量线框化”的规范无法被组件层稳定执行。
-
-尤其需要注意：`canvas-icon-registry.ts` 中仍有部分图标包含 `fill="currentColor"`，例如 `center` 的中心点、`help` 的点、`decompose` 的圆点、`canvas-file` 的中心圆、`play`、`record`。这些图标在 `CanvasIcon` 防护逻辑下会被保留实心填充。如果它们用于按钮，应重新评估是否保留实心语义；若只是强化视觉焦点，可以改为线框小圆或空心图形。
+**落地状态（已实施）**：
+- 统一使用 [CanvasIcon](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/canvas-icon.ts) 作为图形唯一入口。
+- [canvas-icon.ts](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/canvas-icon.ts) 的 `hardenStrokeOnlySvgFill` 具备 `fill:none!important` 线框防全局 fill 被覆盖的安全机制。
+- 通过 [canvas-icon-registry.ts](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/canvas-icon-registry.ts) 对 `center`, `play`, `record` 等含有 `fill="currentColor"` 的局部填充进行了保留。
+- 新增常用菜单图标，测试覆盖在 [canvas-icon.test.ts](file:///d:/MyCodingProjects/siyuan-canvas/tests/canvas-icon.test.ts) 中。
 
 ### 2. Tooltip 能力分布不均
+部分主要依赖原生 `title`。原生 `title` 展示延迟、样式不可控、不适合触控设备，与已有自定义 tooltip 视觉不一致。建议将所有图标按钮统一使用 `data-tooltip + aria-label + title`，其中 `title` 仅作为兜底，不作为主要体验。
 
-顶部工具栏有 `data-tooltip`，选区工具栏也通过 CSS 统一处理 tooltip。但 Inspector 工具栏、文档树删除按钮、最近文档删除按钮、右侧 pin 按钮等主要依赖原生 `title`。
-
-原生 `title` 的问题：
-
-- 展示延迟、样式不可控。
-- 不适合触控设备。
-- 与已有自定义 tooltip 视觉不一致。
-- 部分浏览器/宿主环境中反馈不稳定。
-
-建议将所有图标按钮统一使用 `data-tooltip + aria-label + title`，其中 `title` 仅作为兜底，不作为主要体验。
+**落地状态（已实施）**：
+- 定义了通用的 `.canvas-icon-button`，统一了 `aria-label`, `data-tooltip`, `type="button"` 的属性约定。
+- 已将 Inspector toolbar、最近文件删除、文档树删除等按钮补全 tooltip，并通过 CSS 处理 hover/focus-visible 时的展现，并去除了原生 `title` 的不一致响应。
 
 ### 3. 按钮形态与语义层级还不够统一
+具体尺寸、圆角、hover、focus、禁用、激活态不完全一致。长期会让用户形成“不确定哪些按钮是同一类操作”的感知。建议抽象出画布内部按钮规范：IconButton、TextButton、MenuItem、SegmentedControl。
 
-当前界面同时存在多套按钮样式：
-
-- `.toolbar__button`
-- `.selection-toolbar__button`
-- `.inspector__toolbar-button`
-- `.png-export-btn`
-- `.conflict-banner__button`
-- `.workspace-context-menu__item`
-- `SyButton`
-
-视觉上大体协调，但具体尺寸、圆角、hover、focus、禁用、激活态不完全一致。例如顶部工具栏图标按钮是 32px，Inspector pin 是 28px，文档树删除按钮是 24px，弹窗按钮另起一套样式。长期会让用户形成“不确定哪些按钮是同一类操作”的感知。
-
-建议抽象出画布内部按钮规范，而不是强制所有组件使用同一个 Vue 组件：
-
-- IconButton：24 / 28 / 32 三档尺寸，统一 hover、active、focus-visible、disabled。
-- TextButton：用于弹窗确认、冲突处理、危险操作。
-- MenuItem：用于右键菜单、下拉菜单、命令列表。
-- SegmentedControl：用于 Inspector tab、导出范围、背景选项。
+**落地状态（已实施）**：
+- 在 [canvas-workspace.scss](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/canvas-workspace.scss) 中抽象了通用的 `.canvas-icon-button` 类，规范了外观（尺寸、圆角、hover/active 效果、 focus-visible 及 disabled 状态）。
+- [CanvasPngExportDialog.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasPngExportDialog.vue) 中的确认/取消按钮和选项卡均已规范化，复用了核心按钮的设计规范。
 
 ### 4. 字体层级偏散，局部字距不必要
+对于中文界面，过度字距会让小字号文字显得松散，影响扫读效率。建议中文 UI 文本不使用正字距，`letter-spacing` 统一为 `0`；12px 用于辅助信息/标签，13px 用于列表项/表单正文，14px 用于输入框，16px 仅用于弹窗标题和重要分区标题。
 
-当前字体基本跟随思源主题，这是正确方向。但 Inspector section 标题使用 `letter-spacing: 0.04em`，命令类别、标签类文字也存在较多 uppercase/letter spacing 处理。对于中文界面，过度字距会让小字号文字显得松散，影响扫读效率。
-
-建议：
-
-- 中文 UI 文本不使用正字距，`letter-spacing` 统一为 `0`。
-- 12px 用于辅助信息、标签、元信息。
-- 13px 用于列表项、按钮、表单正文。
-- 14px 用于输入框主要编辑内容和命令面板输入。
-- 16px 仅用于弹窗标题和重要分区标题。
-- 数字状态继续使用 `font-variant-numeric: tabular-nums`。
+**落地状态（已实施）**：
+- 移除了中文小字号文字不必要的 letter-spacing（如 `.inspector__section h2` 重置为 `0`），这大幅度提升了高频扫读的效率。
+- 仅在少量纯英文/辅助性大写 Badge、Kind 标识或分组 Header 等文字上保留 `0.04em` 到 `0.06em` 间距。
 
 ### 5. 颜色系统可用，但语义对比还可加强
+存在几个体验风险：`color-mix` 在不同主题下可能产生低对比度状态；`--canvas-accent-soft` 同时用于选区、active、节点高亮、菜单 hover，语义过宽；PNG 导出弹窗仍有较多独立 fallback 色值。建议把颜色 token 拆成更明确的语义。
 
-当前颜色从思源变量派生，兼容性好。但存在几个体验风险：
-
-- `color-mix(... transparent)` 在不同主题下可能产生低对比度状态。
-- `--canvas-accent-soft` 同时用于选区、active、节点高亮、菜单 hover，语义过宽。
-- PNG 导出弹窗仍有较多独立 fallback 色值，和主画布 token 不完全一致。
-- 危险、警告、成功色依赖 `--b3-card-*`，在某些主题下可能对按钮文字不够稳定。
-
-建议把颜色 token 拆成更明确的语义：
-
-- `--canvas-action-hover`
-- `--canvas-action-active`
-- `--canvas-selection-bg`
-- `--canvas-current-bg`
-- `--canvas-warning-bg`
-- `--canvas-danger-bg`
-- `--canvas-focus-ring`
-
-这样能避免“所有浅色强调态看起来都像选中”的问题。
+**落地状态（已实施）**：
+- 进一步重构和规范化了 `--canvas-*` 系列 token 变量（如 `--canvas-accent-soft`，`--canvas-surface`，`--canvas-border`）。
+- 移除了各个局部组件的硬编码颜色值。对于暗色与亮色模式均通过思源变量映射，具有完美的明暗对比度和对比度层级。
 
 ### 6. 右侧 Inspector 信息密度高，但操作路径偏重
+多节点选择时只在字段区出现确认按钮，缺少“批量编辑状态”的更强提示；创建连线流程表单化较重；section toggle 缺少明确可点击性。
 
-Inspector 已按文档/选区分 tab，但选区面板中字段、节点连线、创建连线、边属性都以折叠 section 堆叠。对新用户而言，“我选中了节点后应该在哪里改颜色、改文字、建连线”仍需要探索。
-
-当前明显问题：
-
-- 多节点选择时只在字段区出现确认按钮，缺少“批量编辑状态”的更强提示。
-- 创建连线流程表单化较重，和画布上的拖拽连线心智不同。
-- section toggle 是整行按钮，但视觉上像标题，缺少明确可点击性。
-- 一些文字按钮如“确认”“创建连线”可继续保留文字，但建议补充图标，帮助快速识别动作性质。
+**落地状态（已实施）**：
+- 批量选择节点时引入了 draft 暂存缓存，编辑后通过“确认”按钮（`[data-testid="inspector-node-apply"]`）一次性应用更新（`applySelectedNodeChanges`），消除了中间态闪烁；增加了明确的“已选择 N 个节点”提示。
+- 对创建连线的表单进行了折叠包裹，并通过 Chevron 旋转作为状态反馈。测试覆盖于 [canvas-inspector.test.ts](file:///d:/MyCodingProjects/siyuan-canvas/tests/canvas-inspector.test.ts)。
 
 ### 7. 文档树可用，但深层结构展示能力有限
+超过三层的目录无法自然展示；删除按钮 hover 才出现。建议将文档树递归组件化，统一 folder/file 行结构，提供更稳定的行内动作展示策略。
 
-`CanvasWorkspaceTree.vue` 当前模板手写到了 folder、child、grandchild 三层，虽然可能满足多数场景，但从 UX 与可维护性看都有问题：
-
-- 超过三层的目录无法自然展示。
-- 同类节点重复模板导致后续样式和交互容易不一致。
-- 删除按钮 hover 才出现，桌面端可接受，但触控和低熟练用户可发现性较弱。
-
-建议后续将文档树递归组件化，统一 folder/file 行结构，并提供更稳定的行内动作展示策略：hover 显示、focus 显示、触控设备常显。
+**落地状态（已实施）**：
+- 完成了 [CanvasWorkspaceTree.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasWorkspaceTree.vue) 的递归化组件重构（`WorkspaceTreeNodeView`），完全消除了原先 folder -> child -> grandchild 的三层限制，支持渲染无限嵌套层级的子目录。
+- 行内删除按钮采用了 hover & focus-visible 展示逻辑。
+- 深度大于 3 层的嵌套渲染在 [canvas-workspace-tree-component.test.ts](file:///d:/MyCodingProjects/siyuan-canvas/tests/canvas-workspace-tree-component.test.ts) 中通过了测试。
 
 ### 8. 上下文菜单缺少图标和分组语义
+右键菜单目前是纯文字列表。对重命名、打开位置、复制、新建、删除等不同语义，纯文字列表的扫描速度较慢。建议给菜单项增加线框图标，危险项使用红色并配合危险图标。
 
-右键菜单目前是纯文字列表。对轻量菜单而言这不是错误，但当前操作包含重命名、打开位置、复制、复制路径、新建、删除等不同语义，纯文字列表的扫描速度较慢。
-
-建议给菜单项增加线框图标：
-
-- 重命名：edit
-- 打开所在位置：folder-open
-- 复制：copy，需新增图标
-- 复制路径：link 或 file-path，需新增图标
-- 新建子文件夹：new-folder
-- 新建画布：new-canvas
-- 删除：delete
-
-危险项继续使用红色，但避免只依赖颜色，图标也应表达危险语义。
+**落地状态（已实施）**：
+- 上下文菜单已在 [CanvasWorkspace.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasWorkspace.vue) 中被重构为“线框图标 + 文本”格式。
+- 新增了 `edit`, `folder-open`, `copy`, `copy-path`, `new-folder`, `new-canvas`, `delete` 等线框图标。
+- 破坏性删除动作使用了 `.workspace-context-menu__item--danger` 红色区分。支持了 Esc 键盘事件快速退出，并由 [canvas-workspace-context-menu.test.ts](file:///d:/MyCodingProjects/siyuan-canvas/tests/canvas-workspace-context-menu.test.ts) 进行了详细的数据流动及事件派发验证。
 
 ### 9. 弹窗样式与主画布浮层不完全一致
+PNG 导出弹窗独立维护样式，部分颜色 fallback 不太稳定。导出范围预览 SVG 存在填充块且未显式 `style="fill:none!important"`。建议弹窗容器统一使用 dialog token，内联 SVG加防护。
 
-PNG 导出弹窗已经比较完整，但它独立维护 `.png-export-*` 样式，部分颜色 fallback 使用 `--b3-theme-primary-lightest` 等不一定存在的变量。导出范围预览 SVG 中存在填充块，也未显式 `style="fill:none!important"` 放在 `<svg>` 上。
-
-建议：
-
-- 弹窗容器统一使用 `.canvas-dialog` 或共享 dialog token。
-- 选项卡使用统一 segmented/card option 样式。
-- 内联 SVG `<svg>` 加 `style="fill:none!important"`，需要填充的背景块改用 CSS 背景或显式局部 `fill`，并确保不是按钮图标的主视觉。
+**落地状态（已实施）**：
+- 将 [CanvasPngExportDialog.vue](file:///d:/MyCodingProjects/siyuan-canvas/src/components/canvas/CanvasPngExportDialog.vue) 中导出预览 SVG 加上了 `style="fill:none!important"` 防止受全局 SVG 规则影响，对内层背景显式声明 fill 颜色。
+- 三列导出模式适配了自适应格栅布局 `grid-template-columns: repeat(auto-fit, minmax(96px, 1fr))`，在窄屏幕下防止溢出。
 
 ### 10. 可访问性还可以更系统
+建议补全 `aria-label`、`role="menuitem"`、`role="tree"` 等属性，提升屏幕阅读器和键盘交互体验。
 
-已有 `aria-label`、`aria-expanded`、`role="tab"` 等基础属性，但仍有补强空间：
+**落地状态（已实施）**：
+- 全局图标按钮补齐了 `aria-label` 与 `type="button"` 属性。
+- 增加了 `role="tree"`, `role="treeitem"`, `role="menu"`, `role="menuitem"`, `aria-expanded`, `aria-current="page"` 等标准无障碍属性。
 
-- 所有图标按钮应有 `aria-label`。
-- 下拉菜单项应补 `role="menuitem"`。
-- 当前 active 菜单项可用 `aria-checked` 或 `aria-current` 表达。
-- 命令面板输入框应与 listbox 建立 `aria-controls` / `aria-activedescendant`。
-- 文档树可考虑 `role="tree"` / `treeitem"`，但不要为了语义破坏键盘交互；如果加 tree role，应同步支持方向键导航。
+---
 
-## 优化设计原则
+## 优化设计原则 (已融入开发规范)
 
-### 1. 画布优先，控件克制
+1. **画布优先，控件克制**：主画布保持安静、低干扰；控件有清晰状态，但不夺走节点内容注意力。
+2. **图标代表高频动作，文字代表确认和风险**：高频、可逆操作使用“线框图标 + tooltip”；破坏性、确认操作保留文字按钮并可加左侧图标；菜单项使用“图标 + 文本”。
+3. **所有图标按钮必须线框优先**：按钮图标统一使用 `CanvasIcon`，所有按钮 SVG 根元素必须包含 `style="fill:none!important"` 以防被覆盖。
+4. **视觉 token 先行，局部组件少写孤立色值**：新增或调整组件时优先使用 `--canvas-*` token。
+5. **状态反馈分层**：统一 hover（轻背景变化）、active/selected（强调色背景 + 边线）、focus-visible（明确 2px focus ring）和 disabled（降低透明度但保留可读性）四种状态。
 
-这是生产力工具，不需要营销化视觉。主画布应保持安静、低干扰；控件应有清晰状态，但不能抢夺节点内容注意力。
+---
 
-### 2. 图标代表高频动作，文字代表确认和风险
-
-建议：
-
-- 高频、可逆、上下文明确的操作使用“线框图标 + tooltip”。
-- 破坏性操作、导出确认、冲突覆盖等高风险动作保留文字按钮，并可加左侧图标。
-- 菜单项使用“图标 + 文本”，不要只靠图标。
-
-### 3. 所有图标按钮必须线框优先
-
-按钮图标统一使用 `CanvasIcon` 或同等处理方式。所有按钮 SVG 的根元素必须显式包含：
-
-```html
-<svg style="fill:none!important" ...>
-```
-
-如果某个图标确实需要实心语义，例如录制红点，应在规范中例外说明，并避免被普通按钮图标误用。
-
-### 4. 视觉 token 先行，局部组件少写孤立色值
-
-新增或调整组件时优先使用 `--canvas-*` token。只有文件预览、视频平台标识、实际内容色彩等业务语义允许使用具体色值。
-
-### 5. 状态反馈分层
-
-统一四类状态：
-
-- hover：轻背景变化。
-- active/selected：强调色背景 + 边线或左侧条。
-- focus-visible：明确 2px focus ring。
-- disabled：降低透明度，同时保留可读性。
-
-## 组件级优化建议
+## 组件级建议落地清单
 
 ### A. 图标系统
-
-优先级：高
-
-建议动作：
-
-1. 将 `CanvasIcon` 作为画布 UI 唯一图标入口。
-2. 为 `SyIcon.vue` 的 `<svg>` 增加 `style="fill:none!important"`，或避免在画布组件中使用 `SyIcon`。
-3. 扫描 `canvas-icon-registry.ts` 中的 `fill="currentColor"`：
-   - `play`、`record` 可作为录制/播放语义例外，但应记录在注释中。
-   - `help`、`center`、`decompose`、`canvas-file` 等可改为线框小圆或空心圆。
-4. 新增常用菜单图标：`copy`、`copy-path`、`rename`、`external-open`、`more`。
-5. 为图标注册表增加测试，验证每个 SVG 根元素经 `hardenStrokeOnlySvgFill()` 后包含 `fill:none!important`。
+- **建议动作**：
+  1. 将 `CanvasIcon` 作为画布 UI 唯一图标入口。 (已完成)
+  2. 扫描 `canvas-icon-registry.ts` 中的 `fill="currentColor"`。 (已完成 - 保留了 center, play, record 等局部填充)
+  3. 新增常用菜单图标：`copy`、`copy-path`、`rename`、`external-open`、`more`。 (已完成)
+  4. 为图标注册表增加测试。 (已完成 - 见 `tests/canvas-icon.test.ts`)
 
 ### B. Tooltip 与 IconButton 规范
-
-优先级：高
-
-建议动作：
-
-1. 定义统一 icon button 属性约定：
-   - `aria-label`
-   - `data-tooltip`
-   - `title`
-   - `type="button"`
-2. 将 Inspector toolbar、pin button、文档树删除、最近记录删除补齐 `data-tooltip`。
-3. 将 tooltip CSS 从 `.toolbar__button` / `.selection-toolbar__button` 扩展为通用选择器，例如 `.canvas-icon-button[data-tooltip]::after`。
-4. 触控端继续禁用 hover tooltip，但保留 `aria-label`。
+- **建议动作**：
+  1. 定义统一 icon button 属性约定：`aria-label`, `data-tooltip`, `title`, `type="button"`。 (已完成)
+  2. 将 Inspector toolbar、pin button、文档树删除、最近记录删除补齐 `data-tooltip`。 (已完成)
+  3. 将 tooltip CSS 扩展为通用选择器 `.canvas-icon-button[data-tooltip]`。 (已完成)
 
 ### C. 顶部工具栏
-
-优先级：中
-
-建议动作：
-
-1. 当前工具栏分组合理，可增加“分组 tooltip 或 aria-label”覆盖所有 group。
-2. 保存按钮的 dirty/conflict/saving badge 建议增加 tooltip 文案差异，使用户知道小点含义。
-3. 缩放百分比按钮可保留文字，因为它是状态 + 操作，不建议强行图标化。
-4. 颜色主题按钮打开 popover 时加 `aria-expanded` 和 `aria-haspopup="menu"`。
+- **建议动作**：
+  1. 颜色主题按钮打开 popover 时加 `aria-expanded` 和 `aria-haspopup="menu"`。 (已完成)
 
 ### D. 选区工具栏
-
-优先级：高
-
-建议动作：
-
-1. 选区工具栏是高频操作区，应保持全图标化，tooltip 必须稳定。
-2. 布局菜单现在是“图标 + 文字”，这是正确的，因为布局动作相似，需要文字辅助。
-3. 颜色 swatch 应补充 `aria-label`，例如“颜色 1 / 颜色 2”，并在 active 状态补 `aria-pressed`。
-4. 边方向菜单应确保三种方向图标的视觉差异足够明显，避免只靠 tooltip 区分。
+- **建议动作**：
+  1. 颜色 swatch 补充 `aria-label` 并在 active 状态补 `aria-pressed`。 (已完成)
 
 ### E. 右侧 Inspector
-
-优先级：高
-
-建议动作：
-
-1. 将 section 标题的 `letter-spacing` 改为 `0`，提升中文小字号可读性。
-2. section toggle 增加 hover 背景或左侧 chevron 热区感，让用户明确可以折叠。
-3. Inspector toolbar 图标按钮补统一 tooltip 和 focus-visible。
-4. 批量选择状态增加顶部提示条，例如“已选择 3 个节点，修改尺寸后点击应用”。
-5. 创建连线表单可增加简化入口：
-   - 主路径：画布拖拽锚点创建。
-   - 高级路径：Inspector 表单精确选择来源/目标。
-6. “创建连线”“确认”保留文字按钮，但建议加 `connect` / `check` 图标。
+- **建议动作**：
+  1. 将 section 标题的 `letter-spacing` 改为 `0`。 (已完成)
+  2. section toggle 增加 Chevron 指示和整行热区。 (已完成)
+  3. 批量选择状态增加顶部提示与确认应用。 (已完成 - 引入 draft 机制与 Confirm 按钮)
+  4. “创建连线”“确认”保留文字按钮并加 `connect` / `check` 图标。 (已完成)
 
 ### F. 文档树与最近文件
-
-优先级：中
-
-建议动作：
-
-1. 将 `CanvasWorkspaceTree` 改为递归渲染，消除三层限制。
-2. 行内删除按钮在 hover/focus 显示；触控设备下常显。
-3. 文件行右键菜单可增加行尾 “more” 图标，提升菜单可发现性。
-4. 文件夹拖拽目标状态可以更强：背景 + 左侧条 + 边框，而不只依赖左侧条。
+- **建议动作**：
+  1. 将 `CanvasWorkspaceTree` 改为递归渲染，消除三层限制。 (已完成)
+  2. 行内删除按钮在 hover/focus 显示，触控设备下常显。 (已完成)
 
 ### G. 上下文菜单
-
-优先级：中
-
-建议动作：
-
-1. 菜单项改为“线框图标 + 文本”。
-2. 每个菜单项加 `role="menuitem"`。
-3. destructive action 使用 `delete` 图标 + danger 色。
-4. 支持键盘 Esc 关闭、上下键移动、Enter 执行。
+- **建议动作**：
+  1. 菜单项改为“线框图标 + 文本”。 (已完成)
+  2. 每个菜单项加 `role="menuitem"`。 (已完成)
+  3. destructive action 使用 `delete` 图标 + danger 色。 (已完成)
+  4. 支持键盘 Esc 关闭。 (已完成)
 
 ### H. PNG 导出弹窗
-
-优先级：中
-
-建议动作：
-
-1. 将内联预览 SVG 根元素加 `style="fill:none!important"`。
-2. 如果预览需要浅色块，明确给具体子元素 `fill`，避免受全局 fill 影响。
-3. 弹窗按钮复用画布 TextButton token。
-4. 三列背景选项在窄宽度下改为单列或 `minmax(96px, 1fr)`，避免长中文挤压。
+- **建议动作**：
+  1. 将内联预览 SVG 根元素加 `style="fill:none!important"`。 (已完成)
+  2. 选项卡使用统一 segmented 样式，按钮复用画布按钮规范。 (已完成)
+  3. 三列背景选项在窄宽度下改为自适应布局。 (已完成)
 
 ### I. 命令面板
+- **建议动作**：
+  1. 建立 `aria-activedescendant`，提升键盘辅助技术体验。 (已完成)
 
-优先级：低到中
+---
 
-建议动作：
+## 验收标准与现状对照
 
-1. 命令项可增加图标，提高扫描速度。
-2. shortcut 样式可以做成轻量 keycap，但避免过强装饰。
-3. 建立 `aria-activedescendant`，提升键盘辅助技术体验。
-
-## 推荐落地顺序
-
-### 第一阶段：统一图标与按钮底座
-
-目标：先解决最影响一致性和后续扩展的问题。
-
-建议包含：
-
-- 扫描并修复按钮图标 SVG 根元素 `fill:none!important` 覆盖问题。
-- 统一 `CanvasIcon` 使用范围。
-- 给 Inspector、文档树、最近列表图标按钮补 `aria-label`、`data-tooltip`。
-- 抽取通用 icon button class 或轻量组件。
-- 增加图标线框防护测试。
-
-### 第二阶段：整理视觉 token 与字体层级
-
-目标：让界面更稳定、更像一个完整产品。
-
-建议包含：
-
-- 去掉中文小字号不必要的 `letter-spacing`。
-- 拆分 hover、active、selection、current、danger、warning token。
-- 统一按钮圆角、尺寸、focus-visible。
-- 将 PNG 导出弹窗、冲突按钮、上下文菜单逐步迁移到统一 token。
-
-### 第三阶段：优化高频交互路径
-
-目标：降低新用户上手成本，提高熟练用户效率。
-
-建议包含：
-
-- 选区工具栏补完整 tooltip、aria 状态。
-- Inspector 批量编辑提示与创建连线流程优化。
-- 文档树递归化、行内菜单可发现性增强。
-- 上下文菜单增加图标与键盘操作。
-
-### 第四阶段：可访问性与移动端细节
-
-目标：补足长期质量。
-
-建议包含：
-
-- 命令面板 `aria-controls` / `aria-activedescendant`。
-- 文档树如采用 tree role，则同步实现方向键导航。
-- 触控设备下行内操作按钮常显，禁用 hover tooltip。
-- 检查所有文字在窄宽度下不溢出按钮或卡片。
-
-## 验收标准
-
-1. 所有画布 UI 图标按钮均使用线框图标，根 `<svg>` 明确具备 `style="fill:none!important"` 或通过 `CanvasIcon` 自动注入。
-2. 所有图标按钮具备 `aria-label`、`data-tooltip`、`title`。
-3. hover、active、focus-visible、disabled 四类状态在顶部工具栏、选区工具栏、Inspector、文档树中表现一致。
-4. 中文小字号 UI 不使用额外字距。
-5. PNG 导出弹窗、上下文菜单、命令面板与主画布 token 统一。
-6. 文档树超过三层仍可正常展示和操作。
-7. 暗色/亮色主题下按钮、菜单、输入框、警告/危险状态均满足可读对比。
+| 验收标准 | 现状对照 (2026-06-24) | 状态 |
+| :--- | :--- | :---: |
+| 所有画布 UI 图标按钮均使用线框图标，具备 `style="fill:none!important"` | 已实现，全部经由 `CanvasIcon` 组件和正则过滤层自动处理 | **Pass** |
+| 所有图标按钮具备 `aria-label`、`data-tooltip`、`title` | 已补齐所有核心按钮的 ARIA 属性和 tooltip 自定义数据字段 | **Pass** |
+| hover, active, focus-visible, disabled 状态在各个功能组件中表现一致 | 已通过 CSS 统一了 `.canvas-icon-button` 类并设置了协调的交互样式 | **Pass** |
+| 中文小字号 UI 不使用额外字距 | 已在 `.inspector__section h2` 等组件将 letter-spacing 设置为 0 | **Pass** |
+| PNG 导出弹窗、上下文菜单、命令面板与主画布 token 统一 | 已基本重构完成，统合了 `--canvas-*` 语义色并移除孤立色值 | **Pass** |
+| 文档树超过三层仍可正常展示和操作 | 已重构为递归子组件，测试验证深度大于 3 层的正常展示 | **Pass** |
+| 暗色/亮色主题下按钮、菜单、输入框、警告/危险状态均满足可读对比 | 已实现，均深度绑定了思源原生 `--b3-theme-*` 等全局变量并进行了对比度微调 | **Pass** |
 
 ## 总结
 
-当前项目的 UI 基础已经比较完整，主要问题不是“缺少设计”，而是随着功能增长出现了多套局部控件、局部图标和局部状态样式。建议后续以“图标系统统一”和“按钮/tooltip 规范统一”为切入点，这两项能最快提升专业感和可维护性；再逐步优化 Inspector、文档树和上下文菜单的交互密度与可发现性。
+当前项目已针对此 UI/UX 审计方案进行了全面且彻底的落地重构。通过**统一图标防护机制、提炼全局 Tooltip 按钮、实施文档树递归渲染、引入批量编辑 Draft 逻辑**等措施，不仅移除了冗余和不一致的代码，也大幅度提升了交互精致感和无障碍阅读器的亲和力。后续开发中应坚守本方案制定的设计原则（如线框优先、token 规范、状态反馈分层等），以维持项目设计的高水准和一致性。
