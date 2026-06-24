@@ -19,8 +19,9 @@ import {
 describe("canvas workspace display helpers", () => {
   it("returns the clear swatch style and falls back for unknown colors", () => {
     expect(getSelectionColorStyle("")).toEqual({
-      backgroundColor: "#9ca3af",
-      borderColor: "#94a3b8",
+      backgroundColor: "var(--canvas-surface, #ffffff)",
+      backgroundImage: "linear-gradient(135deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%)",
+      borderColor: "var(--canvas-border, #cbd5e1)",
     })
 
     expect(getSelectionColorStyle("missing")).toEqual({

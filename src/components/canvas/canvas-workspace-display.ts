@@ -12,8 +12,9 @@ export const CLEAR_SELECTION_COLOR = ""
 export const selectionColorStyles = buildColorStyles(getColorThemeById(DEFAULT_COLOR_THEME))
 
 export const clearSelectionColorStyle = {
-  border: "#94a3b8",
-  swatch: "#9ca3af",
+  border: 'var(--canvas-border, #cbd5e1)',
+  swatch: 'var(--canvas-surface, #ffffff)',
+  backgroundImage: 'linear-gradient(135deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%)',
 }
 
 function getHexChannel(value: string): number {
@@ -56,6 +57,7 @@ export function getSelectionColorStyle(
   if (!color) {
     return {
       backgroundColor: clearSelectionColorStyle.swatch,
+      backgroundImage: clearSelectionColorStyle.backgroundImage,
       borderColor: clearSelectionColorStyle.border,
     }
   }
