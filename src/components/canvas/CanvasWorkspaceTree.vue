@@ -1,196 +1,46 @@
 <template>
   <div
     class="workspace-tree"
+    role="tree"
     @dragover.prevent
     @drop.prevent="$emit('root-drop', $event)"
   >
-    <template
+    <WorkspaceTreeNodeView
       v-for="node in workspaceDocuments"
       :key="node.path"
-    >
-      <div
-        v-if="node.type === 'folder'"
-        class="workspace-tree__folder"
-      >
-        <button
-          :class="['workspace-tree__folder-header', { 'workspace-tree__folder-header--drop-target': dragOverFolderPath === node.path }]"
-          type="button"
-          :title="node.path"
-          :aria-expanded="expandedFolders.has(node.path)"
-          @click="$emit('toggle-folder', node.path)"
-          @contextmenu.prevent="$emit('context-menu', $event, node.path, 'folder')"
-          @dragover.prevent="$emit('folder-drag-over', $event)"
-          @dragenter.prevent="$emit('folder-drag-enter', $event, node.path)"
-          @dragleave="$emit('folder-drag-leave', $event, node.path)"
-          @drop.prevent="$emit('folder-drop', $event, node.path)"
-        >
-          <CanvasIcon
-            class="workspace-tree__chevron"
-            :class="{ 'workspace-tree__chevron--expanded': expandedFolders.has(node.path) }"
-            name="chevron-right"
-            :size="12"
-          />
-          <CanvasIcon
-            class="workspace-tree__folder-icon"
-            :name="expandedFolders.has(node.path) ? 'folder-open' : 'folder'"
-            :size="14"
-          />
-          <span class="workspace-tree__name">{{ node.name }}</span>
-        </button>
-        <div
-          v-if="expandedFolders.has(node.path)"
-          class="workspace-tree__folder-children"
-        >
-          <template
-            v-for="child in node.children"
-            :key="child.path"
-          >
-            <div
-              v-if="child.type === 'file'"
-              :class="['workspace-tree__file', { 'workspace-tree__file--active': child.path === currentFilePath }]"
-              draggable="true"
-              :title="child.path"
-              @contextmenu.prevent="$emit('context-menu', $event, child.path, 'file')"
-              @dragstart="$emit('file-drag-start', $event, child.path)"
-              @dragend="$emit('drag-end')"
-            >
-              <button
-                class="workspace-tree__file-open"
-                type="button"
-                @click="$emit('open-file', child.path)"
-              >
-                <CanvasIcon
-                  class="workspace-tree__file-icon"
-                  name="canvas-file"
-                  :size="14"
-                />
-                <span class="workspace-tree__name">{{ child.name }}</span>
-              </button>
-              <button
-                class="workspace-tree__file-delete"
-                :title="deleteTitle"
-                type="button"
-                @click.stop="$emit('delete-document', child.path)"
-              >
-                <CanvasIcon name="close" :size="12" />
-              </button>
-            </div>
-            <div
-              v-else-if="child.type === 'folder'"
-              class="workspace-tree__folder workspace-tree__folder--nested"
-            >
-              <button
-                :class="['workspace-tree__folder-header', { 'workspace-tree__folder-header--drop-target': dragOverFolderPath === child.path }]"
-                type="button"
-                :title="child.path"
-                :aria-expanded="expandedFolders.has(child.path)"
-                @click="$emit('toggle-folder', child.path)"
-                @contextmenu.prevent="$emit('context-menu', $event, child.path, 'folder')"
-                @dragover.prevent="$emit('folder-drag-over', $event)"
-                @dragenter.prevent="$emit('folder-drag-enter', $event, child.path)"
-                @dragleave="$emit('folder-drag-leave', $event, child.path)"
-                @drop.prevent="$emit('folder-drop', $event, child.path)"
-              >
-                <CanvasIcon
-                  class="workspace-tree__chevron"
-                  :class="{ 'workspace-tree__chevron--expanded': expandedFolders.has(child.path) }"
-                  name="chevron-right"
-                  :size="12"
-                />
-                <CanvasIcon
-                  class="workspace-tree__folder-icon"
-                  :name="expandedFolders.has(child.path) ? 'folder-open' : 'folder'"
-                  :size="14"
-                />
-                <span class="workspace-tree__name">{{ child.name }}</span>
-              </button>
-              <div
-                v-if="expandedFolders.has(child.path)"
-                class="workspace-tree__folder-children"
-              >
-                <template
-                  v-for="grandchild in child.children"
-                  :key="grandchild.path"
-                >
-                  <div
-                    v-if="grandchild.type === 'file'"
-                    :class="['workspace-tree__file', { 'workspace-tree__file--active': grandchild.path === currentFilePath }]"
-                    draggable="true"
-                    :title="grandchild.path"
-                    @contextmenu.prevent="$emit('context-menu', $event, grandchild.path, 'file')"
-                    @dragstart="$emit('file-drag-start', $event, grandchild.path)"
-                    @dragend="$emit('drag-end')"
-                  >
-                    <button
-                      class="workspace-tree__file-open"
-                      type="button"
-                      @click="$emit('open-file', grandchild.path)"
-                    >
-                      <CanvasIcon
-                        class="workspace-tree__file-icon"
-                        name="canvas-file"
-                        :size="14"
-                      />
-                      <span class="workspace-tree__name">{{ grandchild.name }}</span>
-                    </button>
-                    <button
-                      class="workspace-tree__file-delete"
-                      :title="deleteTitle"
-                      type="button"
-                      @click.stop="$emit('delete-document', grandchild.path)"
-                    >
-                      <CanvasIcon name="close" :size="12" />
-                    </button>
-                  </div>
-                </template>
-              </div>
-            </div>
-          </template>
-        </div>
-      </div>
-      <div
-        v-else-if="node.type === 'file'"
-        :class="['workspace-tree__file', { 'workspace-tree__file--active': node.path === currentFilePath }]"
-        draggable="true"
-        :title="node.path"
-        @contextmenu.prevent="$emit('context-menu', $event, node.path, 'file')"
-        @dragstart="$emit('file-drag-start', $event, node.path)"
-        @dragend="$emit('drag-end')"
-      >
-        <button
-          class="workspace-tree__file-open"
-          type="button"
-          @click="$emit('open-file', node.path)"
-        >
-          <CanvasIcon
-            class="workspace-tree__file-icon"
-            name="canvas-file"
-            :size="14"
-          />
-          <span class="workspace-tree__name">{{ node.name }}</span>
-        </button>
-        <button
-          class="workspace-tree__file-delete"
-          :title="deleteTitle"
-          type="button"
-          @click.stop="$emit('delete-document', node.path)"
-        >
-          <CanvasIcon name="close" :size="12" />
-        </button>
-      </div>
-    </template>
+      :node="node"
+      :expanded-folders="expandedFolders"
+      :current-file-path="currentFilePath"
+      :drag-over-folder-path="dragOverFolderPath"
+      :delete-title="deleteTitle"
+      @toggle-folder="$emit('toggle-folder', $event)"
+      @open-file="$emit('open-file', $event)"
+      @delete-document="$emit('delete-document', $event)"
+      @context-menu="forwardContextMenu"
+      @folder-drag-over="$emit('folder-drag-over', $event)"
+      @folder-drag-enter="forwardFolderDragEnter"
+      @folder-drag-leave="forwardFolderDragLeave"
+      @folder-drop="forwardFolderDrop"
+      @file-drag-start="forwardFileDragStart"
+      @drag-end="$emit('drag-end')"
+    />
   </div>
 </template>
 
 <script lang="ts">
-export default { name: "CanvasWorkspaceTree" }
+export default { name: 'CanvasWorkspaceTree' }
 </script>
 
 <script setup lang="ts">
-import type { WorkspaceTreeNode } from "@/canvas/use-canvas-editor-workspace-tree"
-import { CanvasIcon } from "@/components/canvas/canvas-icon"
+import {
+  defineComponent,
+  h,
+  type PropType,
+} from 'vue'
+import type { WorkspaceTreeNode } from '@/canvas/use-canvas-editor-workspace-tree'
+import { CanvasIcon } from '@/components/canvas/canvas-icon'
 
-defineProps<{
+const props = defineProps<{
   workspaceDocuments: WorkspaceTreeNode[]
   expandedFolders: Set<string>
   currentFilePath: string
@@ -198,7 +48,7 @@ defineProps<{
   deleteTitle: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'toggle-folder', path: string): void
   (e: 'open-file', path: string): void
   (e: 'delete-document', path: string): void
@@ -211,9 +61,198 @@ defineEmits<{
   (e: 'file-drag-start', event: DragEvent, path: string): void
   (e: 'drag-end'): void
 }>()
+
+function forwardContextMenu(event: MouseEvent, path: string, type: 'file' | 'folder') {
+  emit('context-menu', event, path, type)
+}
+
+function forwardFolderDragEnter(event: DragEvent, path: string) {
+  emit('folder-drag-enter', event, path)
+}
+
+function forwardFolderDragLeave(event: DragEvent, path: string) {
+  emit('folder-drag-leave', event, path)
+}
+
+function forwardFolderDrop(event: DragEvent, path: string) {
+  emit('folder-drop', event, path)
+}
+
+function forwardFileDragStart(event: DragEvent, path: string) {
+  emit('file-drag-start', event, path)
+}
+
+const WorkspaceTreeNodeView = defineComponent({
+  name: 'WorkspaceTreeNodeView',
+  props: {
+    node: {
+      required: true,
+      type: Object as PropType<WorkspaceTreeNode>,
+    },
+    expandedFolders: {
+      required: true,
+      type: Object as PropType<Set<string>>,
+    },
+    currentFilePath: {
+      required: true,
+      type: String,
+    },
+    dragOverFolderPath: {
+      default: null,
+      type: String as PropType<string | null>,
+    },
+    deleteTitle: {
+      required: true,
+      type: String,
+    },
+  },
+  emits: [
+    'toggle-folder',
+    'open-file',
+    'delete-document',
+    'context-menu',
+    'folder-drag-over',
+    'folder-drag-enter',
+    'folder-drag-leave',
+    'folder-drop',
+    'file-drag-start',
+    'drag-end',
+  ],
+  setup(nodeProps, { emit }) {
+    function renderFolder(node: Extract<WorkspaceTreeNode, { type: 'folder' }>) {
+      const expanded = nodeProps.expandedFolders.has(node.path)
+
+      return h('div', {
+        class: 'workspace-tree__folder',
+        role: 'treeitem',
+        'aria-expanded': expanded,
+      }, [
+        h('button', {
+          class: [
+            'workspace-tree__folder-header',
+            { 'workspace-tree__folder-header--drop-target': nodeProps.dragOverFolderPath === node.path },
+          ],
+          type: 'button',
+          title: node.path,
+          'aria-expanded': expanded,
+          onClick: () => emit('toggle-folder', node.path),
+          onContextmenu: (event: MouseEvent) => {
+            event.preventDefault()
+            emit('context-menu', event, node.path, 'folder')
+          },
+          onDragover: (event: DragEvent) => {
+            event.preventDefault()
+            emit('folder-drag-over', event)
+          },
+          onDragenter: (event: DragEvent) => {
+            event.preventDefault()
+            emit('folder-drag-enter', event, node.path)
+          },
+          onDragleave: (event: DragEvent) => emit('folder-drag-leave', event, node.path),
+          onDrop: (event: DragEvent) => {
+            event.preventDefault()
+            emit('folder-drop', event, node.path)
+          },
+        }, [
+          h(CanvasIcon, {
+            class: [
+              'workspace-tree__chevron',
+              { 'workspace-tree__chevron--expanded': expanded },
+            ],
+            name: 'chevron-right',
+            size: 12,
+          }),
+          h(CanvasIcon, {
+            class: 'workspace-tree__folder-icon',
+            name: expanded ? 'folder-open' : 'folder',
+            size: 14,
+          }),
+          h('span', { class: 'workspace-tree__name' }, node.name),
+        ]),
+        expanded
+          ? h('div', {
+              class: 'workspace-tree__folder-children',
+              role: 'group',
+            }, node.children.map(child => h(WorkspaceTreeNodeView, {
+              key: child.path,
+              node: child,
+              expandedFolders: nodeProps.expandedFolders,
+              currentFilePath: nodeProps.currentFilePath,
+              dragOverFolderPath: nodeProps.dragOverFolderPath,
+              deleteTitle: nodeProps.deleteTitle,
+              onToggleFolder: (path: string) => emit('toggle-folder', path),
+              onOpenFile: (path: string) => emit('open-file', path),
+              onDeleteDocument: (path: string) => emit('delete-document', path),
+              onContextMenu: (event: MouseEvent, path: string, type: 'file' | 'folder') => emit('context-menu', event, path, type),
+              onFolderDragOver: (event: DragEvent) => emit('folder-drag-over', event),
+              onFolderDragEnter: (event: DragEvent, path: string) => emit('folder-drag-enter', event, path),
+              onFolderDragLeave: (event: DragEvent, path: string) => emit('folder-drag-leave', event, path),
+              onFolderDrop: (event: DragEvent, path: string) => emit('folder-drop', event, path),
+              onFileDragStart: (event: DragEvent, path: string) => emit('file-drag-start', event, path),
+              onDragEnd: () => emit('drag-end'),
+            })))
+          : null,
+      ])
+    }
+
+    function renderFile(node: Extract<WorkspaceTreeNode, { type: 'file' }>) {
+      const active = node.path === nodeProps.currentFilePath
+
+      return h('div', {
+        class: [
+          'workspace-tree__file',
+          { 'workspace-tree__file--active': active },
+        ],
+        draggable: 'true',
+        title: node.path,
+        role: 'treeitem',
+        'aria-current': active ? 'page' : undefined,
+        onContextmenu: (event: MouseEvent) => {
+          event.preventDefault()
+          emit('context-menu', event, node.path, 'file')
+        },
+        onDragstart: (event: DragEvent) => emit('file-drag-start', event, node.path),
+        onDragend: () => emit('drag-end'),
+      }, [
+        h('button', {
+          class: 'workspace-tree__file-open',
+          type: 'button',
+          onClick: () => emit('open-file', node.path),
+        }, [
+          h(CanvasIcon, {
+            class: 'workspace-tree__file-icon',
+            name: 'canvas-file',
+            size: 14,
+          }),
+          h('span', { class: 'workspace-tree__name' }, node.name),
+        ]),
+        h('button', {
+          class: 'workspace-tree__file-delete canvas-icon-button',
+          type: 'button',
+          'aria-label': nodeProps.deleteTitle,
+          'data-tooltip': nodeProps.deleteTitle,
+          onClick: (event: MouseEvent) => {
+            event.stopPropagation()
+            emit('delete-document', node.path)
+          },
+        }, [
+          h(CanvasIcon, { name: 'close', size: 12 }),
+        ]),
+      ])
+    }
+
+    return () => {
+      return nodeProps.node.type === 'folder'
+        ? renderFolder(nodeProps.node)
+        : renderFile(nodeProps.node)
+    }
+  },
+})
+
+void props
 </script>
 
-<style scoped>
+<style>
 .workspace-tree {
   display: grid;
   gap: 1px;
@@ -361,6 +400,12 @@ defineEmits<{
 .workspace-tree__file-delete:hover {
   background: var(--canvas-danger-soft);
   color: var(--canvas-danger);
+}
+
+@media (hover: none) {
+  .workspace-tree__file-delete {
+    opacity: 1;
+  }
 }
 
 .workspace-tree__empty {

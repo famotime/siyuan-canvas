@@ -65,7 +65,7 @@
 
   position: relative;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   min-height: 100%;
   color: var(--canvas-text);
@@ -427,7 +427,7 @@
 .workspace {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 304px);
   min-height: 0;
 }
 
@@ -444,7 +444,7 @@
 .workspace__inspector-handle {
   position: absolute;
   top: 50%;
-  right: 304px;
+  right: 288px;
   z-index: 4;
   width: 28px;
   height: 56px;
@@ -716,6 +716,7 @@
 
 .toolbar__button[data-tooltip]::after,
 .toolbar__stat[data-tooltip]::after,
+.canvas-icon-button[data-tooltip]::after,
 .bottom-toolbar__button[data-tooltip]::after,
 .selection-toolbar__button::after,
 .selection-toolbar__menu-button::after {
@@ -745,6 +746,8 @@
 .toolbar__button[data-tooltip]:focus-visible::after,
 .toolbar__stat[data-tooltip]:hover::after,
 .toolbar__stat[data-tooltip]:focus-visible::after,
+.canvas-icon-button[data-tooltip]:hover::after,
+.canvas-icon-button[data-tooltip]:focus-visible::after,
 .bottom-toolbar__button[data-tooltip]:hover::after,
 .bottom-toolbar__button[data-tooltip]:focus-visible::after,
 .selection-toolbar__button:hover::after,
@@ -756,7 +759,8 @@
 }
 
 .canvas-toolbar .toolbar__button[data-tooltip]::after,
-.canvas-toolbar .toolbar__stat[data-tooltip]::after {
+.canvas-toolbar .toolbar__stat[data-tooltip]::after,
+.inspector .canvas-icon-button[data-tooltip]::after {
   top: calc(100% + 8px);
   bottom: auto;
   transform: translate(-50%, -4px);
@@ -765,7 +769,9 @@
 .canvas-toolbar .toolbar__button[data-tooltip]:hover::after,
 .canvas-toolbar .toolbar__button[data-tooltip]:focus-visible::after,
 .canvas-toolbar .toolbar__stat[data-tooltip]:hover::after,
-.canvas-toolbar .toolbar__stat[data-tooltip]:focus-visible::after {
+.canvas-toolbar .toolbar__stat[data-tooltip]:focus-visible::after,
+.inspector .canvas-icon-button[data-tooltip]:hover::after,
+.inspector .canvas-icon-button[data-tooltip]:focus-visible::after {
   transform: translate(-50%, 0);
 }
 
@@ -1380,6 +1386,7 @@
   /* 触屏没有 hover 显示 tooltip 的语义，干脆禁用 ::after 的 tooltip 浮层避免 tap 抖动 */
   .toolbar__button[data-tooltip]::after,
   .toolbar__stat[data-tooltip]::after,
+  .canvas-icon-button[data-tooltip]::after,
   .bottom-toolbar__button[data-tooltip]::after,
   .selection-toolbar__button::after,
   .selection-toolbar__menu-button::after {
@@ -1478,12 +1485,12 @@
 .inspector {
   overflow: hidden;
   box-sizing: border-box;
-  padding: 18px;
+  padding: 12px 8px 12px 14px;
   border-left: 1px solid var(--canvas-border);
   background: var(--canvas-inspector-bg);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
 }
 
@@ -1499,7 +1506,7 @@
   top: 0;
   bottom: 0;
   z-index: 100;
-  width: 320px;
+  width: 304px;
   height: 100%;
   box-sizing: border-box;
   background: var(--canvas-inspector-bg);
@@ -1518,21 +1525,20 @@
 .inspector__content {
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 10px;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 6px;
+  padding-right: 2px;
   scrollbar-color: color-mix(in srgb, var(--canvas-text-muted) 42%, transparent) transparent;
-  scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
 
 .inspector__content::-webkit-scrollbar {
-  width: 8px;
+  width: 5px;
 }
 
 .inspector__content::-webkit-scrollbar-track {
@@ -1541,7 +1547,7 @@
 
 .inspector__content::-webkit-scrollbar-thumb {
   min-height: 48px;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: color-mix(in srgb, var(--canvas-text-muted) 42%, transparent);
   background-clip: content-box;
@@ -1588,7 +1594,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   flex-shrink: 0;
 }
 
@@ -1689,17 +1695,39 @@
 }
 
 .inspector__section {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--canvas-border);
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 0 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--canvas-border) 82%, transparent);
   border-radius: 12px;
-  background: var(--canvas-inspector-section-bg);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--canvas-surface) 94%, transparent), var(--canvas-inspector-section-bg));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--b3-theme-on-surface) 7%, transparent),
+    0 8px 20px color-mix(in srgb, var(--b3-theme-on-surface) 5%, transparent);
   min-width: 0;
   overflow: visible;
+}
+
+.inspector__section::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: color-mix(in srgb, var(--canvas-accent) 50%, transparent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.inspector__section:hover::before,
+.inspector__section:focus-within::before {
+  opacity: 0.65;
 }
 
 .inspector__section-toggle {
@@ -1707,16 +1735,31 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  width: 100%;
+  width: calc(100% + 24px);
   border: 0;
   background: transparent;
-  padding: 0;
+  margin: 0 -12px;
+  padding: 10px 12px;
+  border-radius: 11px 11px 8px 8px;
+  background: color-mix(in srgb, var(--canvas-floating-button-bg) 72%, transparent);
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.inspector__section-toggle:hover {
+  background: var(--canvas-floating-button-bg-hover);
 }
 
 .inspector__section-chevron {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--canvas-surface) 72%, transparent);
   color: var(--canvas-text-muted);
   transition: transform 0.2s ease;
 }
@@ -1728,8 +1771,8 @@
 .inspector__section h2 {
   margin: 0;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0;
   color: var(--canvas-text);
 }
 
@@ -1886,6 +1929,12 @@
 .recent-list__item-delete:hover {
   background: var(--canvas-danger-soft);
   color: var(--canvas-danger);
+}
+
+@media (hover: none) {
+  .recent-list__item-delete {
+    opacity: 1;
+  }
 }
 
 .issues strong {
@@ -2598,4 +2647,3 @@ html[data-theme-mode="dark"] .stage--presentation-mask::before {
   50% { stroke-opacity: 1; }
   100% { stroke-opacity: 0.6; }
 }
-

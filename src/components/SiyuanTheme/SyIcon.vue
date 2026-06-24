@@ -8,6 +8,7 @@
         color: disabled ? 'var(--b3-empty-color)' : undefined,
       }"
       class="enSyIcon"
+      style="fill:none!important"
     >
       <use :xlink:href="`#${name}`"></use>
     </svg>

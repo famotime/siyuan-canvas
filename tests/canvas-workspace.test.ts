@@ -380,7 +380,8 @@ describe("CanvasWorkspace", () => {
 
     for (const testId of controls) {
       const control = wrapper.find(`[data-testid='${testId}']`)
-      expect(control.attributes("title"), testId).toBe(control.attributes("data-tooltip"))
+      expect(control.attributes("data-tooltip"), testId).toBeTruthy()
+      expect(control.attributes("title"), testId).toBeUndefined()
     }
   })
 
@@ -1668,14 +1669,14 @@ describe("CanvasWorkspace", () => {
     expect(pluginTabsSource).toContain("overflow: \"hidden\"")
     expect(stylesheet).toContain("grid-template-rows: auto minmax(0, 1fr);")
     expect(stylesheet).toContain(".inspector__content")
-    expect(stylesheet).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, 320px);")
+    expect(stylesheet).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, 304px);")
     expect(stylesheet).toContain(".inspector {\n  overflow: hidden;")
     expect(stylesheet).toContain("box-sizing: border-box;")
     expect(stylesheet).toContain("min-height: 0;")
     expect(stylesheet).toContain("flex: 1 1 auto;")
     expect(stylesheet).toContain("overflow-y: auto;")
     expect(stylesheet).toContain("overscroll-behavior: contain;")
-    expect(stylesheet).toContain("scrollbar-gutter: stable;")
+    expect(stylesheet).not.toContain("scrollbar-gutter: stable;")
     expect(stylesheet).toContain(".inspector__content::-webkit-scrollbar-thumb")
   })
 

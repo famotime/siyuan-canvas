@@ -27,7 +27,7 @@
                   value="full"
                 >
                 <!-- full canvas: large rectangle filling the card -->
-                <svg class="png-export-option__preview-icon" viewBox="0 0 48 32" fill="none">
+                <svg class="png-export-option__preview-icon" viewBox="0 0 48 32" fill="none" style="fill:none!important">
                   <rect x="2" y="2" width="44" height="28" rx="3" stroke="currentColor" stroke-width="2" fill="var(--canvas-surface, #fafafa)"/>
                   <rect x="8" y="8" width="10" height="6" rx="1" fill="currentColor" opacity="0.15"/>
                   <rect x="22" y="10" width="8" height="4" rx="1" fill="currentColor" opacity="0.15"/>
@@ -47,7 +47,7 @@
                   value="viewport"
                 >
                 <!-- viewport: framed crop of the canvas -->
-                <svg class="png-export-option__preview-icon" viewBox="0 0 48 32" fill="none">
+                <svg class="png-export-option__preview-icon" viewBox="0 0 48 32" fill="none" style="fill:none!important">
                   <rect x="2" y="2" width="44" height="28" rx="3" stroke="currentColor" stroke-width="2" fill="var(--canvas-surface, #fafafa)"/>
                   <rect x="8" y="8" width="10" height="6" rx="1" fill="currentColor" opacity="0.1"/>
                   <rect x="22" y="10" width="8" height="4" rx="1" fill="currentColor" opacity="0.1"/>

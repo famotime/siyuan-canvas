@@ -17,6 +17,12 @@ describe('canvas-icon', () => {
     expect(hardened).toContain('style="fill:none"')
   })
 
+  it('adds an important fill none guard to the root svg', () => {
+    const hardened = hardenStrokeOnlySvgFill(getCanvasIconMarkup('zoom-in'))
+
+    expect(hardened).toMatch(/<svg[^>]*style="[^"]*fill:none!important/)
+  })
+
   it('preserves icons that intentionally use currentColor fills', () => {
     const hardened = hardenStrokeOnlySvgFill(getCanvasIconMarkup('center'))
 

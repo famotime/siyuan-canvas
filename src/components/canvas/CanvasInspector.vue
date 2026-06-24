@@ -752,17 +752,39 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 
 <style scoped>
 .inspector__section {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--canvas-border);
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 0 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--canvas-border) 82%, transparent);
   border-radius: 12px;
-  background: var(--canvas-inspector-section-bg);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--canvas-surface) 94%, transparent), var(--canvas-inspector-section-bg));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--b3-theme-on-surface) 7%, transparent),
+    0 8px 20px color-mix(in srgb, var(--b3-theme-on-surface) 5%, transparent);
   min-width: 0;
   overflow: visible;
+}
+
+.inspector__section::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: color-mix(in srgb, var(--canvas-accent) 50%, transparent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.inspector__section:hover::before,
+.inspector__section:focus-within::before {
+  opacity: 0.65;
 }
 
 .inspector__action-button {
@@ -782,7 +804,7 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   color: var(--canvas-accent);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   cursor: pointer;
   transition:
     background 150ms ease,
@@ -813,16 +835,30 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  width: 100%;
+  width: calc(100% + 24px);
   border: 0;
-  background: transparent;
-  padding: 0;
+  background: color-mix(in srgb, var(--canvas-floating-button-bg) 72%, transparent);
+  margin: 0 -12px;
+  padding: 10px 12px;
+  border-radius: 11px 11px 8px 8px;
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.inspector__section-toggle:hover {
+  background: var(--canvas-floating-button-bg-hover);
 }
 
 .inspector__section-chevron {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--canvas-surface) 72%, transparent);
   color: var(--canvas-text-muted);
   transition: transform 0.2s ease;
 }
@@ -834,8 +870,8 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
 .inspector__section h2 {
   margin: 0;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0;
   color: var(--canvas-text);
 }
 

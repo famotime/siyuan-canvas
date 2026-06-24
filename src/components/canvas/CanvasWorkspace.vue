@@ -15,7 +15,6 @@
           data-testid="top-toolbar-new"
           :aria-label="t('toolbarNew')"
           :data-tooltip="t('toolbarNew')"
-          :title="t('toolbarNew')"
           type="button"
           @click="editor.newCanvas"
         >
@@ -29,7 +28,6 @@
           data-testid="top-toolbar-open"
           :aria-label="t('toolbarOpen')"
           :data-tooltip="t('toolbarOpen')"
-          :title="t('toolbarOpen')"
           type="button"
           @click="editor.triggerImport"
         >
@@ -47,7 +45,6 @@
           data-testid="top-toolbar-save"
           :aria-label="editor.isSaving ? t('toolbarSaving') : t('toolbarSaveAs')"
           :data-tooltip="editor.isSaving ? t('toolbarSaving') : t('toolbarSaveAs')"
-          :title="editor.isSaving ? t('toolbarSaving') : t('toolbarSaveAs')"
           :disabled="editor.isSaving"
           type="button"
           @click="editor.save"
@@ -80,7 +77,6 @@
           data-testid="top-toolbar-export"
           :aria-label="t('toolbarExport')"
           :data-tooltip="t('toolbarExport')"
-          :title="t('toolbarExport')"
           type="button"
           @click="pngExportDialogVisible = true"
         >
@@ -97,7 +93,6 @@
           data-testid="top-toolbar-undo"
           :aria-label="t('toolbarUndo')"
           :data-tooltip="t('toolbarUndo')"
-          :title="t('toolbarUndo')"
           :disabled="!editor.canUndo"
           type="button"
           @click="editor.undo"
@@ -113,7 +108,6 @@
           data-testid="top-toolbar-redo"
           :aria-label="t('toolbarRedo')"
           :data-tooltip="t('toolbarRedo')"
-          :title="t('toolbarRedo')"
           :disabled="!editor.canRedo"
           type="button"
           @click="editor.redo"
@@ -132,7 +126,6 @@
           data-testid="top-toolbar-zoom-out"
           :aria-label="t('toolbarZoomOut')"
           :data-tooltip="t('toolbarZoomOut')"
-          :title="t('toolbarZoomOut')"
           type="button"
           @click="editor.zoomOut"
         >
@@ -146,7 +139,6 @@
           data-testid="top-toolbar-scale-value"
           :aria-label="t('toolbarZoomActual')"
           :data-tooltip="t('toolbarZoomActual')"
-          :title="t('toolbarZoomActual')"
           type="button"
           @click="editor.zoomToActualSize"
         >
@@ -157,7 +149,6 @@
           data-testid="top-toolbar-zoom-in"
           :aria-label="t('toolbarZoomIn')"
           :data-tooltip="t('toolbarZoomIn')"
-          :title="t('toolbarZoomIn')"
           type="button"
           @click="editor.zoomIn"
         >
@@ -171,7 +162,6 @@
           data-testid="top-toolbar-reset-viewport"
           :aria-label="t('toolbarZoomFit')"
           :data-tooltip="t('toolbarZoomFit')"
-          :title="t('toolbarZoomFit')"
           type="button"
           @click="editor.resetViewport"
         >
@@ -190,7 +180,6 @@
           data-testid="top-toolbar-color-theme"
           :aria-label="t('toolbarColorTheme')"
           :data-tooltip="t('toolbarColorTheme')"
-          :title="t('toolbarColorTheme')"
           type="button"
           @click="toggleColorThemePopover"
         >
@@ -230,7 +219,6 @@
           data-testid="top-toolbar-command-palette"
           :aria-label="t('commandPaletteOpen')"
           :data-tooltip="t('commandPaletteOpen')"
-          :title="t('commandPaletteOpen')"
           type="button"
           @click="commandPaletteOpen = true"
         >
@@ -244,7 +232,6 @@
           data-testid="top-toolbar-help"
           :aria-label="t('helpDialogTitle')"
           :data-tooltip="t('helpDialogTitle')"
-          :title="t('helpDialogTitle')"
           type="button"
           @click="showHelpDialog"
         >
@@ -1353,7 +1340,8 @@
             <button
               class="inspector__pin-btn"
               :class="{ 'inspector__pin-btn--pinned': pinned }"
-              :title="pinned ? t('inspectorUnpin') : t('inspectorPin')"
+              :aria-label="pinned ? t('inspectorUnpin') : t('inspectorPin')"
+              :data-tooltip="pinned ? t('inspectorUnpin') : t('inspectorPin')"
               type="button"
               @click="pinned = !pinned"
             >
@@ -1368,9 +1356,10 @@
           <template v-if="activeInspectorTab === 'documents'">
           <div class="inspector__toolbar">
             <button
-              class="inspector__toolbar-button"
+              class="inspector__toolbar-button canvas-icon-button"
               data-testid="inspector-toolbar-new-canvas"
-              :title="t('inspectorNewCanvas')"
+              :aria-label="t('inspectorNewCanvas')"
+              :data-tooltip="t('inspectorNewCanvas')"
               type="button"
               @click="editor.newCanvas"
             >
@@ -1380,9 +1369,10 @@
               />
             </button>
             <button
-              class="inspector__toolbar-button"
+              class="inspector__toolbar-button canvas-icon-button"
               data-testid="inspector-toolbar-new-folder"
-              :title="t('inspectorNewFolder')"
+              :aria-label="t('inspectorNewFolder')"
+              :data-tooltip="t('inspectorNewFolder')"
               type="button"
               @click="editor.createWorkspaceFolder"
             >
@@ -1392,10 +1382,11 @@
               />
             </button>
             <button
-              class="inspector__toolbar-button"
+              class="inspector__toolbar-button canvas-icon-button"
               :class="{ 'inspector__toolbar-button--active': sortDropdownOpen }"
               data-testid="inspector-toolbar-sort"
-              :title="t('inspectorSort')"
+              :aria-label="t('inspectorSort')"
+              :data-tooltip="t('inspectorSort')"
               type="button"
               :aria-haspopup="'menu'"
               :aria-expanded="sortDropdownOpen"
@@ -1407,9 +1398,10 @@
               />
             </button>
             <button
-              class="inspector__toolbar-button"
+              class="inspector__toolbar-button canvas-icon-button"
               data-testid="inspector-toolbar-expand-all"
-              :title="editor.allFoldersExpanded ? t('inspectorCollapseAll') : t('inspectorExpandAll')"
+              :aria-label="editor.allFoldersExpanded ? t('inspectorCollapseAll') : t('inspectorExpandAll')"
+              :data-tooltip="editor.allFoldersExpanded ? t('inspectorCollapseAll') : t('inspectorExpandAll')"
               type="button"
               @click="editor.expandAllInspectorSections"
             >
@@ -1539,8 +1531,9 @@
                     <span class="workspace-tree__name">{{ recent.title }}</span>
                   </button>
                   <button
-                    class="recent-list__item-delete"
-                    :title="t('selectionToolbarDelete')"
+                    class="recent-list__item-delete canvas-icon-button"
+                    :aria-label="t('selectionToolbarDelete')"
+                    :data-tooltip="t('selectionToolbarDelete')"
                     type="button"
                     @click.stop="editor.removeRecentFileRecord(recent.path)"
                   >
