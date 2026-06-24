@@ -695,6 +695,51 @@
     0 0 0 4px var(--selection-toolbar-text);
 }
 
+.selection-toolbar__swatch--custom-empty {
+  border: 1px dashed var(--selection-toolbar-border);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--selection-toolbar-text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.selection-toolbar__swatch--custom-empty:hover {
+  border-color: var(--selection-toolbar-text);
+}
+
+.selection-toolbar__swatch--picker {
+  background: conic-gradient(
+    from 180deg at 50% 50%,
+    #ff4d4f 0deg,
+    #ff9c6e 60deg,
+    #fadb14 120deg,
+    #52c41a 180deg,
+    #13c2c2 240deg,
+    #2f54eb 300deg,
+    #722ed1 360deg
+  );
+  border: 1px solid var(--selection-toolbar-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.selection-toolbar__swatch--picker::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: #ffffff;
+  border-radius: 99px;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
 .selection-toolbar__menu-button {
   position: relative;
   display: inline-flex;

@@ -760,10 +760,11 @@
             >
               <button
                 class="selection-toolbar__swatch selection-toolbar__swatch--clear"
+                :class="{ 'selection-toolbar__swatch--active': activeEdgeColor === CLEAR_SELECTION_COLOR }"
                 data-testid="edge-color-clear"
                 :style="getSelectionColorStyle(CLEAR_SELECTION_COLOR)"
                 :aria-label="t('selectionToolbarClearColor')"
-                aria-pressed="false"
+                :aria-pressed="activeEdgeColor === CLEAR_SELECTION_COLOR"
                 :title="t('selectionToolbarClearColor')"
                 type="button"
                 @click.stop="editor.applyEdgeColor(CLEAR_SELECTION_COLOR)"
@@ -772,12 +773,41 @@
                 v-for="color in editor.edgeColorOptions"
                 :key="`edge-color-${color}`"
                 class="selection-toolbar__swatch"
+                :class="{ 'selection-toolbar__swatch--active': activeEdgeColor === color }"
                 :data-testid="`edge-color-${color}`"
                 :style="getSelectionColorStyle(color)"
                 :aria-label="`${t('selectionToolbarColor')} ${color}`"
-                aria-pressed="false"
+                :aria-pressed="activeEdgeColor === color"
                 type="button"
                 @click.stop="editor.applyEdgeColor(color)"
+              />
+              <button
+                v-if="lastCustomColor"
+                class="selection-toolbar__swatch"
+                :class="{ 'selection-toolbar__swatch--active': activeEdgeColor === lastCustomColor }"
+                data-testid="edge-color-custom-last"
+                :style="getSelectionColorStyle(lastCustomColor)"
+                :aria-label="t('selectionToolbarLastCustomColor') || '最近自定义颜色'"
+                :aria-pressed="activeEdgeColor === lastCustomColor"
+                type="button"
+                @click.stop="editor.applyEdgeColor(lastCustomColor)"
+              />
+              <button
+                v-else
+                class="selection-toolbar__swatch selection-toolbar__swatch--custom-empty"
+                data-testid="edge-color-custom-empty"
+                :aria-label="t('selectionToolbarCustomColorEmpty') || '未设置自定义颜色'"
+                type="button"
+                @click.stop="triggerCustomColorPicker('edge')"
+              >
+                +
+              </button>
+              <button
+                class="selection-toolbar__swatch selection-toolbar__swatch--picker"
+                data-testid="edge-color-picker"
+                :aria-label="t('selectionToolbarCustomColorPicker') || '自定义选色器'"
+                type="button"
+                @click.stop="triggerCustomColorPicker('edge')"
               />
             </div>
           </div>
@@ -1039,6 +1069,34 @@
                 :aria-pressed="activeSelectionColor === color"
                 type="button"
                 @click.stop="editor.applySelectionColor(color)"
+              />
+              <button
+                v-if="lastCustomColor"
+                class="selection-toolbar__swatch"
+                :class="{ 'selection-toolbar__swatch--active': activeSelectionColor === lastCustomColor }"
+                data-testid="selection-color-custom-last"
+                :style="getSelectionColorStyle(lastCustomColor)"
+                :aria-label="t('selectionToolbarLastCustomColor') || '最近自定义颜色'"
+                :aria-pressed="activeSelectionColor === lastCustomColor"
+                type="button"
+                @click.stop="editor.applySelectionColor(lastCustomColor)"
+              />
+              <button
+                v-else
+                class="selection-toolbar__swatch selection-toolbar__swatch--custom-empty"
+                data-testid="selection-color-custom-empty"
+                :aria-label="t('selectionToolbarCustomColorEmpty') || '未设置自定义颜色'"
+                type="button"
+                @click.stop="triggerCustomColorPicker('selection')"
+              >
+                +
+              </button>
+              <button
+                class="selection-toolbar__swatch selection-toolbar__swatch--picker"
+                data-testid="selection-color-picker"
+                :aria-label="t('selectionToolbarCustomColorPicker') || '自定义选色器'"
+                type="button"
+                @click.stop="triggerCustomColorPicker('selection')"
               />
             </div>
           </div>
@@ -1713,6 +1771,12 @@
       type="file"
       @change="handleImport"
     >
+    <input
+      ref="customColorInputRef"
+      type="color"
+      style="display: none"
+      @change="onCustomColorChange"
+    >
   </div>
 </template>
 
@@ -1821,6 +1885,45 @@ const sortDropdownOpen = ref(false)
 const colorThemePopoverOpen = ref(false)
 const colorThemeButtonRef = ref<HTMLElement>()
 const colorThemePopoverStyle = ref<Record<string, string>>({})
+
+const lastCustomColor = ref<string | null>(localStorage.getItem("siyuan-canvas-last-custom-color"))
+
+function setLastCustomColor(color: string) {
+  lastCustomColor.value = color
+  localStorage.setItem("siyuan-canvas-last-custom-color", color)
+}
+
+const customColorContext = ref<'selection' | 'edge' | null>(null)
+const customColorInputRef = ref<HTMLInputElement | null>(null)
+
+function triggerCustomColorPicker(context: 'selection' | 'edge') {
+  customColorContext.value = context
+  if (customColorInputRef.value) {
+    customColorInputRef.value.value = lastCustomColor.value || '#3575f0'
+    customColorInputRef.value.click()
+  }
+}
+
+function onCustomColorChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const selectedColor = input.value
+  if (!selectedColor) return
+
+  setLastCustomColor(selectedColor)
+
+  if (customColorContext.value === 'selection') {
+    editor.applySelectionColor(selectedColor)
+  } else if (customColorContext.value === 'edge') {
+    editor.applyEdgeColor(selectedColor)
+  }
+  customColorContext.value = null
+}
+
+const activeEdgeColor = computed(() => {
+  return editor.state.selectedEdgeId && editor.selectedEdge
+    ? (editor.selectedEdge.color || CLEAR_SELECTION_COLOR)
+    : CLEAR_SELECTION_COLOR
+})
 
 const pinned = ref(localStorage.getItem("siyuan-canvas-inspector-pinned") !== "false")
 watch(pinned, (val) => {

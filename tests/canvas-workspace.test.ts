@@ -880,6 +880,7 @@ describe("CanvasWorkspace", () => {
 
     expect(clickSpy).toHaveBeenCalledTimes(1)
     expect((wrapper.find("[data-testid='png-export-background-custom']").element as HTMLInputElement).checked).toBe(true)
+    clickSpy.mockRestore()
   })
 
   it("passes the new right-click canvas and document tree rename tips into the help dialog", async () => {
@@ -2036,7 +2037,7 @@ describe("CanvasWorkspace", () => {
 
     const swatches = wrapper.findAll(".selection-toolbar__swatch")
 
-    expect(swatches).toHaveLength(7)
+    expect(swatches).toHaveLength(9)
     expect(swatches[0]?.attributes("data-testid")).toBe("selection-color-clear")
     expect(wrapper.find("[data-testid='selection-color-clear']").classes()).not.toContain("selection-toolbar__swatch--active")
     expect(wrapper.find("[data-testid='selection-color-clear']").attributes("aria-label")).toBe("清除颜色")
@@ -2048,6 +2049,52 @@ describe("CanvasWorkspace", () => {
     await wrapper.find("[data-testid='selection-color-clear']").trigger("click")
 
     expect(currentEditor.applySelectionColor).toHaveBeenCalledWith("")
+  })
+
+  it("renders custom color swatches and applies custom colors on selection color palette", async () => {
+    const node = createTextNode({ color: "1" })
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionColors = ["1", "2", "3", "4", "5", "6"]
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.selectionToolbarPopover = "color"
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const customEmptyButton = wrapper.find("[data-testid='selection-color-custom-empty']")
+    expect(customEmptyButton.exists()).toBe(true)
+    expect(customEmptyButton.text()).toBe("+")
+
+    const pickerButton = wrapper.find("[data-testid='selection-color-picker']")
+    expect(pickerButton.exists()).toBe(true)
+
+    const colorInput = wrapper.find("input[type='color']")
+    expect(colorInput.exists()).toBe(true)
+
+    await pickerButton.trigger("click")
+
+    Object.defineProperty(colorInput.element, "value", {
+      value: "#a123eb",
+      writable: true,
+    })
+
+    await colorInput.trigger("change")
+
+    expect(currentEditor.applySelectionColor).toHaveBeenCalledWith("#a123eb")
+
+    wrapper.unmount()
   })
 
   it("renders workspace context menu items with icons and menu roles", async () => {

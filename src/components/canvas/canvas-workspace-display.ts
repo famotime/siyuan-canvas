@@ -48,6 +48,20 @@ function getContrastingLabelTextColor(background: string): string {
   return luminance >= 160 ? "#111827" : "#ffffff"
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace("#", "")
+  if (normalized.length === 3) {
+    const r = Number.parseInt(normalized[0] + normalized[0], 16)
+    const g = Number.parseInt(normalized[1] + normalized[1], 16)
+    const b = Number.parseInt(normalized[2] + normalized[2], 16)
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+  const r = Number.parseInt(normalized.slice(0, 2), 16)
+  const g = Number.parseInt(normalized.slice(2, 4), 16)
+  const b = Number.parseInt(normalized.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 export function getSelectionColorStyle(
   color: string,
   colorStyles?: Record<string, { background: string, border: string, swatch: string }>,
@@ -62,7 +76,14 @@ export function getSelectionColorStyle(
     }
   }
 
-  const colorStyle = styles[color]
+  let colorStyle = styles[color]
+  if (!colorStyle && color && color.startsWith("#")) {
+    colorStyle = {
+      background: hexToRgba(color, 0.18),
+      border: color,
+      swatch: color,
+    }
+  }
 
   return {
     backgroundColor: colorStyle?.swatch || "#64748b",
@@ -81,7 +102,14 @@ export function getCanvasNodeStyle(
   colorStyles?: Record<string, { background: string, border: string, swatch: string }>,
 ) {
   const styles = colorStyles ?? selectionColorStyles
-  const colorStyle = "color" in node && node.color ? styles[node.color] : undefined
+  let colorStyle = "color" in node && node.color ? styles[node.color] : undefined
+  if (!colorStyle && "color" in node && node.color && node.color.startsWith("#")) {
+    colorStyle = {
+      background: hexToRgba(node.color, 0.18),
+      border: node.color,
+      swatch: node.color,
+    }
+  }
   const zIndex = node.type === "group"
     ? options.selected ? "2" : "1"
     : options.selected ? "4" : "3"
@@ -107,7 +135,14 @@ export function getCanvasNodeContentStyle(
   }
 
   const styles = colorStyles ?? selectionColorStyles
-  const colorStyle = styles[node.color]
+  let colorStyle = styles[node.color]
+  if (!colorStyle && node.color && node.color.startsWith("#")) {
+    colorStyle = {
+      background: hexToRgba(node.color, 0.18),
+      border: node.color,
+      swatch: node.color,
+    }
+  }
 
   if (!colorStyle) {
     return undefined
