@@ -75,7 +75,7 @@ describe("CanvasCommandPalette", () => {
     expect(titles).not.toContain("toolbarZoomIn")
   })
 
-  it("shows recent files as palette entries", () => {
+  it("does not show recent files as palette entries", () => {
     const editor = makeEditor({
       recentFiles: [
         { path: "/foo/bar.canvas", title: "Bar", sourceType: "workspace" },
@@ -85,8 +85,8 @@ describe("CanvasCommandPalette", () => {
       props: { open: true, editor, t },
     })
 
-    expect(wrapper.find("[data-testid='command-palette']").text()).toContain("Bar")
-    expect(wrapper.find("[data-testid='command-palette']").text()).toContain("/foo/bar.canvas")
+    expect(wrapper.find("[data-testid='command-palette']").text()).not.toContain("Bar")
+    expect(wrapper.find("[data-testid='command-palette']").text()).not.toContain("/foo/bar.canvas")
   })
 
   it("shows nodes as palette entries with node titles", () => {

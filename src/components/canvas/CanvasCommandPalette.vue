@@ -182,7 +182,7 @@ const nodeItems = computed<PaletteItem[]>(() => {
 })
 
 const allItems = computed<PaletteItem[]>(() => {
-  return [...commandItems.value, ...recentItems.value, ...nodeItems.value]
+  return [...commandItems.value, ...nodeItems.value]
 })
 
 const filtered = computed<PaletteItem[]>(() => {
