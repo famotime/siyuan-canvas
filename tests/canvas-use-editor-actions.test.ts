@@ -1583,7 +1583,7 @@ New body`)
 
     const createdNode = editor.state.document.nodes.find((node) => node.id !== "current" && node.id !== "obstacle")
     expect(createdNode).toMatchObject({
-      text: "New note",
+      text: "",
       type: "text",
       x: 180,
       width: 320,
@@ -1687,7 +1687,7 @@ New body`)
 
     const createdNode = editor.state.document.nodes.find((node) => !["parent", "current", "obstacle"].includes(node.id))
     expect(createdNode).toMatchObject({
-      text: "New note",
+      text: "",
       type: "text",
       x: 180,
       width: 320,

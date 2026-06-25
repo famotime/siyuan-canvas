@@ -57,7 +57,7 @@ export function createCanvasNode(type: CanvasNodeType): CanvasNode {
       return {
         ...shared,
         type,
-        text: "New note",
+        text: "",
       }
     default:
       throw new Error(`Unsupported node type: ${String(type)}`)
