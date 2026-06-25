@@ -131,10 +131,12 @@ export function shouldIncludeCanvasPngExportNode(node: Node): boolean {
 export async function exportCanvasWorldToPng(options: ExportCanvasWorldToPngOptions) {
   const scrollbarStyle = document.createElement("style")
   scrollbarStyle.textContent = `
-    .canvas-node__body,
-    .canvas-node__body * {
+    .canvas-node__body {
       scrollbar-width: none !important;
       overflow: hidden !important;
+    }
+    .canvas-node__body * {
+      scrollbar-width: none !important;
     }
     .canvas-node__body::-webkit-scrollbar,
     .canvas-node__body *::-webkit-scrollbar {
@@ -151,10 +153,8 @@ export async function exportCanvasWorldToPng(options: ExportCanvasWorldToPngOpti
     pixelRatio: 2,
     skipFonts: true,
     style: {
-      height: `${options.world.offsetHeight}px`,
       transform: `translate(${-options.bounds.x}px, ${-options.bounds.y}px)`,
       transformOrigin: "top left",
-      width: `${options.world.offsetWidth}px`,
     },
     width: Math.ceil(options.bounds.width),
   }
