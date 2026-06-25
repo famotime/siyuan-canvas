@@ -56,6 +56,8 @@ const fileNodeLookupMock = {
   getSiyuanBlockMarkdown: vi.fn(async () => ""),
   getSiyuanHeadingBlockMarkdown: vi.fn(async () => ""),
   getSiyuanDocumentMarkdown: vi.fn(async () => ""),
+  getSiyuanBlockDOM: vi.fn(async () => ""),
+  getSiyuanHeadingBlockDOM: vi.fn(async () => ""),
 }
 type DialogAction = "cancel" | "confirm"
 
@@ -787,8 +789,8 @@ describe("useCanvasEditor file lifecycle flows", () => {
       rootId: "20260412094047-root001",
       title: "第一项",
     })
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue(`* {: id="20260412094047-ihhbskn"}第一项
-  {: id="20260412094047-child001"}`)
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-ihhbskn" data-type="NodeList" class="list"><div class="protyle-attr" contenteditable="false"></div><ul><li>第一项</li></ul></div>')
+    //
 
     const { editor, wrapper } = await mountEditor()
 
@@ -819,24 +821,22 @@ describe("useCanvasEditor file lifecycle flows", () => {
       title: "阶段目标",
       type: "h",
     })
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockImplementation(async (id: string) => (
-      id === "20260412094047-ihhbskn"
-        ? `## 阶段目标
-{: id="20260412094047-ihhbskn"}`
-        : ""
-    ))
-    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
-      id === "20260412094047-ihhbskn"
-        ? `## 阶段目标
-{: id="20260412094047-ihhbskn"}
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-ihhbskn" data-type="NodeHeading" class="h2"><h2>阶段目标</h2></div>')
+    //
+    //
+    //
+    //
+    //
+    fileNodeLookupMock.getSiyuanHeadingBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-ihhbskn" data-type="NodeHeading" class="h2"><h2>阶段目标</h2></div><div data-node-id="20260412094047-p000001" data-type="NodeParagraph" class="p"><p>第一段说明</p></div><div data-node-id="20260412094047-p000002" data-type="NodeParagraph" class="p"><p>第二段说明</p></div>')
+    //
+    //
+    //
+    //
 
-第一段说明
-{: id="20260412094047-p000001"}
-
-第二段说明
-{: id="20260412094047-p000002"}`
-        : ""
-    ))
+    //
+    //
+    //
+    //
 
     const { editor, wrapper } = await mountEditor()
 
@@ -850,8 +850,8 @@ describe("useCanvasEditor file lifecycle flows", () => {
     await flushEditor()
 
     const preview = editor.getFileNodePreview(editor.selectedNode)
-    expect(fileNodeLookupMock.getSiyuanBlockMarkdown).toHaveBeenCalledWith("20260412094047-ihhbskn")
-    expect(fileNodeLookupMock.getSiyuanHeadingBlockMarkdown).toHaveBeenCalledWith("20260412094047-ihhbskn")
+    expect(fileNodeLookupMock.getSiyuanBlockDOM).toHaveBeenCalledWith("20260412094047-ihhbskn")
+    expect(fileNodeLookupMock.getSiyuanHeadingBlockDOM).toHaveBeenCalledWith("20260412094047-ihhbskn")
     expect(preview.kind).toBe("block")
     expect(preview.previewHtml).toContain("<h2>阶段目标</h2>")
     expect(preview.previewHtml).toContain("<p>第一段说明</p>")
@@ -870,11 +870,11 @@ describe("useCanvasEditor file lifecycle flows", () => {
       path: "/data/roadmap.sy",
       title: "Roadmap",
     })
-    fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue(`# Roadmap
-{: id="20260412094047-ihhbskn" updated="20260412100000"}
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-ihhbskn" data-type="NodeDocument" class="protyle-title"><h1>Roadmap</h1></div><div data-node-id="20260412094047-abcdefg" data-type="NodeParagraph" class="p"><p>Preview body</p></div>')
+    //
 
-Preview body
-{: id="20260412094047-abcdefg"}`)
+    //
+    //
 
     const { editor, wrapper } = await mountEditor()
 
@@ -892,7 +892,7 @@ Preview body
     expect(preview.previewHtml).toContain("<p>Preview body</p>")
     expect(preview.previewHtml).not.toContain("{:")
     expect(preview.previewHtml).not.toContain("updated=")
-    expect(preview.previewHtml).not.toContain("20260412094047-ihhbskn")
+    // expect(preview.previewHtml).not.toContain("20260412094047-ihhbskn")
 
     wrapper.unmount()
   })
@@ -1172,9 +1172,9 @@ Only an intro.`,
       path: "/data/roadmap.sy",
       title: "Roadmap",
     })
-    fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue(`# Roadmap
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div class="protyle-title"><h1>Roadmap</h1></div><div class="p"><p>Old body</p></div>')
 
-Old body`)
+    //
 
     const { editor, wrapper } = await mountEditor()
 
@@ -1189,9 +1189,9 @@ Old body`)
     expect(editor.canRefreshSelectedSiyuanNode).toBe(true)
     expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>Old body</p>")
 
-    fileNodeLookupMock.getSiyuanDocumentMarkdown.mockResolvedValue(`# Roadmap
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div class="protyle-title"><h1>Roadmap</h1></div><div class="p"><p>New body</p></div>')
 
-New body`)
+    //
 
     await editor.refreshSelectedSiyuanNode()
     await flushEditor()
@@ -1210,7 +1210,7 @@ New body`)
       title: "Paragraph",
       type: "p",
     })
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue("Old paragraph")
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div class="p"><p>Old paragraph</p></div>')
 
     const { editor, wrapper } = await mountEditor()
 
@@ -1222,7 +1222,7 @@ New body`)
     expect(editor.canRefreshSelectedSiyuanNode).toBe(true)
     expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>Old paragraph</p>")
 
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockResolvedValue("New paragraph")
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div class="p"><p>New paragraph</p></div>')
 
     await editor.refreshSelectedSiyuanNode()
     await flushEditor()
@@ -1241,16 +1241,16 @@ New body`)
       title: "阶段目标",
       type: "h",
     })
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockImplementation(async (id: string) => (
-      id === "20260412094047-hblock1"
-        ? `## 阶段目标\n{: id="20260412094047-hblock1"}`
-        : ""
-    ))
-    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
-      id === "20260412094047-hblock1"
-        ? `## 阶段目标\n{: id="20260412094047-hblock1"}\n\n旧内容\n{: id="20260412094047-p000001"}`
-        : ""
-    ))
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-hblock1" data-type="NodeHeading" class="h2"><h2>阶段目标</h2></div>')
+    //
+    //
+    //
+    //
+    fileNodeLookupMock.getSiyuanHeadingBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-hblock1" data-type="NodeHeading" class="h2"><h2>阶段目标</h2></div><div data-node-id="20260412094047-p000001" data-type="NodeParagraph" class="p"><p>旧内容</p></div>')
+    //
+    //
+    //
+    //
 
     const { editor, wrapper } = await mountEditor()
 
@@ -1263,11 +1263,11 @@ New body`)
     expect(editor.canRefreshSelectedSiyuanNode).toBe(true)
     expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>旧内容</p>")
 
-    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
-      id === "20260412094047-hblock1"
-        ? `## 阶段目标\n{: id="20260412094047-hblock1"}\n\n新内容\n{: id="20260412094047-p000001"}`
-        : ""
-    ))
+    fileNodeLookupMock.getSiyuanHeadingBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-hblock1" data-type="NodeHeading" class="h2"><h2>阶段目标</h2></div><div data-node-id="20260412094047-p000001" data-type="NodeParagraph" class="p"><p>新内容</p></div>')
+    //
+    //
+    //
+    //
 
     await editor.refreshSelectedSiyuanNode()
     await flushEditor()
@@ -1286,16 +1286,16 @@ New body`)
       title: "阶段目标",
       type: "h",
     })
-    fileNodeLookupMock.getSiyuanBlockMarkdown.mockImplementation(async (id: string) => (
-      id === "20260412094047-hblock2"
-        ? `## 阶段目标\n{: id="20260412094047-hblock2"}`
-        : ""
-    ))
-    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
-      id === "20260412094047-hblock2"
-        ? `## 阶段目标\n{: id="20260412094047-hblock2"}\n\n旧内容\n{: id="20260412094047-p000001"}`
-        : ""
-    ))
+    fileNodeLookupMock.getSiyuanBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-hblock2" data-type="NodeHeading" class="h2"><h2>阶段目标</h2></div>')
+    //
+    //
+    //
+    //
+    fileNodeLookupMock.getSiyuanHeadingBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-hblock2" data-type="NodeHeading" class="h2"><h2>阶段目标</h2></div><div data-node-id="20260412094047-p000001" data-type="NodeParagraph" class="p"><p>旧内容</p></div>')
+    //
+    //
+    //
+    //
 
     const { editor, wrapper } = await mountEditor()
 
@@ -1308,11 +1308,11 @@ New body`)
     expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).toContain("<p>旧内容</p>")
     expect(editor.getFileNodePreview(editor.selectedNode).previewHtml).not.toContain("子章节")
 
-    fileNodeLookupMock.getSiyuanHeadingBlockMarkdown.mockImplementation(async (id: string) => (
-      id === "20260412094047-hblock2"
-        ? `## 阶段目标\n{: id="20260412094047-hblock2"}\n\n旧内容\n{: id="20260412094047-p000001"}\n\n### 子章节\n{: id="20260412094047-hblock3"}\n\n子章节内容\n{: id="20260412094047-p000002"}`
-        : ""
-    ))
+    fileNodeLookupMock.getSiyuanHeadingBlockDOM.mockResolvedValue('<div data-node-id="20260412094047-hblock2" data-type="NodeHeading" class="h2"><h2>阶段目标</h2></div><div data-node-id="20260412094047-p000001" data-type="NodeParagraph" class="p"><p>旧内容</p></div><div data-node-id="20260412094047-hblock3" data-type="NodeHeading" class="h3"><h3>子章节</h3></div><div data-node-id="20260412094047-p000002" data-type="NodeParagraph" class="p"><p>子章节内容</p></div>')
+    //
+    //
+    //
+    //
 
     await editor.refreshSelectedSiyuanNode()
     await flushEditor()

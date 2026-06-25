@@ -54,7 +54,7 @@
     </div>
     <div
       v-if="['block', 'document'].includes(preview.kind) && documentPreviewHtml"
-      class="file-card__document-preview markdown-preview"
+      class="file-card__document-preview markdown-preview protyle-wysiwyg"
       v-html="documentPreviewHtml"
       @error.capture="emit('preview-image-error', node, $event)"
     />

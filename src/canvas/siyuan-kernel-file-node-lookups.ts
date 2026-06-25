@@ -95,6 +95,37 @@ export async function getSiyuanDocumentMarkdown(documentId: string): Promise<str
   return getSiyuanBlockMarkdown(documentId)
 }
 
+export async function getSiyuanBlockDOM(blockId: string): Promise<string> {
+  const response = await fetchSyncPost("/api/block/getBlockDOM", {
+    id: blockId,
+  }) as IWebSocketData
+
+  return response.code === 0 ? String(response.data?.dom || "") : ""
+}
+
+export async function getSiyuanHeadingBlockDOM(blockId: string): Promise<string> {
+  async function fetchBlockWithDescendants(id: string): Promise<string> {
+    const blockDOM = await getSiyuanBlockDOM(id)
+
+    const response = await fetchSyncPost("/api/block/getChildBlocks", {
+      id,
+    }) as IWebSocketData
+
+    const childBlocks = response.code === 0 && Array.isArray(response.data)
+      ? response.data as Array<{ id?: string }>
+      : []
+    const childDOMs = await Promise.all(
+      childBlocks
+        .filter((block) => block.id)
+        .map((block) => fetchBlockWithDescendants(String(block.id))),
+    )
+
+    return [blockDOM, ...childDOMs].filter(Boolean).join("")
+  }
+
+  return fetchBlockWithDescendants(blockId)
+}
+
 export type {
   SiyuanResolvedBlock,
   SiyuanResolvedAsset,

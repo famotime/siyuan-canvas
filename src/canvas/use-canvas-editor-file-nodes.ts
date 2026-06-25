@@ -11,15 +11,9 @@ import {
   findSiyuanDocumentByBlockId,
   findSiyuanDocumentByPath,
   findSiyuanImageAssetByBlockId,
-  getSiyuanBlockMarkdown,
-  getSiyuanDocumentMarkdown,
-  getSiyuanHeadingBlockMarkdown,
+  getSiyuanBlockDOM,
+  getSiyuanHeadingBlockDOM,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
-import {
-  extractHeadingSectionMarkdown,
-  renderMarkdownPreview,
-  truncateMarkdownPreviewSource,
-} from "@/canvas/markdown-preview"
 import {
   createCanvasFileTargetPreview,
   loadCanvasTargetPreview,
@@ -157,25 +151,48 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
     return fileNodeMeta.value[node.id] || createFallbackFileTarget(node.file)
   }
 
+  function preprocessSiyuanBlockDOM(domStr: string): string {
+    if (!domStr) {
+      return ""
+    }
+
+    if (typeof document === "undefined") {
+      return domStr
+        .replace(/contenteditable="true"/gi, "")
+        .replace(/<div[^>]*class="[^"]*protyle-attr[^"]*"[^>]*>([\s\S]*?)<\/div>/gi, "")
+    }
+
+    const temp = document.createElement("div")
+    temp.innerHTML = domStr
+
+    const editableElements = temp.querySelectorAll("[contenteditable]")
+    editableElements.forEach((el) => {
+      el.removeAttribute("contenteditable")
+    })
+
+    const attrs = temp.querySelectorAll(".protyle-attr")
+    attrs.forEach((el) => {
+      el.remove()
+    })
+
+    return temp.innerHTML
+  }
+
   async function withDocumentPreview(target: ResolvedCanvasDocumentTarget) {
-    const markdown = await getSiyuanDocumentMarkdown(target.id)
+    const dom = await getSiyuanBlockDOM(target.id)
     return {
       ...target,
       detail: target.hpath || target.path,
-      excerptHtml: renderMarkdownPreview(truncateMarkdownPreviewSource(markdown)),
+      excerptHtml: preprocessSiyuanBlockDOM(dom),
     }
   }
 
   async function withBlockPreview(target: ResolvedCanvasBlockTarget) {
-    const blockMarkdown = await getSiyuanBlockMarkdown(target.id)
-    const isHeadingBlock = target.type === "h" || /^#{1,6}\s+/.test(blockMarkdown.trimStart())
-    const markdown = isHeadingBlock
-      ? await getSiyuanHeadingBlockMarkdown(target.id) || blockMarkdown
-      : blockMarkdown
-    const previewMarkdown = isHeadingBlock
-      ? extractHeadingSectionMarkdown(markdown)
-      : truncateMarkdownPreviewSource(markdown)
-    const excerptHtml = renderMarkdownPreview(previewMarkdown)
+    const isHeadingBlock = target.type === "h"
+    const dom = isHeadingBlock
+      ? await getSiyuanHeadingBlockDOM(target.id)
+      : await getSiyuanBlockDOM(target.id)
+    const excerptHtml = preprocessSiyuanBlockDOM(dom)
     return {
       ...target,
       detail: target.hpath || target.path,
