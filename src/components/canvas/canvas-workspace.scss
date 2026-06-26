@@ -938,6 +938,23 @@
   stroke-linejoin: round;
 }
 
+.stage__alignment-guides {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.stage__alignment-guide {
+  stroke: var(--canvas-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 10 6;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px var(--canvas-accent-soft));
+}
+
 .canvas-node {
   --canvas-node-midpoint-shield: 60px;
   position: absolute;

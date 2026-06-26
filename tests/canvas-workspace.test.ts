@@ -75,6 +75,10 @@ function createEditorMock(node = createTextNode()) {
     activateCanvasSurface: vi.fn(),
     applySelectionColor: vi.fn(),
     applySelectionLayout: vi.fn(),
+    alignmentGuides: {
+      guides: [],
+      visible: false,
+    },
     board: ref({
       height: 4200,
       left: -2800,
@@ -350,6 +354,41 @@ describe("CanvasWorkspace", () => {
 
     expect(wrapper.find("[data-testid='top-toolbar']").classes()).toContain("canvas-toolbar")
     expect(wrapper.find("[data-testid='top-toolbar']").classes()).not.toContain("toolbar")
+  })
+
+  it("renders visible alignment guides across the canvas world", () => {
+    currentEditor = createEditorMock()
+    currentEditor.alignmentGuides.visible = true
+    currentEditor.alignmentGuides.guides = [
+      { axis: "x", kind: "left", position: 120 },
+      { axis: "y", kind: "top", position: 240 },
+    ]
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const verticalGuide = wrapper.find("[data-testid='alignment-guide-x']")
+    const horizontalGuide = wrapper.find("[data-testid='alignment-guide-y']")
+
+    expect(verticalGuide.exists()).toBe(true)
+    expect(verticalGuide.attributes()).toMatchObject({
+      x1: "2920",
+      x2: "2920",
+      y1: "0",
+      y2: "4200",
+    })
+    expect(horizontalGuide.exists()).toBe(true)
+    expect(horizontalGuide.attributes()).toMatchObject({
+      x1: "0",
+      x2: "5600",
+      y1: "2340",
+      y2: "2340",
+    })
   })
 
   it("provides title tooltips for every top toolbar control", () => {

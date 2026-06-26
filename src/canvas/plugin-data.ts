@@ -12,6 +12,7 @@ export interface CanvasPluginSettings {
   enableDebugLog: boolean
   recentFilesLimit: number
   noteCreationDirectory: string
+  showDragAlignmentGuides: boolean
   showCanvasThumbnails: boolean
   showNodeHeader: boolean
   presentationStyle: "zoom" | "mask"
@@ -56,6 +57,7 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     enableDebugLog: false,
     recentFilesLimit: 8,
     noteCreationDirectory: "",
+    showDragAlignmentGuides: false,
     showCanvasThumbnails: false,
     showNodeHeader: true,
     presentationStyle: "zoom",
@@ -154,6 +156,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     showCanvasThumbnails: typeof candidate.settings?.showCanvasThumbnails === "boolean"
       ? candidate.settings.showCanvasThumbnails
       : defaults.settings.showCanvasThumbnails,
+    showDragAlignmentGuides: typeof candidate.settings?.showDragAlignmentGuides === "boolean"
+      ? candidate.settings.showDragAlignmentGuides
+      : defaults.settings.showDragAlignmentGuides,
     showNodeHeader: typeof candidate.settings?.showNodeHeader === "boolean"
       ? candidate.settings.showNodeHeader
       : defaults.settings.showNodeHeader,

@@ -704,6 +704,7 @@ describe("canvas plugin lifecycle", () => {
     const detectExternalChangesInput = setting.items[3].createActionElement() as HTMLInputElement
     const showCanvasThumbnailsInput = setting.items[4].createActionElement() as HTMLInputElement
     const showNodeHeaderInput = setting.items[5].createActionElement() as HTMLInputElement
+    const showDragAlignmentGuidesInput = setting.items[6].createActionElement() as HTMLInputElement
 
     expect(colorThemeSelect.value).toBe("classic")
     expect(defaultDirectoryInput.value).toBe("/data/storage/petal/siyuan-canvas")
@@ -711,6 +712,7 @@ describe("canvas plugin lifecycle", () => {
     expect(detectExternalChangesInput.checked).toBe(true)
     expect(showCanvasThumbnailsInput.checked).toBe(false)
     expect(showNodeHeaderInput.checked).toBe(true)
+    expect(showDragAlignmentGuidesInput.checked).toBe(false)
 
     recentFilesLimitInput.value = "1"
     recentFilesLimitInput.dispatchEvent(new Event("change"))
@@ -722,6 +724,10 @@ describe("canvas plugin lifecycle", () => {
 
     showCanvasThumbnailsInput.checked = true
     showCanvasThumbnailsInput.dispatchEvent(new Event("change"))
+    await Promise.resolve()
+
+    showDragAlignmentGuidesInput.checked = false
+    showDragAlignmentGuidesInput.dispatchEvent(new Event("change"))
     await Promise.resolve()
 
     expect(plugin.getCanvasSettings()).toEqual({
@@ -736,6 +742,7 @@ describe("canvas plugin lifecycle", () => {
       presentationStyle: "zoom",
       recentFilesLimit: 1,
       showCanvasThumbnails: true,
+      showDragAlignmentGuides: false,
       showNodeHeader: true,
     })
   })
@@ -781,6 +788,7 @@ describe("canvas plugin lifecycle", () => {
       presentationStyle: "zoom",
       recentFilesLimit: 3,
       showCanvasThumbnails: false,
+      showDragAlignmentGuides: false,
       showNodeHeader: true,
     })
     expect(plugin.getRecentCanvasFiles()).toEqual([

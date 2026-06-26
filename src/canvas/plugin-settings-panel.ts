@@ -131,6 +131,20 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     },
   })
   setting.addItem({
+    title: t("settingsShowDragAlignmentGuidesTitle"),
+    description: t("settingsShowDragAlignmentGuidesDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.type = "checkbox"
+      input.checked = draft.showDragAlignmentGuides
+      input.addEventListener("change", () => {
+        draft.showDragAlignmentGuides = input.checked
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
     title: t("settingsEnableDebugLogTitle"),
     description: t("settingsEnableDebugLogDescription"),
     createActionElement: () => {

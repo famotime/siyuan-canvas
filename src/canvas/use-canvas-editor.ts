@@ -64,6 +64,7 @@ import { createCanvasEditorStageDropActions } from "@/canvas/use-canvas-editor-s
 
 import {
   createCanvasEditorGestureHandlers,
+  type CanvasEditorAlignmentGuideState,
   type CanvasEditorConnectionDraftState,
   type CanvasEditorEdgeReconnectDraftState,
   type CanvasEditorSelectionBoxState,
@@ -224,6 +225,10 @@ export function useCanvasEditor(
     width: 0,
     x: 0,
     y: 0,
+  })
+  const alignmentGuides = reactive<CanvasEditorAlignmentGuideState>({
+    guides: [],
+    visible: false,
   })
   const connectionDraft = reactive<CanvasEditorConnectionDraftState>({
     fromNodeId: "",
@@ -1080,6 +1085,7 @@ export function useCanvasEditor(
     startPan,
     startResize,
   } = createCanvasEditorGestureHandlers({
+    alignmentGuides,
     board,
     commitDocument,
     connectionDraft,
@@ -1091,6 +1097,7 @@ export function useCanvasEditor(
     stageRef,
     state,
     viewport,
+    showDragAlignmentGuides: computed(() => getPluginSettings().showDragAlignmentGuides !== false),
     showNodeHeader: computed(() => getPluginSettings().showNodeHeader),
   })
 
@@ -1308,6 +1315,7 @@ export function useCanvasEditor(
       removeRecentFileRecord,
       connectionDraft,
       edgeColorOptions: selectionColors,
+      alignmentGuides,
       edgeLabelDraft,
       edgeLabelEditorPosition,
       edgeReconnectDraft,

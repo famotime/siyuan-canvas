@@ -203,6 +203,8 @@
   "settingsShowCanvasThumbnailsDescription": "开启后在画布右下角显示整个画布的缩略导航图。默认关闭。",
   "settingsShowNodeHeaderTitle": "显示标题栏",
   "settingsShowNodeHeaderDescription": "开启后在画布卡片顶部显示标题栏（图标、标题文字、拖拽区域）。默认开启。",
+  "settingsShowDragAlignmentGuidesTitle": "拖拽对齐辅助线",
+  "settingsShowDragAlignmentGuidesDescription": "开启后拖拽卡片时显示边缘/中心对齐辅助线并自动吸附。默认关闭。",
   "settingsEnableDebugLogTitle": "启用调试日志",
   "settingsEnableDebugLogDescription": "开启后在浏览器控制台输出调试信息。",
   "settingsNoteCreationDirectoryTitle": "笔记创建目录",

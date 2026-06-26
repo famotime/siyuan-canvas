@@ -16,6 +16,8 @@ import {
   toBoardX,
   toBoardY,
 } from "@/canvas/board"
+import type { CanvasAlignmentGuide } from "@/canvas/alignment-guides"
+import { resolveCanvasAlignmentGuides } from "@/canvas/alignment-guides"
 import { cloneCanvasDocument } from "@/canvas/canvas-history"
 import {
   createCanvasEdge,
@@ -50,6 +52,11 @@ export interface CanvasEditorSelectionBoxState {
   y: number
 }
 
+export interface CanvasEditorAlignmentGuideState {
+  guides: CanvasAlignmentGuide[]
+  visible: boolean
+}
+
 export interface CanvasEditorConnectionDraftState {
   fromNodeId: string
   fromSide: CanvasSide
@@ -71,6 +78,7 @@ export interface CanvasEditorEdgeReconnectDraftState {
 }
 
 interface CanvasEditorGestureOptions {
+  alignmentGuides: CanvasEditorAlignmentGuideState
   board: ComputedRef<CanvasBoardMetrics>
   commitDocument: (document: CanvasDocument, options?: { coalesceKey?: string }) => void
   connectionDraft: CanvasEditorConnectionDraftState
@@ -79,6 +87,7 @@ interface CanvasEditorGestureOptions {
   readonly: ComputedRef<boolean>
   selectionBox: CanvasEditorSelectionBoxState
   selectedEdge: ComputedRef<CanvasEdge | null>
+  showDragAlignmentGuides: ComputedRef<boolean>
   stageRef: Ref<HTMLElement | undefined>
   state: CanvasEditorState
   viewport: {
@@ -91,6 +100,7 @@ interface CanvasEditorGestureOptions {
 
 export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOptions) {
   const {
+    alignmentGuides,
     board,
     commitDocument,
     connectionDraft,
@@ -99,6 +109,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     readonly,
     selectionBox,
     selectedEdge,
+    showDragAlignmentGuides,
     stageRef,
     state,
     viewport,
@@ -129,6 +140,11 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     edgeReconnectDraft.toX = 0
     edgeReconnectDraft.toY = 0
     edgeReconnectDraft.visible = false
+  }
+
+  function clearAlignmentGuides() {
+    alignmentGuides.guides = []
+    alignmentGuides.visible = false
   }
 
   function startPointerGesture(
@@ -256,6 +272,27 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     return { deltaX: 0, deltaY }
+  }
+
+  function resolveAlignmentDragDelta(options: {
+    deltaX: number
+    deltaY: number
+    movingNodeIds: string[]
+    nodes: CanvasNode[]
+  }) {
+    if (!showDragAlignmentGuides.value) {
+      clearAlignmentGuides()
+      return {
+        deltaX: options.deltaX,
+        deltaY: options.deltaY,
+        guides: [],
+      }
+    }
+
+    const resolved = resolveCanvasAlignmentGuides(options)
+    alignmentGuides.guides = resolved.guides
+    alignmentGuides.visible = resolved.guides.length > 0
+    return resolved
   }
 
   function isNodeGestureTarget(target: EventTarget | null): boolean {
@@ -466,7 +503,16 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       state.selectNode(node.id)
     }
     startPointerGesture(event, (dx, dy, moveEvent) => {
-      const { deltaX, deltaY } = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
+      const rawDelta = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
+      const {
+        deltaX,
+        deltaY,
+      } = resolveAlignmentDragDelta({
+        deltaX: rawDelta.deltaX,
+        deltaY: rawDelta.deltaY,
+        movingNodeIds: selectedNodeIds,
+        nodes: state.document.nodes,
+      })
       const movedDocument = state.document.nodes.reduce((document, candidate) => {
         const initial = initialPositions.get(candidate.id)
         if (!initial) {
@@ -480,6 +526,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       }, state.document)
 
       commitDocument(movedDocument, { coalesceKey: `drag-${node.id}` })
+    }, {
+      onEnd: clearAlignmentGuides,
     })
   }
 
@@ -508,7 +556,21 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     let hasCopied = false
 
     startPointerGesture(event, (dx, dy, moveEvent) => {
-      const { deltaX, deltaY } = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
+      const rawDelta = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
+      const {
+        deltaX,
+        deltaY,
+      } = resolveAlignmentDragDelta({
+        deltaX: rawDelta.deltaX,
+        deltaY: rawDelta.deltaY,
+        movingNodeIds: copiedNodeIds,
+        nodes: [
+          ...state.document.nodes.filter(candidate =>
+            !copiedNodeIds.includes(candidate.id) && !selectedNodeIds.includes(candidate.id),
+          ),
+          ...copiedNodes,
+        ],
+      })
       if (deltaX === 0 && deltaY === 0) {
         return
       }
@@ -533,6 +595,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         state.selectNodes(copiedNodeIds)
         hasCopied = true
       }
+    }, {
+      onEnd: clearAlignmentGuides,
     })
   }
 

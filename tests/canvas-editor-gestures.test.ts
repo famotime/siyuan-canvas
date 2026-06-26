@@ -15,9 +15,17 @@ import { createEmptyCanvasDocument } from '@/canvas/document'
 import { createCanvasEditorGestureHandlers } from '@/canvas/use-canvas-editor-gestures'
 import type { CanvasNode } from '@/canvas/types'
 
-function createGestureHarness(nodes: CanvasNode[], selectedNodeIds: string[] = []) {
+function createGestureHarness(
+  nodes: CanvasNode[],
+  selectedNodeIds: string[] = [],
+  options: { showDragAlignmentGuides?: boolean } = {},
+) {
   const stage = document.createElement('div')
   const viewport = { scale: 1, x: 0, y: 0 }
+  const alignmentGuides = {
+    guides: [],
+    visible: false,
+  }
   const state = {
     document: {
       nodes: [...nodes],
@@ -36,6 +44,7 @@ function createGestureHarness(nodes: CanvasNode[], selectedNodeIds: string[] = [
   })
   const handlers = createCanvasEditorGestureHandlers({
     board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
+    alignmentGuides,
     commitDocument,
     connectionDraft: {} as any,
     edgeReconnectDraft: {} as any,
@@ -46,11 +55,13 @@ function createGestureHarness(nodes: CanvasNode[], selectedNodeIds: string[] = [
     stageRef: ref(stage),
     state: state as any,
     viewport,
+    showDragAlignmentGuides: computed(() => options.showDragAlignmentGuides ?? true),
     showNodeHeader: computed(() => false),
   })
 
   return {
     commitDocument,
+    alignmentGuides,
     handlers,
     stage,
     state,
@@ -86,6 +97,10 @@ describe('canvas editor gesture handlers', () => {
     } as unknown as WheelEvent
 
     const handlers = createCanvasEditorGestureHandlers({
+      alignmentGuides: {
+        guides: [],
+        visible: false,
+      },
       board: computed(() => ({
         height: 2400,
         left: 0,
@@ -119,6 +134,7 @@ describe('canvas editor gesture handlers', () => {
       viewport,
       readonly: computed(() => false),
       selectedEdge: computed(() => null),
+      showDragAlignmentGuides: computed(() => true),
       showNodeHeader: computed(() => true),
     })
 
@@ -136,6 +152,10 @@ describe('canvas editor gesture handlers', () => {
     const commitDocument = vi.fn()
 
     const handlers = createCanvasEditorGestureHandlers({
+      alignmentGuides: {
+        guides: [],
+        visible: false,
+      },
       board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
       commitDocument,
       connectionDraft: {} as any,
@@ -144,6 +164,7 @@ describe('canvas editor gesture handlers', () => {
       readonly: computed(() => true),
       selectionBox: {} as any,
       selectedEdge: computed(() => null),
+      showDragAlignmentGuides: computed(() => true),
       stageRef: ref(stage),
       state: {
         document: {
@@ -189,6 +210,10 @@ describe('canvas editor gesture handlers', () => {
     const node = { id: 'node-1', type: 'text', x: 50, y: 50, width: 100, height: 100 }
 
     const handlers = createCanvasEditorGestureHandlers({
+      alignmentGuides: {
+        guides: [],
+        visible: false,
+      },
       board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
       commitDocument,
       connectionDraft: {} as any,
@@ -197,6 +222,7 @@ describe('canvas editor gesture handlers', () => {
       readonly: computed(() => false),
       selectionBox: {} as any,
       selectedEdge: computed(() => null),
+      showDragAlignmentGuides: computed(() => true),
       stageRef: ref(stage),
       state: {
         document: {
@@ -242,6 +268,10 @@ describe('canvas editor gesture handlers', () => {
     const node = { id: 'node-1', type: 'text', x: 50, y: 50, width: 100, height: 100 }
 
     const handlers = createCanvasEditorGestureHandlers({
+      alignmentGuides: {
+        guides: [],
+        visible: false,
+      },
       board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
       commitDocument,
       connectionDraft: {} as any,
@@ -250,6 +280,7 @@ describe('canvas editor gesture handlers', () => {
       readonly: computed(() => false),
       selectionBox: {} as any,
       selectedEdge: computed(() => null),
+      showDragAlignmentGuides: computed(() => true),
       stageRef: ref(stage),
       state: {
         document: {
@@ -425,6 +456,117 @@ describe('canvas editor gesture handlers', () => {
     expect(state.document.nodes[1]).toMatchObject({ x: 50, y: 130 })
   })
 
+  it('snaps a dragged card to nearby vertical alignment guides', () => {
+    const moving = { id: 'moving', type: 'text', x: 106, y: 220, width: 100, height: 80 } as CanvasNode
+    const target = { id: 'target', type: 'text', x: 100, y: 20, width: 100, height: 80 } as CanvasNode
+    const { alignmentGuides, handlers, state } = createGestureHarness([moving, target])
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: document.createElement('div') })
+
+    handlers.handleNodePointerDown(moving, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 97,
+      clientY: 100,
+    }))
+
+    expect(state.document.nodes[0]).toMatchObject({ x: 100, y: 220 })
+    expect(alignmentGuides.visible).toBe(true)
+    expect(alignmentGuides.guides).toEqual([
+      { axis: 'x', kind: 'left', position: 100 },
+    ])
+
+    window.dispatchEvent(new PointerEvent('pointerup', {
+      clientX: 97,
+      clientY: 100,
+    }))
+
+    expect(alignmentGuides.visible).toBe(false)
+    expect(alignmentGuides.guides).toEqual([])
+  })
+
+  it('does not snap or show guides when drag alignment guides are disabled', () => {
+    const moving = { id: 'moving', type: 'text', x: 106, y: 220, width: 100, height: 80 } as CanvasNode
+    const target = { id: 'target', type: 'text', x: 100, y: 20, width: 100, height: 80 } as CanvasNode
+    const { alignmentGuides, handlers, state } = createGestureHarness([moving, target], [], {
+      showDragAlignmentGuides: false,
+    })
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: document.createElement('div') })
+
+    handlers.handleNodePointerDown(moving, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 97,
+      clientY: 100,
+    }))
+
+    expect(state.document.nodes[0]).toMatchObject({ x: 103, y: 220 })
+    expect(alignmentGuides.visible).toBe(false)
+    expect(alignmentGuides.guides).toEqual([])
+  })
+
+  it('snaps selected group bounds while dragging multiple cards', () => {
+    const firstNode = { id: 'node-1', type: 'text', x: 306, y: 60, width: 100, height: 80 } as CanvasNode
+    const secondNode = { id: 'node-2', type: 'text', x: 456, y: 80, width: 100, height: 80 } as CanvasNode
+    const target = { id: 'target', type: 'text', x: 300, y: 280, width: 120, height: 80 } as CanvasNode
+    const { alignmentGuides, handlers, state } = createGestureHarness([firstNode, secondNode, target], ['node-1', 'node-2'])
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: document.createElement('div') })
+
+    handlers.handleNodePointerDown(firstNode, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 97,
+      clientY: 100,
+    }))
+
+    expect(state.document.nodes[0]).toMatchObject({ x: 300, y: 60 })
+    expect(state.document.nodes[1]).toMatchObject({ x: 450, y: 80 })
+    expect(alignmentGuides.guides).toEqual([
+      { axis: 'x', kind: 'left', position: 300 },
+    ])
+  })
+
+  it('snaps copied cards to alignment guides while ctrl-dragging', () => {
+    const moving = { id: 'moving', type: 'text', x: 106, y: 220, width: 100, height: 80 } as CanvasNode
+    const target = { id: 'target', type: 'text', x: 100, y: 20, width: 100, height: 80 } as CanvasNode
+    const { alignmentGuides, handlers, state } = createGestureHarness([moving, target])
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      ctrlKey: true,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: document.createElement('div') })
+
+    handlers.handleNodePointerDown(moving, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 97,
+      clientY: 100,
+      ctrlKey: true,
+    }))
+
+    expect(state.document.nodes).toHaveLength(3)
+    expect(state.document.nodes[2]).toMatchObject({ x: 100, y: 220 })
+    expect(alignmentGuides.guides).toEqual([
+      { axis: 'x', kind: 'left', position: 100 },
+    ])
+  })
+
   it('performs pinch-to-zoom and pan correctly on touch devices', () => {
     const stage = document.createElement('div')
     stage.getBoundingClientRect = vi.fn(() => ({
@@ -442,6 +584,10 @@ describe('canvas editor gesture handlers', () => {
     const viewport = ref({ scale: 1, x: 0, y: 0 })
 
     createCanvasEditorGestureHandlers({
+      alignmentGuides: {
+        guides: [],
+        visible: false,
+      },
       board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
       commitDocument: vi.fn(),
       connectionDraft: {} as any,
@@ -450,6 +596,7 @@ describe('canvas editor gesture handlers', () => {
       readonly: computed(() => false),
       selectionBox: {} as any,
       selectedEdge: computed(() => null),
+      showDragAlignmentGuides: computed(() => true),
       stageRef: ref(stage),
       state: {
         document: {

@@ -471,6 +471,25 @@
             </g>
           </svg>
 
+          <svg
+            v-if="editor.alignmentGuides.visible"
+            class="stage__alignment-guides"
+            :height="editor.board.height"
+            :viewBox="`0 0 ${editor.board.width} ${editor.board.height}`"
+            :width="editor.board.width"
+          >
+            <line
+              v-for="guide in editor.alignmentGuides.guides"
+              :key="`${guide.axis}-${guide.kind}-${guide.position}`"
+              class="stage__alignment-guide"
+              :data-testid="`alignment-guide-${guide.axis}`"
+              :x1="guide.axis === 'x' ? guide.position - editor.board.left : 0"
+              :x2="guide.axis === 'x' ? guide.position - editor.board.left : editor.board.width"
+              :y1="guide.axis === 'y' ? guide.position - editor.board.top : 0"
+              :y2="guide.axis === 'y' ? guide.position - editor.board.top : editor.board.height"
+            />
+          </svg>
+
           <article
             v-for="node in editor.displayNodes"
             :key="node.id"
