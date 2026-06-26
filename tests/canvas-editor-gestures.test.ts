@@ -13,6 +13,50 @@ import {
 
 import { createEmptyCanvasDocument } from '@/canvas/document'
 import { createCanvasEditorGestureHandlers } from '@/canvas/use-canvas-editor-gestures'
+import type { CanvasNode } from '@/canvas/types'
+
+function createGestureHarness(nodes: CanvasNode[], selectedNodeIds: string[] = []) {
+  const stage = document.createElement('div')
+  const viewport = { scale: 1, x: 0, y: 0 }
+  const state = {
+    document: {
+      nodes: [...nodes],
+      edges: [],
+    },
+    selectNode: vi.fn((id: string) => {
+      state.selectedNodeIds = [id]
+    }),
+    selectNodes: vi.fn((ids: string[]) => {
+      state.selectedNodeIds = [...ids]
+    }),
+    selectedNodeIds: [...selectedNodeIds],
+  }
+  const commitDocument = vi.fn((document) => {
+    state.document = document
+  })
+  const handlers = createCanvasEditorGestureHandlers({
+    board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
+    commitDocument,
+    connectionDraft: {} as any,
+    edgeReconnectDraft: {} as any,
+    getAnchor: vi.fn(),
+    readonly: computed(() => false),
+    selectionBox: {} as any,
+    selectedEdge: computed(() => null),
+    stageRef: ref(stage),
+    state: state as any,
+    viewport,
+    showNodeHeader: computed(() => false),
+  })
+
+  return {
+    commitDocument,
+    handlers,
+    stage,
+    state,
+    viewport,
+  }
+}
 
 describe('canvas editor gesture handlers', () => {
   it('zooms around the cursor without cancelling the wheel event', () => {
@@ -244,6 +288,143 @@ describe('canvas editor gesture handlers', () => {
     expect(viewport.x).toBe(0)
   })
 
+  it('copies the dragged card when holding ctrl', () => {
+    const node = { id: 'node-1', type: 'text', x: 50, y: 60, width: 100, height: 80 } as CanvasNode
+    const { commitDocument, handlers, state } = createGestureHarness([node])
+    const target = document.createElement('div')
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      ctrlKey: true,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: target })
+
+    handlers.handleNodePointerDown(node, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 140,
+      clientY: 130,
+      ctrlKey: true,
+    }))
+
+    expect(commitDocument).toHaveBeenCalled()
+    expect(state.document.nodes).toHaveLength(2)
+    expect(state.document.nodes[0]).toMatchObject({ id: 'node-1', x: 50, y: 60 })
+    expect(state.document.nodes[1]).toMatchObject({ x: 90, y: 90 })
+    expect(state.document.nodes[1]?.id).not.toBe('node-1')
+    expect(state.selectedNodeIds).toEqual([state.document.nodes[1]?.id])
+  })
+
+  it('does not copy or change selection when ctrl-clicking a card without dragging', () => {
+    const node = { id: 'node-1', type: 'text', x: 50, y: 60, width: 100, height: 80 } as CanvasNode
+    const { commitDocument, handlers, state } = createGestureHarness([node], ['node-1'])
+    const target = document.createElement('div')
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      ctrlKey: true,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: target })
+
+    handlers.handleNodePointerDown(node, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointerup', {
+      clientX: 100,
+      clientY: 100,
+      ctrlKey: true,
+    }))
+
+    expect(commitDocument).not.toHaveBeenCalled()
+    expect(state.document.nodes).toHaveLength(1)
+    expect(state.selectedNodeIds).toEqual(['node-1'])
+  })
+
+  it('copies the selected card group when ctrl-dragging one selected card', () => {
+    const firstNode = { id: 'node-1', type: 'text', x: 50, y: 60, width: 100, height: 80 } as CanvasNode
+    const secondNode = { id: 'node-2', type: 'text', x: 220, y: 90, width: 100, height: 80 } as CanvasNode
+    const { handlers, state } = createGestureHarness([firstNode, secondNode], ['node-1', 'node-2'])
+    const target = document.createElement('div')
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      ctrlKey: true,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: target })
+
+    handlers.handleNodePointerDown(firstNode, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 140,
+      clientY: 130,
+      ctrlKey: true,
+    }))
+
+    expect(state.document.nodes).toHaveLength(4)
+    expect(state.document.nodes[0]).toMatchObject({ id: 'node-1', x: 50, y: 60 })
+    expect(state.document.nodes[1]).toMatchObject({ id: 'node-2', x: 220, y: 90 })
+    expect(state.document.nodes[2]).toMatchObject({ x: 90, y: 90 })
+    expect(state.document.nodes[3]).toMatchObject({ x: 260, y: 120 })
+    expect(state.selectedNodeIds).toEqual([
+      state.document.nodes[2]?.id,
+      state.document.nodes[3]?.id,
+    ])
+  })
+
+  it('copies the dragged card horizontally when holding ctrl and shift with wider x movement', () => {
+    const node = { id: 'node-1', type: 'text', x: 50, y: 60, width: 100, height: 80 } as CanvasNode
+    const { handlers, state } = createGestureHarness([node])
+    const target = document.createElement('div')
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: target })
+
+    handlers.handleNodePointerDown(node, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 180,
+      clientY: 130,
+      ctrlKey: true,
+      shiftKey: true,
+    }))
+
+    expect(state.document.nodes).toHaveLength(2)
+    expect(state.document.nodes[1]).toMatchObject({ x: 130, y: 60 })
+  })
+
+  it('copies the dragged card vertically when holding ctrl and shift with taller y movement', () => {
+    const node = { id: 'node-1', type: 'text', x: 50, y: 60, width: 100, height: 80 } as CanvasNode
+    const { handlers, state } = createGestureHarness([node])
+    const target = document.createElement('div')
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: target })
+
+    handlers.handleNodePointerDown(node, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 125,
+      clientY: 170,
+      ctrlKey: true,
+      shiftKey: true,
+    }))
+
+    expect(state.document.nodes).toHaveLength(2)
+    expect(state.document.nodes[1]).toMatchObject({ x: 50, y: 130 })
+  })
+
   it('performs pinch-to-zoom and pan correctly on touch devices', () => {
     const stage = document.createElement('div')
     stage.getBoundingClientRect = vi.fn(() => ({
@@ -340,4 +521,3 @@ describe('canvas editor gesture handlers', () => {
     expect(viewport.value.x).toBe(-100)
   })
 })
-

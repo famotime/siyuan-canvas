@@ -16,6 +16,7 @@ import {
   toBoardX,
   toBoardY,
 } from "@/canvas/board"
+import { cloneCanvasDocument } from "@/canvas/canvas-history"
 import {
   createCanvasEdge,
   removeCanvasEdge,
@@ -234,6 +235,29 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     return Boolean(event.ctrlKey || event.metaKey || event.shiftKey)
   }
 
+  function isCopyDragGesture(event: MouseEvent | PointerEvent): boolean {
+    return Boolean(event.ctrlKey || event.metaKey)
+  }
+
+  function createCopiedNodeId(nodeId: string): string {
+    return `${nodeId}-copy-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+  }
+
+  function resolveDragDelta(dx: number, dy: number, options: { lockAxis: boolean }) {
+    const deltaX = Math.round(dx / viewport.scale)
+    const deltaY = Math.round(dy / viewport.scale)
+
+    if (!options.lockAxis) {
+      return { deltaX, deltaY }
+    }
+
+    if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+      return { deltaX, deltaY: 0 }
+    }
+
+    return { deltaX: 0, deltaY }
+  }
+
   function isNodeGestureTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) {
       return false
@@ -393,7 +417,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return
     }
 
-    if (event.button !== 0 || isAdditiveSelectionGesture(event)) {
+    if (event.button !== 0) {
       return
     }
 
@@ -415,6 +439,15 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return
     }
 
+    if (isCopyDragGesture(event)) {
+      startCopyDrag(node, event)
+      return
+    }
+
+    if (isAdditiveSelectionGesture(event)) {
+      return
+    }
+
     startDrag(node, event)
   }
 
@@ -432,9 +465,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     if (!state.selectedNodeIds.includes(node.id)) {
       state.selectNode(node.id)
     }
-    startPointerGesture(event, (dx, dy) => {
-      const deltaX = Math.round(dx / viewport.scale)
-      const deltaY = Math.round(dy / viewport.scale)
+    startPointerGesture(event, (dx, dy, moveEvent) => {
+      const { deltaX, deltaY } = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
       const movedDocument = state.document.nodes.reduce((document, candidate) => {
         const initial = initialPositions.get(candidate.id)
         if (!initial) {
@@ -448,6 +480,59 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       }, state.document)
 
       commitDocument(movedDocument, { coalesceKey: `drag-${node.id}` })
+    })
+  }
+
+  function startCopyDrag(node: CanvasNode, event: PointerEvent) {
+    if (readonly.value) return
+    const selectedNodeIds = resolveDragNodeIds(state.document, node.id, state.selectedNodeIds)
+    const copiedNodes = state.document.nodes
+      .filter(candidate => selectedNodeIds.includes(candidate.id))
+      .map((candidate) => {
+        const copiedNode = cloneCanvasDocument({ nodes: [candidate], edges: [] }).nodes[0]
+        return {
+          ...copiedNode,
+          id: createCopiedNodeId(candidate.id),
+        } as CanvasNode
+      })
+
+    if (copiedNodes.length === 0) {
+      return
+    }
+
+    const copiedNodeIds = copiedNodes.map(candidate => candidate.id)
+    const initialPositions = new Map(copiedNodes.map(candidate => [candidate.id, {
+      x: candidate.x,
+      y: candidate.y,
+    }]))
+    let hasCopied = false
+
+    startPointerGesture(event, (dx, dy, moveEvent) => {
+      const { deltaX, deltaY } = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
+      if (deltaX === 0 && deltaY === 0) {
+        return
+      }
+      const movedCopiedNodes = copiedNodes.map((candidate) => {
+        const initial = initialPositions.get(candidate.id)!
+        return {
+          ...candidate,
+          x: initial.x + deltaX,
+          y: initial.y + deltaY,
+        }
+      })
+      const movedDocument: CanvasDocument = {
+        ...state.document,
+        nodes: [
+          ...state.document.nodes.filter(candidate => !copiedNodeIds.includes(candidate.id)),
+          ...movedCopiedNodes,
+        ],
+      }
+
+      commitDocument(movedDocument, { coalesceKey: `copy-drag-${node.id}` })
+      if (!hasCopied) {
+        state.selectNodes(copiedNodeIds)
+        hasCopied = true
+      }
     })
   }
 
