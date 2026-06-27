@@ -538,6 +538,7 @@
               >↗</a>
             </header>
             <div
+              v-if="node.type !== 'group' || !node.collapsed"
               class="canvas-node__body"
               :class="{ 'canvas-node__body--selectable': node.type === 'text' || node.type === 'link' }"
             >
@@ -615,7 +616,7 @@
                 <CanvasIcon
                   class="canvas-node__group-collapsed-icon"
                   name="group"
-                  :size="14"
+                  :size="16"
                 />
                 <span class="canvas-node__group-collapsed-label">{{ node.label || '未命名群组' }}</span>
                 <span class="canvas-node__group-collapsed-badge">{{ node.collapsedNodes?.length || 0 }}</span>
