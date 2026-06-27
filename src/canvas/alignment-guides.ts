@@ -70,6 +70,10 @@ function resolveAxisSnap<TKind extends CanvasAlignmentGuideKind>(
 
   for (const movingAnchor of movingAnchors) {
     for (const targetAnchor of targetAnchors) {
+      if (targetAnchor.kind !== movingAnchor.kind) {
+        continue
+      }
+
       const offset = targetAnchor.value - movingAnchor.value
       const distance = Math.abs(offset)
       if (distance > threshold) {

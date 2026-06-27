@@ -26,6 +26,7 @@ function createGestureHarness(
     guides: [],
     visible: false,
   }
+  const showDragAlignmentGuides = ref(options.showDragAlignmentGuides ?? true)
   const state = {
     document: {
       nodes: [...nodes],
@@ -55,7 +56,7 @@ function createGestureHarness(
     stageRef: ref(stage),
     state: state as any,
     viewport,
-    showDragAlignmentGuides: computed(() => options.showDragAlignmentGuides ?? true),
+    showDragAlignmentGuides: computed(() => showDragAlignmentGuides.value),
     showNodeHeader: computed(() => false),
   })
 
@@ -66,6 +67,7 @@ function createGestureHarness(
     stage,
     state,
     viewport,
+    showDragAlignmentGuides,
   }
 }
 
@@ -565,6 +567,61 @@ describe('canvas editor gesture handlers', () => {
     expect(alignmentGuides.guides).toEqual([
       { axis: 'x', kind: 'left', position: 100 },
     ])
+  })
+
+
+  it('reacts to drag alignment guide setting changes in the current canvas', () => {
+    const moving = { id: 'moving', type: 'text', x: 106, y: 220, width: 100, height: 80 } as CanvasNode
+    const target = { id: 'target', type: 'text', x: 100, y: 20, width: 100, height: 80 } as CanvasNode
+    const { alignmentGuides, handlers, showDragAlignmentGuides, state } = createGestureHarness([moving, target], [], {
+      showDragAlignmentGuides: false,
+    })
+    const pointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    })
+    Object.defineProperty(pointerDownEvent, 'target', { value: document.createElement('div') })
+
+    handlers.handleNodePointerDown(moving, pointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 97,
+      clientY: 100,
+    }))
+
+    expect(state.document.nodes[0]).toMatchObject({ x: 103, y: 220 })
+    expect(alignmentGuides.visible).toBe(false)
+
+    showDragAlignmentGuides.value = true
+    window.dispatchEvent(new PointerEvent('pointerup', {
+      clientX: 97,
+      clientY: 100,
+    }))
+
+    const secondPointerDownEvent = new PointerEvent('pointerdown', {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    })
+    Object.defineProperty(secondPointerDownEvent, 'target', { value: document.createElement('div') })
+    handlers.handleNodePointerDown(moving, secondPointerDownEvent)
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      clientX: 97,
+      clientY: 100,
+    }))
+
+    expect(state.document.nodes[0]).toMatchObject({ x: 100, y: 220 })
+    expect(alignmentGuides.visible).toBe(true)
+    expect(alignmentGuides.guides).toEqual([
+      { axis: 'x', kind: 'left', position: 100 },
+    ])
+
+    showDragAlignmentGuides.value = false
+
+    expect(alignmentGuides.visible).toBe(false)
+    expect(alignmentGuides.guides).toEqual([])
   })
 
   it('performs pinch-to-zoom and pan correctly on touch devices', () => {

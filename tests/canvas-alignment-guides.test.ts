@@ -105,4 +105,39 @@ describe('resolveCanvasAlignmentGuides', () => {
     expect(result.deltaX).toBe(-5)
     expect(result.guides).toEqual([])
   })
+
+  it('does not snap a moving edge to a target center guide', () => {
+    const result = resolveCanvasAlignmentGuides({
+      deltaX: 4,
+      deltaY: 0,
+      movingNodeIds: ['moving'],
+      nodes: [
+        textNode('moving', 106, 220),
+        textNode('target', 50, 20, 120),
+      ],
+      threshold: 8,
+    })
+
+    expect(result.deltaX).toBe(4)
+    expect(result.guides).toEqual([])
+  })
+
+  it('snaps a moving center only to a target center guide', () => {
+    const result = resolveCanvasAlignmentGuides({
+      deltaX: 4,
+      deltaY: 0,
+      movingNodeIds: ['moving'],
+      nodes: [
+        textNode('moving', 106, 220),
+        textNode('target', 100, 20, 120),
+      ],
+      threshold: 8,
+    })
+
+    expect(result.deltaX).toBe(4)
+    expect(result.guides).toEqual([
+      { axis: 'x', kind: 'center-x', position: 160 },
+    ])
+  })
+
 })

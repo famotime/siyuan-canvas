@@ -154,6 +154,7 @@ export function useCanvasEditor(
   const colorThemeId = ref<CanvasColorThemeId>(
     getPluginSettings().colorTheme ?? "classic",
   )
+  const settingsVersion = ref(0)
   const currentColorStyles = computed(() =>
     buildColorStyles(getColorThemeById(colorThemeId.value)),
   )
@@ -430,6 +431,11 @@ export function useCanvasEditor(
     return plugin.getCanvasSettings?.() ?? createDefaultCanvasPluginSettings()
   }
 
+  function getReactivePluginSettings(): CanvasPluginSettings {
+    void settingsVersion.value
+    return getPluginSettings()
+  }
+
   function filterEdgeNodeOptions(nodes: CanvasNode[], query: string) {
     const normalizedQuery = query.trim().toLowerCase()
     if (!normalizedQuery) {
@@ -456,6 +462,7 @@ export function useCanvasEditor(
   }
 
   function handleExternalSettingsChange() {
+    settingsVersion.value += 1
     const settings = getPluginSettings()
     if (settings.colorTheme && settings.colorTheme !== colorThemeId.value) {
       colorThemeId.value = settings.colorTheme
@@ -1097,8 +1104,8 @@ export function useCanvasEditor(
     stageRef,
     state,
     viewport,
-    showDragAlignmentGuides: computed(() => getPluginSettings().showDragAlignmentGuides !== false),
-    showNodeHeader: computed(() => getPluginSettings().showNodeHeader),
+    showDragAlignmentGuides: computed(() => getReactivePluginSettings().showDragAlignmentGuides !== false),
+    showNodeHeader: computed(() => getReactivePluginSettings().showNodeHeader),
   })
 
   const { handleKeydown } = createCanvasEditorKeyboardHandler({

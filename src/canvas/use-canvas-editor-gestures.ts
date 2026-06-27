@@ -147,6 +147,12 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     alignmentGuides.visible = false
   }
 
+  watch(showDragAlignmentGuides, (enabled) => {
+    if (!enabled) {
+      clearAlignmentGuides()
+    }
+  }, { flush: "sync" })
+
   function startPointerGesture(
     event: PointerEvent,
     onMove: (dx: number, dy: number, moveEvent: PointerEvent) => void,
