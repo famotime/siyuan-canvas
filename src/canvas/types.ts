@@ -43,6 +43,11 @@ export interface CanvasGroupNode extends CanvasNodeBase {
   label?: string
   background?: string
   backgroundStyle?: string
+  collapsed?: boolean
+  originalWidth?: number
+  originalHeight?: number
+  collapsedNodes?: CanvasNode[]
+  collapsedEdges?: CanvasEdge[]
 }
 
 export type CanvasNode =
@@ -61,6 +66,8 @@ export interface CanvasEdge {
   endArrow?: boolean
   label?: string
   color?: string
+  collapsedOriginalFromNode?: string
+  collapsedOriginalToNode?: string
   [key: string]: unknown
 }
 

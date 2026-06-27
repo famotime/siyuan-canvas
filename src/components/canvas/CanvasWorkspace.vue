@@ -506,6 +506,7 @@
                 'canvas-node--presentation-current': editor.presentation.currentNodeId === node.id,
                 'canvas-node--presentation-history': editor.presentation.pathHistory.includes(node.id),
                 'canvas-node--presentation-next': editor.presentation.availableNextNodes.includes(node.id),
+                'canvas-node--group-collapsed': node.type === 'group' && node.collapsed,
               },
             ]"
             :style="getCanvasNodeStyle(node)"
@@ -610,48 +611,62 @@
               <template v-else />
             </div>
             <template v-if="node.type === 'group'">
-              <textarea
-                v-if="editingNodeId === node.id"
-                :ref="setEditingTextareaRef"
-                v-model="editingMarkdown"
-                class="canvas-node__group-label canvas-node__group-label-editor"
-                @blur="commitTextNodeEditing"
+              <div v-if="node.collapsed" class="canvas-node__group-collapsed-header" @dblclick.stop="editor.toggleGroupCollapse(node.id)">
+                <CanvasIcon
+                  class="canvas-node__group-collapsed-icon"
+                  name="group"
+                  :size="14"
+                />
+                <span class="canvas-node__group-collapsed-label">{{ node.label || '未命名群组' }}</span>
+                <span class="canvas-node__group-collapsed-badge">{{ node.collapsedNodes?.length || 0 }}</span>
+              </div>
+              <template v-else>
+                <textarea
+                  v-if="editingNodeId === node.id"
+                  :ref="setEditingTextareaRef"
+                  v-model="editingMarkdown"
+                  class="canvas-node__group-label canvas-node__group-label-editor"
+                  @blur="commitTextNodeEditing"
+                />
+                <div
+                  v-else
+                  class="canvas-node__group-label"
+                  data-canvas-field="label"
+                  :style="getCanvasNodeContentStyle(node)"
+                >
+                  <span v-html="renderCanvasGroupLabel(node)" />
+                </div>
+              </template>
+            </template>
+            <template v-if="!node.collapsed">
+              <button
+                v-for="side in editor.sides"
+                :key="`anchor-${node.id}-${side}`"
+                class="canvas-node__anchor"
+                :class="[
+                  `canvas-node__anchor--${side}`,
+                  { 'canvas-node__anchor--active': editor.isConnectionTarget(node.id, side) },
+                ]"
+                :data-testid="`node-anchor-${side}`"
+                type="button"
+                @pointerdown.stop.prevent="editor.startConnectionDrag(node, side, $event)"
               />
-              <div
-                v-else
-                class="canvas-node__group-label"
-                data-canvas-field="label"
-                :style="getCanvasNodeContentStyle(node)"
-                v-html="renderCanvasGroupLabel(node)"
+              <button
+                v-for="segment in NODE_RESIZE_SEGMENTS"
+                :key="`resize-${node.id}-${segment.id}`"
+                class="canvas-node__resize-handle"
+                :class="`canvas-node__resize-handle--${segment.id}`"
+                :data-testid="`node-resize-${segment.id}`"
+                type="button"
+                @pointerdown.stop.prevent="editor.startResize(node, segment.side, $event)"
+              />
+              <button
+                class="canvas-node__resize-corner"
+                data-testid="node-resize-corner"
+                type="button"
+                @pointerdown.stop.prevent="editor.startCornerResize(node, $event)"
               />
             </template>
-            <button
-              v-for="side in editor.sides"
-              :key="`anchor-${node.id}-${side}`"
-              class="canvas-node__anchor"
-              :class="[
-                `canvas-node__anchor--${side}`,
-                { 'canvas-node__anchor--active': editor.isConnectionTarget(node.id, side) },
-              ]"
-              :data-testid="`node-anchor-${side}`"
-              type="button"
-              @pointerdown.stop.prevent="editor.startConnectionDrag(node, side, $event)"
-            />
-            <button
-              v-for="segment in NODE_RESIZE_SEGMENTS"
-              :key="`resize-${node.id}-${segment.id}`"
-              class="canvas-node__resize-handle"
-              :class="`canvas-node__resize-handle--${segment.id}`"
-              :data-testid="`node-resize-${segment.id}`"
-              type="button"
-              @pointerdown.stop.prevent="editor.startResize(node, segment.side, $event)"
-            />
-            <button
-              class="canvas-node__resize-corner"
-              data-testid="node-resize-corner"
-              type="button"
-              @pointerdown.stop.prevent="editor.startCornerResize(node, $event)"
-            />
           </article>
 
           <svg
@@ -1216,6 +1231,20 @@
               name="arrange-row"
             />
           </button>
+          <button
+            v-if="editor.state.selectedNodeIds.length === 1 && editor.state.document.nodes.find(n => n.id === editor.state.selectedNodeIds[0])?.type === 'group'"
+            class="selection-toolbar__button"
+            data-testid="selection-toolbar-toggle-group-collapse"
+            :aria-label="editor.state.document.nodes.find(n => n.id === editor.state.selectedNodeIds[0])?.collapsed ? '展开群组' : '折叠群组'"
+            :data-tooltip="editor.state.document.nodes.find(n => n.id === editor.state.selectedNodeIds[0])?.collapsed ? '展开群组' : '折叠群组'"
+            type="button"
+            @click.stop="editor.toggleGroupCollapse(editor.state.selectedNodeIds[0])"
+          >
+            <CanvasIcon
+              class="selection-toolbar__icon"
+              :name="editor.state.document.nodes.find(n => n.id === editor.state.selectedNodeIds[0])?.collapsed ? 'unfold' : 'fold'"
+            />
+          </button>
           <template v-else-if="editor.selectedNodeCount > 1">
             <button
               v-if="editor.canConvertSelectionToDocument"
@@ -1258,6 +1287,7 @@
                 name="group"
               />
             </button>
+
             <div class="selection-toolbar__menu">
               <button
                 class="selection-toolbar__button"

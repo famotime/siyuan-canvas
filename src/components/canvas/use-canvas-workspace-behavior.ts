@@ -39,6 +39,7 @@ interface CanvasWorkspaceEditor {
     selectedNodeIds: string[]
   }
   updateTextNodeContent: (nodeId: string, text: string) => void
+  toggleGroupCollapse: (nodeId: string) => void
 }
 
 export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
@@ -175,6 +176,10 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   }
 
   function handleNodeDoubleClick(node: CanvasNode) {
+    if (node.type === "group" && node.collapsed) {
+      editor.toggleGroupCollapse(node.id)
+      return
+    }
     if (!["group", "text", "link"].includes(node.type)) {
       editor.activateNode(node)
       return

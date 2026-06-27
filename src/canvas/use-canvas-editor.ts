@@ -53,6 +53,8 @@ import {
   getCanvasSelectionBounds,
   setCanvasEdgeEndpoint,
   upsertCanvasEdge,
+  collapseCanvasGroup,
+  expandCanvasGroup,
 } from "@/canvas/document"
 import { createCanvasEditorBindings } from "@/canvas/editor-bindings"
 import { CanvasEditorState } from "@/canvas/editor-state"
@@ -667,6 +669,38 @@ export function useCanvasEditor(
     state.patchDocument(nextDocument)
     state.issues = validateCanvasDocument(nextDocument)
     notifyCanvasSearchChanged()
+  }
+
+  function toggleGroupCollapse(nodeId: string) {
+    const node = state.document.nodes.find((n) => n.id === nodeId && n.type === "group") as CanvasGroupNode
+    if (!node) {
+      return
+    }
+
+    let nextDocument: CanvasDocument
+    if (node.collapsed) {
+      nextDocument = expandCanvasGroup(state.document, nodeId)
+    } else {
+      nextDocument = collapseCanvasGroup(state.document, nodeId)
+    }
+
+    // 处理选中状态的清理
+    const childNodeIds = node.collapsedNodes?.map((n) => n.id) || []
+    let nextSelectedNodeIds = [...state.selectedNodeIds]
+    let nextSelectedNodeId = state.selectedNodeId
+
+    if (nextSelectedNodeIds.some((id) => childNodeIds.includes(id))) {
+      nextSelectedNodeIds = nextSelectedNodeIds.filter((id) => !childNodeIds.includes(id))
+      if (childNodeIds.includes(nextSelectedNodeId)) {
+        nextSelectedNodeId = nodeId
+      }
+    }
+
+    // 提交前，我们可以临时修改选中状态，以便 commitDocument 在记录历史时使用正确的选中状态
+    state.selectedNodeIds = nextSelectedNodeIds
+    state.selectedNodeId = nextSelectedNodeId
+
+    commitDocument(nextDocument)
   }
 
   function applyHistorySnapshot(snapshot: ReturnType<typeof cloneCanvasDocument> extends infer _T ? import("@/canvas/canvas-history").CanvasHistorySnapshot : never) {
@@ -1458,6 +1492,7 @@ export function useCanvasEditor(
       cancelEdgeLabelEditing,
       updateEditingEdgeLabel,
       toggleInspector,
+      toggleGroupCollapse,
       toggleEdgePopover,
       toggleSelectionPopover,
       updateSelectedEdgeDirection,

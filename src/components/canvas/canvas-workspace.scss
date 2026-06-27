@@ -990,6 +990,78 @@
   overflow: visible;
 }
 
+.canvas-node--group-collapsed {
+  background: var(--canvas-surface) !important;
+  border-style: solid !important;
+  border-width: 1px !important;
+  border-color: color-mix(in srgb, var(--canvas-text-muted) 25%, transparent) !important;
+  box-shadow: var(--canvas-shadow) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 16px !important;
+  border-radius: 8px !important;
+  cursor: pointer;
+  box-sizing: border-box !important;
+  transition: background-color 0.2s, border-color 0.2s;
+
+  &:hover {
+    background: var(--canvas-hover) !important;
+    border-color: color-mix(in srgb, var(--canvas-text-muted) 45%, transparent) !important;
+  }
+
+  &.canvas-node--selected {
+    border-width: 2px !important;
+    border-color: var(--canvas-selection-border) !important;
+    box-shadow: var(--canvas-shadow-strong) !important;
+  }
+
+  .canvas-node__group-collapsed-header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    gap: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--canvas-text);
+    user-select: none;
+    line-height: 1;
+  }
+
+  .canvas-node__group-collapsed-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--canvas-text-muted);
+    opacity: 0.85;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+  }
+
+  .canvas-node__group-collapsed-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .canvas-node__group-collapsed-badge {
+    background: color-mix(in srgb, var(--canvas-text-muted) 15%, transparent);
+    color: var(--canvas-text-muted);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    line-height: 1;
+    margin-left: auto;
+    margin-right: 2px;
+  }
+}
+
 .canvas-node--selected {
   z-index: 3;
   box-shadow: 0 0 0 2px var(--canvas-selection-border), var(--canvas-shadow-strong);
