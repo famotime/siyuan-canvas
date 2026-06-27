@@ -2161,4 +2161,65 @@ Only an intro.`,
 
     wrapper.unmount()
   })
+
+  it("allows updating and moving selected node ZIndex in the document nodes array", async () => {
+    const { editor, wrapper } = await mountEditor()
+
+    editor.addNode("text")
+    await flushEditor()
+    const textNode1Id = editor.state.selectedNodeId
+
+    editor.addNode("text")
+    await flushEditor()
+    const textNode2Id = editor.state.selectedNodeId
+
+    editor.addNode("text")
+    await flushEditor()
+    const textNode3Id = editor.state.selectedNodeId
+
+    expect(editor.state.document.nodes.map((n: any) => n.id)).toEqual([
+      textNode1Id,
+      textNode2Id,
+      textNode3Id,
+    ])
+
+    editor.selectNode(textNode2Id)
+    editor.moveSelectedNodeToTop()
+    await flushEditor()
+
+    expect(editor.state.document.nodes.map((n: any) => n.id)).toEqual([
+      textNode1Id,
+      textNode3Id,
+      textNode2Id,
+    ])
+
+    editor.moveSelectedNodeToBottom()
+    await flushEditor()
+
+    expect(editor.state.document.nodes.map((n: any) => n.id)).toEqual([
+      textNode2Id,
+      textNode1Id,
+      textNode3Id,
+    ])
+
+    editor.updateSelectedNodeZIndex(2)
+    await flushEditor()
+
+    expect(editor.state.document.nodes.map((n: any) => n.id)).toEqual([
+      textNode1Id,
+      textNode2Id,
+      textNode3Id,
+    ])
+
+    editor.moveSelectedNodeZIndex(1)
+    await flushEditor()
+
+    expect(editor.state.document.nodes.map((n: any) => n.id)).toEqual([
+      textNode1Id,
+      textNode3Id,
+      textNode2Id,
+    ])
+
+    wrapper.unmount()
+  })
 })

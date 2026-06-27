@@ -69,6 +69,45 @@
         </label>
       </div>
 
+      <div
+        v-if="editor.selectedNodeCount === 1"
+        class="inspector__field-row"
+      >
+        <label>
+          {{ t("fieldZIndex") }}
+          <input
+            data-testid="inspector-node-zIndex"
+            type="number"
+            :min="1"
+            :max="editor.state.document.nodes.length"
+            :value="currentZIndex"
+            @change="handleZIndexChange"
+            @keydown.enter="handleZIndexEnter"
+          />
+        </label>
+        <div class="inspector__zIndex-actions-container">
+          <span class="inspector__zIndex-actions-label">&nbsp;</span>
+          <div class="inspector__zIndex-actions">
+            <button
+              class="inspector__zIndex-btn"
+              :title="t('zIndexToBottom')"
+              type="button"
+              @click="editor.moveSelectedNodeToBottom()"
+            >
+              <CanvasIcon name="zIndex-to-bottom" class="inspector__zIndex-icon" />
+            </button>
+            <button
+              class="inspector__zIndex-btn"
+              :title="t('zIndexToTop')"
+              type="button"
+              @click="editor.moveSelectedNodeToTop()"
+            >
+              <CanvasIcon name="zIndex-to-top" class="inspector__zIndex-icon" />
+            </button>
+          </div>
+        </div>
+      </div>
+
       <label v-if="editor.selectedNode.type === 'text'">
         {{ t("fieldText") }}
         <textarea
@@ -738,6 +777,27 @@ function applyDraft(): void {
   props.editor.applySelectedNodeChanges(fields)
 }
 
+const currentZIndex = computed(() => {
+  const node = props.editor.selectedNode
+  if (!node) return 0
+  return props.editor.state.document.nodes.findIndex((n: any) => n.id === node.id) + 1
+})
+
+function handleZIndexChange(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const value = Number.parseInt(input.value, 10)
+  if (!Number.isNaN(value)) {
+    props.editor.updateSelectedNodeZIndex(value)
+  } else {
+    input.value = String(currentZIndex.value)
+  }
+}
+
+function handleZIndexEnter(event: Event): void {
+  const input = event.target as HTMLInputElement
+  input.blur()
+}
+
 function focusConnectedNode(nodeId: string): void {
   props.editor.selectNode(nodeId)
   props.editor.centerSelectionInViewport()
@@ -1124,5 +1184,57 @@ function getSectionToggleTitle(section: keyof typeof props.editor.inspectorSecti
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.inspector__zIndex-actions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inspector__zIndex-actions-label {
+  font-size: 12px;
+  line-height: 1.2;
+  visibility: hidden;
+}
+
+.inspector__zIndex-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.inspector__zIndex-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 36px;
+  border: 1px solid var(--canvas-border);
+  border-radius: 10px;
+  background: var(--canvas-input-bg);
+  color: var(--canvas-text);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, transform 120ms ease;
+}
+
+.inspector__zIndex-btn:hover {
+  background: color-mix(in srgb, var(--canvas-accent) 8%, var(--canvas-input-bg));
+  border-color: var(--canvas-accent-soft);
+  transform: translateY(-1px);
+}
+
+.inspector__zIndex-btn:active {
+  transform: translateY(0);
+}
+
+.inspector__zIndex-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--canvas-text-muted);
+  transition: color 150ms ease;
+}
+
+.inspector__zIndex-btn:hover .inspector__zIndex-icon {
+  color: var(--canvas-accent);
 }
 </style>

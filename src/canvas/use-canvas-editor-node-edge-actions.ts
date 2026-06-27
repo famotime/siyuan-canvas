@@ -622,6 +622,56 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     })
   }
 
+  function updateSelectedNodeZIndex(targetZIndex: number) {
+    if (!selectedNode.value) {
+      return
+    }
+
+    const nodes = [...state.document.nodes]
+    const currentIndex = nodes.findIndex((n) => n.id === selectedNode.value!.id)
+    if (currentIndex === -1) {
+      return
+    }
+
+    const targetIndex = Math.max(0, Math.min(nodes.length - 1, targetZIndex - 1))
+    if (targetIndex === currentIndex) {
+      return
+    }
+
+    const [removed] = nodes.splice(currentIndex, 1)
+    nodes.splice(targetIndex, 0, removed)
+
+    commitDocument({
+      ...state.document,
+      nodes,
+    })
+  }
+
+  function moveSelectedNodeZIndex(delta: number) {
+    if (!selectedNode.value) {
+      return
+    }
+
+    const nodes = state.document.nodes
+    const currentIndex = nodes.findIndex((n) => n.id === selectedNode.value!.id)
+    if (currentIndex === -1) {
+      return
+    }
+
+    updateSelectedNodeZIndex(currentIndex + 1 + delta)
+  }
+
+  function moveSelectedNodeToBottom() {
+    updateSelectedNodeZIndex(1)
+  }
+
+  function moveSelectedNodeToTop() {
+    if (!state.document.nodes.length) {
+      return
+    }
+    updateSelectedNodeZIndex(state.document.nodes.length)
+  }
+
   function applySelectedNodeChanges(fields: CanvasGeometryPatch & { text?: string }) {
     if (!state.selectedNodeIds.length) {
       return
@@ -827,6 +877,10 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     updateEditingEdgeLabel,
     updateNodeField,
     updateNumericNodeField,
+    updateSelectedNodeZIndex,
+    moveSelectedNodeZIndex,
+    moveSelectedNodeToBottom,
+    moveSelectedNodeToTop,
     applySelectedNodeChanges,
     updateSelectedEdgeDirection,
     updateTextNodeContent,
