@@ -61,12 +61,22 @@ function getHorizontalAnchors(bounds: CanvasBounds) {
   ]
 }
 
+function getBoundsDistance(a: CanvasBounds, b: CanvasBounds): number {
+  const aCenterX = a.x + a.width / 2
+  const aCenterY = a.y + a.height / 2
+  const bCenterX = b.x + b.width / 2
+  const bCenterY = b.y + b.height / 2
+  const dx = aCenterX - bCenterX
+  const dy = aCenterY - bCenterY
+  return Math.sqrt(dx * dx + dy * dy)
+}
+
 function resolveAxisSnap<TKind extends CanvasAlignmentGuideKind>(
   movingAnchors: Array<{ kind: TKind, value: number }>,
-  targetAnchors: Array<{ kind: TKind, value: number }>,
+  targetAnchors: Array<{ kind: TKind, value: number, spatialDistance: number }>,
   threshold: number,
-): null | { kind: TKind, offset: number, position: number } {
-  let best: null | { distance: number, kind: TKind, offset: number, position: number } = null
+): null | { kind: TKind, offset: number, position: number, spatialDistance: number } {
+  let best: null | { distance: number, kind: TKind, offset: number, position: number, spatialDistance: number } = null
 
   for (const movingAnchor of movingAnchors) {
     for (const targetAnchor of targetAnchors) {
@@ -80,12 +90,18 @@ function resolveAxisSnap<TKind extends CanvasAlignmentGuideKind>(
         continue
       }
 
-      if (!best || distance < best.distance) {
+      // 优先吸附空间距离近的目标卡片（差距超10个画布单位）。在空间距离极其接近时，才比较对齐偏离量。
+      const isBetter = !best
+        || targetAnchor.spatialDistance < best.spatialDistance - 10
+        || (Math.abs(targetAnchor.spatialDistance - best.spatialDistance) <= 10 && distance < best.distance)
+
+      if (isBetter) {
         best = {
           distance,
           kind: movingAnchor.kind,
           offset,
           position: targetAnchor.value,
+          spatialDistance: targetAnchor.spatialDistance,
         }
       }
     }
@@ -114,18 +130,29 @@ export function resolveCanvasAlignmentGuides(options: ResolveCanvasAlignmentGuid
     x: movingBounds.x + options.deltaX,
     y: movingBounds.y + options.deltaY,
   }
-  const targetBoundsList = targetNodes
-    .map(node => createBoundsForNodes([node]))
-    .filter((bounds): bounds is CanvasBounds => Boolean(bounds))
+  const targetBoundsWithDistance = targetNodes
+    .map((node) => {
+      const bounds = createBoundsForNodes([node])
+      if (!bounds) {
+        return null
+      }
+      const spatialDistance = getBoundsDistance(movedBounds, bounds)
+      return { bounds, spatialDistance }
+    })
+    .filter((item): item is { bounds: CanvasBounds, spatialDistance: number } => Boolean(item))
 
   const xSnap = resolveAxisSnap(
     getVerticalAnchors(movedBounds),
-    targetBoundsList.flatMap(getVerticalAnchors),
+    targetBoundsWithDistance.flatMap(({ bounds, spatialDistance }) =>
+      getVerticalAnchors(bounds).map(anchor => ({ ...anchor, spatialDistance }))
+    ),
     threshold,
   )
   const ySnap = resolveAxisSnap(
     getHorizontalAnchors(movedBounds),
-    targetBoundsList.flatMap(getHorizontalAnchors),
+    targetBoundsWithDistance.flatMap(({ bounds, spatialDistance }) =>
+      getHorizontalAnchors(bounds).map(anchor => ({ ...anchor, spatialDistance }))
+    ),
     threshold,
   )
   const guides: CanvasAlignmentGuide[] = []

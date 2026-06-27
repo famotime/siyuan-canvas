@@ -295,7 +295,11 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       }
     }
 
-    const resolved = resolveCanvasAlignmentGuides(options)
+    // 基于当前视口缩放比例自适应调整吸附阈值，确保在不同缩放比例下，屏幕上物理吸附距离保持约 8 像素
+    const resolved = resolveCanvasAlignmentGuides({
+      ...options,
+      threshold: 8 / viewport.scale,
+    })
     alignmentGuides.guides = resolved.guides
     alignmentGuides.visible = resolved.guides.length > 0
     return resolved
@@ -497,8 +501,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   function startDrag(node: CanvasNode, event: PointerEvent) {
     if (readonly.value) return
     const selectedNodeIds = resolveDragNodeIds(state.document, node.id, state.selectedNodeIds)
+    // 锁存拖拽开始前的初始节点状态，避免拖动过程中的 commit 导致对齐基准抖动
+    const initialNodes = [...state.document.nodes]
     const initialPositions = new Map(
-      state.document.nodes
+      initialNodes
         .filter((candidate) => selectedNodeIds.includes(candidate.id))
         .map((candidate) => [candidate.id, {
           x: candidate.x,
@@ -517,7 +523,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         deltaX: rawDelta.deltaX,
         deltaY: rawDelta.deltaY,
         movingNodeIds: selectedNodeIds,
-        nodes: state.document.nodes,
+        nodes: initialNodes,
       })
       const movedDocument = state.document.nodes.reduce((document, candidate) => {
         const initial = initialPositions.get(candidate.id)
@@ -559,6 +565,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       x: candidate.x,
       y: candidate.y,
     }]))
+    // 锁存拖拽开始前的初始非移动节点列表，避免拖动过程中的 commit 导致对齐基准抖动
+    const initialTargetNodes = state.document.nodes.filter(candidate =>
+      !copiedNodeIds.includes(candidate.id) && !selectedNodeIds.includes(candidate.id),
+    )
     let hasCopied = false
 
     startPointerGesture(event, (dx, dy, moveEvent) => {
@@ -571,9 +581,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         deltaY: rawDelta.deltaY,
         movingNodeIds: copiedNodeIds,
         nodes: [
-          ...state.document.nodes.filter(candidate =>
-            !copiedNodeIds.includes(candidate.id) && !selectedNodeIds.includes(candidate.id),
-          ),
+          ...initialTargetNodes,
           ...copiedNodes,
         ],
       })

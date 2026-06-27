@@ -140,4 +140,24 @@ describe('resolveCanvasAlignmentGuides', () => {
     ])
   })
 
+  it('prioritizes nodes that are spatially closer to the moving node when multiple options are within threshold', () => {
+    const result = resolveCanvasAlignmentGuides({
+      deltaX: -5,
+      deltaY: 0,
+      movingNodeIds: ['moving'],
+      nodes: [
+        textNode('moving', 205, 100),
+        textNode('target_far', 201, 1000),  // 空间距离远，但偏差只有 1 (201 - 200)
+        textNode('target_near', 196, 120), // 空间距离近，但偏差有 4 (196 - 200)
+      ],
+      threshold: 8,
+    })
+
+    // 空间距离优先选择 target_near，即使偏差更大 (4px 对齐到 196px)
+    expect(result.deltaX).toBe(-9) // -5 + (196 - 200) = -9
+    expect(result.guides).toEqual([
+      { axis: 'x', kind: 'left', position: 196 },
+    ])
+  })
+
 })
