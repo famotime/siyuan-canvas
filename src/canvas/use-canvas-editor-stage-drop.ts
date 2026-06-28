@@ -103,6 +103,9 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
           { x: stageX, y: startY + i * verticalGap },
         )
         node.file = blockId
+        // Align drop position to card center instead of top-left
+        node.x -= node.width / 2
+        node.y -= node.height / 2
         currentDoc = upsertCanvasNode(currentDoc, node)
         newNodes.push(node)
 

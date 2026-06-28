@@ -190,7 +190,7 @@ describe('canvas editor stage drop', () => {
     expect(event.preventDefault).not.toHaveBeenCalled()
   })
 
-  it('places node at drop coordinates', async () => {
+  it('places node centered at drop coordinates', async () => {
     const { committed, harness } = createStageDropHarness()
     const event = createDropEvent('20230613234017-zkw3pr0', 400, 300)
 
@@ -198,8 +198,9 @@ describe('canvas editor stage drop', () => {
 
     expect(committed).toHaveLength(1)
     const node = committed[0].nodes.find((n: any) => n.type === 'file')!
-    expect(node.x).toBe(400)
-    expect(node.y).toBe(300)
+    // Centered alignment offset: 400 - 320/2 = 240, 300 - 180/2 = 210
+    expect(node.x).toBe(240)
+    expect(node.y).toBe(210)
   })
 
   it('keeps dropped image block id as file source so metadata refresh can resolve it as an image', async () => {
