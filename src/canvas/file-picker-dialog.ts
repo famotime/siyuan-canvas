@@ -1,6 +1,6 @@
 export interface CanvasFilePickerOption {
   blockId?: string
-  kind: "block" | "canvas" | "document" | "image"
+  kind: "block" | "canvas" | "document" | "image" | "query"
   path: string
   subtitle: string
   title: string

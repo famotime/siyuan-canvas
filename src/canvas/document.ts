@@ -64,6 +64,16 @@ export function createCanvasNode(type: CanvasNodeType): CanvasNode {
         type,
         text: "",
       }
+    case "query":
+      return {
+        ...shared,
+        type,
+        sql: "SELECT * FROM blocks WHERE content LIKE '%项目A%' LIMIT 5",
+        refreshInterval: 0,
+        maxResults: 50,
+        width: 360,
+        height: 480,
+      }
     default:
       throw new Error(`Unsupported node type: ${String(type)}`)
   }

@@ -180,7 +180,7 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
       editor.toggleGroupCollapse(node.id)
       return
     }
-    if (!["group", "text", "link"].includes(node.type)) {
+    if (!["group", "text", "link", "query"].includes(node.type)) {
       editor.activateNode(node)
       return
     }
@@ -193,7 +193,9 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
         ? (node.text || "")
         : node.type === "link"
           ? (node.url || "")
-          : ""
+          : node.type === "query"
+            ? (node.sql || "")
+            : ""
     editingMarkdown.value = initialText
     editingOriginalText.value = initialText
     void nextTick(() => {
@@ -213,7 +215,9 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
 
     const trimmed = editingMarkdown.value.trim()
     const node = editor.state.document.nodes.find((candidate) => candidate.id === editingNodeId.value)
-    if (node?.type === "text" && isWebUrl(trimmed)) {
+    if (node?.type === "query") {
+      editor.updateNodeField(editingNodeId.value, "sql", editingMarkdown.value.trim())
+    } else if (node?.type === "text" && isWebUrl(trimmed)) {
       editor.convertTextToLink(editingNodeId.value, trimmed)
     } else if (node?.type === "link") {
       if (isWebUrl(trimmed)) {

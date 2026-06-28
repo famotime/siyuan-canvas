@@ -1,4 +1,4 @@
-export type CanvasNodeType = "file" | "group" | "link" | "text"
+export type CanvasNodeType = "file" | "group" | "link" | "text" | "query"
 
 export type CanvasSide = "bottom" | "left" | "right" | "top"
 
@@ -38,6 +38,13 @@ export interface CanvasLinkNode extends CanvasNodeBase {
   url: string
 }
 
+export interface CanvasQueryNode extends CanvasNodeBase {
+  type: "query"
+  sql: string
+  refreshInterval?: number
+  maxResults?: number
+}
+
 export interface CanvasGroupNode extends CanvasNodeBase {
   type: "group"
   label?: string
@@ -55,6 +62,7 @@ export type CanvasNode =
   | CanvasGroupNode
   | CanvasLinkNode
   | CanvasTextNode
+  | CanvasQueryNode
 
 export interface CanvasEdge {
   id: string

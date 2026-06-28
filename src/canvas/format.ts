@@ -8,7 +8,7 @@ import type {
   CanvasSide,
 } from "@/canvas/types"
 
-const VALID_NODE_TYPES: CanvasNodeType[] = ["file", "group", "link", "text"]
+const VALID_NODE_TYPES: CanvasNodeType[] = ["file", "group", "link", "text", "query"]
 const VALID_SIDES: CanvasSide[] = ["bottom", "left", "right", "top"]
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -123,6 +123,17 @@ function asNode(candidate: unknown, index: number, errors: CanvasIssue[]): Canva
           level: "error",
           message: "Link node requires a url.",
           path: `nodes[${index}].url`,
+        })
+        return null
+      }
+      break
+    case "query":
+      if (typeof candidate.sql !== "string" || !candidate.sql) {
+        errors.push({
+          code: "node.sql",
+          level: "error",
+          message: "Query node requires a SQL statement.",
+          path: `nodes[${index}].sql`,
         })
         return null
       }

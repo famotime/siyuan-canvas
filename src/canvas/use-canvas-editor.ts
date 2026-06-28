@@ -1471,6 +1471,7 @@ export function useCanvasEditor(
       createEdgeFromSelection,
       deleteSelection,
       activateNode,
+      openDocumentAtBlock,
       loadConflictVersion,
       openRecentPath,
       openSettings,

@@ -609,6 +609,155 @@
                   </div>
                 </div>
               </template>
+              <template v-else-if="node.type === 'query'">
+                <!-- 编辑状态：SQL 输入表单 -->
+                <div
+                  v-if="editingNodeId === node.id"
+                  class="canvas-node__query-editor"
+                  @pointerdown.stop
+                >
+                  <label class="query-editor__label">
+                    <span>SQL 语句</span>
+                    <textarea
+                      v-model="editingQuerySql"
+                      class="query-editor__textarea"
+                      placeholder="SELECT * FROM blocks WHERE ..."
+                      @keydown.stop
+                    />
+                  </label>
+                  <div class="query-editor__row">
+                    <label class="query-editor__input-group">
+                      <span>自动刷新 (秒, 0代表手动)</span>
+                      <input
+                        v-model.number="editingQueryInterval"
+                        type="number"
+                        min="0"
+                        class="query-editor__input"
+                        @keydown.stop
+                      />
+                    </label>
+                    <label class="query-editor__input-group">
+                      <span>最大结果数</span>
+                      <input
+                        v-model.number="editingQueryMaxResults"
+                        type="number"
+                        min="1"
+                        class="query-editor__input"
+                        @keydown.stop
+                      />
+                    </label>
+                  </div>
+                  <div class="query-editor__buttons">
+                    <button
+                      class="query-editor__btn query-editor__btn--cancel"
+                      type="button"
+                      @click.stop="cancelQueryEditing"
+                    >
+                      取消
+                    </button>
+                    <button
+                      class="query-editor__btn query-editor__btn--save"
+                      type="button"
+                      @click.stop="saveQueryEditing(node)"
+                    >
+                      保存
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 正常展示状态 -->
+                <div v-else class="canvas-node__query-view" @wheel.stop>
+                  <header class="canvas-node__query-header">
+                    <div class="query-header__left">
+                      <CanvasIcon
+                        class="query-header__icon"
+                        name="search"
+                        :size="14"
+                      />
+                      <span class="query-header__title">SQL 查询结果</span>
+                      <span
+                        v-if="node.refreshInterval && node.refreshInterval > 0"
+                        class="query-header__badge"
+                        title="已启用定时自动刷新"
+                      >
+                        ⏱️ {{ node.refreshInterval }}s
+                      </span>
+                    </div>
+                    <div class="query-header__right">
+                      <button
+                        class="query-header__btn"
+                        title="立即刷新"
+                        type="button"
+                        :disabled="queryLoadingMap[node.id]"
+                        @click.stop="fetchQueryResult(node)"
+                        @pointerdown.stop
+                      >
+                        <CanvasIcon
+                          class="query-header__btn-icon"
+                          :class="{ 'query-header__btn-icon--rotating': queryLoadingMap[node.id] }"
+                          name="refresh"
+                          :size="12"
+                        />
+                      </button>
+                      <button
+                        class="query-header__btn"
+                        title="编辑 SQL"
+                        type="button"
+                        @click.stop="startQueryEditing(node)"
+                        @pointerdown.stop
+                      >
+                        <CanvasIcon
+                          class="query-header__btn-icon"
+                          name="edit"
+                          :size="12"
+                        />
+                      </button>
+                    </div>
+                  </header>
+                  
+                  <div class="canvas-node__query-content">
+                    <!-- Loading 状态 -->
+                    <div v-if="queryLoadingMap[node.id] && (!queryResultsMap[node.id] || !queryResultsMap[node.id].length)" class="query-status-info">
+                      <div class="query-loading-spinner" />
+                      <span>正在执行 SQL 查询...</span>
+                    </div>
+
+                    <!-- 错误状态 -->
+                    <div v-else-if="queryErrorsMap[node.id]" class="query-error-info">
+                      <span class="query-error-title">SQL 执行失败:</span>
+                      <span class="query-error-msg">{{ queryErrorsMap[node.id] }}</span>
+                    </div>
+
+                    <!-- 空结果状态 -->
+                    <div v-else-if="!queryResultsMap[node.id] || !queryResultsMap[node.id].length" class="query-status-info">
+                      <span>无符合条件的查询结果</span>
+                    </div>
+
+                    <!-- 正常结果列表 -->
+                    <div v-else class="query-results-list">
+                      <div
+                        v-for="(block, idx) in queryResultsMap[node.id]"
+                        :key="block.id"
+                        class="query-result-item"
+                        draggable="true"
+                        @pointerdown.stop
+                        @dragstart="handleQueryResultDragStart($event, block.id)"
+                      >
+                        <div class="query-result-item__index-wrapper">
+                          <div class="query-result-item__index">{{ idx + 1 }}</div>
+                          <span
+                            class="query-result-item__badge"
+                            :class="block.type === 'd' ? 'query-result-item__badge--doc' : 'query-result-item__badge--block'"
+                          >
+                            {{ block.type === 'd' ? '文档' : '块' }}
+                          </span>
+                        </div>
+                        <div class="query-result-item__body markdown-preview" v-html="block.renderedHtml" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
               <template v-else />
             </div>
             <template v-if="node.type === 'group'">
@@ -1978,6 +2127,8 @@
 <script setup lang="ts">
 import type { Plugin } from "siyuan"
 import { showMessage } from "siyuan"
+import { sql } from "@/api"
+import type { CanvasQueryNode } from "@/canvas/types"
 import type {
   CanvasPngExportBackgroundMode,
   CanvasPngExportRange,
@@ -2087,6 +2238,149 @@ function setLastCustomColor(color: string) {
   lastCustomColor.value = color
   localStorage.setItem("siyuan-canvas-last-custom-color", color)
 }
+
+// SQL 动态智能节点相关逻辑
+const queryResultsMap = ref<Record<string, any[]>>({})
+const queryErrorsMap = ref<Record<string, string>>({})
+const queryLoadingMap = ref<Record<string, boolean>>({})
+const queryTimersMap = new Map<string, { timer: any, interval: number }>()
+
+const editingQuerySql = ref("")
+const editingQueryInterval = ref(0)
+const editingQueryMaxResults = ref(50)
+
+async function fetchQueryResult(node: CanvasQueryNode) {
+  if (!node.id || !node.sql) return
+  queryLoadingMap.value[node.id] = true
+  queryErrorsMap.value[node.id] = ""
+  try {
+    const rawResults = await sql(node.sql)
+    if (!Array.isArray(rawResults)) {
+      throw new Error("SQL returned invalid results (expected array)")
+    }
+    const limit = node.maxResults || 50
+    const sliced = rawResults.slice(0, limit)
+
+    const processed = sliced.map(block => {
+      const markdown = block.markdown || block.content || ""
+      let html = editor.getRenderedMarkdown(markdown)
+      for (const source of collectWorkspaceStorageImages(html)) {
+        void loadTextMarkdownImageBlobUrl(source)
+      }
+      html = applyTextMarkdownImageBlobUrls(html)
+      return {
+        ...block,
+        renderedHtml: html
+      }
+    })
+    queryResultsMap.value[node.id] = processed
+  } catch (err: any) {
+    console.error("[siyuan-canvas] SQL Query error for node:", node.id, err)
+    queryErrorsMap.value[node.id] = err.message || String(err)
+    queryResultsMap.value[node.id] = []
+  } finally {
+    queryLoadingMap.value[node.id] = false
+  }
+}
+
+function startQueryEditing(node: CanvasQueryNode) {
+  editingNodeId.value = node.id
+  editingQuerySql.value = node.sql || ""
+  editingQueryInterval.value = node.refreshInterval || 0
+  editingQueryMaxResults.value = node.maxResults || 50
+}
+
+function cancelQueryEditing() {
+  editingNodeId.value = ""
+  editingQuerySql.value = ""
+}
+
+function saveQueryEditing(node: CanvasQueryNode) {
+  if (!editingQuerySql.value.trim()) {
+    showMessage(t("sqlCannotBeEmpty" as any), 3000, "error")
+    return
+  }
+
+  editor.updateNodeField(node.id, "sql", editingQuerySql.value.trim())
+  editor.updateNodeField(node.id, "refreshInterval", Math.max(0, editingQueryInterval.value || 0))
+  editor.updateNodeField(node.id, "maxResults", Math.max(1, editingQueryMaxResults.value || 50))
+
+  editingNodeId.value = ""
+
+  const updatedNode = editor.state.document.nodes.find(n => n.id === node.id) as CanvasQueryNode
+  if (updatedNode) {
+    void fetchQueryResult(updatedNode)
+  }
+}
+
+function handleQueryResultDragStart(event: DragEvent, blockId: string) {
+  if (!event.dataTransfer) return
+  event.dataTransfer.effectAllowed = "copy"
+  event.dataTransfer.setData("application/siyuan-file", blockId)
+}
+
+watch(
+  () => editor.state.document.nodes,
+  (newNodes) => {
+    if (!newNodes) return
+    const queryNodes = newNodes.filter(node => node.type === 'query') as CanvasQueryNode[]
+
+    const currentTimerIds = Array.from(queryTimersMap.keys())
+    for (const timerId of currentTimerIds) {
+      if (!queryNodes.some(n => n.id === timerId)) {
+        const info = queryTimersMap.get(timerId)
+        if (info) clearInterval(info.timer)
+        queryTimersMap.delete(timerId)
+        delete queryResultsMap.value[timerId]
+        delete queryErrorsMap.value[timerId]
+        delete queryLoadingMap.value[timerId]
+      }
+    }
+
+    for (const node of queryNodes) {
+      if (queryResultsMap.value[node.id] === undefined && !queryLoadingMap.value[node.id]) {
+        void fetchQueryResult(node)
+      }
+
+      const timerInfo = queryTimersMap.get(node.id)
+      const timerInterval = timerInfo ? timerInfo.interval : -1
+      const currentInterval = node.refreshInterval !== undefined ? node.refreshInterval : 0
+
+      if (currentInterval !== timerInterval) {
+        if (timerInfo) {
+          clearInterval(timerInfo.timer)
+          queryTimersMap.delete(node.id)
+        }
+        if (currentInterval > 0) {
+          const timer = setInterval(() => {
+            const exists = editor.state.document.nodes.some(n => n.id === node.id)
+            if (exists) {
+              if (editingNodeId.value !== node.id) {
+                void fetchQueryResult(node)
+              }
+            } else {
+              clearInterval(timer)
+              queryTimersMap.delete(node.id)
+            }
+          }, currentInterval * 1000)
+          queryTimersMap.set(node.id, { timer, interval: currentInterval })
+        }
+      }
+    }
+  },
+  { deep: true, immediate: true }
+)
+
+watch(editingNodeId, (newId) => {
+  if (newId) {
+    const node = editor.state.document.nodes.find(n => n.id === newId)
+    if (node && node.type === 'query') {
+      editingQuerySql.value = node.sql || ""
+      editingQueryInterval.value = node.refreshInterval || 0
+      editingQueryMaxResults.value = node.maxResults || 50
+    }
+  }
+})
 
 const customColorContext = ref<'selection' | 'edge' | null>(null)
 const customColorInputRef = ref<HTMLInputElement | null>(null)
@@ -2449,6 +2743,10 @@ onBeforeUnmount(() => {
   document.removeEventListener("click", closeContextMenu)
   document.removeEventListener("keydown", onContextMenuKeydown)
   document.removeEventListener("pointerdown", closeColorThemePopover)
+  for (const info of queryTimersMap.values()) {
+    clearInterval(info.timer)
+  }
+  queryTimersMap.clear()
 })
 
 // 选区/边变更时若用户尚停留在文档 tab，自动切到选区 tab，避免反复手动切换
@@ -3093,20 +3391,36 @@ function getFilePickerResults() {
   ]
 }
 
-type FilePickerKind = "block" | "canvas" | "document" | "image"
+type FilePickerKind = "block" | "canvas" | "document" | "image" | "query"
 
 function getFilePickerGroups() {
   const g = editor.filePickerDialog.groups
-  const candidates = [
+  const candidates: Array<{ kind: FilePickerKind, items: any[] }> = []
+
+  const queryText = editor.filePickerDialog.query.trim()
+  if (/^\s*select\s/i.test(queryText)) {
+    candidates.push({
+      kind: "query" as FilePickerKind,
+      items: [{
+        kind: "query" as const,
+        path: "new-query-node",
+        title: t("createQueryNodeWithSql"),
+        subtitle: queryText,
+      }]
+    })
+  }
+
+  candidates.push(
     { kind: "document" as FilePickerKind, items: g.documents },
     { kind: "canvas" as FilePickerKind, items: g.canvases },
     { kind: "block" as FilePickerKind, items: g.blocks },
-    { kind: "image" as FilePickerKind, items: g.images },
-  ]
+    { kind: "image" as FilePickerKind, items: g.images }
+  )
   return candidates.filter((group) => group.items.length > 0)
 }
 
 function getFilePickerGroupLabel(kind: FilePickerKind): string {
+  if (kind === "query") return t("filePickerGroupQueries" as any)
   return t(`filePickerGroup${kind.charAt(0).toUpperCase()}${kind.slice(1)}s` as any)
 }
 
@@ -3120,6 +3434,8 @@ function getFilePickerKindLabel(kind: FilePickerKind): string {
       return "Document"
     case "image":
       return "Image"
+    case "query":
+      return "SQL"
     default:
       return kind
   }

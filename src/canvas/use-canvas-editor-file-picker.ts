@@ -8,7 +8,7 @@ import type {
   CanvasFilePickerOption,
   CanvasFilePickerGroups,
 } from '@/canvas/file-picker-dialog'
-import type { CanvasNode } from '@/canvas/types'
+import type { CanvasNode, CanvasQueryNode } from '@/canvas/types'
 import type {
   CanvasEditorFileSource,
   CanvasI18nTranslator,
@@ -240,6 +240,21 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
   }
 
   async function selectFilePickerResult(option: CanvasFilePickerOption) {
+    if (option.kind === 'query') {
+      const node = createCanvasNode('query') as CanvasQueryNode
+      node.sql = option.subtitle
+
+      const sx = 200
+      const sy = 160
+      node.x = Math.round((sx - viewport.x) / viewport.scale + board.value.left)
+      node.y = Math.round((sy - viewport.y) / viewport.scale + board.value.top)
+
+      commitDocument(upsertCanvasNode(state.document, node))
+      selectNode(node.id)
+      closeFilePickerDialog()
+      return
+    }
+
     const node = createFileNodeAtViewport(board.value, viewport)
     node.file = option.kind === 'block' && option.blockId
       ? option.blockId

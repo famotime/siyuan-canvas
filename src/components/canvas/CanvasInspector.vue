@@ -144,6 +144,34 @@
           @input="handleTextInput($event)"
         />
       </label>
+      <template v-if="editor.selectedNode.type === 'query'">
+        <label>
+          {{ t("sqlStatement") || 'SQL 语句' }}
+          <textarea
+            data-testid="inspector-node-sql"
+            :value="getDraftText()"
+            @input="handleTextInput($event)"
+          />
+        </label>
+        <label>
+          {{ t("refreshInterval") || '自动刷新间隔 (秒, 0代表手动)' }}
+          <input
+            type="number"
+            min="0"
+            :value="editor.selectedNode.refreshInterval || 0"
+            @input="props.editor.updateNodeField('refreshInterval', Number(($event.target as HTMLInputElement).value) || 0)"
+          />
+        </label>
+        <label>
+          {{ t("maxResults") || '最大结果数' }}
+          <input
+            type="number"
+            min="1"
+            :value="editor.selectedNode.maxResults || 50"
+            @input="props.editor.updateNodeField('maxResults', Number(($event.target as HTMLInputElement).value) || 50)"
+          />
+        </label>
+      </template>
       <button
         v-if="isMultiNodeSelection"
         class="inspector__action-button"
@@ -728,6 +756,9 @@ function getDraftText(): string {
   if (node.type === 'link') {
     return node.url
   }
+  if (node.type === 'query') {
+    return node.sql || ''
+  }
   return node.text
 }
 
@@ -766,6 +797,8 @@ function handleTextInput(event: Event): void {
     props.editor.updateNodeField('url', value)
   } else if (node.type === 'group') {
     props.editor.updateNodeField('label', value)
+  } else if (node.type === 'query') {
+    props.editor.updateNodeField('sql', value)
   }
 }
 
