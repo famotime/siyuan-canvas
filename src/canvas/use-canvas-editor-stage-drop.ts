@@ -6,7 +6,7 @@ import type { CanvasEditorFileSource } from '@/canvas/use-canvas-editor-shared'
 
 import { showMessage } from 'siyuan'
 import { putFile } from '@/api'
-import { upsertCanvasNode } from '@/canvas/document'
+import { upsertCanvasNode, upsertCanvasEdge, createCanvasId } from '@/canvas/document'
 import { createFileNodeAtViewport } from '@/canvas/use-canvas-editor-file-picker'
 import { writeWorkspaceImageFile } from '@/canvas/workspace-image-files'
 
@@ -89,9 +89,11 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
       if (ids.length === 0)
         return
 
+      const dragSourceNodeId = event.dataTransfer?.getData('application/siyuan-canvas-drag-source-node-id') ?? ''
       const verticalGap = 360 * viewport.scale
       const startY = stageY - ((ids.length - 1) * verticalGap) / 2
 
+      let currentDoc = state.document
       for (let i = 0; i < ids.length; i++) {
         const blockId = ids[i].trim()
         const node = createFileNodeAtViewport(
@@ -100,11 +102,57 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
           { x: stageX, y: startY + i * verticalGap },
         )
         node.file = blockId
-        commitDocument(upsertCanvasNode(state.document, node))
+        currentDoc = upsertCanvasNode(currentDoc, node)
+
+        if (dragSourceNodeId) {
+          const sourceNode = currentDoc.nodes.find(n => n.id === dragSourceNodeId)
+          if (sourceNode) {
+            const fromCenterX = sourceNode.x + sourceNode.width / 2
+            const fromCenterY = sourceNode.y + sourceNode.height / 2
+            const toCenterX = node.x + node.width / 2
+            const toCenterY = node.y + node.height / 2
+
+            const deltaX = toCenterX - fromCenterX
+            const deltaY = toCenterY - fromCenterY
+
+            let fromSide: 'bottom' | 'left' | 'right' | 'top' = 'right'
+            let toSide: 'bottom' | 'left' | 'right' | 'top' = 'left'
+
+            if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+              if (deltaX >= 0) {
+                fromSide = 'right'
+                toSide = 'left'
+              } else {
+                fromSide = 'left'
+                toSide = 'right'
+              }
+            } else {
+              if (deltaY >= 0) {
+                fromSide = 'bottom'
+                toSide = 'top'
+              } else {
+                fromSide = 'top'
+                toSide = 'bottom'
+              }
+            }
+
+            const edge = {
+              id: createCanvasId('edge-'),
+              fromNode: sourceNode.id,
+              fromSide,
+              toNode: node.id,
+              toSide,
+              endArrow: true,
+            }
+            currentDoc = upsertCanvasEdge(currentDoc, edge)
+          }
+        }
+
         if (i === ids.length - 1)
           selectNode(node.id)
       }
 
+      commitDocument(currentDoc)
       await refreshFileNodeMetadata()
       return
     }

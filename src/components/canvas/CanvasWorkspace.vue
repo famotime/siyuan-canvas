@@ -741,7 +741,7 @@
                         class="query-result-item"
                         draggable="true"
                         @pointerdown.stop
-                        @dragstart="handleQueryResultDragStart($event, block.id)"
+                        @dragstart="handleQueryResultDragStart($event, block.id, node.id)"
                       >
                         <div class="query-result-item__index-wrapper">
                           <div class="query-result-item__index">{{ idx + 1 }}</div>
@@ -2313,10 +2313,11 @@ function saveQueryEditing(node: CanvasQueryNode) {
   }
 }
 
-function handleQueryResultDragStart(event: DragEvent, blockId: string) {
+function handleQueryResultDragStart(event: DragEvent, blockId: string, sourceNodeId: string) {
   if (!event.dataTransfer) return
   event.dataTransfer.effectAllowed = "copy"
   event.dataTransfer.setData("application/siyuan-file", blockId)
+  event.dataTransfer.setData("application/siyuan-canvas-drag-source-node-id", sourceNodeId)
 }
 
 watch(

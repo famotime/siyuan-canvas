@@ -23,7 +23,7 @@ export function createEmptyCanvasDocument(): CanvasDocument {
   }
 }
 
-function createCanvasId(prefix: string): string {
+export function createCanvasId(prefix: string): string {
   const random = Math.random().toString(16).slice(2, 10)
   return `${prefix}${random}`
 }

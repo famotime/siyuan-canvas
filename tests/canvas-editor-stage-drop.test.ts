@@ -49,10 +49,10 @@ function createStageDropHarness(options?: { fileSource?: string, filePath?: stri
     viewport,
   })
 
-  return { committed, harness, refreshFileNodeMetadata, selectNode }
+  return { committed, harness, refreshFileNodeMetadata, selectNode, state }
 }
 
-function createDropEvent(data: string, clientX = 100, clientY = 200): DragEvent {
+function createDropEvent(data: string, clientX = 100, clientY = 200, sourceNodeId?: string): DragEvent {
   const stageEl = document.createElement('section')
   stageEl.getBoundingClientRect = vi.fn(() => ({
     bottom: 600,
@@ -67,7 +67,11 @@ function createDropEvent(data: string, clientX = 100, clientY = 200): DragEvent 
   }))
 
   const dt = {
-    getData: (type: string) => type === 'application/siyuan-file' ? data : '',
+    getData: (type: string) => {
+      if (type === 'application/siyuan-file') return data
+      if (type === 'application/siyuan-canvas-drag-source-node-id' && sourceNodeId) return sourceNodeId
+      return ''
+    },
     types: ['application/siyuan-file'],
   }
 
@@ -154,14 +158,14 @@ describe('canvas editor stage drop', () => {
     expect(selectNode).toHaveBeenCalledWith(node.id)
   })
 
-  it('creates multiple file nodes from comma-separated block IDs', async () => {
+  it('creates multiple file nodes from comma-separated block IDs in a single commit', async () => {
     const { committed, harness } = createStageDropHarness()
     const event = createDropEvent('20230613234017-zkw3pr0,20230614091200-abc1234')
 
     await harness.handleStageDrop(event)
 
-    expect(committed).toHaveLength(2)
-    const nodes = committed.flatMap((doc: any) => doc.nodes.filter((n: any) => n.type === 'file'))
+    expect(committed).toHaveLength(1)
+    const nodes = committed[0].nodes.filter((n: any) => n.type === 'file')
     expect(nodes[0].file).toBe('20230613234017-zkw3pr0')
     expect(nodes[1].file).toBe('20230614091200-abc1234')
     expect(nodes[1].y).toBeGreaterThan(nodes[0].y)
@@ -238,5 +242,43 @@ describe('canvas editor stage drop', () => {
       y: 300,
     })
     expect(selectNode).toHaveBeenCalledWith(node.id)
+  })
+
+  it('automatically connects the newly dropped file node to the source query node with direction-based anchors', async () => {
+    const { committed, harness, state } = createStageDropHarness()
+
+    // Preset source query node in state document
+    const sourceNode = {
+      id: 'query-node-123',
+      type: 'query',
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 200,
+      sql: 'SELECT * FROM blocks',
+    }
+    state.document.nodes.push(sourceNode as any)
+
+    // Simulate drop coordinate x = 400, y = 200
+    // Source Center: (200, 200)
+    // New Node Center: (400 + 360/2 = 580, 200 + 480/2 = 440)
+    // deltaX = 380, deltaY = 240. deltaX >= deltaY -> Right -> Left connection
+    const event = createDropEvent('20230613234017-zkw3pr0', 400, 200, 'query-node-123')
+    await harness.handleStageDrop(event)
+
+    expect(committed).toHaveLength(1)
+    const doc = committed[0]
+
+    // Verify file node was added
+    const fileNode = doc.nodes.find((n: any) => n.type === 'file')!
+    expect(fileNode.file).toBe('20230613234017-zkw3pr0')
+
+    // Verify automatic directional edge creation
+    const edge = doc.edges.find((e: any) => e.fromNode === 'query-node-123')!
+    expect(edge).toBeDefined()
+    expect(edge.toNode).toBe(fileNode.id)
+    expect(edge.fromSide).toBe('right')
+    expect(edge.toSide).toBe('left')
+    expect(edge.endArrow).toBe(true)
   })
 })
