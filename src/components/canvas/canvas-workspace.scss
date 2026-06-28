@@ -1526,6 +1526,20 @@
       white-space: nowrap;
     }
 
+    .query-header__count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: var(--b3-theme-primary-light, rgba(0, 97, 224, 0.1));
+      color: var(--b3-theme-primary, #0061e0);
+      line-height: 1;
+      border: 1px solid var(--b3-theme-primary-light, rgba(0, 97, 224, 0.2));
+    }
+
     .query-header__badge {
       font-size: 10px;
       background: var(--b3-theme-primary-light, rgba(0, 0, 0, 0.05));

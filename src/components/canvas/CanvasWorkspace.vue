@@ -676,6 +676,13 @@
                       />
                       <span class="query-header__title">SQL 查询结果</span>
                       <span
+                        v-if="queryResultsMap[node.id]"
+                        class="query-header__count-badge"
+                        title="查询结果数量"
+                      >
+                        {{ queryResultsMap[node.id].length }}
+                      </span>
+                      <span
                         v-if="node.refreshInterval && node.refreshInterval > 0"
                         class="query-header__badge"
                         title="已启用定时自动刷新"
