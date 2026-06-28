@@ -325,5 +325,16 @@
   "settingsPresentationMaskOpacityDescription": "在“背景暗色遮罩”模式下应用的不透明度，范围为 0% 到 100%。",
   "settingsPresentationAutoPlayIntervalTitle": "自动播放间隔时间",
   "settingsPresentationAutoPlayIntervalDescription": "在混合模式下，卡片自动切换到下一张的时间（秒）。",
-  "selectionToolbarPlay": "播放演示"
+  "selectionToolbarPlay": "播放演示",
+  "selectionToolbarSprout": "扩散关联文档",
+  "sproutTitle": "扩散关联文档",
+  "sproutOutlinks": "出链文档",
+  "sproutInlinks": "入链文档",
+  "sproutChildDocs": "子文档",
+  "sproutConfirm": "确认扩散",
+  "sproutSelectAll": "全选",
+  "sproutDeselectAll": "全不选",
+  "sproutLoading": "正在读取关联文档...",
+  "sproutNoLinks": "未找到任何关联文档",
+  "sproutLimitWarning": "部分类别关联项较多，已默认勾选前 10 个"
 }

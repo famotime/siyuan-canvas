@@ -1044,6 +1044,7 @@
               name="play"
             />
           </button>
+
           <button
             class="selection-toolbar__button"
             data-testid="selection-toolbar-delete"
@@ -1174,6 +1175,21 @@
             <CanvasIcon
               class="selection-toolbar__icon"
               name="decompose"
+            />
+          </button>
+          <button
+            v-if="canSprout"
+            class="selection-toolbar__button"
+            :class="{ 'selection-toolbar__button--active': editor.selectionToolbarPopover === 'sprout' }"
+            data-testid="selection-toolbar-sprout"
+            :aria-label="t('selectionToolbarSprout')"
+            :data-tooltip="t('selectionToolbarSprout')"
+            type="button"
+            @click.stop="handleSproutClick"
+          >
+            <CanvasIcon
+              class="selection-toolbar__icon"
+              name="sprout"
             />
           </button>
           <button
@@ -1332,6 +1348,135 @@
               </div>
             </div>
           </template>
+        </div>
+
+        <div
+          v-if="editor.selectionToolbarPopover === 'sprout'"
+          class="selection-toolbar__popover selection-toolbar__popover--sprout"
+          :style="sproutPopoverStyle"
+          @click.stop
+          @pointerdown.stop
+          @wheel.passive.stop
+        >
+          <div class="sprout-popover__title">
+            <span>{{ t('sproutTitle') }}</span>
+          </div>
+          <div v-if="editor.sproutLoading" class="sprout-popover__loading">
+            <div class="sprout-spinner"></div>
+            <span>{{ t('sproutLoading') }}</span>
+          </div>
+          <div v-else-if="sproutRelations.inlinks.length === 0 && sproutRelations.outlinks.length === 0 && sproutRelations.children.length === 0" class="sprout-popover__empty">
+            <span>{{ t('sproutNoLinks') }}</span>
+          </div>
+          <div v-else class="sprout-popover__body">
+            <!-- 入链分组 -->
+            <div v-if="sproutRelations.inlinks.length > 0" class="sprout-popover__group">
+              <div class="sprout-popover__group-header" @click="toggleSproutGroupExpand('inlinks')">
+                <span class="sprout-group-title">
+                  <CanvasIcon
+                    class="sprout-chevron"
+                    :class="{ 'sprout-chevron--expanded': sproutGroupsExpanded.inlinks }"
+                    name="chevron-right"
+                  />
+                  {{ t('sproutInlinks') }} ({{ sproutRelations.inlinks.length }})
+                </span>
+                <div class="sprout-group-actions" @click.stop>
+                  <span @click="editor.setAllSproutItemsSelected('inlinks', true)">{{ t('sproutSelectAll') }}</span>
+                  <span @click="editor.setAllSproutItemsSelected('inlinks', false)">{{ t('sproutDeselectAll') }}</span>
+                </div>
+              </div>
+              <div v-show="sproutGroupsExpanded.inlinks" class="sprout-popover__list">
+                <label
+                  v-for="item in sproutRelations.inlinks"
+                  :key="item.id"
+                  class="sprout-popover__item"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="item.checked"
+                    @change="editor.toggleSproutItemSelect('inlinks', item.id)"
+                  />
+                  <span class="sprout-item-title" :title="item.title">{{ item.title }}</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 出链分组 -->
+            <div v-if="sproutRelations.outlinks.length > 0" class="sprout-popover__group">
+              <div class="sprout-popover__group-header" @click="toggleSproutGroupExpand('outlinks')">
+                <span class="sprout-group-title">
+                  <CanvasIcon
+                    class="sprout-chevron"
+                    :class="{ 'sprout-chevron--expanded': sproutGroupsExpanded.outlinks }"
+                    name="chevron-right"
+                  />
+                  {{ t('sproutOutlinks') }} ({{ sproutRelations.outlinks.length }})
+                </span>
+                <div class="sprout-group-actions" @click.stop>
+                  <span @click="editor.setAllSproutItemsSelected('outlinks', true)">{{ t('sproutSelectAll') }}</span>
+                  <span @click="editor.setAllSproutItemsSelected('outlinks', false)">{{ t('sproutDeselectAll') }}</span>
+                </div>
+              </div>
+              <div v-show="sproutGroupsExpanded.outlinks" class="sprout-popover__list">
+                <label
+                  v-for="item in sproutRelations.outlinks"
+                  :key="item.id"
+                  class="sprout-popover__item"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="item.checked"
+                    @change="editor.toggleSproutItemSelect('outlinks', item.id)"
+                  />
+                  <span class="sprout-item-title" :title="item.title">{{ item.title }}</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 子文档分组 -->
+            <div v-if="sproutRelations.children.length > 0" class="sprout-popover__group">
+              <div class="sprout-popover__group-header" @click="toggleSproutGroupExpand('children')">
+                <span class="sprout-group-title">
+                  <CanvasIcon
+                    class="sprout-chevron"
+                    :class="{ 'sprout-chevron--expanded': sproutGroupsExpanded.children }"
+                    name="chevron-right"
+                  />
+                  {{ t('sproutChildDocs') }} ({{ sproutRelations.children.length }})
+                </span>
+                <div class="sprout-group-actions" @click.stop>
+                  <span @click="editor.setAllSproutItemsSelected('children', true)">{{ t('sproutSelectAll') }}</span>
+                  <span @click="editor.setAllSproutItemsSelected('children', false)">{{ t('sproutDeselectAll') }}</span>
+                </div>
+              </div>
+              <div v-show="sproutGroupsExpanded.children" class="sprout-popover__list">
+                <label
+                  v-for="item in sproutRelations.children"
+                  :key="item.id"
+                  class="sprout-popover__item"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="item.checked"
+                    @change="editor.toggleSproutItemSelect('children', item.id)"
+                  />
+                  <span class="sprout-item-title" :title="item.title">{{ item.title }}</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 大数量限额提示 -->
+            <div
+              v-if="sproutRelations.inlinks.length > 10 || sproutRelations.outlinks.length > 10 || sproutRelations.children.length > 10"
+              class="sprout-popover__limit-warning"
+            >
+              {{ t('sproutLimitWarning') }}
+            </div>
+          </div>
+          <div v-if="!editor.sproutLoading && (sproutRelations.inlinks.length > 0 || sproutRelations.outlinks.length > 0 || sproutRelations.children.length > 0)" class="sprout-popover__footer">
+            <button type="button" class="sprout-btn--cancel" @click="editor.closeSelectionPopover">{{ t('dialogCancel') }}</button>
+            <button type="button" class="sprout-btn--primary" @click="editor.executeSprout">{{ t('sproutConfirm') }}</button>
+          </div>
         </div>
 
         <CanvasMinimap
@@ -2053,6 +2198,91 @@ const canPlayPresentation = computed(() => {
     return (e.fromNode === nodeId && canGoToToNode) ||
            (e.toNode === nodeId && canGoToFromNode)
   })
+})
+
+const SIYUAN_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
+function getSproutDocumentId(node: Extract<CanvasNode, { type: "file" }>) {
+  if (SIYUAN_ID_PATTERN.test(node.file)) {
+    return node.file
+  }
+
+  const resolved = editor.getResolvedFileNode(node)
+  return resolved.kind === "document" ? resolved.id : null
+}
+
+const canSprout = computed(() => {
+  if (editor.selectedNodeCount !== 1) {
+    return false
+  }
+  const node = editor.selectedNode
+  if (!node || node.type !== "file") {
+    return false
+  }
+  return SIYUAN_ID_PATTERN.test(node.file) || editor.getFileNodePreview(node).kind === "document"
+})
+
+function handleSproutClick() {
+  if (editor.selectionToolbarPopover === "sprout") {
+    editor.toggleSelectionPopover("sprout")
+  } else {
+    editor.toggleSelectionPopover("sprout")
+    const docId = editor.selectedNode?.type === "file" ? getSproutDocumentId(editor.selectedNode) : null
+    if (docId) {
+      void editor.loadSproutRelations(docId)
+    }
+  }
+}
+
+const sproutGroupsExpanded = ref({
+  inlinks: true,
+  outlinks: true,
+  children: true,
+})
+
+function toggleSproutGroupExpand(group: "inlinks" | "outlinks" | "children") {
+  sproutGroupsExpanded.value[group] = !sproutGroupsExpanded.value[group]
+}
+
+const sproutRelations = computed(() => {
+  return editor.sproutRelations || { inlinks: [], outlinks: [], children: [] }
+})
+
+const sproutPopoverStyle = computed(() => {
+  const bounds = editor.selectionBounds
+  const viewport = editor.viewport
+  const board = editor.board
+  console.log("[Sprout] style bounds & board:", { bounds, board, viewport })
+  if (!bounds || !board) {
+    return { display: "none" }
+  }
+
+  // 计算节点在画布面板上的像素坐标与大小
+  const rect = {
+    x: (bounds.x - board.left) * viewport.scale + viewport.x,
+    y: (bounds.y - board.top) * viewport.scale + viewport.y,
+    width: bounds.width * viewport.scale,
+    height: bounds.height * viewport.scale,
+  }
+  console.log("[Sprout] style rect computed:", rect)
+
+  // 菜单的高度和宽度
+  const popoverWidth = 300
+  const popoverHeight = 350
+
+  // 计算居中位置
+  const left = rect.x + rect.width / 2 - popoverWidth / 2
+  const top = rect.y + rect.height / 2 - popoverHeight / 2
+
+  const style = {
+    position: "absolute" as const,
+    left: `${Math.round(left)}px`,
+    top: `${Math.round(top)}px`,
+    width: `${popoverWidth}px`,
+    height: `${popoverHeight}px`,
+    zIndex: 1000,
+  }
+  console.log("[Sprout] final style:", style)
+  return style
 })
 const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)

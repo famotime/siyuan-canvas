@@ -39,6 +39,7 @@ import { isWebUrl } from '@/canvas/url-detection'
 import { centerViewportOnBounds } from '@/canvas/selection-toolbar'
 import { clampViewportScale, scaleViewportAtPoint } from '@/canvas/viewport'
 import { findNonOverlappingPosition } from '@/canvas/node-overlap'
+import { findSproutRelations, type SproutRelationItem } from '@/canvas/siyuan-kernel-file-node-lookups'
 
 const MIND_MAP_HORIZONTAL_GAP = 80
 const MIND_MAP_VERTICAL_GAP = 40
@@ -824,6 +825,235 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     viewport.y = nextViewport.y
   }
 
+  // Sprout (扩散) 功能状态
+  const sproutLoading = ref(false)
+  const sproutRelations = ref<{
+    inlinks: Array<SproutRelationItem & { checked: boolean }>
+    outlinks: Array<SproutRelationItem & { checked: boolean }>
+    children: Array<SproutRelationItem & { checked: boolean }>
+  }>({
+    inlinks: [],
+    outlinks: [],
+    children: [],
+  })
+
+  async function loadSproutRelations(docId: string) {
+    if (!docId) return
+    sproutLoading.value = true
+    try {
+      const res = await findSproutRelations(docId)
+      sproutRelations.value = {
+        inlinks: res.inlinks.map((item, idx) => ({ ...item, checked: idx < 10 })),
+        outlinks: res.outlinks.map((item, idx) => ({ ...item, checked: idx < 10 })),
+        children: res.children.map((item, idx) => ({ ...item, checked: idx < 10 })),
+      }
+    } catch (e) {
+      console.error(e)
+      showMessage(t('sproutNoLinks') || '读取关联文档失败', 2000, 'error')
+    } finally {
+      sproutLoading.value = false
+    }
+  }
+
+  function toggleSproutItemSelect(type: 'inlinks' | 'outlinks' | 'children', id: string) {
+    const list = sproutRelations.value[type]
+    const item = list.find((i) => i.id === id)
+    if (item) {
+      item.checked = !item.checked
+    }
+  }
+
+  function setAllSproutItemsSelected(type: 'inlinks' | 'outlinks' | 'children', selected: boolean) {
+    const list = sproutRelations.value[type]
+    list.forEach((item) => {
+      item.checked = selected
+    })
+  }
+
+  async function executeSprout() {
+    const currentNode = selectedNode.value
+    if (!currentNode || state.selectedNodeIds.length !== 1) {
+      return
+    }
+
+    const docId = currentNode.type === 'file' ? currentNode.file : null
+    if (!docId) return
+
+    // 收集所有勾选的项
+    const checkedInlinks = sproutRelations.value.inlinks.filter(i => i.checked)
+    const checkedOutlinks = sproutRelations.value.outlinks.filter(i => i.checked)
+    const checkedChildren = sproutRelations.value.children.filter(i => i.checked)
+
+    if (checkedInlinks.length === 0 && checkedOutlinks.length === 0 && checkedChildren.length === 0) {
+      showMessage(t('sproutNoLinks') || '请先勾选需要扩散的文档', 2000, 'info')
+      return
+    }
+
+    const currentNodes = [...state.document.nodes]
+    const currentEdges = [...state.document.edges]
+    const addedNodeIds: string[] = []
+
+    // 辅助函数：查找画布中是否已存在该文档节点
+    const findExistingNode = (fileId: string) => {
+      return currentNodes.find(node => node.type === 'file' && node.file === fileId)
+    }
+
+    // 1. 处理入链 (Inlinks) - 新创建节点在左侧垂直排列
+    const newInlinksToCreate = checkedInlinks.filter(i => !findExistingNode(i.id))
+    const inlinkHeight = 180
+    const inlinkGap = 40
+    const totalInlinkHeight = newInlinksToCreate.length * inlinkHeight + (newInlinksToCreate.length - 1) * inlinkGap
+    const startInlinkY = (currentNode.y + currentNode.height / 2) - totalInlinkHeight / 2
+
+    newInlinksToCreate.forEach((item, idx) => {
+      const newNode = createCanvasNode('file') as Extract<CanvasNode, { type: 'file' }>
+      newNode.file = item.id
+      newNode.x = currentNode.x - 160 - newNode.width
+      newNode.y = Math.round(startInlinkY + idx * (inlinkHeight + inlinkGap))
+      currentNodes.push(newNode)
+      addedNodeIds.push(newNode.id)
+    })
+
+    // 2. 处理出链 (Outlinks) - 新创建节点在右侧垂直排列
+    const newOutlinksToCreate = checkedOutlinks.filter(i => !findExistingNode(i.id))
+    const outlinkHeight = 180
+    const outlinkGap = 40
+    const totalOutlinkHeight = newOutlinksToCreate.length * outlinkHeight + (newOutlinksToCreate.length - 1) * outlinkGap
+    const startOutlinkY = (currentNode.y + currentNode.height / 2) - totalOutlinkHeight / 2
+
+    newOutlinksToCreate.forEach((item, idx) => {
+      const newNode = createCanvasNode('file') as Extract<CanvasNode, { type: 'file' }>
+      newNode.file = item.id
+      newNode.x = currentNode.x + currentNode.width + 160
+      newNode.y = Math.round(startOutlinkY + idx * (outlinkHeight + outlinkGap))
+      currentNodes.push(newNode)
+      addedNodeIds.push(newNode.id)
+    })
+
+    // 3. 处理子文档 (Children) - 新创建节点在下方水平排列
+    const newChildrenToCreate = checkedChildren.filter(i => !findExistingNode(i.id))
+    const childWidth = 320
+    const childGap = 40
+    const totalChildWidth = newChildrenToCreate.length * childWidth + (newChildrenToCreate.length - 1) * childGap
+    const startChildX = (currentNode.x + currentNode.width / 2) - totalChildWidth / 2
+
+    newChildrenToCreate.forEach((item, idx) => {
+      const newNode = createCanvasNode('file') as Extract<CanvasNode, { type: 'file' }>
+      newNode.file = item.id
+      newNode.x = Math.round(startChildX + idx * (childWidth + childGap))
+      newNode.y = currentNode.y + currentNode.height + 160
+      currentNodes.push(newNode)
+      addedNodeIds.push(newNode.id)
+    })
+
+    // 避让微调算法：针对每一个新生成的节点，检测与已有节点（或已定位的新节点）的重叠并推开
+    const safetyGap = 40 // 节点之间的最小安全间距
+    for (let iteration = 0; iteration < 8; iteration++) {
+      let hasOverlap = false
+      for (const nodeId of addedNodeIds) {
+        const node = currentNodes.find(n => n.id === nodeId)
+        if (!node) continue
+
+        // 与画布上的所有其他节点进行碰撞检测
+        for (const otherNode of currentNodes) {
+          if (otherNode.id === node.id) continue
+
+          // 检测两个节点的包围盒（加上 safetyGap 间距后）是否重合
+          const isOverlapping = (node.x - safetyGap < otherNode.x + otherNode.width) &&
+                                (node.x + node.width + safetyGap > otherNode.x) &&
+                                (node.y - safetyGap < otherNode.y + otherNode.height) &&
+                                (node.y + node.height + safetyGap > otherNode.y)
+
+          if (isOverlapping) {
+            hasOverlap = true
+            // 计算重叠中心位置差异以确定推移方向
+            const dx = (node.x + node.width / 2) - (otherNode.x + otherNode.width / 2)
+            const dy = (node.y + node.height / 2) - (otherNode.y + otherNode.height / 2)
+
+            // 如果中心点完全重合，加入随机微调防止同向死锁
+            const moveX = dx === 0 ? (Math.random() > 0.5 ? 1 : -1) : dx
+            const moveY = dy === 0 ? (Math.random() > 0.5 ? 1 : -1) : dy
+
+            const absMoveX = Math.abs(moveX)
+            const absMoveY = Math.abs(moveY)
+
+            // 沿着重叠相对较小的轴向外推移避让
+            if (absMoveX < absMoveY) {
+              const pushDistance = (otherNode.x + otherNode.width + safetyGap) - node.x
+              const pushDistanceLeft = (node.x + node.width + safetyGap) - otherNode.x
+              if (moveX > 0) {
+                node.x += Math.round(pushDistance)
+              } else {
+                node.x -= Math.round(pushDistanceLeft)
+              }
+            } else {
+              const pushDistance = (otherNode.y + otherNode.height + safetyGap) - node.y
+              const pushDistanceUp = (node.y + node.height + safetyGap) - otherNode.y
+              if (moveY > 0) {
+                node.y += Math.round(pushDistance)
+              } else {
+                node.y -= Math.round(pushDistanceUp)
+              }
+            }
+          }
+        }
+      }
+      if (!hasOverlap) {
+        break
+      }
+    }
+
+    // 4. 创建连线 (Edges)
+    const addEdgeIfNotExist = (fromId: string, fromSide: CanvasSide, toId: string, toSide: CanvasSide) => {
+      const exists = currentEdges.some(e => e.fromNode === fromId && e.toNode === toId)
+      if (!exists) {
+        const edge = createCanvasEdge(fromId, toId)
+        edge.fromSide = fromSide
+        edge.toSide = toSide
+        currentEdges.push(edge)
+      }
+    }
+
+    // 连线入链：从入链指向原节点
+    checkedInlinks.forEach(item => {
+      const targetNode = findExistingNode(item.id) || currentNodes.find(n => n.type === 'file' && n.file === item.id)
+      if (targetNode) {
+        addEdgeIfNotExist(targetNode.id, 'right', currentNode.id, 'left')
+      }
+    })
+
+    // 连线出链：从原节点指向出链
+    checkedOutlinks.forEach(item => {
+      const targetNode = findExistingNode(item.id) || currentNodes.find(n => n.type === 'file' && n.file === item.id)
+      if (targetNode) {
+        addEdgeIfNotExist(currentNode.id, 'right', targetNode.id, 'left')
+      }
+    })
+
+    // 连线子文档：从原节点指向子文档
+    checkedChildren.forEach(item => {
+      const targetNode = findExistingNode(item.id) || currentNodes.find(n => n.type === 'file' && n.file === item.id)
+      if (targetNode) {
+        addEdgeIfNotExist(currentNode.id, 'bottom', targetNode.id, 'top')
+      }
+    })
+
+    // 提交更改
+    commitDocument({
+      ...state.document,
+      nodes: currentNodes,
+      edges: currentEdges,
+    })
+
+    // 刷新新节点元数据
+    if (addedNodeIds.length > 0) {
+      await options.fileFieldRefresh(addedNodeIds)
+    }
+
+    // 关闭气泡
+    closeSelectionPopover()
+  }
+
   function zoomOut() {
     const stage = stageRef.value
     if (!stage) {
@@ -886,5 +1116,11 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     updateTextNodeContent,
     zoomIn,
     zoomOut,
+    sproutLoading,
+    sproutRelations,
+    loadSproutRelations,
+    toggleSproutItemSelect,
+    setAllSproutItemsSelected,
+    executeSprout,
   }
 }

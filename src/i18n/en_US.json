@@ -325,5 +325,16 @@
   "settingsPresentationMaskOpacityDescription": "Mask opacity applied in 'Dark Background Mask' style (0% to 100%).",
   "settingsPresentationAutoPlayIntervalTitle": "Auto Play Interval",
   "settingsPresentationAutoPlayIntervalDescription": "Time in seconds before automatically transitioning to the next card.",
-  "selectionToolbarPlay": "Play Presentation"
+  "selectionToolbarPlay": "Play Presentation",
+  "selectionToolbarSprout": "Sprout Linked Docs",
+  "sproutTitle": "Sprout Linked Documents",
+  "sproutOutlinks": "Outlinks",
+  "sproutInlinks": "Inlinks",
+  "sproutChildDocs": "Child Documents",
+  "sproutConfirm": "Confirm Sprout",
+  "sproutSelectAll": "Select All",
+  "sproutDeselectAll": "Deselect All",
+  "sproutLoading": "Loading linked documents...",
+  "sproutNoLinks": "No linked documents found",
+  "sproutLimitWarning": "Some categories have many links; first 10 selected by default"
 }

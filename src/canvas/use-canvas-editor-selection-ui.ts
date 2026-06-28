@@ -47,7 +47,7 @@ export interface CanvasEditorSelectionUiOptions {
 }
 
 export function createCanvasEditorSelectionUi(options: CanvasEditorSelectionUiOptions) {
-  const selectionToolbarPopover = ref<"closed" | "color" | "layout">("closed")
+  const selectionToolbarPopover = ref<"closed" | "color" | "layout" | "sprout">("closed")
   const edgeToolbarPopover = ref<"closed" | "color" | "direction">("closed")
   const selectionToolbarSize = reactive({
     height: DEFAULT_SELECTION_TOOLBAR_SIZE.height,

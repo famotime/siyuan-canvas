@@ -2136,6 +2136,62 @@ describe("CanvasWorkspace", () => {
     wrapper.unmount()
   })
 
+  it("shows the sprout button for a single selected Siyuan document node stored as a sy path", async () => {
+    const node = {
+      id: "file-1",
+      type: "file",
+      file: "/data/roadmap.sy",
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 180,
+    }
+    currentEditor = createEditorMock(node)
+    currentEditor.selectionToolbar = {
+      placement: "top",
+      visible: true,
+      x: 144,
+      y: 88,
+    }
+    currentEditor.state.selectedNodeIds = [node.id]
+    currentEditor.getFileNodePreview = vi.fn(() => ({
+      badge: "Document",
+      detail: "/Projects/Roadmap",
+      headline: "Roadmap",
+      helper: "Opens in SiYuan",
+      kind: "document",
+    }))
+    currentEditor.getResolvedFileNode = vi.fn(() => ({
+      detail: "/Projects/Roadmap",
+      document: {
+        hpath: "/Projects/Roadmap",
+        id: "20260412094047-ihhbskn",
+        path: "/data/roadmap.sy",
+        title: "Roadmap",
+      },
+      hpath: "/Projects/Roadmap",
+      id: "20260412094047-ihhbskn",
+      kind: "document",
+      path: "/data/roadmap.sy",
+      title: "Roadmap",
+    }))
+    currentEditor.loadSproutRelations = vi.fn()
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    expect(wrapper.find("[data-testid='selection-toolbar-sprout']").exists()).toBe(true)
+
+    await wrapper.find("[data-testid='selection-toolbar-sprout']").trigger("click")
+
+    expect(currentEditor.loadSproutRelations).toHaveBeenCalledWith("20260412094047-ihhbskn")
+  })
+
   it("renders workspace context menu items with icons and menu roles", async () => {
     currentEditor = createEditorMock()
     currentEditor.workspaceDocuments = [
