@@ -94,6 +94,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
       const startY = stageY - ((ids.length - 1) * verticalGap) / 2
 
       let currentDoc = state.document
+      const newNodes: any[] = []
       for (let i = 0; i < ids.length; i++) {
         const blockId = ids[i].trim()
         const node = createFileNodeAtViewport(
@@ -103,6 +104,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
         )
         node.file = blockId
         currentDoc = upsertCanvasNode(currentDoc, node)
+        newNodes.push(node)
 
         if (dragSourceNodeId) {
           const sourceNode = currentDoc.nodes.find(n => n.id === dragSourceNodeId)
@@ -153,7 +155,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
       }
 
       commitDocument(currentDoc)
-      await refreshFileNodeMetadata()
+      await refreshFileNodeMetadata(newNodes.map(n => n.id))
       return
     }
 

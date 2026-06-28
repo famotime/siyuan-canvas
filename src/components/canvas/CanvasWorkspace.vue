@@ -2365,6 +2365,8 @@ watch(
             }
           }, currentInterval * 1000)
           queryTimersMap.set(node.id, { timer, interval: currentInterval })
+        } else {
+          queryTimersMap.set(node.id, { timer: null as any, interval: 0 })
         }
       }
     }
