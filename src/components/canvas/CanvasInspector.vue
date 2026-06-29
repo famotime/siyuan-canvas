@@ -123,7 +123,7 @@
           data-testid="inspector-node-file"
           :value="getDraftText()"
           :placeholder="isTextMixed() ? '--' : ''"
-          @input="handleTextInput($event)"
+          readonly
         />
       </label>
       <label v-if="editor.selectedNode.type === 'link'">
@@ -701,6 +701,19 @@ const mixedFields = computed(() => {
   return result
 })
 
+function getFileNodePath(node: any): string {
+  if (!node) return ''
+  if (node.type !== 'file') return ''
+  if (typeof props.editor.getResolvedFileNode !== 'function') {
+    return node.file
+  }
+  const resolved = props.editor.getResolvedFileNode(node)
+  if (!resolved) {
+    return node.file
+  }
+  return resolved.hpath || resolved.detail || resolved.path || node.file
+}
+
 watch(
   () => props.editor.selectedNode,
   (node) => {
@@ -716,7 +729,7 @@ watch(
     multiNodeDraft.text = node.type === 'group'
       ? (node.label || '')
       : node.type === 'file'
-        ? node.file
+        ? getFileNodePath(node)
         : node.type === 'link'
           ? node.url
           : node.text
@@ -751,7 +764,7 @@ function getDraftText(): string {
     return node.label || ''
   }
   if (node.type === 'file') {
-    return node.file
+    return getFileNodePath(node)
   }
   if (node.type === 'link') {
     return node.url
