@@ -1149,6 +1149,7 @@ export function useCanvasEditor(
     state,
     viewport,
     showDragAlignmentGuides: computed(() => getReactivePluginSettings().showDragAlignmentGuides !== false),
+    autoCreateTextCardOnDrag: computed(() => getReactivePluginSettings().autoCreateTextCardOnDrag),
     showNodeHeader: computed(() => getReactivePluginSettings().showNodeHeader),
   })
 

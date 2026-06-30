@@ -145,6 +145,20 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     },
   })
   setting.addItem({
+    title: t("settingsAutoCreateTextCardOnDragTitle"),
+    description: t("settingsAutoCreateTextCardOnDragDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.type = "checkbox"
+      input.checked = draft.autoCreateTextCardOnDrag
+      input.addEventListener("change", () => {
+        draft.autoCreateTextCardOnDrag = input.checked
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
     title: t("settingsEnableDebugLogTitle"),
     description: t("settingsEnableDebugLogDescription"),
     createActionElement: () => {

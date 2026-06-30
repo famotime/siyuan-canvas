@@ -22,6 +22,7 @@ describe("canvas plugin data", () => {
     expect(data.settings.showDragAlignmentGuides).toBe(false)
     expect(data.settings.presentationAutoRatio).toBe(true)
     expect(data.settings.presentationMaskOpacity).toBe(60)
+    expect(data.settings.autoCreateTextCardOnDrag).toBe(false)
     expect(data.recentFiles).toEqual([])
     expect(data.ui.inspectorSections).toEqual({
       createEdge: true,
@@ -119,6 +120,29 @@ describe("canvas plugin data", () => {
       },
       version: 1,
     }).settings.showDragAlignmentGuides).toBe(false)
+  })
+
+  it("normalizes autoCreateTextCardOnDrag setting", () => {
+    expect(normalizeCanvasPluginData({
+      settings: {
+        autoCreateTextCardOnDrag: false,
+      },
+      version: 1,
+    }).settings.autoCreateTextCardOnDrag).toBe(false)
+
+    expect(normalizeCanvasPluginData({
+      settings: {
+        autoCreateTextCardOnDrag: true,
+      },
+      version: 1,
+    }).settings.autoCreateTextCardOnDrag).toBe(true)
+
+    expect(normalizeCanvasPluginData({
+      settings: {
+        autoCreateTextCardOnDrag: "invalid",
+      },
+      version: 1,
+    }).settings.autoCreateTextCardOnDrag).toBe(false)
   })
 })
 

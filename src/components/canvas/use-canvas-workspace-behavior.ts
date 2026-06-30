@@ -244,6 +244,19 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     }
   })
 
+  watch(
+    () => editor.state.pendingEditNodeId,
+    (newId) => {
+      if (newId) {
+        const node = editor.state.document.nodes.find((candidate) => candidate.id === newId)
+        if (node) {
+          handleNodeDoubleClick(node)
+        }
+        editor.state.pendingEditNodeId = ""
+      }
+    },
+  )
+
   async function handleImport(event: Event) {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0]

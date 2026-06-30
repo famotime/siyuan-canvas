@@ -9,6 +9,7 @@ import {
 import {
   computed,
   ref,
+  reactive,
 } from 'vue'
 
 import { createEmptyCanvasDocument } from '@/canvas/document'
@@ -18,7 +19,7 @@ import type { CanvasNode } from '@/canvas/types'
 function createGestureHarness(
   nodes: CanvasNode[],
   selectedNodeIds: string[] = [],
-  options: { showDragAlignmentGuides?: boolean } = {},
+  options: { showDragAlignmentGuides?: boolean, autoCreateTextCardOnDrag?: boolean } = {},
 ) {
   const stage = document.createElement('div')
   const viewport = { scale: 1, x: 0, y: 0 }
@@ -27,6 +28,16 @@ function createGestureHarness(
     visible: false,
   }
   const showDragAlignmentGuides = ref(options.showDragAlignmentGuides ?? true)
+  const autoCreateTextCardOnDrag = ref(options.autoCreateTextCardOnDrag ?? false)
+  const connectionDraft = reactive({
+    fromNodeId: '',
+    fromSide: 'left' as const,
+    toNodeId: '',
+    toSide: 'left' as const,
+    toX: 0,
+    toY: 0,
+    visible: false,
+  })
   const state = {
     document: {
       nodes: [...nodes],
@@ -39,6 +50,7 @@ function createGestureHarness(
       state.selectedNodeIds = [...ids]
     }),
     selectedNodeIds: [...selectedNodeIds],
+    pendingEditNodeId: '',
   }
   const commitDocument = vi.fn((document) => {
     state.document = document
@@ -47,9 +59,15 @@ function createGestureHarness(
     board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
     alignmentGuides,
     commitDocument,
-    connectionDraft: {} as any,
+    connectionDraft,
     edgeReconnectDraft: {} as any,
-    getAnchor: vi.fn(),
+    getAnchor: vi.fn((node, side) => {
+      if (side === 'left') return { x: node.x, y: node.y + node.height / 2 }
+      if (side === 'right') return { x: node.x + node.width, y: node.y + node.height / 2 }
+      if (side === 'top') return { x: node.x + node.width / 2, y: node.y }
+      if (side === 'bottom') return { x: node.x + node.width / 2, y: node.y + node.height }
+      return { x: node.x, y: node.y }
+    }),
     readonly: computed(() => false),
     selectionBox: {} as any,
     selectedEdge: computed(() => null),
@@ -57,6 +75,7 @@ function createGestureHarness(
     state: state as any,
     viewport,
     showDragAlignmentGuides: computed(() => showDragAlignmentGuides.value),
+    autoCreateTextCardOnDrag: computed(() => autoCreateTextCardOnDrag.value),
     showNodeHeader: computed(() => false),
   })
 
@@ -723,5 +742,98 @@ describe('canvas editor gesture handlers', () => {
     // Viewport should remain same since it's not 2 touches
     expect(viewport.value.scale).toBe(2)
     expect(viewport.value.x).toBe(-100)
+  })
+
+  describe("autoCreateTextCardOnDrag", () => {
+    it("automatically creates a text card and connection when dragging to empty canvas and setting is enabled", () => {
+      const fromNode = { id: "node-1", type: "text", x: 100, y: 100, width: 200, height: 100 } as CanvasNode
+      const { commitDocument, handlers, state } = createGestureHarness([fromNode], [], { autoCreateTextCardOnDrag: true })
+
+      const event = new PointerEvent("pointerdown", {
+        button: 0,
+        clientX: 300,
+        clientY: 150,
+        bubbles: true,
+      })
+
+      handlers.startConnectionDrag(fromNode, "right", event)
+
+      // Simulate dragging to empty space
+      const pointerMoveEvent = new PointerEvent("pointermove", {
+        clientX: 600,
+        clientY: 200,
+        bubbles: true,
+      })
+      window.dispatchEvent(pointerMoveEvent)
+
+      // Simulate pointerup to release
+      const pointerUpEvent = new PointerEvent("pointerup", {
+        clientX: 600,
+        clientY: 200,
+        bubbles: true,
+      })
+      window.dispatchEvent(pointerUpEvent)
+
+      // Expectations
+      expect(commitDocument).toHaveBeenCalled()
+      expect(state.document.nodes).toHaveLength(2)
+      
+      const newNode = state.document.nodes.find((n) => n.id !== "node-1")
+      expect(newNode).toBeDefined()
+      expect(newNode!.type).toBe("text")
+
+      // fromNode's right handle is dragged to x=600, y=200.
+      // So new node should align left side to x=600, center y to 200.
+      // W=320, H=180.
+      // newNode.x = 600
+      // newNode.y = 200 - 180/2 = 110
+      expect(newNode!.x).toBe(600)
+      expect(newNode!.y).toBe(110)
+
+      expect(state.document.edges).toHaveLength(1)
+      const edge = state.document.edges[0]
+      expect(edge).toBeDefined()
+      expect(edge!.fromNode).toBe("node-1")
+      expect(edge!.toNode).toBe(newNode!.id)
+      expect(edge!.fromSide).toBe("right")
+      expect(edge!.toSide).toBe("left")
+
+      expect(state.selectedNodeIds).toEqual([newNode!.id])
+      expect(state.pendingEditNodeId).toBe(newNode!.id)
+    })
+
+    it("does not create a text card when dragging to empty canvas and setting is disabled", () => {
+      const fromNode = { id: "node-1", type: "text", x: 100, y: 100, width: 200, height: 100 } as CanvasNode
+      const { commitDocument, handlers, state } = createGestureHarness([fromNode], [], { autoCreateTextCardOnDrag: false })
+
+      const event = new PointerEvent("pointerdown", {
+        button: 0,
+        clientX: 300,
+        clientY: 150,
+        bubbles: true,
+      })
+
+      handlers.startConnectionDrag(fromNode, "right", event)
+
+      // Simulate dragging to empty space
+      const pointerMoveEvent = new PointerEvent("pointermove", {
+        clientX: 600,
+        clientY: 200,
+        bubbles: true,
+      })
+      window.dispatchEvent(pointerMoveEvent)
+
+      // Simulate pointerup to release
+      const pointerUpEvent = new PointerEvent("pointerup", {
+        clientX: 600,
+        clientY: 200,
+        bubbles: true,
+      })
+      window.dispatchEvent(pointerUpEvent)
+
+      expect(commitDocument).not.toHaveBeenCalled()
+      expect(state.document.nodes).toHaveLength(1)
+      expect(state.document.edges).toHaveLength(0)
+    })
   })
 })

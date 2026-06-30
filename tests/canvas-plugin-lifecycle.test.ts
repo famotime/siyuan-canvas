@@ -744,6 +744,7 @@ describe("canvas plugin lifecycle", () => {
       showCanvasThumbnails: true,
       showDragAlignmentGuides: false,
       showNodeHeader: true,
+      autoCreateTextCardOnDrag: false,
     })
   })
 
@@ -790,6 +791,7 @@ describe("canvas plugin lifecycle", () => {
       showCanvasThumbnails: false,
       showDragAlignmentGuides: false,
       showNodeHeader: true,
+      autoCreateTextCardOnDrag: false,
     })
     expect(plugin.getRecentCanvasFiles()).toEqual([
       expect.objectContaining({

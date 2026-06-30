@@ -19,6 +19,7 @@ export interface CanvasPluginSettings {
   presentationAutoPlayInterval: number
   presentationAutoRatio: boolean
   presentationMaskOpacity: number
+  autoCreateTextCardOnDrag: boolean
 }
 
 export interface CanvasInspectorSectionsState {
@@ -64,6 +65,7 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     presentationAutoPlayInterval: 3,
     presentationAutoRatio: true,
     presentationMaskOpacity: 60,
+    autoCreateTextCardOnDrag: false,
   }
 }
 
@@ -176,6 +178,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
       && candidate.settings.presentationMaskOpacity <= 100
       ? candidate.settings.presentationMaskOpacity
       : defaults.settings.presentationMaskOpacity,
+    autoCreateTextCardOnDrag: typeof candidate.settings?.autoCreateTextCardOnDrag === "boolean"
+      ? candidate.settings.autoCreateTextCardOnDrag
+      : defaults.settings.autoCreateTextCardOnDrag,
   }
 
   const defaultInspectorSections = defaults.ui.inspectorSections

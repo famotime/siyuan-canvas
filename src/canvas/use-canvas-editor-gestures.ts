@@ -21,10 +21,12 @@ import { resolveCanvasAlignmentGuides } from "@/canvas/alignment-guides"
 import { cloneCanvasDocument } from "@/canvas/canvas-history"
 import {
   createCanvasEdge,
+  createCanvasNode,
   removeCanvasEdge,
   setCanvasEdgeEndpoint,
   setCanvasNodeGeometry,
   upsertCanvasEdge,
+  upsertCanvasNode,
 } from "@/canvas/document"
 import {
   CONNECTION_SNAP_DISTANCE,
@@ -88,6 +90,7 @@ interface CanvasEditorGestureOptions {
   selectionBox: CanvasEditorSelectionBoxState
   selectedEdge: ComputedRef<CanvasEdge | null>
   showDragAlignmentGuides: ComputedRef<boolean>
+  autoCreateTextCardOnDrag: ComputedRef<boolean>
   stageRef: Ref<HTMLElement | undefined>
   state: CanvasEditorState
   viewport: {
@@ -110,6 +113,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     selectionBox,
     selectedEdge,
     showDragAlignmentGuides,
+    autoCreateTextCardOnDrag,
     stageRef,
     state,
     viewport,
@@ -715,7 +719,51 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
   }
 
   function finishConnectionDrag() {
-    if (!connectionDraft.fromNodeId || !connectionDraft.toNodeId) {
+    if (!connectionDraft.fromNodeId) {
+      clearConnectionDraft()
+      return
+    }
+
+    if (!connectionDraft.toNodeId) {
+      if (autoCreateTextCardOnDrag.value) {
+        const fromNode = state.document.nodes.find((node) => node.id === connectionDraft.fromNodeId)
+        if (fromNode) {
+          const newNode = createCanvasNode("text")
+          const W = newNode.width
+          const H = newNode.height
+          const fromSide = connectionDraft.fromSide
+          let toSide: CanvasSide = "left"
+
+          if (fromSide === "right") {
+            toSide = "left"
+            newNode.x = Math.round(connectionDraft.toX)
+            newNode.y = Math.round(connectionDraft.toY - H / 2)
+          } else if (fromSide === "left") {
+            toSide = "right"
+            newNode.x = Math.round(connectionDraft.toX - W)
+            newNode.y = Math.round(connectionDraft.toY - H / 2)
+          } else if (fromSide === "bottom") {
+            toSide = "top"
+            newNode.x = Math.round(connectionDraft.toX - W / 2)
+            newNode.y = Math.round(connectionDraft.toY)
+          } else if (fromSide === "top") {
+            toSide = "bottom"
+            newNode.x = Math.round(connectionDraft.toX - W / 2)
+            newNode.y = Math.round(connectionDraft.toY - H)
+          }
+
+          const edge = createCanvasEdge(connectionDraft.fromNodeId, newNode.id)
+          edge.fromSide = fromSide
+          edge.toSide = toSide
+
+          let updatedDoc = upsertCanvasNode(state.document, newNode)
+          updatedDoc = upsertCanvasEdge(updatedDoc, edge)
+          commitDocument(updatedDoc)
+
+          state.selectNode(newNode.id)
+          state.pendingEditNodeId = newNode.id
+        }
+      }
       clearConnectionDraft()
       return
     }

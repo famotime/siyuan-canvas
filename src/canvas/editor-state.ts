@@ -46,6 +46,7 @@ export class CanvasEditorState {
   public selectedEdgeId = ""
   public selectedNodeId = ""
   public selectedNodeIds: string[] = []
+  public pendingEditNodeId = ""
 
   constructor(private readonly service: CanvasEditorService) {}
 
@@ -63,6 +64,7 @@ export class CanvasEditorState {
     this.selectedNodeId = ""
     this.selectedNodeIds = []
     this.selectedEdgeId = ""
+    this.pendingEditNodeId = ""
   }
 
   replaceDocument(
@@ -84,6 +86,7 @@ export class CanvasEditorState {
     this.selectedNodeId = ""
     this.selectedNodeIds = []
     this.selectedEdgeId = ""
+    this.pendingEditNodeId = ""
   }
 
   patchDocument(document: CanvasDocument): void {

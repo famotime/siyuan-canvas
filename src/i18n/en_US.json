@@ -208,6 +208,8 @@
   "settingsShowNodeHeaderDescription": "When enabled, show the title bar (icon, title text, drag handle) on each canvas card. On by default.",
   "settingsShowDragAlignmentGuidesTitle": "Drag alignment guides",
   "settingsShowDragAlignmentGuidesDescription": "When enabled, show edge/center alignment guides and snap cards while dragging. Off by default.",
+  "settingsAutoCreateTextCardOnDragTitle": "Auto-create text card on drag connection",
+  "settingsAutoCreateTextCardOnDragDescription": "When dragging to create a new connection from a card handle and releasing in empty area, automatically create and connect a text card. Off by default.",
   "settingsEnableDebugLogTitle": "Enable debug logging",
   "settingsEnableDebugLogDescription": "When enabled, output Canvas save flow debug information in the browser console.",
   "settingsNoteCreationDirectoryTitle": "Note creation directory",
