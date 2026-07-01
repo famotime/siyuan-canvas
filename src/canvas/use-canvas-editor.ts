@@ -1306,7 +1306,8 @@ export function useCanvasEditor(
   watch(
     () => state.document.nodes
       .filter((node) => node.type === "file")
-      .map((node) => `${node.id}:${node.file}`),
+      .map((node) => `${node.id}:${node.file}`)
+      .join(","),
     () => {
       void refreshFileNodeMetadata()
     },

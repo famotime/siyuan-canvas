@@ -209,9 +209,11 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
       excerptHtml?: string
       imageSrc?: string
       thumbnail?: CanvasFileTargetPreview['thumbnail']
+      originalFile?: string
     } = {
       ...resolved,
       detail: resolved.path,
+      originalFile: node.file,
     }
 
     if (resolved.kind === 'block') {
@@ -230,6 +232,7 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
         ...resolved,
         detail: resolved.path,
         thumbnail: canvasPreview.thumbnail,
+        originalFile: node.file,
       }
     }
 
@@ -242,6 +245,11 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
       node.type === 'file' && (!nodeIds || nodeIds.includes(node.id))
     ))
     const nextEntries = await Promise.all(fileNodes.map(async (node) => {
+      // 如果没有指定 nodeIds（属于全局刷新），且当前缓存中有此节点的元数据且原 file 路径/ID 未改变，直接复用缓存
+      const cached = fileNodeMeta.value[node.id]
+      if (!nodeIds && cached && cached.originalFile === node.file) {
+        return [node.id, cached] as const
+      }
       return [node.id, await resolveFileNodeMetadata(node)] as const
     }))
 
