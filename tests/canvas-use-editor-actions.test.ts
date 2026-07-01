@@ -2222,4 +2222,40 @@ Only an intro.`,
 
     wrapper.unmount()
   })
+
+  it("updates specific nodes and selected nodes via updateNodeField", async () => {
+    const path = "/data/storage/maps/roadmap.canvas"
+    workspaceFiles.set(path, createCanvasRaw("workspace canvas"))
+    const { editor, wrapper } = await mountEditor({ path })
+
+    editor.addNode("query")
+    await flushEditor()
+    const queryNodeId = editor.state.selectedNodeId
+    expect(queryNodeId).toBeTruthy()
+
+    // 1. Test 2-argument form (updates selected node)
+    editor.updateNodeField("sql", "SELECT * FROM blocks LIMIT 10")
+    await flushEditor()
+    let node = editor.state.document.nodes.find((n: any) => n.id === queryNodeId)
+    expect(node).toMatchObject({
+      sql: "SELECT * FROM blocks LIMIT 10"
+    })
+
+    // Deselect query node by adding a text node
+    editor.addNode("text")
+    await flushEditor()
+    const textNodeId = editor.state.selectedNodeId
+    expect(textNodeId).not.toBe(queryNodeId)
+
+    // 2. Test 3-argument form (updates node by ID even when it is not selected)
+    editor.updateNodeField(queryNodeId, "sql", "SELECT * FROM attributes LIMIT 5")
+    await flushEditor()
+    node = editor.state.document.nodes.find((n: any) => n.id === queryNodeId)
+    expect(node).toMatchObject({
+      sql: "SELECT * FROM attributes LIMIT 5"
+    })
+
+    wrapper.unmount()
+  })
 })
+

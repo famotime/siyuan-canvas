@@ -596,15 +596,38 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     }))
   }
 
-  function updateNodeField(field: string, value: string) {
-    if (!selectedNode.value) {
+  // 支持 2 个参数 (field, value) 或 3 个参数 (nodeId, field, value) 调用
+  // 既可以更新当前选中的节点属性，也可以根据节点 ID 更新指定节点属性
+  function updateNodeField(field: string, value: any): void
+  function updateNodeField(nodeId: string, field: string, value: any): void
+  function updateNodeField(nodeIdOrField: string, fieldOrValue: any, maybeValue?: any) {
+    let nodeId: string | undefined
+    let field: string
+    let value: any
+
+    if (arguments.length >= 3) {
+      nodeId = nodeIdOrField
+      field = fieldOrValue
+      value = maybeValue
+    } else {
+      nodeId = selectedNode.value?.id
+      field = nodeIdOrField
+      value = fieldOrValue
+    }
+
+    if (!nodeId) {
+      return
+    }
+
+    const node = state.document.nodes.find((n) => n.id === nodeId)
+    if (!node) {
       return
     }
 
     updateNode({
-      ...selectedNode.value,
+      ...node,
       [field]: value,
-    })
+    } as any)
   }
 
   function updateNumericNodeField(field: 'height' | 'width' | 'x' | 'y', value: string) {
