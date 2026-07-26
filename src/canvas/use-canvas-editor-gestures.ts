@@ -180,11 +180,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     window.addEventListener("pointerup", handleUp)
   }
 
-  const TRACKPAD_DELTA_THRESHOLD = 20
-
   function isTrackpadWheel(event: WheelEvent): boolean {
     return event.deltaMode === WheelEvent.DOM_DELTA_PIXEL
-      && Math.abs(event.deltaY) < TRACKPAD_DELTA_THRESHOLD
   }
 
   function handleWheel(event: WheelEvent) {
