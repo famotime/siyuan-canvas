@@ -1798,6 +1798,25 @@
   box-sizing: border-box;
 }
 
+.canvas-node__protyle {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  outline: 0;
+  box-sizing: border-box;
+}
+
+.canvas-node__protyle :deep(.protyle-wysiwyg) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.canvas-node__protyle :deep(.protyle-wysiwyg p) {
+  margin: 0;
+  line-height: 1.6;
+}
+
 .markdown-preview {
   white-space: normal;
   color: var(--canvas-text);

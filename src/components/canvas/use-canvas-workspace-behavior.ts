@@ -10,6 +10,15 @@ import {
 } from "vue"
 import { getNodeSelectionColorValue } from "@/components/canvas/canvas-workspace-display"
 import { isWebUrl } from "@/canvas/url-detection"
+import { useProtyleEditor } from "@/canvas/canvas-protyle-editor"
+
+interface ResolvedCanvasFileBlockTarget {
+  kind: "block"
+  id: string
+  rootId: string
+  title: string
+  hpath: string
+}
 
 interface CanvasWorkspaceEditor {
   activateNode: (node: CanvasNode) => void
@@ -21,6 +30,7 @@ interface CanvasWorkspaceEditor {
     visible: boolean
   }
   edgeToolbarPopover: "closed" | "color" | "direction"
+  getResolvedFileNode: (node: Extract<CanvasNode, { type: "file" }>) => Record<string, unknown> & { kind: string }
   importCanvas: (file: File) => Promise<void>
   selectNode: (nodeId: string) => void
   selectedNode: CanvasNode | null
@@ -38,6 +48,7 @@ interface CanvasWorkspaceEditor {
     isDirty: boolean
     selectedNodeIds: string[]
   }
+  updateNodeField: (nodeId: string, field: string, value: unknown) => void
   updateTextNodeContent: (nodeId: string, text: string) => void
   toggleGroupCollapse: (nodeId: string) => void
 }
@@ -47,6 +58,7 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   const editingNodeId = ref("")
   const editingOriginalText = ref("")
   const editingTextareaRef = ref<HTMLTextAreaElement>()
+  const fileProtyleContainerRef = ref<HTMLElement>()
   const canvasShellRef = ref<HTMLElement>()
   const edgeToolbarRef = ref<HTMLElement>()
   const selectionToolbarRef = ref<HTMLElement>()
@@ -55,6 +67,23 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
   let canvasThemeObserver: MutationObserver | null = null
   let edgeToolbarResizeObserver: ResizeObserver | null = null
   let selectionToolbarResizeObserver: ResizeObserver | null = null
+
+  const protyleAvailable = typeof window !== 'undefined' && !!(window as any).siyuan?.ws?.app
+
+  const fileProtyleEditor = useProtyleEditor()
+
+  const isFileProtyleEditing = computed(() => {
+    if (!editingNodeId.value) return false
+    if (!protyleAvailable) return false
+    const node = editor.state.document.nodes.find((c) => c.id === editingNodeId.value)
+    if (node?.type !== "file") return false
+    const resolved = editor.getResolvedFileNode(node as Extract<CanvasNode, { type: "file" }>)
+    return resolved.kind === "block"
+  })
+
+  function setFileProtyleContainerRef(value: Element | null) {
+    fileProtyleContainerRef.value = value instanceof HTMLElement ? value : undefined
+  }
 
   const activeSelectionColor = computed(() => {
     if (!editor.state.selectedNodeIds.length) {
@@ -166,6 +195,10 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
       return
     }
 
+    if (isFileProtyleEditing.value && !event.target.closest(".canvas-node__protyle")) {
+      void commitFileProtyleEditing()
+    }
+
     if (editor.selectionToolbarPopover !== "closed" && !event.target.closest(".selection-toolbar")) {
       editor.closeSelectionPopover()
     }
@@ -180,6 +213,21 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
       editor.toggleGroupCollapse(node.id)
       return
     }
+
+    if (node.type === "file") {
+      if (protyleAvailable) {
+        const resolved = editor.getResolvedFileNode(node as Extract<CanvasNode, { type: "file" }>)
+        if (resolved.kind === "block") {
+          editor.selectNode(node.id)
+          editingNodeId.value = node.id
+          void startFileProtyleEditing(node, resolved as ResolvedCanvasFileBlockTarget)
+          return
+        }
+      }
+      editor.activateNode(node)
+      return
+    }
+
     if (!["group", "text", "link", "query"].includes(node.type)) {
       editor.activateNode(node)
       return
@@ -206,6 +254,18 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
         editingTextareaRef.value?.setSelectionRange(editingMarkdown.value.length, editingMarkdown.value.length)
       }
     })
+  }
+
+  async function startFileProtyleEditing(node: CanvasNode, resolved: ResolvedCanvasFileBlockTarget) {
+    await nextTick()
+    if (!fileProtyleContainerRef.value) return
+
+    fileProtyleEditor.mount(fileProtyleContainerRef.value, resolved.id)
+  }
+
+  async function commitFileProtyleEditing() {
+    fileProtyleEditor.destroy()
+    editingNodeId.value = ""
   }
 
   function commitTextNodeEditing() {
@@ -257,6 +317,12 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     },
   )
 
+  watch(editingNodeId, (newId, oldId) => {
+    if (oldId && !newId) {
+      fileProtyleEditor.destroy()
+    }
+  })
+
   async function handleImport(event: Event) {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0]
@@ -288,6 +354,7 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     window.removeEventListener("pointerdown", handleWindowPointerDown)
     edgeToolbarResizeObserver?.disconnect()
     selectionToolbarResizeObserver?.disconnect()
+    fileProtyleEditor.destroy()
   })
 
   watch(
@@ -312,12 +379,15 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     commitTextNodeEditing,
     editingMarkdown,
     editingNodeId,
+    fileProtyleContainerRef,
+    isFileProtyleEditing,
     setEdgeToolbarRef,
     handleImport,
     handleNodeDoubleClick,
     handleToolbarEdit,
     selectionToolbarThemeMode,
     setEditingTextareaRef,
+    setFileProtyleContainerRef,
     setSelectionToolbarRef,
   }
 }

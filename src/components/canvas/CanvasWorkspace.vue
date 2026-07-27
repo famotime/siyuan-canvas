@@ -590,7 +590,14 @@
               </template>
               <template v-else-if="node.type === 'file'">
                 <div data-canvas-field="note">
+                  <div
+                    v-if="editingNodeId === node.id && isFileProtyleEditing"
+                    :ref="setFileProtyleContainerRef"
+                    class="canvas-node__protyle"
+                    @pointerdown.stop
+                  />
                   <CanvasFileCard
+                    v-else
                     :canvas-thumbnail-view-box="getCanvasThumbnailViewBox(editor.getFileNodePreview(node).thumbnail)"
                     :document-preview-html="getFileCardDocumentPreviewHtml(node)"
                     :image-src="getFileCardImageSource(node)"
@@ -2290,12 +2297,15 @@ const {
   commitTextNodeEditing,
   editingMarkdown,
   editingNodeId,
+  fileProtyleContainerRef,
   handleImport,
   handleNodeDoubleClick,
   handleToolbarEdit,
+  isFileProtyleEditing,
   selectionToolbarThemeMode,
   setEdgeToolbarRef,
   setEditingTextareaRef,
+  setFileProtyleContainerRef,
   setSelectionToolbarRef,
 } = useCanvasWorkspaceBehavior(editor)
 const edgeLabelInputRef = ref<HTMLInputElement>()

@@ -153,6 +153,7 @@ function createEditorMock(node = createTextNode()) {
       kind: "file",
       imageSrc: "",
     })),
+    getResolvedFileNode: vi.fn(() => ({ kind: "file" })),
     getPluginSettings: vi.fn(() => ({
       showCanvasThumbnails: false,
       showNodeHeader: true,
