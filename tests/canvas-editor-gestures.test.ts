@@ -91,7 +91,7 @@ function createGestureHarness(
 }
 
 describe('canvas editor gesture handlers', () => {
-  it('zooms around the cursor without cancelling the wheel event', () => {
+  it('zooms around the cursor on mouse wheel (line mode)', () => {
     const stage = document.createElement('div')
     stage.getBoundingClientRect = vi.fn(() => ({
       bottom: 440,
@@ -159,12 +159,92 @@ describe('canvas editor gesture handlers', () => {
       showNodeHeader: computed(() => true),
     })
 
-    handlers.handleWheelZoom(event)
+    handlers.handleWheel(event)
 
-    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.preventDefault).toHaveBeenCalled()
     expect(viewport.scale).toBe(0.84)
     expect((150 - viewport.x) / viewport.scale).toBeCloseTo(140)
     expect((120 - viewport.y) / viewport.scale).toBeCloseTo(100)
+  })
+
+  it('pans the canvas on trackpad scroll (pixel mode, small delta)', () => {
+    const stage = document.createElement('div')
+    stage.getBoundingClientRect = vi.fn(() => ({
+      bottom: 440, height: 400, left: 0, right: 400, top: 0, width: 400,
+      x: 0, y: 0, toJSON: () => ({}),
+    }))
+
+    const viewport = { scale: 1, x: 100, y: 200 }
+    const event = {
+      deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+      deltaX: 5,
+      deltaY: 3,
+      preventDefault: vi.fn(),
+    } as unknown as WheelEvent
+
+    const handlers = createCanvasEditorGestureHandlers({
+      board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
+      alignmentGuides: { guides: [], visible: false },
+      commitDocument: vi.fn(),
+      connectionDraft: {} as any,
+      edgeReconnectDraft: {} as any,
+      getAnchor: vi.fn(),
+      readonly: computed(() => false),
+      selectionBox: {} as any,
+      selectedEdge: computed(() => null),
+      showDragAlignmentGuides: computed(() => true),
+      stageRef: ref(stage),
+      state: { document: { nodes: [], edges: [] }, selectNode: vi.fn(), selectedNodeIds: [] } as any,
+      viewport,
+      showNodeHeader: computed(() => true),
+    })
+
+    handlers.handleWheel(event)
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(viewport.x).toBe(95)
+    expect(viewport.y).toBe(197)
+    expect(viewport.scale).toBe(1)
+  })
+
+  it('zooms on trackpad scroll when holding ctrl/cmd key', () => {
+    const stage = document.createElement('div')
+    stage.getBoundingClientRect = vi.fn(() => ({
+      bottom: 400, height: 400, left: 0, right: 400, top: 0, width: 400,
+      x: 0, y: 0, toJSON: () => ({}),
+    }))
+
+    const viewport = { scale: 1, x: 0, y: 0 }
+    const event = {
+      deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+      deltaY: 3,
+      ctrlKey: true,
+      clientX: 200,
+      clientY: 200,
+      preventDefault: vi.fn(),
+    } as unknown as WheelEvent
+
+    const handlers = createCanvasEditorGestureHandlers({
+      board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
+      alignmentGuides: { guides: [], visible: false },
+      commitDocument: vi.fn(),
+      connectionDraft: {} as any,
+      edgeReconnectDraft: {} as any,
+      getAnchor: vi.fn(),
+      readonly: computed(() => false),
+      selectionBox: {} as any,
+      selectedEdge: computed(() => null),
+      showDragAlignmentGuides: computed(() => true),
+      stageRef: ref(stage),
+      state: { document: { nodes: [], edges: [] }, selectNode: vi.fn(), selectedNodeIds: [] } as any,
+      viewport,
+      showNodeHeader: computed(() => true),
+    })
+
+    handlers.handleWheel(event)
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(viewport.scale).toBeLessThan(1)
   })
 
   it('pans the canvas in readonly mode when dragging a node', () => {
