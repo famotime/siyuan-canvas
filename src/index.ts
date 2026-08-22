@@ -92,7 +92,10 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.isElectron = runtime.isElectron
 
     bindPlugin(this)
-    this.addIcons(`<symbol id="${CANVAS_TAB_ICON_ID}" viewBox="0 0 48 48">${CANVAS_TAB_ICON_BODY}</symbol>`)
+    this.addIcons(
+      `<symbol id="${CANVAS_TAB_ICON_ID}" viewBox="0 0 48 48">${CANVAS_TAB_ICON_BODY}</symbol>` +
+      `<symbol id="iconCanvasDock" viewBox="0 0 48 48">${CANVAS_TAB_ICON_BODY}</symbol>`
+    )
     registerCanvasEditorTab(this, CANVAS_EDITOR_TAB_TYPE)
 
     const pluginInstance = this

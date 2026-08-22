@@ -11,8 +11,8 @@ export interface CanvasAnchorTarget {
 }
 
 export const CONNECTION_SNAP_DISTANCE = 24
-const MIN_NODE_WIDTH = 180
-const MIN_NODE_HEIGHT = 100
+const MIN_NODE_WIDTH = 50
+const MIN_NODE_HEIGHT = 50
 const MIN_GROUP_HEIGHT = 120
 
 export function getCanvasNodeAnchor(node: CanvasNode, side: CanvasSide): { x: number, y: number } {

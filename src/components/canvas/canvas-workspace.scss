@@ -84,6 +84,83 @@
   --canvas-floating-bg: color-mix(in srgb, var(--b3-theme-surface) 92%, transparent);
 }
 
+/* 侧边栏（dock）中移除氛围渐变，背景透明以继承主题面板自身绘制的背景色 */
+.layout__dockl .canvas-shell,
+.layout__dockr .canvas-shell,
+.layout__dockt .canvas-shell,
+.layout__dockb .canvas-shell {
+  background: transparent;
+}
+
+/* dock 内检查器与主题面板保持一致：去除灰色卡片化，扁平化 + 思源原生悬停色 */
+.layout__dockl .canvas-shell.inspector,
+.layout__dockr .canvas-shell.inspector,
+.layout__dockt .canvas-shell.inspector,
+.layout__dockb .canvas-shell.inspector,
+.layout__dockl .canvas-shell .inspector,
+.layout__dockr .canvas-shell .inspector,
+.layout__dockt .canvas-shell .inspector,
+.layout__dockb .canvas-shell .inspector {
+  --canvas-text: var(--b3-theme-on-background);
+  --canvas-text-muted: var(--b3-theme-on-background-light, var(--b3-theme-on-surface-light));
+  --canvas-inspector-bg: transparent;
+  --canvas-inspector-section-bg: transparent;
+  background: transparent;
+  border-left: 0;
+
+  .inspector__tabs {
+    background: transparent;
+    padding: 0;
+  }
+
+  .inspector__tab--active {
+    background: var(--b3-list-hover);
+    color: var(--b3-theme-on-background);
+    box-shadow: none;
+
+    &::after {
+      display: none;
+    }
+  }
+
+  .inspector__toolbar-button,
+  .inspector__pin-btn {
+    background: transparent;
+  }
+
+  .inspector__toolbar-button:hover,
+  .inspector__pin-btn:hover {
+    background: var(--b3-list-hover);
+  }
+
+  .inspector__toolbar-button--active {
+    background: var(--canvas-accent-soft);
+  }
+
+  .inspector__section {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .inspector__section-toggle {
+    background: transparent;
+
+    &:hover {
+      background: var(--b3-list-hover);
+    }
+  }
+
+  .inspector__section-chevron {
+    background: transparent;
+  }
+
+  .workspace-tree__file:hover,
+  .workspace-tree__folder-header:hover,
+  .recent-list__item:hover {
+    background: var(--b3-list-hover);
+  }
+}
+
 .canvas-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1374,7 +1451,7 @@
 
 .canvas-node__body {
   flex: 1;
-  padding: 12px 14px 16px;
+  padding: 14px;
   overflow: auto;
   border-bottom-left-radius: 9px;
   border-bottom-right-radius: 9px;
