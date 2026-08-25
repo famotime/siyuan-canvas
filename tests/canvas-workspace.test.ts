@@ -166,7 +166,7 @@ function createEditorMock(node = createTextNode()) {
     getNodeTitle: vi.fn((candidate: any) => candidate.text || candidate.label || candidate.url || candidate.id || "Text"),
     getRenderedMarkdown: vi.fn((text: string) => `<p>${text}</p>`),
     handleNodePointerDown: vi.fn(),
-    handleWheelZoom: vi.fn(),
+    handleWheel: vi.fn(),
     isConnectionTarget: vi.fn(() => false),
     importCanvas: vi.fn(),
     inspectorExpanded: true,
@@ -1018,7 +1018,7 @@ describe("CanvasWorkspace", () => {
     }))
     await nextTick()
 
-    expect(currentEditor.handleWheelZoom).not.toHaveBeenCalled()
+    expect(currentEditor.handleWheel).not.toHaveBeenCalled()
   })
 
   it("keeps canvas zoom enabled when wheeling over an unselected node", async () => {
@@ -1041,7 +1041,7 @@ describe("CanvasWorkspace", () => {
     }))
     await nextTick()
 
-    expect(currentEditor.handleWheelZoom).toHaveBeenCalledTimes(1)
+    expect(currentEditor.handleWheel).toHaveBeenCalledTimes(1)
   })
 
   it("opens the create-edge dialog from the bottom toolbar", async () => {
@@ -1345,7 +1345,7 @@ describe("CanvasWorkspace", () => {
     }))
     await nextTick()
 
-    expect(currentEditor.handleWheelZoom).not.toHaveBeenCalled()
+    expect(currentEditor.handleWheel).not.toHaveBeenCalled()
   })
 
   it("hides the canvas minimap by default", () => {

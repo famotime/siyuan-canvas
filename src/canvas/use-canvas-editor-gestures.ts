@@ -180,23 +180,43 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     window.addEventListener("pointerup", handleUp)
   }
 
-  function handleWheelZoom(event: WheelEvent) {
-    const stage = stageRef.value
-    if (!stage) {
-      return
-    }
+  function isTrackpadWheel(event: WheelEvent): boolean {
+    return event.deltaMode === WheelEvent.DOM_DELTA_PIXEL
+  }
 
-    const rect = stage.getBoundingClientRect()
-    const point = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    }
-    const nextScale = clampViewportScale(Number((viewport.scale * Math.exp(-event.deltaY * 0.0015)).toFixed(2)))
-    const nextViewport = scaleViewportAtPoint(viewport, point, nextScale)
+  function handleWheel(event: WheelEvent) {
+    const isZoom = event.ctrlKey || event.metaKey || !isTrackpadWheel(event)
+    event.preventDefault()
 
-    viewport.scale = nextViewport.scale
-    viewport.x = nextViewport.x
-    viewport.y = nextViewport.y
+    if (isZoom) {
+      const stage = stageRef.value
+      if (!stage) {
+        return
+      }
+
+      const rect = stage.getBoundingClientRect()
+      const point = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      }
+
+      let delta = event.deltaY
+      if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL)
+        delta = event.deltaY * 15
+      else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE)
+        delta = event.deltaY * 120
+
+      const nextScale = clampViewportScale(Number((viewport.scale * Math.exp(-delta * 0.0015)).toFixed(2)))
+      const nextViewport = scaleViewportAtPoint(viewport, point, nextScale)
+
+      viewport.scale = nextViewport.scale
+      viewport.x = nextViewport.x
+      viewport.y = nextViewport.y
+    }
+    else {
+      viewport.x -= event.deltaX
+      viewport.y -= event.deltaY
+    }
   }
 
   watch(() => stageRef.value, (stage) => {
@@ -923,7 +943,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     getConnectionDraftPath,
     getEdgeReconnectDraftPath,
     handleNodePointerDown,
-    handleWheelZoom,
+    handleWheel,
     isConnectionTarget,
     startEdgeEndpointDrag,
     startConnectionDrag,
