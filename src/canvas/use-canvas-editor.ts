@@ -1318,6 +1318,7 @@ export function useCanvasEditor(
       bootstrap,
       fileSource,
       getFileName,
+      getRecentCanvasFiles: () => plugin.getRecentCanvasFiles?.(),
       newCanvas,
       refreshFileNodeMetadata,
       refreshRecentFiles,
