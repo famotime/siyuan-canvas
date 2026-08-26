@@ -345,7 +345,7 @@
         @pointerdown="handleStagePointerDown"
         @dblclick="handleStageDoubleClick"
         @paste="handleStagePaste"
-        @wheel.passive="editor.handleWheelZoom"
+        @wheel="editor.handleWheel"
         @contextmenu.prevent
         @dragover="editor.handleStageDragOver"
         @dragenter.prevent

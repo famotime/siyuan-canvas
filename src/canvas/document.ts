@@ -34,8 +34,8 @@ export function createCanvasNode(type: CanvasNodeType): CanvasNode {
     type,
     x: 80,
     y: 80,
-    width: type === "group" ? 640 : 320,
-    height: type === "group" ? 360 : 180,
+    width: type === "group" ? 640 : 150,
+    height: type === "group" ? 360 : 50,
   } as const
 
   switch (type) {

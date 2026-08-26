@@ -8,6 +8,7 @@ import type {
   CanvasEditorEdgeReconnectDraftState,
 } from '@/canvas/use-canvas-editor-gestures'
 import type { CanvasEditorState } from '@/canvas/editor-state'
+import type { CanvasRecentFile } from '@/canvas/plugin-data'
 
 import { showMessage } from 'siyuan'
 import { parseCanvasDocument } from '@/canvas/format'
@@ -16,6 +17,7 @@ interface InitializeCanvasEditorOptions {
   bootstrap: CanvasTabBootstrap
   fileSource: Ref<CanvasEditorFileSource>
   getFileName: (path: string) => string
+  getRecentCanvasFiles?: () => CanvasRecentFile[]
   newCanvas: () => Promise<void>
   refreshFileNodeMetadata: () => Promise<void>
   refreshRecentFiles: () => void
@@ -43,6 +45,7 @@ export async function initializeCanvasEditor(options: InitializeCanvasEditorOpti
     bootstrap,
     fileSource,
     getFileName,
+    getRecentCanvasFiles,
     newCanvas,
     refreshFileNodeMetadata,
     refreshRecentFiles,
@@ -75,7 +78,24 @@ export async function initializeCanvasEditor(options: InitializeCanvasEditorOpti
       showMessage(error instanceof Error ? error.message : t('messageUnableOpenCanvasFile'), 4000, 'error')
     }
   } else {
-    await newCanvas()
+    let autoLoaded = false
+    if (getRecentCanvasFiles) {
+      const recentFiles = getRecentCanvasFiles()
+      const lastFile = recentFiles.find(f => f.sourceType === 'workspace')
+      if (lastFile) {
+        try {
+          await state.open(lastFile.path)
+          suggestedFilename.value = getFileName(lastFile.path)
+          fileSource.value = 'workspace'
+          autoLoaded = true
+        } catch {
+          // 文件已不存在，回退到新建
+        }
+      }
+    }
+    if (!autoLoaded) {
+      await newCanvas()
+    }
   }
 
   refreshRecentFiles()
