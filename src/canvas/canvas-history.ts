@@ -68,6 +68,19 @@ export class CanvasHistoryStack {
    * 任何成功入栈都会清空 redo 栈（线性历史）。
    */
   record(snapshot: CanvasHistorySnapshot, options: CanvasHistoryRecordOptions = {}): void {
+    this.recordLazy(() => snapshot, options)
+  }
+
+  /**
+   * 惰性记录快照：仅当确认需要入栈时才调用 createSnapshot()。
+   * 当连续操作命中合并窗口（如连续拖拽、连续调整尺寸）时，跳过快照生成，
+   * 从根源上消除每帧深拷贝整个画布文档的内存与垃圾回收开销。
+   * 返回 true 表示成功入栈，返回 false 表示被合并跳过。
+   */
+  recordLazy(
+    createSnapshot: () => CanvasHistorySnapshot,
+    options: CanvasHistoryRecordOptions = {},
+  ): boolean {
     const now = options.now ?? Date.now()
     const coalesceMs = options.coalesceMs ?? this.defaultCoalesceMs
 
@@ -77,9 +90,10 @@ export class CanvasHistoryStack {
       && now - this.lastRecordAt < coalesceMs
     ) {
       this.lastRecordAt = now
-      return
+      return false
     }
 
+    const snapshot = createSnapshot()
     this.undoStack.push(snapshot)
     if (this.undoStack.length > this.capacity) {
       this.undoStack.shift()
@@ -87,6 +101,7 @@ export class CanvasHistoryStack {
     this.redoStack = []
     this.lastCoalesceKey = options.coalesceKey
     this.lastRecordAt = now
+    return true
   }
 
   /**

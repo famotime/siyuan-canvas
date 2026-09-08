@@ -34,7 +34,7 @@ import {
   upsertCanvasEdge,
   upsertCanvasNode,
 } from '@/canvas/document'
-import { renderMarkdownPreview } from '@/canvas/markdown-preview'
+import { getCachedMarkdownPreview } from '@/canvas/markdown-preview-cache'
 import { isWebUrl } from '@/canvas/url-detection'
 import { centerViewportOnBounds } from '@/canvas/selection-toolbar'
 import { clampViewportScale, scaleViewportAtPoint } from '@/canvas/viewport'
@@ -125,7 +125,7 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
   }
 
   function getRenderedMarkdown(text: string): string {
-    return renderMarkdownPreview(text)
+    return getCachedMarkdownPreview(text)
   }
 
   function addNode(type: CanvasNode['type']) {

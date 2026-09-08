@@ -276,8 +276,15 @@ export function useCanvasEditor(
       return left.type === "group" ? -1 : 1
     }),
   )
+  const nodeMap = computed(() => {
+    const map = new Map<string, CanvasNode>()
+    for (const node of state.document.nodes) {
+      map.set(node.id, node)
+    }
+    return map
+  })
   const selectedNode = computed(
-    () => state.document.nodes.find((node) => node.id === state.selectedNodeId) || null,
+    () => (state.selectedNodeId ? nodeMap.value.get(state.selectedNodeId) || null : null),
   )
   const selectedNodeCount = computed(() => state.selectedNodeIds.length)
   const canRefreshSelectedSiyuanNode = computed(() => {
@@ -355,6 +362,7 @@ export function useCanvasEditor(
   } = createCanvasEditorSelectionUi({
     board,
     getCanvasNodeAnchor,
+    getNodeById: (id: string) => nodeMap.value.get(id),
     selectedEdge,
     selectionBounds,
     stageRef,
@@ -619,8 +627,8 @@ export function useCanvasEditor(
   }
 
   function getEdgePath(edge: CanvasEdge): string {
-    const fromNode = state.document.nodes.find((node) => node.id === edge.fromNode)
-    const toNode = state.document.nodes.find((node) => node.id === edge.toNode)
+    const fromNode = nodeMap.value.get(edge.fromNode)
+    const toNode = nodeMap.value.get(edge.toNode)
     if (!fromNode || !toNode) {
       return ""
     }
@@ -631,8 +639,8 @@ export function useCanvasEditor(
   }
 
   function getEdgeLabelPosition(edge: CanvasEdge) {
-    const fromNode = state.document.nodes.find((node) => node.id === edge.fromNode)
-    const toNode = state.document.nodes.find((node) => node.id === edge.toNode)
+    const fromNode = nodeMap.value.get(edge.fromNode)
+    const toNode = nodeMap.value.get(edge.toNode)
     if (!fromNode || !toNode) {
       return {
         x: 0,
@@ -676,20 +684,25 @@ export function useCanvasEditor(
   }
 
   function commitDocument(nextDocument: CanvasDocument, options: { coalesceKey?: string } = {}) {
-    // 在变更前抓快照入历史栈，undo 时可还原文档与选区
-    history.record(
-      {
+    // 采用惰性快照：仅在需要产生新的历史记录步时才执行 cloneCanvasDocument 全量深拷贝
+    const didRecord = history.recordLazy(
+      () => ({
         document: cloneCanvasDocument(state.document),
         selectedNodeIds: [...state.selectedNodeIds],
         selectedNodeId: state.selectedNodeId,
         selectedEdgeId: state.selectedEdgeId,
-      },
+      }),
       { coalesceKey: options.coalesceKey },
     )
-    historyVersion.value++
+    if (didRecord) {
+      historyVersion.value++
+    }
     state.patchDocument(nextDocument)
-    state.issues = validateCanvasDocument(nextDocument)
-    notifyCanvasSearchChanged()
+    // 连续拖拽的中间帧跳过全量规范校验与搜索更新，消除多余的 CPU 消耗
+    if (didRecord || !options.coalesceKey) {
+      state.issues = validateCanvasDocument(nextDocument)
+      notifyCanvasSearchChanged()
+    }
   }
 
   function toggleGroupCollapse(nodeId: string) {
@@ -1399,6 +1412,8 @@ export function useCanvasEditor(
       createEdgeDialog,
       filePickerDialog,
       displayNodes,
+      nodeMap,
+      getNodeById: (id: string) => nodeMap.value.get(id),
       deactivateCanvasSurface,
       createWorkspaceFolder: workspaceTree.createWorkspaceFolder,
       createWorkspaceCanvas: workspaceTree.createWorkspaceCanvas,

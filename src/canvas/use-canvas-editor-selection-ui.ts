@@ -39,6 +39,7 @@ export interface CanvasEditorSelectionUiState {
 export interface CanvasEditorSelectionUiOptions {
   board: ComputedRef<CanvasBoardMetrics>
   getCanvasNodeAnchor: (node: CanvasNode, side: CanvasSide) => { x: number, y: number }
+  getNodeById?: (id: string) => CanvasNode | undefined
   selectedEdge: ComputedRef<CanvasEdge | null>
   selectionBounds: ComputedRef<CanvasBounds | null>
   stageRef: Ref<HTMLElement | undefined>
@@ -63,8 +64,9 @@ export function createCanvasEditorSelectionUi(options: CanvasEditorSelectionUiOp
       return null
     }
 
-    const fromNode = options.state.document.nodes.find((node) => node.id === options.selectedEdge.value?.fromNode)
-    const toNode = options.state.document.nodes.find((node) => node.id === options.selectedEdge.value?.toNode)
+    const findNode = options.getNodeById ?? ((id: string) => options.state.document.nodes.find((node) => node.id === id))
+    const fromNode = findNode(options.selectedEdge.value.fromNode)
+    const toNode = findNode(options.selectedEdge.value.toNode)
     if (!fromNode || !toNode) {
       return null
     }

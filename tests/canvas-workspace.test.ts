@@ -804,6 +804,86 @@ describe("CanvasWorkspace", () => {
     expect(currentEditor.startConnectionDrag).toHaveBeenNthCalledWith(2, node, "bottom", expect.anything())
   })
 
+  it("renders handles conditionally in large canvas scenarios (>20 nodes)", async () => {
+    // 构造 25 个节点
+    const nodes = Array.from({ length: 25 }, (_, i) => createTextNode({ id: `node-${i}` }))
+    currentEditor = createEditorMock(nodes[0])
+    currentEditor.state.document.nodes = nodes
+    currentEditor.state.selectedNodeIds = [] // 均未选中
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    // 未选中且未 hover 时，不挂载任何把手 DOM
+    expect(wrapper.findAll("[data-testid^='node-resize-']")).toHaveLength(0)
+
+    // 选中第一个节点
+    currentEditor.state.selectedNodeIds = [nodes[0].id]
+    await nextTick()
+
+    // 仅选中节点渲染 9 个尺寸把手与 4 个锚点
+    expect(wrapper.findAll("[data-testid^='node-resize-']")).toHaveLength(9)
+    expect(wrapper.findAll("[data-testid^='node-anchor-']")).toHaveLength(4)
+  })
+
+  it("renders node content conditionally with skeleton when outside viewport in large canvas scenarios (>20 nodes)", async () => {
+    const origClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth")
+    const origClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight")
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, value: 1000 })
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, value: 800 })
+
+    try {
+      // 构造 25 个节点，其中 1 个在视野内 (x: 100, y: 100)，其余远在视野外 (10000, 10000)
+      const inViewNode = createTextNode({ id: "node-in-view", x: 100, y: 100, width: 300, height: 200, text: "可见卡片内容" })
+      const outViewNodes = Array.from({ length: 24 }, (_, i) =>
+        createTextNode({ id: `node-out-${i}`, x: 10000 + i * 500, y: 10000, width: 300, height: 200, text: `远离卡片 ${i}` })
+      )
+      const allNodes = [inViewNode, ...outViewNodes]
+
+      currentEditor = createEditorMock(inViewNode)
+      currentEditor.state.document.nodes = allNodes
+      currentEditor.displayNodes = allNodes
+      currentEditor.state.selectedNodeIds = []
+      currentEditor.viewport = reactive({ scale: 1, x: 0, y: 0 })
+      currentEditor.board = reactive({ height: 20000, left: 0, top: 0, width: 20000 })
+
+      const wrapper = mount(CanvasWorkspace, {
+        props: {
+          bootstrap: {},
+          plugin: {},
+          setTitle: vi.fn(),
+        },
+      })
+      await nextTick()
+
+      // 视野内的节点完整渲染 Markdown 内容
+      const inViewWrapper = wrapper.find('[data-canvas-node-id="node-in-view"]')
+      expect(inViewWrapper.find(".canvas-node__content-skeleton").exists()).toBe(false)
+      expect(inViewWrapper.text()).toContain("可见卡片内容")
+
+      // 视野外的节点渲染轻量 skeleton 占位
+      const outViewWrapper = wrapper.find('[data-canvas-node-id="node-out-0"]')
+      expect(outViewWrapper.find(".canvas-node__content-skeleton").exists()).toBe(true)
+
+      // 当视野外的节点被选中时，应该跳过裁剪完整渲染
+      currentEditor.state.selectedNodeIds = ["node-out-0"]
+      await nextTick()
+      expect(outViewWrapper.find(".canvas-node__content-skeleton").exists()).toBe(false)
+    } finally {
+      if (origClientWidth) {
+        Object.defineProperty(HTMLElement.prototype, "clientWidth", origClientWidth)
+      }
+      if (origClientHeight) {
+        Object.defineProperty(HTMLElement.prototype, "clientHeight", origClientHeight)
+      }
+    }
+  })
+
   it("removes retired top toolbar buttons and keeps file controls", () => {
     currentEditor = createEditorMock()
     currentEditor.state.filePath = "/data/storage/petal/siyuan-canvas/project.canvas"

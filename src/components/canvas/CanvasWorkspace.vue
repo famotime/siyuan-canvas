@@ -545,6 +545,8 @@
             @click.stop="handleNodeClick(node, $event)"
             @dblclick.stop="handleNodeDoubleClick(node)"
             @wheel.passive="handleNodeWheel(node, $event)"
+            @mouseenter="handleNodeMouseEnter(node.id)"
+            @mouseleave="handleNodeMouseLeave(node.id)"
           >
             <header
               v-if="node.type !== 'group' && showNodeHeader"
@@ -573,7 +575,8 @@
               class="canvas-node__body"
               :class="{ 'canvas-node__body--selectable': node.type === 'text' || node.type === 'link' }"
             >
-              <template v-if="node.type === 'text'">
+              <template v-if="shouldRenderNodeContent(node)">
+                <template v-if="node.type === 'text'">
                 <textarea
                   v-if="editingNodeId === node.id"
                   :ref="setEditingTextareaRef"
@@ -798,7 +801,9 @@
                 </div>
               </template>
               <template v-else />
-            </div>
+            </template>
+            <div v-else class="canvas-node__content-skeleton" aria-hidden="true" />
+          </div>
             <template v-if="node.type === 'group'">
               <div v-if="node.collapsed" class="canvas-node__group-collapsed-header" @dblclick.stop="editor.toggleGroupCollapse(node.id)">
                 <CanvasIcon
@@ -827,7 +832,7 @@
                 </div>
               </template>
             </template>
-            <template v-if="!node.collapsed">
+            <template v-if="shouldRenderNodeHandles(node)">
               <button
                 v-for="side in editor.sides"
                 :key="`anchor-${node.id}-${side}`"
@@ -2207,6 +2212,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  unref,
   watch,
 } from "vue"
 import type { CanvasTabBootstrap } from "@/main"
@@ -2261,6 +2267,10 @@ import { collectUpstreamContext, requestAiSearch } from "@/canvas/ai-search-help
 import { openAiSearchPromptDialog } from "@/canvas/ai-search-prompt-dialog"
 import { findNonOverlappingPosition } from "@/canvas/node-overlap"
 import { createCanvasNode, createCanvasEdge } from "@/canvas/document"
+import {
+  computeViewportVisibleBounds,
+  isNodeInViewportBounds,
+} from "@/canvas/viewport-culling"
 
 const vNativeRender = {
   mounted(el: HTMLElement) {
@@ -2298,7 +2308,7 @@ onBeforeUnmount(unbindEditorFromPlugin)
 onDeactivated(unbindEditorFromPlugin)
 const workspaceExpandedFolders = computed(() => editor.expandedFolders ?? new Set<string>())
 const fileInputRef = editor.fileInputRef
-const stageRef = editor.stageRef
+const stageRef = editor.stageRef ?? ref<HTMLElement>()
 const SELECTION_TOOLBAR_TOOLTIPS = createSelectionToolbarTooltips(t)
 const {
   activeSelectionColor,
@@ -2321,6 +2331,88 @@ const fileCardPreviewImageOverrides = ref<Record<string, Record<string, string>>
 const fileCardImageBlobUrls = ref<Record<string, string>>({})
 const textMarkdownImageBlobUrls = ref<Record<string, string>>({})
 const hoveredEdgeId = ref("")
+const hoveredNodeId = ref("")
+
+function shouldRenderNodeHandles(node: CanvasNode): boolean {
+  if (node.collapsed) {
+    return false
+  }
+  // 节点总数较少（<= 20）时保持全量显示，保证小画布即时可见性与已有测试兼容
+  if (editor.state.document.nodes.length <= 20) {
+    return true
+  }
+  // 大规模节点场景下按需渲染：仅在选中、悬浮或连线目标候选时挂载把手
+  return (
+    editor.state.selectedNodeIds.includes(node.id) ||
+    hoveredNodeId.value === node.id ||
+    editor.isConnectionTarget(node.id, "top") ||
+    editor.isConnectionTarget(node.id, "right") ||
+    editor.isConnectionTarget(node.id, "bottom") ||
+    editor.isConnectionTarget(node.id, "left")
+  )
+}
+
+function handleNodeMouseEnter(nodeId: string) {
+  hoveredNodeId.value = nodeId
+}
+
+function handleNodeMouseLeave(nodeId: string) {
+  if (hoveredNodeId.value === nodeId) {
+    hoveredNodeId.value = ""
+  }
+}
+
+const viewportVisibleBounds = computed(() => {
+  const stage = stageRef?.value
+  if (!stage || stage.clientWidth <= 0 || stage.clientHeight <= 0) {
+    return null
+  }
+  const board = unref(editor.board)
+  const viewport = unref(editor.viewport)
+  if (!board || !viewport) {
+    return null
+  }
+  return computeViewportVisibleBounds(
+    viewport,
+    board,
+    { clientWidth: stage.clientWidth, clientHeight: stage.clientHeight },
+    400,
+  )
+})
+
+function shouldRenderNodeContent(node: CanvasNode): boolean {
+  // 1. 节点总数较少时（<= 20）保持全量渲染，兼顾小规模操作与已有单测兼容
+  if (editor.state.document.nodes.length <= 20) {
+    return true
+  }
+  // 2. 正在编辑的节点必须完整渲染
+  if (editingNodeId.value === node.id) {
+    return true
+  }
+  // 3. 当前被选中的节点必须完整渲染
+  if (editor.state.selectedNodeIds.includes(node.id)) {
+    return true
+  }
+  // 4. 当前搜索高亮命中的节点完整渲染
+  if (hasCanvasSearchMatch(node.id)) {
+    return true
+  }
+  // 5. 演示模式相关的节点完整渲染
+  if (
+    editor.presentation.isActive &&
+    (editor.presentation.currentNodeId === node.id ||
+      editor.presentation.availableNextNodes.includes(node.id))
+  ) {
+    return true
+  }
+  // 6. 若容器尺寸尚未初始化（如部分单测环境 clientWidth === 0），安全保底渲染
+  const bounds = viewportVisibleBounds.value
+  if (!bounds) {
+    return true
+  }
+  // 7. AABB 碰撞检测视口裁剪
+  return isNodeInViewportBounds(node, bounds)
+}
 const pngExportBackgroundMode = ref<CanvasPngExportBackgroundMode>("white")
 const pngExportCustomColor = ref("#ffffff")
 const pngExportDialogVisible = ref(false)
@@ -2420,8 +2512,12 @@ function handleQueryResultDragStart(event: DragEvent, blockId: string, sourceNod
 }
 
 watch(
-  () => editor.state.document.nodes,
-  (newNodes) => {
+  () => editor.state.document.nodes
+    .filter(node => node.type === 'query')
+    .map(node => `${node.id}:${(node as CanvasQueryNode).sql || ''}:${(node as CanvasQueryNode).refreshInterval || 0}:${(node as CanvasQueryNode).maxResults || 50}`)
+    .join(';'),
+  () => {
+    const newNodes = editor.state.document.nodes
     if (!newNodes) return
     const queryNodes = newNodes.filter(node => node.type === 'query') as CanvasQueryNode[]
 
@@ -2470,7 +2566,7 @@ watch(
       }
     }
   },
-  { deep: true, immediate: true }
+  { immediate: true }
 )
 
 watch(editingNodeId, (newId) => {
@@ -3473,6 +3569,9 @@ function renderCanvasTextNodeContent(node: CanvasNode) {
     ? markCanvasSearchTextRanges(node.text, decorations)
     : node.text
   const html = editor.getRenderedMarkdown(markdown)
+  if (!html.includes("/data/storage/")) {
+    return html
+  }
   for (const source of collectWorkspaceStorageImages(html)) {
     void loadTextMarkdownImageBlobUrl(source)
   }
