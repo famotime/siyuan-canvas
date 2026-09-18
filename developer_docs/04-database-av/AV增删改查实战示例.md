@@ -1,104 +1,158 @@
 # AV 增删改查实战示例
 
-- 适用版本：SiYuan `v3.5.7`
-- 官方仓库同步到：`siyuan-note/siyuan@master` + Release `v3.5.7`（2026-02-14）
-- 最后核对：2026-02-21
-- 稳定性：stable（含迁移项）
+- 适用版本：SiYuan `v3.8.3`
+- 官方仓库同步到：`siyuan-note/siyuan@master` + Release `v3.8.3`（2026-09-13）
+- 最后核对：2026-09-13
+- 稳定性：stable
 - 权威来源：
-  - <https://github.com/siyuan-note/siyuan/blob/master/kernel/api/router.go>
-  - <https://github.com/siyuan-note/siyuan/issues/15310#issuecomment-3079412833>
-  - <https://github.com/siyuan-community/siyuan-developer-docs/tree/main/docs/zh-Hans/reference/database>
+  - [../03-kernel-api/official/API_zh_CN.md](../03-kernel-api/official/API_zh_CN.md)
+  - [../03-kernel-api/official/router.go](../03-kernel-api/official/router.go)
 
-## 1. 统一请求封装
+## 1. 统一请求函数
 
 ```ts
 import { fetchSyncPost, showMessage } from "siyuan";
 
-export async function requestApi<T = any>(url: string, data?: any): Promise<T> {
+export async function requestApi<T = any>(url: string, data: Record<string, unknown> = {}): Promise<T> {
   const res = await fetchSyncPost(url, data);
   if (res.code !== 0) {
-    showMessage(res.msg || url, 5000, "error");
-    throw new Error(res.msg || url);
+    showMessage(res.msg || `请求 ${url} 失败`, 5000, "error");
+    throw new Error(`[API Error ${res.code}] ${res.msg}`);
   }
   return res.data as T;
 }
 ```
 
-## 2. 新增行（非绑定块）
-
-适合纯结构化录入，直接附带列值。
+## 2. 插入非绑定块行（纯结构化录入，带 Kramdown 富文本）
 
 ```ts
-await requestApi("/api/av/appendAttributeViewDetachedBlocksWithValues", {
-  avID: "20241017094451-2urncs9",
-  blocksValues: [
-    [
-      { keyID: "20241017094451-jwfegvp", block: { content: "Title" } },
-      { keyID: "20241017095436-2wlgb7o", number: { content: 123 } },
-      { keyID: "20241017094451-fu1pv7s", mSelect: [{ content: "Fiction" }] }
+export async function createDetachedRowWithRichText(avID: string, keyTitleID: string, keyScoreID: string) {
+  return await requestApi("/api/av/appendAttributeViewDetachedBlocksWithValues", {
+    avID,
+    blocksValues: [
+      [
+        {
+          keyID: keyTitleID,
+          text: {
+            content: "调研报告",
+            rich: "**调研报告** [参考文档](siyuan://blocks/20260913080000-xxxx)"
+          }
+        },
+        {
+          keyID: keyScoreID,
+          number: {
+            content: 95
+          }
+        }
+      ]
     ]
-  ]
-});
+  });
+}
 ```
 
-## 3. 新增行（绑定块）与批量写值
-
-绑定块更易与文档结构一致，常用“两段式”。
+## 3. 绑定已有块并批量写入多列值（两段式）
 
 ```ts
-await requestApi("/api/av/addAttributeViewBlocks", {
-  avID: "20241017094451-2urncs9",
-  srcs: [{ id: "20240107212802-727hsjv", isDetached: false }]
-});
+export async function bindBlockAndSetValues(
+  avID: string,
+  blockID: string,
+  keyMap: { statusKeyID: string; tagKeyID: string }
+) {
+  // 1. 绑定块到属性视图
+  await requestApi("/api/av/addAttributeViewBlocks", {
+    avID,
+    srcs: [{ id: blockID, isDetached: false }]
+  });
 
-await requestApi("/api/av/batchSetAttributeViewBlockAttrs", {
-  avID: "20241017094451-2urncs9",
-  values: [
-    {
-      keyID: "20241017094451-jwfegvp",
-      itemID: "20240107212802-727hsjv",
-      value: { text: { content: "Bound Title" } }
+  // 2. 批量设置该行各列值
+  await requestApi("/api/av/batchSetAttributeViewBlockAttrs", {
+    avID,
+    values: [
+      {
+        keyID: keyMap.statusKeyID,
+        itemID: blockID,
+        value: { select: { content: "已就绪" } }
+      },
+      {
+        keyID: keyMap.tagKeyID,
+        itemID: blockID,
+        value: { mSelect: [{ content: "内核" }, { content: "v3.8.3" }] }
+      }
+    ]
+  });
+}
+```
+
+## 4. 动态设置上下文过滤 (v3.8.3 新增)
+
+```ts
+export async function applyContextFilter(avID: string, viewID: string, currentDocID: string) {
+  await requestApi("/api/av/setAttrViewContextFilter", {
+    avID,
+    viewID,
+    contextFilter: {
+      key: "doc_relation",
+      operator: "equal",
+      value: currentDocID
     }
-  ]
-});
+  });
+}
 ```
 
-## 4. 查询与结果归一化
+## 5. 文档与属性视图双向转换 (v3.8.3 新增)
 
 ```ts
-const data = await requestApi("/api/av/renderAttributeView", {
-  id: "20241017094451-2urncs9",
-  query: "",
-  pageSize: 50
-});
+// 将现有普通文档转换为属性视图 (数据库)
+export async function convertDocToDatabase(docID: string) {
+  const result = await requestApi<{ avID: string }>("/api/av/convertDocToAttrView", {
+    id: docID
+  });
+  console.log("转换成功，新属性视图 ID:", result.avID);
+  return result.avID;
+}
 
-const viewType = data.viewType;
-const rowField = viewType === "gallery" ? "cards" : "rows";
-const colField = viewType === "gallery" ? "fields" : "columns";
-const rows = data.view?.group ? data.view.groups.flatMap((g: any) => g.rows) : data.view[rowField];
-const columns = data.view[colField];
+// 将属性视图转换回普通文档
+export async function convertDatabaseToDoc(avID: string) {
+  const result = await requestApi<{ docID: string }>("/api/av/convertAttrViewToDoc", {
+    id: avID
+  });
+  console.log("降维转换成功，恢复文档 ID:", result.docID);
+  return result.docID;
+}
 ```
 
-## 5. 获取列 ID 与行 ID
+## 6. 查询视图数据并归一化解析
 
 ```ts
-const keys = await requestApi("/api/av/getAttributeViewKeysByAvID", {
-  avID: "20241017094451-2urncs9"
-});
+export async function fetchAndParseAV(avID: string, viewID?: string) {
+  const res = await requestApi<any>("/api/av/renderAttributeView", {
+    id: avID,
+    viewID: viewID || "",
+    pageSize: 50,
+    page: 1
+  });
+
+  const viewType = res.viewType; // "table" | "gallery" | "kanban"
+  const rawItems = res.view?.group
+    ? res.view.groups.flatMap((g: any) => (viewType === "gallery" ? g.cards : g.rows))
+    : (viewType === "gallery" ? res.view.cards : res.view.rows);
+
+  console.log(`获取到 ${rawItems?.length || 0} 行数据，当前视图类型: ${viewType}`);
+  return {
+    viewType,
+    columns: viewType === "gallery" ? res.view.fields : res.view.columns,
+    items: rawItems || []
+  };
+}
 ```
 
-行 ID 可从 `renderAttributeView` 的行数据中解析，或通过映射接口获取。
-
-## 6. 删除行
+## 7. 移除指定行
 
 ```ts
-await requestApi("/api/av/removeAttributeViewBlocks", {
-  avID: "20241017094451-2urncs9",
-  srcIDs: ["20240107212802-727hsjv"]
-});
+export async function removeRow(avID: string, itemID: string) {
+  await requestApi("/api/av/removeAttributeViewBlocks", {
+    avID,
+    srcIDs: [itemID]
+  });
+}
 ```
-
-## 7. 本章如何使用
-
-- 先选”绑定块”还是”非绑定块”，再设计数据写入流程。
-- 解析结果时统一做视图归一化，避免 UI 改动导致崩溃。

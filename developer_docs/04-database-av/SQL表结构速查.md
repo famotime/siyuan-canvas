@@ -1,58 +1,72 @@
 # SQL 表结构速查
 
-- 适用版本：SiYuan `v3.5.7`
-- 最后核对：2026-02-21
-- 稳定性：stable（查询）/ caution（写入）
+- 适用版本：SiYuan `v3.8.3`
+- 官方仓库同步到：`siyuan-note/siyuan@master` + Release `v3.8.3`（2026-09-13）
+- 最后核对：2026-09-13
+- 稳定性：stable（只读查询）/ caution（严禁直接通过 SQL 写入）
 - 权威来源：
-  - <https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md>
-  - <https://github.com/siyuan-community/siyuan-developer-docs/tree/main/docs/zh-Hans/reference/database>
+  - [../03-kernel-api/official/API_zh_CN.md](../03-kernel-api/official/API_zh_CN.md)
+  - [数据库表与字段详解.md](数据库表与字段详解.md)
 
-## 1. 常用表
+## 1. 核心 SQLite 关系表总览
 
-- `blocks`：内容块主表
-- `refs`：块引用关系
-- `attributes`：属性键值
-- `assets`：资源文件索引
-- `spans`：行内元素索引
+| 表名 | 数据粒度 | 核心索引键 | 典型业务场景 |
+|---|---|---|---|
+| `blocks` | 内容块主表 | `id`, `root_id`, `parent_id`, `box`, `type` | 关键词全文搜索、文档树结构遍历、按块类型聚合 |
+| `refs` | 双向链接与块引用 | `def_block_id`, `block_id`, `root_id` | 反向链接统计、引用图谱分析 |
+| `attributes` | 块属性键值对 | `block_id`, `name`, `value` | 查询带有 `custom-*` 业务属性的块 |
+| `assets` | 静态附件与资源文件 | `path`, `block_id`, `root_id` | 附件被引用次数计算、孤立静态文件分析 |
+| `spans` | 行内文本与样式标记 | `block_id`, `type`, `content` | 行内标签（`#标签#`）、链接锚点精确检索 |
+| `file_annotation_refs` | 附件批注索引表 | `file_path`, `block_id` | PDF 阅读器高亮与批注关联 |
 
-详表与字段语义见：`reference/04-database-av/数据库表与字段详解.md`
+## 2. blocks 表关键字段规范
 
-## 2. blocks 核心字段
+- `id`：块唯一标识（22 位时间戳字符）。
+- `parent_id` / `root_id`：父块 ID 与文档根块 ID。
+- `box` / `path` / `hpath`：笔记本 ID、物理 `.sy` 路径与人类可读层级路径。
+- `type` / `subtype`：块主类型与子类型。在 v3.8.3 中：
+  - `custom`：插件自定义块（`NodeCustomBlock`）。
+  - `tabs`：选项卡容器块（`NodeTabs`）。
+  - `tab`：选项卡子页面块（`NodeTabItem`）。
+  - `callout`：提示卡片块（`NodeCallout`）。
+  - 传统类型：`d` (文档), `h` (标题), `p` (段落), `c` (代码), `m` (公式), `t` (表格), `l` (列表), `i` (列表项), `b` (引述), `s` (超级块), `av` (属性视图)。
+- `content` / `markdown`：去掉标记的纯文本内容与带完整标记的 Markdown 文本。
+- `ial`：行内属性列表（序列化文本）。
+- `created` / `updated`：创建与最后更新时间戳字符串（如 `20260913080000`）。
 
-- `id`：块 ID
-- `parent_id` / `root_id`：父块与文档根块
-- `box` / `path` / `hpath`：归属与路径
-- `type` / `subtype`：块类型
-- `content` / `markdown`：文本内容
-- `created` / `updated`：时间戳
+## 3. 高频实用 SQL 示例
 
-## 3. 常见查询
-
-### 根据关键词查块
+### 3.1 检索自定义块与选项卡容器
 
 ```sql
-SELECT id, type, content
+SELECT id, root_id, type, content, updated
 FROM blocks
-WHERE content LIKE '%keyword%'
+WHERE type IN ('custom', 'tabs', 'tab')
+ORDER BY updated DESC
 LIMIT 50;
 ```
 
-### 查某文档下块
+### 3.2 跨文档检索包含特定自定义属性的块
 
 ```sql
-SELECT id, parent_id, type, content
-FROM blocks
-WHERE root_id = '20210104091228-d0rzbmm';
+SELECT b.id, b.root_id, b.content, a.name, a.value
+FROM blocks AS b
+JOIN attributes AS a ON b.id = a.block_id
+WHERE a.name = 'custom-task-status' AND a.value = 'in_progress'
+LIMIT 50;
 ```
 
-## 4. 安全边界
+### 3.3 统计文档的反向链接引用数
 
-- 插件中建议只读查询 SQL，写入应走官方 API
-- 避免依赖未文档化字段的业务语义
-- 大查询注意 `LIMIT` 与分页，避免卡 UI
+```sql
+SELECT def_block_id, COUNT(*) AS ref_count
+FROM refs
+WHERE def_block_root_id = '20260913080000-doc12345'
+GROUP BY def_block_id
+ORDER BY ref_count DESC;
+```
 
-## 5. 本章如何使用
+## 4. 安全与性能准则
 
-- 当 API 无法直接满足查询需求时，用 SQL 做补充检索
-- 查询结果再回到 `/api/block/*` 或 `/api/attr/*` 做标准化处理
-- 不把 SQL 结构当作长期稳定契约
+1. **只读性契约**：思源内核对外部插件只开放只读 SQL 访问，**绝不能尝试执行 `UPDATE`、`DELETE` 或 `DROP`**。
+2. **强制分页与限制**：执行全文检索或复杂联表查询时，**必须带上 `LIMIT` 限制**，避免因工作空间海量数据卡顿主线程。
