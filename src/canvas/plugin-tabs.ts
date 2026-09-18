@@ -93,10 +93,13 @@ export function registerCanvasEditorTab(plugin: Plugin, tabType = CANVAS_EDITOR_
       host.innerHTML = ""
       host.classList.add("siyuan-canvas__tab")
       Object.assign(host.style, {
+        width: "100%",
+        minWidth: "0",
         height: "100%",
         minHeight: "0",
         overflow: "hidden",
         position: "relative",
+        boxSizing: "border-box",
       })
       mountCanvasApp(host, this.data ?? {}, (title) => {
         if (this.tab) {

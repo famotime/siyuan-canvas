@@ -4,6 +4,8 @@
     class="canvas-shell"
     :class="{ 'canvas-shell--toolbar-collapsed': toolbarCollapsed }"
     data-testid="canvas-shell"
+    @dragstart.capture="handleShellCaptureDragStart"
+    @dragover.capture="handleShellCaptureDragOver"
   >
     <header
       class="canvas-toolbar"
@@ -310,28 +312,8 @@
     </Teleport>
 
     <div
-      class="workspace"
-      :class="{ 'workspace--inspector-collapsed': true }"
-      :style="{ gridTemplateColumns: '1fr 0px' }"
+      class="workspace workspace--inspector-collapsed"
     >
-      <div
-        v-if="false"
-        class="workspace__inspector-trigger"
-        @mouseenter="editor.inspectorExpanded = true"
-      />
-
-      <button
-        v-if="false"
-        class="workspace__inspector-handle"
-        :class="{ 'workspace__inspector-handle--collapsed': !editor.inspectorExpanded }"
-        :style="editor.inspectorExpanded ? undefined : { right: '8px' }"
-        type="button"
-        :title="editor.inspectorExpanded ? t('inspectorCollapseSidebar') : t('inspectorExpandSidebar')"
-        @click="editor.toggleInspector"
-      >
-        {{ editor.inspectorExpanded ? "›" : "‹" }}
-      </button>
-
       <section
         ref="stageRef"
         class="stage"
@@ -541,24 +523,28 @@
               },
             ]"
             :style="getCanvasNodeStyle(node)"
+            draggable="false"
             @pointerdown.stop="handleNodePointerDown(node, $event)"
+            @mousedown.stop
             @click.stop="handleNodeClick(node, $event)"
             @dblclick.stop="handleNodeDoubleClick(node)"
             @wheel.passive="handleNodeWheel(node, $event)"
             @mouseenter="handleNodeMouseEnter(node.id)"
             @mouseleave="handleNodeMouseLeave(node.id)"
+            @dragstart.stop.prevent="handleNodeDragStart"
           >
             <header
               v-if="node.type !== 'group' && showNodeHeader"
               class="canvas-node__header"
               data-drag-handle="true"
+              draggable="false"
             >
               <CanvasIcon
                 class="canvas-node__header-icon"
                 :name="getNodeHeaderIconName(node)"
                 :size="14"
               />
-              <span class="canvas-node__header-title">{{ getNodeHeaderTitle(node) }}</span>
+              <span class="canvas-node__header-title" draggable="false">{{ getNodeHeaderTitle(node) }}</span>
               <a
                 v-if="node.type === 'link' && node.url"
                 class="canvas-node__header-action"
@@ -1768,399 +1754,7 @@
         </div>
       </section>
 
-      <aside v-if="false"
-        class="inspector"
-        :class="{
-          'inspector--collapsed': !editor.inspectorExpanded,
-          'inspector--floating': !pinned
-        }"
-        @pointerdown.capture="editor.deactivateCanvasSurface"
-        @mouseleave="handleInspectorMouseLeave"
-      >
-        <div
-          v-if="editor.inspectorExpanded"
-          class="inspector__content"
-          @click="sortDropdownOpen = false; closeContextMenu()"
-        >
-          <div class="inspector__header">
-            <nav
-              class="inspector__tabs"
-              role="tablist"
-              data-testid="inspector-tabs"
-            >
-              <button
-                class="inspector__tab"
-                :class="{ 'inspector__tab--active': activeInspectorTab === 'documents' }"
-                data-testid="inspector-tab-documents"
-                role="tab"
-                :aria-selected="activeInspectorTab === 'documents'"
-                type="button"
-                @click="activeInspectorTab = 'documents'"
-              >
-                {{ t('inspectorTabDocuments') }}
-                <span
-                  v-if="totalInspectorIssueCount > 0"
-                  class="inspector__tab-badge inspector__tab-badge--danger"
-                >{{ totalInspectorIssueCount }}</span>
-              </button>
-              <button
-                class="inspector__tab"
-                :class="{ 'inspector__tab--active': activeInspectorTab === 'selection' }"
-                data-testid="inspector-tab-selection"
-                role="tab"
-                :aria-selected="activeInspectorTab === 'selection'"
-                type="button"
-                @click="activeInspectorTab = 'selection'"
-              >
-                {{ t('inspectorTabSelection') }}
-                <span
-                  v-if="editor.selectedNodeCount > 0 || editor.selectedEdge"
-                  class="inspector__tab-badge"
-                >{{ editor.selectedNodeCount > 0 ? editor.selectedNodeCount : '·' }}</span>
-              </button>
-            </nav>
-            <button
-              class="inspector__pin-btn canvas-icon-button"
-              :class="{ 'inspector__pin-btn--pinned': pinned }"
-              :aria-label="pinned ? t('inspectorUnpin') : t('inspectorPin')"
-              :data-tooltip="pinned ? t('inspectorUnpin') : t('inspectorPin')"
-              type="button"
-              @click="pinned = !pinned"
-            >
-              <CanvasIcon
-                class="inspector__pin-icon"
-                :class="{ 'inspector__pin-icon--unpinned': !pinned }"
-                name="pin"
-                :size="14"
-              />
-            </button>
-          </div>
-          <template v-if="activeInspectorTab === 'documents'">
-          <div class="inspector__toolbar">
-            <button
-              class="inspector__toolbar-button canvas-icon-button"
-              data-testid="inspector-toolbar-new-canvas"
-              :aria-label="t('inspectorNewCanvas')"
-              :data-tooltip="t('inspectorNewCanvas')"
-              type="button"
-              @click="() => editor.createWorkspaceCanvas()"
-            >
-              <CanvasIcon
-                name="new-canvas"
-                :size="16"
-              />
-            </button>
-            <button
-              class="inspector__toolbar-button canvas-icon-button"
-              data-testid="inspector-toolbar-new-folder"
-              :aria-label="t('inspectorNewFolder')"
-              :data-tooltip="t('inspectorNewFolder')"
-              type="button"
-              @click="editor.createWorkspaceFolder"
-            >
-              <CanvasIcon
-                name="new-folder"
-                :size="16"
-              />
-            </button>
-            <button
-              class="inspector__toolbar-button canvas-icon-button"
-              :class="{ 'inspector__toolbar-button--active': sortDropdownOpen }"
-              data-testid="inspector-toolbar-sort"
-              :aria-label="t('inspectorSort')"
-              :data-tooltip="t('inspectorSort')"
-              type="button"
-              :aria-haspopup="'menu'"
-              :aria-expanded="sortDropdownOpen"
-              @click.stop="sortDropdownOpen = !sortDropdownOpen"
-            >
-              <CanvasIcon
-                name="sort"
-                :size="16"
-              />
-            </button>
-            <button
-              class="inspector__toolbar-button canvas-icon-button"
-              data-testid="inspector-toolbar-expand-all"
-              :aria-label="editor.allFoldersExpanded ? t('inspectorCollapseAll') : t('inspectorExpandAll')"
-              :data-tooltip="editor.allFoldersExpanded ? t('inspectorCollapseAll') : t('inspectorExpandAll')"
-              type="button"
-              @click="editor.expandAllInspectorSections"
-            >
-              <CanvasIcon
-                name="expand-all"
-                :size="16"
-              />
-            </button>
-            <div
-              v-if="sortDropdownOpen"
-              class="inspector__sort-dropdown"
-              role="menu"
-              @click.stop
-            >
-              <div class="inspector__sort-dropdown-group">
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'name' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortField('name'); sortDropdownOpen = false"
-                >{{ t('inspectorSortByName') }}</button>
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'updated' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortField('updated'); sortDropdownOpen = false"
-                >{{ t('inspectorSortByUpdated') }}</button>
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortField === 'created' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortField('created'); sortDropdownOpen = false"
-                >{{ t('inspectorSortByCreated') }}</button>
-              </div>
-              <div class="inspector__sort-dropdown-divider" />
-              <div class="inspector__sort-dropdown-group">
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortDirection === 'asc' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortDirection('asc'); sortDropdownOpen = false"
-                >{{ t('inspectorSortAsc') }}</button>
-                <button
-                  :class="['inspector__sort-dropdown-item', { 'inspector__sort-dropdown-item--active': editor.workspaceSortDirection === 'desc' }]"
-                  type="button"
-                  @click="editor.setWorkspaceSortDirection('desc'); sortDropdownOpen = false"
-                >{{ t('inspectorSortDesc') }}</button>
-              </div>
-            </div>
-          </div>
-          <section class="inspector__section">
-            <button
-              class="inspector__section-toggle"
-              data-testid="inspector-section-document-toggle"
-              :title="getInspectorSectionToggleTitle('document')"
-              type="button"
-              @click="editor.toggleInspectorSection('document')"
-            >
-              <h2>{{ t("inspectorDocument") }}</h2>
-              <CanvasIcon
-                name="chevron-right"
-                class="inspector__section-chevron"
-                :class="{'inspector__section-chevron--expanded': editor.inspectorSectionState.document}"
-              />
-            </button>
-            <div
-              v-if="editor.inspectorSectionState.document"
-              data-testid="inspector-section-document-body"
-            >
-              <CanvasWorkspaceTree
-                v-if="editor.workspaceDocuments.length"
-                :workspace-documents="editor.workspaceDocuments"
-                :expanded-folders="workspaceExpandedFolders"
-                :current-file-path="editor.state.filePath"
-                :drag-over-folder-path="dragOverFolderPath"
-                :delete-title="t('selectionToolbarDelete')"
-                @toggle-folder="editor.toggleFolderExpand"
-                @open-file="editor.openWorkspacePath"
-                @delete-document="editor.deleteWorkspaceDocument"
-                @context-menu="onContextMenu"
-                @root-drop="onRootDrop"
-                @folder-drag-over="onFolderDragOver"
-                @folder-drag-enter="onFolderDragEnter"
-                @folder-drag-leave="onFolderDragLeave"
-                @folder-drop="onFolderDrop"
-                @file-drag-start="onFileDragStart"
-                @drag-end="onDragEnd"
-              />
-              <p v-else class="workspace-tree__empty">
-                {{ t("inspectorNoWorkspaceCanvasFiles") }}<br>
-                <code>{{ editor.defaultCanvasDirectory }}/</code>
-              </p>
-            </div>
-          </section>
-
-          <section class="inspector__section">
-            <button
-              class="inspector__section-toggle"
-              :title="getInspectorSectionToggleTitle('recent')"
-              type="button"
-              @click="editor.toggleInspectorSection('recent')"
-            >
-              <h2>{{ t("inspectorRecent") }}</h2>
-              <CanvasIcon
-                name="chevron-right"
-                class="inspector__section-chevron"
-                :class="{'inspector__section-chevron--expanded': editor.inspectorSectionState.recent}"
-              />
-            </button>
-            <div v-if="editor.inspectorSectionState.recent">
-              <div
-                v-if="editor.recentFiles.length"
-                class="recent-list"
-              >
-                <div
-                  v-for="recent in editor.recentFiles"
-                  :key="recent.path"
-                  class="recent-list__item"
-                  :title="recent.path"
-                >
-                  <button
-                    class="recent-list__item-open"
-                    type="button"
-                    @click="editor.openRecentFile(recent)"
-                  >
-                    <CanvasIcon
-                      class="recent-list__item-icon"
-                      name="canvas-file"
-                      :size="14"
-                    />
-                    <span class="workspace-tree__name">{{ recent.title }}</span>
-                  </button>
-                  <button
-                    class="recent-list__item-delete canvas-icon-button"
-                    :aria-label="t('selectionToolbarDelete')"
-                    :data-tooltip="t('selectionToolbarDelete')"
-                    type="button"
-                    @click.stop="editor.removeRecentFileRecord(recent.path)"
-                  >
-                    <CanvasIcon name="close" :size="12" />
-                  </button>
-                </div>
-              </div>
-              <p v-else>
-                {{ t("inspectorNoRecentWorkspaceFiles") }}
-              </p>
-            </div>
-          </section>
-
-          <section
-            v-if="editor.state.conflict"
-            class="inspector__section"
-            data-testid="inspector-conflict-section"
-          >
-            <h2>{{ t("inspectorExternalChangeDetected") }}</h2>
-            <p>{{ t("inspectorExternalChangeDescription") }}</p>
-            <div class="conflict-panel__actions">
-              <button
-                class="toolbar__button"
-                type="button"
-                @click="editor.loadConflictVersion"
-              >
-                {{ t("inspectorLoadDiskVersion") }}
-              </button>
-              <button
-                class="toolbar__button toolbar__button--primary"
-                type="button"
-                @click="editor.overwriteConflictVersion"
-              >
-                {{ t("inspectorOverwriteDiskVersion") }}
-              </button>
-            </div>
-          </section>
-          <section
-            v-if="editor.state.issues.errors.length || editor.state.issues.warnings.length"
-            class="inspector__section"
-            data-testid="inspector-issues-section"
-          >
-            <h2>{{ t("inspectorTabIssues") }}</h2>
-            <div class="issues">
-              <div
-                v-for="issue in [...editor.state.issues.errors, ...editor.state.issues.warnings]"
-                :key="issue.code + issue.path"
-                :class="['issues__item', `issues__item--${issue.level}`]"
-              >
-                <strong>{{ getIssueLevelLabel(issue.level) }}</strong>
-                <span>{{ issue.message }}</span>
-              </div>
-            </div>
-          </section>
-          </template>
-
-          <CanvasInspector
-            v-if="activeInspectorTab === 'selection'"
-            :editor="(editor as Record<string, unknown>)"
-            :get-side-label="getSideLabel"
-            :t="t"
-          />
-
-        </div>
-      </aside>
     </div>
-
-    <Teleport to="body">
-      <div
-        v-if="contextMenuVisible"
-        class="workspace-context-menu"
-        role="menu"
-        :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
-        @click.stop
-      >
-        <button
-          class="workspace-context-menu__item"
-          role="menuitem"
-          type="button"
-          @click="contextMenuRename"
-        >
-          <CanvasIcon class="workspace-context-menu__icon" name="edit" :size="14" />
-          {{ t('contextMenuRename') }}
-        </button>
-        <button
-          class="workspace-context-menu__item"
-          role="menuitem"
-          type="button"
-          @click="contextMenuOpenInExplorer"
-        >
-          <CanvasIcon class="workspace-context-menu__icon" name="folder-open" :size="14" />
-          {{ t('contextMenuOpenInExplorer') }}
-        </button>
-        <button
-          v-if="contextMenuType === 'file'"
-          class="workspace-context-menu__item"
-          role="menuitem"
-          type="button"
-          @click="contextMenuCopy"
-        >
-          <CanvasIcon class="workspace-context-menu__icon" name="copy" :size="14" />
-          {{ t('contextMenuCopy') }}
-        </button>
-        <button
-          v-if="contextMenuType === 'file'"
-          class="workspace-context-menu__item"
-          role="menuitem"
-          type="button"
-          @click="contextMenuCopyPath"
-        >
-          <CanvasIcon class="workspace-context-menu__icon" name="copy-path" :size="14" />
-          {{ t('contextMenuCopyPath') }}
-        </button>
-        <template v-if="contextMenuType === 'folder'">
-          <button
-            class="workspace-context-menu__item"
-            role="menuitem"
-            type="button"
-            @click="contextMenuNewSubfolder"
-          >
-            <CanvasIcon class="workspace-context-menu__icon" name="new-folder" :size="14" />
-            {{ t('contextMenuNewSubfolder') }}
-          </button>
-          <button
-            class="workspace-context-menu__item"
-            role="menuitem"
-            type="button"
-            @click="contextMenuNewDocument"
-          >
-            <CanvasIcon class="workspace-context-menu__icon" name="new-canvas" :size="14" />
-            {{ t('contextMenuNewDocument') }}
-          </button>
-        </template>
-        <div class="workspace-context-menu__divider" />
-        <button
-          class="workspace-context-menu__item workspace-context-menu__item--danger"
-          role="menuitem"
-          type="button"
-          @click="contextMenuDelete"
-        >
-          <CanvasIcon class="workspace-context-menu__icon" name="delete" :size="14" />
-          {{ t('contextMenuDelete') }}
-        </button>
-      </div>
-    </Teleport>
 
     <CanvasCreateEdgeDialog
       v-if="editor.createEdgeDialog.visible"
@@ -2199,6 +1793,7 @@ import type { Plugin } from "siyuan"
 import { showMessage } from "siyuan"
 import { sql } from "@/api"
 import type { CanvasQueryNode } from "@/canvas/types"
+import { createQueryNodeRuntime } from "@/canvas/query-node-runtime"
 import type {
   CanvasPngExportBackgroundMode,
   CanvasPngExportRange,
@@ -2231,8 +1826,6 @@ import CanvasCommandPalette from "@/components/canvas/CanvasCommandPalette.vue"
 import { openHelpDialog } from "@/canvas/help-dialog"
 import CanvasFileCard from "@/components/canvas/CanvasFileCard.vue"
 import CanvasMinimap from "@/components/canvas/CanvasMinimap.vue"
-import CanvasWorkspaceTree from "@/components/canvas/CanvasWorkspaceTree.vue"
-import CanvasInspector from "@/components/canvas/CanvasInspector.vue"
 import CanvasPresentationController from "@/components/canvas/CanvasPresentationController.vue"
 import CanvasPngExportDialog from "@/components/canvas/CanvasPngExportDialog.vue"
 import {
@@ -2243,7 +1836,6 @@ import {
   selectionColorStyles,
 } from "@/components/canvas/canvas-workspace-display"
 import { useCanvasWorkspaceBehavior } from "@/components/canvas/use-canvas-workspace-behavior"
-import { useCanvasWorkspaceContextMenu } from "@/components/canvas/use-canvas-workspace-context-menu"
 import { createCanvasI18n } from "@/i18n/canvas"
 import type {
   CanvasEdge,
@@ -2306,7 +1898,6 @@ onMounted(bindEditorToPlugin)
 onActivated(bindEditorToPlugin)
 onBeforeUnmount(unbindEditorFromPlugin)
 onDeactivated(unbindEditorFromPlugin)
-const workspaceExpandedFolders = computed(() => editor.expandedFolders ?? new Set<string>())
 const fileInputRef = editor.fileInputRef
 const stageRef = editor.stageRef ?? ref<HTMLElement>()
 const SELECTION_TOOLBAR_TOOLTIPS = createSelectionToolbarTooltips(t)
@@ -2418,7 +2009,6 @@ const pngExportCustomColor = ref("#ffffff")
 const pngExportDialogVisible = ref(false)
 const pngExportLoading = ref(false)
 const pngExportRange = ref<CanvasPngExportRange>("full")
-const sortDropdownOpen = ref(false)
 const colorThemePopoverOpen = ref(false)
 const colorThemeButtonRef = ref<HTMLElement>()
 const colorThemePopoverStyle = ref<Record<string, string>>({})
@@ -2430,154 +2020,34 @@ function setLastCustomColor(color: string) {
   localStorage.setItem("siyuan-canvas-last-custom-color", color)
 }
 
-// SQL 动态智能节点相关逻辑
-const queryResultsMap = ref<Record<string, any[]>>({})
-const queryErrorsMap = ref<Record<string, string>>({})
-const queryLoadingMap = ref<Record<string, boolean>>({})
-const queryTimersMap = new Map<string, { timer: any, interval: number }>()
-
-const editingQuerySql = ref("")
-const editingQueryInterval = ref(0)
-const editingQueryMaxResults = ref(50)
-
-async function fetchQueryResult(node: CanvasQueryNode) {
-  if (!node.id || !node.sql) return
-  queryLoadingMap.value[node.id] = true
-  queryErrorsMap.value[node.id] = ""
-  try {
-    const rawResults = await sql(node.sql)
-    if (!Array.isArray(rawResults)) {
-      throw new Error("SQL returned invalid results (expected array)")
+// SQL 动态智能节点运行时
+const {
+  queryResultsMap,
+  queryErrorsMap,
+  queryLoadingMap,
+  editingQuerySql,
+  editingQueryInterval,
+  editingQueryMaxResults,
+  fetchQueryResult,
+  startQueryEditing,
+  cancelQueryEditing,
+  saveQueryEditing,
+  handleQueryResultDragStart,
+  cleanup: cleanupQueryRuntime,
+} = createQueryNodeRuntime({
+  getNodes: () => editor.state.document.nodes,
+  updateNodeField: editor.updateNodeField,
+  editingNodeId,
+  renderMarkdown: editor.getRenderedMarkdown,
+  processRenderedHtml: (html) => {
+    for (const source of collectWorkspaceStorageImages(html)) {
+      void loadTextMarkdownImageBlobUrl(source)
     }
-    const limit = node.maxResults || 50
-    const sliced = rawResults.slice(0, limit)
-
-    const processed = sliced.map(block => {
-      const markdown = block.markdown || block.content || ""
-      let html = editor.getRenderedMarkdown(markdown)
-      for (const source of collectWorkspaceStorageImages(html)) {
-        void loadTextMarkdownImageBlobUrl(source)
-      }
-      html = applyTextMarkdownImageBlobUrls(html)
-      return {
-        ...block,
-        renderedHtml: html
-      }
-    })
-    queryResultsMap.value[node.id] = processed
-  } catch (err: any) {
-    console.error("[siyuan-canvas] SQL Query error for node:", node.id, err)
-    queryErrorsMap.value[node.id] = err.message || String(err)
-    queryResultsMap.value[node.id] = []
-  } finally {
-    queryLoadingMap.value[node.id] = false
-  }
-}
-
-function startQueryEditing(node: CanvasQueryNode) {
-  editingNodeId.value = node.id
-  editingQuerySql.value = node.sql || ""
-  editingQueryInterval.value = node.refreshInterval || 0
-  editingQueryMaxResults.value = node.maxResults || 50
-}
-
-function cancelQueryEditing() {
-  editingNodeId.value = ""
-  editingQuerySql.value = ""
-}
-
-function saveQueryEditing(node: CanvasQueryNode) {
-  if (!editingQuerySql.value.trim()) {
-    showMessage(t("sqlCannotBeEmpty" as any), 3000, "error")
-    return
-  }
-
-  editor.updateNodeField(node.id, "sql", editingQuerySql.value.trim())
-  editor.updateNodeField(node.id, "refreshInterval", Math.max(0, editingQueryInterval.value || 0))
-  editor.updateNodeField(node.id, "maxResults", Math.max(1, editingQueryMaxResults.value || 50))
-
-  editingNodeId.value = ""
-
-  const updatedNode = editor.state.document.nodes.find(n => n.id === node.id) as CanvasQueryNode
-  if (updatedNode) {
-    void fetchQueryResult(updatedNode)
-  }
-}
-
-function handleQueryResultDragStart(event: DragEvent, blockId: string, sourceNodeId: string) {
-  if (!event.dataTransfer) return
-  event.dataTransfer.effectAllowed = "copy"
-  event.dataTransfer.setData("application/siyuan-file", blockId)
-  event.dataTransfer.setData("application/siyuan-canvas-drag-source-node-id", sourceNodeId)
-}
-
-watch(
-  () => editor.state.document.nodes
-    .filter(node => node.type === 'query')
-    .map(node => `${node.id}:${(node as CanvasQueryNode).sql || ''}:${(node as CanvasQueryNode).refreshInterval || 0}:${(node as CanvasQueryNode).maxResults || 50}`)
-    .join(';'),
-  () => {
-    const newNodes = editor.state.document.nodes
-    if (!newNodes) return
-    const queryNodes = newNodes.filter(node => node.type === 'query') as CanvasQueryNode[]
-
-    const currentTimerIds = Array.from(queryTimersMap.keys())
-    for (const timerId of currentTimerIds) {
-      if (!queryNodes.some(n => n.id === timerId)) {
-        const info = queryTimersMap.get(timerId)
-        if (info) clearInterval(info.timer)
-        queryTimersMap.delete(timerId)
-        delete queryResultsMap.value[timerId]
-        delete queryErrorsMap.value[timerId]
-        delete queryLoadingMap.value[timerId]
-      }
-    }
-
-    for (const node of queryNodes) {
-      if (queryResultsMap.value[node.id] === undefined && !queryLoadingMap.value[node.id]) {
-        void fetchQueryResult(node)
-      }
-
-      const timerInfo = queryTimersMap.get(node.id)
-      const timerInterval = timerInfo ? timerInfo.interval : -1
-      const currentInterval = node.refreshInterval !== undefined ? node.refreshInterval : 0
-
-      if (currentInterval !== timerInterval) {
-        if (timerInfo) {
-          clearInterval(timerInfo.timer)
-          queryTimersMap.delete(node.id)
-        }
-        if (currentInterval > 0) {
-          const timer = setInterval(() => {
-            const exists = editor.state.document.nodes.some(n => n.id === node.id)
-            if (exists) {
-              if (editingNodeId.value !== node.id) {
-                void fetchQueryResult(node)
-              }
-            } else {
-              clearInterval(timer)
-              queryTimersMap.delete(node.id)
-            }
-          }, currentInterval * 1000)
-          queryTimersMap.set(node.id, { timer, interval: currentInterval })
-        } else {
-          queryTimersMap.set(node.id, { timer: null as any, interval: 0 })
-        }
-      }
-    }
+    return applyTextMarkdownImageBlobUrls(html)
   },
-  { immediate: true }
-)
-
-watch(editingNodeId, (newId) => {
-  if (newId) {
-    const node = editor.state.document.nodes.find(n => n.id === newId)
-    if (node && node.type === 'query') {
-      editingQuerySql.value = node.sql || ""
-      editingQueryInterval.value = node.refreshInterval || 0
-      editingQueryMaxResults.value = node.maxResults || 50
-    }
-  }
+  executeSql: sql,
+  showMessage,
+  t: (key) => t(key as any),
 })
 
 const isAiSearching = ref(false)
@@ -2845,38 +2315,6 @@ const activeEdgeColor = computed(() => {
     : CLEAR_SELECTION_COLOR
 })
 
-const pinned = ref(localStorage.getItem("siyuan-canvas-inspector-pinned") !== "false")
-watch(pinned, (val) => {
-  localStorage.setItem("siyuan-canvas-inspector-pinned", String(val))
-})
-
-function handleInspectorMouseLeave() {
-  if (!pinned.value) {
-    editor.inspectorExpanded = false
-  }
-}
-const {
-  closeContextMenu,
-  contextMenuCopy,
-  contextMenuCopyPath,
-  contextMenuDelete,
-  contextMenuNewDocument,
-  contextMenuNewSubfolder,
-  contextMenuOpenInExplorer,
-  contextMenuRename,
-  contextMenuType,
-  contextMenuVisible,
-  contextMenuX,
-  contextMenuY,
-  onContextMenu,
-} = useCanvasWorkspaceContextMenu({
-  copyPath: path => navigator.clipboard.writeText(path),
-  editor,
-  showCopyPathSuccess: () => {
-    showMessage(t("contextMenuCopyPathSuccess"), 2000)
-  },
-})
-
 const presentationPathNodeIds = computed(() => [
   ...editor.presentation.pathHistory,
   ...(editor.presentation.currentNodeId ? [editor.presentation.currentNodeId] : []),
@@ -2981,22 +2419,9 @@ const sproutPopoverStyle = computed(() => {
   }
   return style
 })
-const dragSourcePath = ref<string | null>(null)
-const dragOverFolderPath = ref<string | null>(null)
 const settingsRevision = ref(0)
-let dragExpandTimer: ReturnType<typeof setTimeout> | null = null
 const fileCardImageBlobUrlLoads = new Set<string>()
 const textMarkdownImageBlobUrlLoads = new Set<string>()
-
-type InspectorTab = 'documents' | 'selection'
-const activeInspectorTab = ref<InspectorTab>('documents')
-
-const totalInspectorIssueCount = computed(() => {
-  const errors = editor.state.issues.errors.length
-  const warnings = editor.state.issues.warnings.length
-  const conflict = editor.state.conflict ? 1 : 0
-  return errors + warnings + conflict
-})
 
 function isWorkspaceStorageImageSource(source: string): boolean {
   return /^\/data\/storage\/.+\.(?:avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(source.trim())
@@ -3097,10 +2522,6 @@ function handleCanvasSettingsChanged() {
   settingsRevision.value += 1
 }
 
-function onContextMenuKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') closeContextMenu()
-}
-
 function toggleColorThemePopover() {
   if (colorThemePopoverOpen.value) {
     colorThemePopoverOpen.value = false
@@ -3130,8 +2551,6 @@ function closeColorThemePopover(event: PointerEvent) {
 
 onMounted(() => {
   window.addEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
-  document.addEventListener("click", closeContextMenu)
-  document.addEventListener("keydown", onContextMenuKeydown)
   document.addEventListener("pointerdown", closeColorThemePopover)
 })
 
@@ -3143,93 +2562,9 @@ onBeforeUnmount(() => {
     URL.revokeObjectURL(blobUrl)
   }
   window.removeEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
-  document.removeEventListener("click", closeContextMenu)
-  document.removeEventListener("keydown", onContextMenuKeydown)
   document.removeEventListener("pointerdown", closeColorThemePopover)
-  for (const info of queryTimersMap.values()) {
-    clearInterval(info.timer)
-  }
-  queryTimersMap.clear()
+  cleanupQueryRuntime()
 })
-
-// 选区/边变更时若用户尚停留在文档 tab，自动切到选区 tab，避免反复手动切换
-watch(
-  () => `${editor.state.selectedEdgeId}|${editor.state.selectedNodeIds.length}`,
-  (next, prev) => {
-    if (next === prev) return
-    const hasSelection = editor.state.selectedEdgeId !== '' || editor.state.selectedNodeIds.length > 0
-    if (hasSelection && activeInspectorTab.value === 'documents') {
-      activeInspectorTab.value = 'selection'
-    }
-  },
-)
-
-function onFileDragStart(event: DragEvent, filePath: string) {
-  if (!event.dataTransfer) return
-  event.dataTransfer.effectAllowed = 'copyMove'
-  event.dataTransfer.setData('text/plain', filePath)
-  event.dataTransfer.setData('application/siyuan-workspace-file', filePath)
-  dragSourcePath.value = filePath
-}
-
-function onFolderDragOver(event: DragEvent) {
-  event.preventDefault()
-  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-}
-
-function onFolderDragEnter(event: DragEvent, folderPath: string) {
-  event.preventDefault()
-  dragOverFolderPath.value = folderPath
-  if (!editor.expandedFolders.has(folderPath)) {
-    if (dragExpandTimer) clearTimeout(dragExpandTimer)
-    dragExpandTimer = setTimeout(() => {
-      editor.toggleFolderExpand(folderPath)
-      dragExpandTimer = null
-    }, 600)
-  }
-}
-
-function onFolderDragLeave(event: DragEvent, folderPath: string) {
-  const related = event.relatedTarget as HTMLElement | null
-  if (related && (event.currentTarget as HTMLElement).contains(related)) return
-  if (dragOverFolderPath.value === folderPath) {
-    dragOverFolderPath.value = null
-  }
-  if (dragExpandTimer) {
-    clearTimeout(dragExpandTimer)
-    dragExpandTimer = null
-  }
-}
-
-async function onFolderDrop(event: DragEvent, folderPath: string) {
-  event.preventDefault()
-  if (dragExpandTimer) {
-    clearTimeout(dragExpandTimer)
-    dragExpandTimer = null
-  }
-  dragOverFolderPath.value = null
-  const sourcePath = event.dataTransfer?.getData('text/plain') || dragSourcePath.value
-  if (!sourcePath) return
-  dragSourcePath.value = null
-  await editor.moveWorkspaceFile(sourcePath, folderPath)
-}
-
-async function onRootDrop(event: DragEvent) {
-  event.preventDefault()
-  const sourcePath = event.dataTransfer?.getData('text/plain') || dragSourcePath.value
-  if (!sourcePath) return
-  dragSourcePath.value = null
-  await editor.moveWorkspaceFile(sourcePath, editor.defaultCanvasDirectory)
-}
-
-function onDragEnd() {
-  dragSourcePath.value = null
-  dragOverFolderPath.value = null
-  if (dragExpandTimer) {
-    clearTimeout(dragExpandTimer)
-    dragExpandTimer = null
-  }
-}
 
 function closePngExportDialog() {
   pngExportDialogVisible.value = false
@@ -3252,10 +2587,6 @@ async function confirmPngExport() {
 }
 
 onBeforeUnmount(() => {
-  if (dragExpandTimer) {
-    clearTimeout(dragExpandTimer)
-    dragExpandTimer = null
-  }
   window.removeEventListener("keydown", handleGlobalKeydown, true)
 })
 
@@ -3351,10 +2682,6 @@ function valueFromEvent(event: Event): string {
   return (event.target as HTMLInputElement).value
 }
 
-function getIssueLevelLabel(level: "error" | "warning"): string {
-  return level === "error" ? t("issueError") : t("issueWarning")
-}
-
 function handleStagePointerDown(event: PointerEvent) {
   if (editor.presentation.isActive) {
     editor.startPan(event)
@@ -3392,6 +2719,34 @@ function handleNodePointerDown(node: CanvasNode, event: PointerEvent) {
   }
   editor.activateCanvasSurface()
   editor.handleNodePointerDown(node, event)
+}
+
+function handleShellCaptureDragStart(event: DragEvent) {
+  const target = event.target as HTMLElement | null
+  // 放行 SQL 查询结果项的内部拖拽创建卡片行为
+  if (target?.closest?.(".query-result-item[draggable='true']")) {
+    return
+  }
+  // 坚决阻止任何内部卡片或文字的原生拖拽穿透到思源全局 window
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function handleShellCaptureDragOver(event: DragEvent) {
+  // 若非操作系统外部文件拖入，阻止 dragover 冒泡穿透触发思源宿主的分屏指示
+  if (!event.dataTransfer?.types.includes("Files")) {
+    event.stopPropagation()
+  }
+}
+
+function handleNodeDragStart(event: DragEvent) {
+  // 允许 SQL 查询结果项的特定拖拽；阻止其他卡片内容的原生 HTML5 拖拽，避免冒泡干扰卡片移动与穿透至思源分屏宿主
+  const target = event.target as HTMLElement | null
+  if (target?.closest?.(".query-result-item[draggable='true']")) {
+    return
+  }
+  event.preventDefault()
+  event.stopPropagation()
 }
 
 function handleNodeClick(node: CanvasNode, event: MouseEvent) {
@@ -3478,13 +2833,6 @@ function showHelpDialog() {
     { key: t("helpShortcutDragAnchor"), action: t("helpActionDragAnchor") },
   ]
   openHelpDialog(t("helpDialogTitle"), shortcuts)
-}
-
-
-function getInspectorSectionToggleTitle(section: keyof typeof editor.inspectorSectionState): string {
-  return editor.inspectorSectionState[section]
-    ? t("inspectorCollapseSection")
-    : t("inspectorExpandSection")
 }
 
 function getSideLabel(side: string): string {
@@ -3925,62 +3273,6 @@ watch(
 
 
 <style lang="scss">
-.workspace-context-menu {
-  position: fixed;
-  z-index: 10000;
-  min-width: 160px;
-  padding: 4px 0;
-  border: 1px solid var(--b3-border-color);
-  border-radius: 8px;
-  background: var(--b3-theme-surface);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
-}
-
-.workspace-context-menu__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: calc(100% - 8px);
-  margin: 0 4px;
-  padding: 7px 10px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--b3-theme-on-surface);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-  box-sizing: border-box;
-
-  &:hover {
-    background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
-  }
-
-  &--danger {
-    color: var(--b3-card-error-color, #c04f2a);
-
-    &:hover {
-      background: color-mix(in srgb, var(--b3-card-error-color, #c04f2a) 12%, transparent);
-    }
-  }
-}
-
-.workspace-context-menu__icon {
-  width: 14px;
-  height: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 14px;
-  color: currentColor;
-}
-
-.workspace-context-menu__divider {
-  height: 1px;
-  margin: 4px;
-  background: var(--b3-border-color);
-}
-
 .canvas-relayout-overlay {
   position: absolute;
   inset: 0;

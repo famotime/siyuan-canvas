@@ -17,7 +17,7 @@
     "release:patch": "node ./release.js --mode=patch",
     "release:minor": "node ./release.js --mode=minor",
     "release:major": "node ./release.js --mode=major",
-    "build": "vite build",
+    "build": "vite build && node ./scripts/sync-plugins.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

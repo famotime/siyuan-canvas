@@ -836,4 +836,92 @@ describe('canvas editor gesture handlers', () => {
       expect(state.document.edges).toHaveLength(0)
     })
   })
+
+  describe("pointer event confinement and capture", () => {
+    it("calls event.preventDefault and sets/releases pointer capture during card drag", () => {
+      const node = { id: "node-1", type: "text", x: 100, y: 100, width: 200, height: 100 } as CanvasNode
+      const { handlers } = createGestureHarness([node])
+
+      const target = document.createElement("div")
+      target.className = "canvas-node__header"
+      const setPointerCapture = vi.fn()
+      const releasePointerCapture = vi.fn()
+      const hasPointerCapture = vi.fn().mockReturnValue(true)
+      target.setPointerCapture = setPointerCapture
+      target.releasePointerCapture = releasePointerCapture
+      target.hasPointerCapture = hasPointerCapture
+
+      const pointerDownEvent = new PointerEvent("pointerdown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        pointerId: 42,
+        bubbles: true,
+        cancelable: true,
+      })
+      Object.defineProperty(pointerDownEvent, "target", { value: target })
+      const preventDefaultSpy = vi.spyOn(pointerDownEvent, "preventDefault")
+
+      handlers.handleNodePointerDown(node, pointerDownEvent)
+
+      expect(preventDefaultSpy).toHaveBeenCalled()
+      expect(setPointerCapture).toHaveBeenCalledWith(42)
+
+      // Simulate pointerup
+      const pointerUpEvent = new PointerEvent("pointerup", {
+        clientX: 150,
+        clientY: 150,
+        pointerId: 42,
+        bubbles: true,
+      })
+      window.dispatchEvent(pointerUpEvent)
+
+      expect(releasePointerCapture).toHaveBeenCalledWith(42)
+    })
+
+    it("suppresses synthetic click event after significant drag displacement", () => {
+      const node = { id: "node-1", type: "text", x: 100, y: 100, width: 200, height: 100 } as CanvasNode
+      const { handlers } = createGestureHarness([node])
+
+      const target = document.createElement("div")
+      target.className = "canvas-node__header"
+      const pointerDownEvent = new PointerEvent("pointerdown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+        bubbles: true,
+      })
+      Object.defineProperty(pointerDownEvent, "target", { value: target })
+
+      handlers.handleNodePointerDown(node, pointerDownEvent)
+
+      // 产生实质位移 (> 2px)
+      const pointerMoveEvent = new PointerEvent("pointermove", {
+        clientX: 120,
+        clientY: 130,
+      })
+      window.dispatchEvent(pointerMoveEvent)
+
+      // 释放指针
+      const pointerUpEvent = new PointerEvent("pointerup", {
+        clientX: 120,
+        clientY: 130,
+      })
+      window.dispatchEvent(pointerUpEvent)
+
+      // 模拟随后浏览器派发的 click 事件
+      const clickEvent = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+      })
+      const preventDefaultSpy = vi.spyOn(clickEvent, "preventDefault")
+      const stopPropagationSpy = vi.spyOn(clickEvent, "stopPropagation")
+
+      window.dispatchEvent(clickEvent)
+
+      expect(preventDefaultSpy).toHaveBeenCalled()
+      expect(stopPropagationSpy).toHaveBeenCalled()
+    })
+  })
 })

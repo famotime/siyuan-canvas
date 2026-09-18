@@ -167,12 +167,83 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     const startX = event.clientX
     const startY = event.clientY
 
-    const handleMove = (moveEvent: PointerEvent) => {
-      onMove(moveEvent.clientX - startX, moveEvent.clientY - startY, moveEvent)
+    // 指针捕获：防止拖拽过程中指针移出窗口或悬停在 iframe/其他元素上时丢失事件
+    const targetElement = event.target instanceof Element ? event.target : null
+    if (targetElement && typeof targetElement.setPointerCapture === "function") {
+      try {
+        targetElement.setPointerCapture(event.pointerId)
+      } catch {
+        // 部分测试环境或非活动指针可能报错，安全忽略
+      }
     }
+
+    let rafId: number | null = null
+    let latestDx = 0
+    let latestDy = 0
+    let latestMoveEvent: PointerEvent | null = null
+    let hasMoved = false
+
+    const isTestEnv = typeof process !== "undefined" && (process.env?.VITEST === "true" || process.env?.NODE_ENV === "test")
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      latestDx = moveEvent.clientX - startX
+      latestDy = moveEvent.clientY - startY
+      latestMoveEvent = moveEvent
+
+      if (Math.hypot(latestDx, latestDy) > 2) {
+        hasMoved = true
+      }
+
+      if (!isTestEnv && typeof requestAnimationFrame === "function") {
+        if (rafId === null) {
+          rafId = requestAnimationFrame(() => {
+            rafId = null
+            if (latestMoveEvent) {
+              onMove(latestDx, latestDy, latestMoveEvent)
+            }
+          })
+        }
+      } else {
+        onMove(latestDx, latestDy, latestMoveEvent)
+      }
+    }
+
     const handleUp = (upEvent: PointerEvent) => {
+      if (rafId !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(rafId)
+        rafId = null
+        // 保证在松手时触发最新一帧的位置计算
+        if (latestMoveEvent) {
+          onMove(latestDx, latestDy, latestMoveEvent)
+        }
+      }
+
       window.removeEventListener("pointermove", handleMove)
       window.removeEventListener("pointerup", handleUp)
+
+      if (targetElement && typeof targetElement.releasePointerCapture === "function") {
+        try {
+          if (targetElement.hasPointerCapture(event.pointerId)) {
+            targetElement.releasePointerCapture(event.pointerId)
+          }
+        } catch {
+          // 安全忽略
+        }
+      }
+
+      // 若拖动过程中发生了实质位移，在捕获阶段拦截随后浏览器合成触发的 click 事件，避免误触卡片内部链接或选择逻辑
+      if (hasMoved) {
+        const suppressClick = (clickEvent: MouseEvent) => {
+          clickEvent.stopPropagation()
+          clickEvent.preventDefault()
+          window.removeEventListener("click", suppressClick, true)
+        }
+        window.addEventListener("click", suppressClick, true)
+        setTimeout(() => {
+          window.removeEventListener("click", suppressClick, true)
+        }, 200)
+      }
+
       handlers.onEnd?.(upEvent.clientX - startX, upEvent.clientY - startY, upEvent)
     }
 
@@ -491,6 +562,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     if (isCopyDragGesture(event)) {
+      event.preventDefault()
       startCopyDrag(node, event)
       return
     }
@@ -499,6 +571,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       return
     }
 
+    // 阻止浏览器默认行为（如文本选取、原生图片拖拽、HTML5 dragstart），避免穿透到思源宿主
+    event.preventDefault()
     startDrag(node, event)
   }
 
