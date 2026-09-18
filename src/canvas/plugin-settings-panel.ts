@@ -31,6 +31,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
   const activeAiConfig = options.getActiveAiConfig?.() || null
 
   const draft = getSettings()
+  injectSettingsPanelStyles()
   const setting = createSetting({
     width: "560px",
   })
@@ -103,6 +104,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     createActionElement: () => {
       const input = document.createElement("input")
       input.dataset.settingKey = "detectExternalChanges"
+      input.className = "b3-switch fn__flex-center"
       input.type = "checkbox"
       input.checked = draft.detectExternalChanges
       input.addEventListener("change", () => {
@@ -118,6 +120,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     createActionElement: () => {
       const input = document.createElement("input")
       input.dataset.settingKey = "showCanvasThumbnails"
+      input.className = "b3-switch fn__flex-center"
       input.type = "checkbox"
       input.checked = draft.showCanvasThumbnails
       input.addEventListener("change", () => {
@@ -133,6 +136,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     createActionElement: () => {
       const input = document.createElement("input")
       input.dataset.settingKey = "showNodeHeader"
+      input.className = "b3-switch fn__flex-center"
       input.type = "checkbox"
       input.checked = draft.showNodeHeader
       input.addEventListener("change", () => {
@@ -148,6 +152,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     createActionElement: () => {
       const input = document.createElement("input")
       input.dataset.settingKey = "showDragAlignmentGuides"
+      input.className = "b3-switch fn__flex-center"
       input.type = "checkbox"
       input.checked = draft.showDragAlignmentGuides
       input.addEventListener("change", () => {
@@ -163,6 +168,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     createActionElement: () => {
       const input = document.createElement("input")
       input.dataset.settingKey = "autoCreateTextCardOnDrag"
+      input.className = "b3-switch fn__flex-center"
       input.type = "checkbox"
       input.checked = draft.autoCreateTextCardOnDrag
       input.addEventListener("change", () => {
@@ -178,6 +184,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     createActionElement: () => {
       const input = document.createElement("input")
       input.dataset.settingKey = "enableDebugLog"
+      input.className = "b3-switch fn__flex-center"
       input.type = "checkbox"
       input.checked = draft.enableDebugLog
       input.addEventListener("change", () => {
@@ -238,6 +245,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     createActionElement: () => {
       const input = document.createElement("input")
       input.dataset.settingKey = "presentationAutoRatio"
+      input.className = "b3-switch fn__flex-center"
       input.type = "checkbox"
       input.checked = draft.presentationAutoRatio !== false
       input.addEventListener("change", () => {
@@ -460,6 +468,7 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     createActionElement: () => {
       const input = document.createElement("input")
       input.dataset.settingKey = "enableAiSearch"
+      input.className = "b3-switch fn__flex-center"
       input.type = "checkbox"
       input.checked = draft.enableAiSearch === true
       input.addEventListener("change", () => {
@@ -1194,41 +1203,124 @@ function injectSettingsPanelStyles() {
       transform: scale(1) translateY(0) !important;
     }
 
-    /* 纯 CSS 打造的高级 iOS / Modern Slider 开关样式 */
+    /* 确保设置页所有设置条目（开关、输入框、下拉框等），文本与控件始终在同一行水平排列，严禁换行 */
+    .b3-dialog__content .config-item:has([data-setting-key]),
+    .siyuan-canvas-settings-details-content .config-item:has([data-setting-key]),
+    .siyuan-canvas-settings-details-content > .fn__flex:has([data-setting-key]),
+    .siyuan-canvas-settings-details-content > .b3-label:has([data-setting-key]),
+    .b3-dialog__content .config-item:has(.b3-text-field),
+    .b3-dialog__content .config-item:has(.b3-select),
+    .b3-dialog__content .config-item:has(input[type="checkbox"]) {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 12px 16px !important;
+      box-sizing: border-box !important;
+    }
+
+    .b3-dialog__content .config-item:has([data-setting-key]) > .fn__flex-1,
+    .siyuan-canvas-settings-details-content .config-item:has([data-setting-key]) > .fn__flex-1,
+    .b3-dialog__content .config-item:has(.b3-text-field) > .fn__flex-1,
+    .b3-dialog__content .config-item:has(.b3-select) > .fn__flex-1,
+    .b3-dialog__content .config-item:has(input[type="checkbox"]) > .fn__flex-1 {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+      width: auto !important;
+      max-width: none !important;
+      margin-bottom: 0 !important;
+      margin-right: 16px !important;
+    }
+
+    .b3-dialog__content .config-item:has([data-setting-key]) .config-name,
+    .siyuan-canvas-settings-details-content .config-item:has([data-setting-key]) .config-name {
+      margin-bottom: 0 !important;
+      line-height: 20px !important;
+      font-size: 14px !important;
+    }
+
+    .b3-dialog__content .config-item:has([data-setting-key]) > .fn__space,
+    .siyuan-canvas-settings-details-content .config-item:has([data-setting-key]) > .fn__space {
+      display: none !important;
+    }
+
+    /* 文本输入框与下拉选择框：固定标准 200px 尺寸靠右水平对齐，严禁换行撑满 */
+    .b3-dialog__content .config-item > input[data-setting-key]:not([type="checkbox"]),
+    .b3-dialog__content .config-item > select[data-setting-key],
+    .b3-dialog__content .config-item > .b3-text-field:not([type="checkbox"]),
+    .b3-dialog__content .config-item > .b3-select,
+    .siyuan-canvas-settings-details-content input[data-setting-key]:not([type="checkbox"]),
+    .siyuan-canvas-settings-details-content select[data-setting-key] {
+      flex: 0 0 200px !important;
+      width: 200px !important;
+      min-width: 200px !important;
+      max-width: 200px !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      box-sizing: border-box !important;
+      align-self: center !important;
+    }
+
+    /* 思源标准开关样式：宽 26px × 高 16px，与 14px 正文字体大小完美匹配 */
+    .b3-dialog__content .config-item input[data-setting-key][type="checkbox"],
+    .b3-dialog__content input[data-setting-key][type="checkbox"],
+    .siyuan-canvas-settings-details-content input[data-setting-key][type="checkbox"],
+    input[data-setting-key][type="checkbox"].fn__size200,
+    input.b3-switch,
     input[data-setting-key][type="checkbox"] {
       position: relative !important;
       appearance: none !important;
       -webkit-appearance: none !important;
-      width: 42px !important;
-      height: 22px !important;
-      background-color: rgba(120, 120, 128, 0.25) !important;
-      border: 1px solid rgba(120, 120, 128, 0.15) !important;
-      border-radius: 22px !important;
+      width: 26px !important;
+      min-width: 26px !important;
+      max-width: 26px !important;
+      height: 16px !important;
+      min-height: 16px !important;
+      max-height: 16px !important;
+      flex: 0 0 26px !important;
+      box-sizing: border-box !important;
+      background-color: var(--b3-switch-background, #e1e3e1) !important;
+      border: 1px solid var(--b3-switch-border, rgba(120, 120, 128, 0.3)) !important;
+      border-radius: 12px !important;
       outline: none !important;
       cursor: pointer !important;
-      transition: background-color 0.2s ease, border-color 0.2s ease !important;
+      transition: background-color 0.15s ease, border-color 0.15s ease !important;
       display: inline-block !important;
       margin: 0 !important;
     }
+
+    .b3-dialog__content input[data-setting-key][type="checkbox"]:checked,
+    input.b3-switch:checked,
     input[data-setting-key][type="checkbox"]:checked {
-      background-color: var(--b3-theme-primary, #007aff) !important;
-      border-color: var(--b3-theme-primary, #007aff) !important;
+      background-color: var(--b3-switch-checked-background, var(--b3-theme-primary, #3575f0)) !important;
+      border-color: transparent !important;
     }
+
+    .b3-dialog__content input[data-setting-key][type="checkbox"]::after,
+    input.b3-switch::after,
     input[data-setting-key][type="checkbox"]::after {
       content: "" !important;
       position: absolute !important;
-      top: 2px !important;
-      left: 2px !important;
-      width: 16px !important;
-      height: 16px !important;
+      top: 50% !important;
+      left: 7px !important;
+      transform: translate(-50%, -50%) !important;
+      width: 8px !important;
+      height: 8px !important;
       border-radius: 50% !important;
-      background-color: #ffffff !important;
-      transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.25) !important;
+      background-color: var(--b3-switch-border, rgba(0, 0, 0, 0.4)) !important;
+      transition: left 0.12s ease, width 0.12s ease, height 0.12s ease, background-color 0.12s ease !important;
+      pointer-events: none !important;
+      box-shadow: none !important;
     }
+
+    .b3-dialog__content input[data-setting-key][type="checkbox"]:checked::after,
+    input.b3-switch:checked::after,
     input[data-setting-key][type="checkbox"]:checked::after {
-      transform: translateX(20px) !important;
-      background-color: #ffffff !important;
+      left: 17px !important;
+      width: 12px !important;
+      height: 12px !important;
+      background-color: var(--b3-switch-checked, #ffffff) !important;
     }
   `
   document.head.appendChild(style)

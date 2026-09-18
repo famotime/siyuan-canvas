@@ -208,3 +208,121 @@
   align-items: center;
   gap: 8px;
 }
+
+// =============================================================================
+// Canvas 设置页条目布局与尺寸样式：所有设置项（输入框、选择框、开关）单行水平对齐
+// =============================================================================
+.b3-dialog__content .config-item:has([data-setting-key]),
+.siyuan-canvas-settings-details-content .config-item:has([data-setting-key]),
+.siyuan-canvas-settings-details-content > .fn__flex:has([data-setting-key]),
+.siyuan-canvas-settings-details-content > .b3-label:has([data-setting-key]),
+.b3-dialog__content .config-item:has(.b3-text-field),
+.b3-dialog__content .config-item:has(.b3-select),
+.b3-dialog__content .config-item:has(input[type="checkbox"]) {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 12px 16px !important;
+  box-sizing: border-box !important;
+
+  > .fn__flex-1,
+  > .config-item__main {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    margin-bottom: 0 !important;
+    margin-right: 16px !important;
+  }
+
+  .config-name {
+    margin-bottom: 0 !important;
+    line-height: 20px !important;
+    font-size: 14px !important;
+  }
+
+  > .fn__space {
+    display: none !important;
+  }
+}
+
+/* 文本输入框与下拉选择框：固定标准 200px 尺寸靠右水平对齐，严禁换行撑满 */
+.b3-dialog__content .config-item > input[data-setting-key]:not([type="checkbox"]),
+.b3-dialog__content .config-item > select[data-setting-key],
+.b3-dialog__content .config-item > .b3-text-field:not([type="checkbox"]),
+.b3-dialog__content .config-item > .b3-select,
+.siyuan-canvas-settings-details-content input[data-setting-key]:not([type="checkbox"]),
+.siyuan-canvas-settings-details-content select[data-setting-key] {
+  flex: 0 0 200px !important;
+  width: 200px !important;
+  min-width: 200px !important;
+  max-width: 200px !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  box-sizing: border-box !important;
+  align-self: center !important;
+}
+
+.b3-dialog__content .config-item input[data-setting-key][type="checkbox"],
+.b3-dialog__content input[data-setting-key][type="checkbox"],
+.siyuan-canvas-settings-details-content input[data-setting-key][type="checkbox"],
+input[data-setting-key][type="checkbox"].fn__size200,
+input.b3-switch,
+input[data-setting-key][type="checkbox"] {
+  position: relative !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  max-height: 16px !important;
+  flex: 0 0 26px !important;
+  box-sizing: border-box !important;
+  background-color: var(--b3-switch-background, #e1e3e1) !important;
+  border: 1px solid var(--b3-switch-border, rgba(120, 120, 128, 0.3)) !important;
+  border-radius: 12px !important;
+  outline: none !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease !important;
+  display: inline-block !important;
+  margin: 0 !important;
+}
+
+.b3-dialog__content input[data-setting-key][type="checkbox"]:checked,
+input.b3-switch:checked,
+input[data-setting-key][type="checkbox"]:checked {
+  background-color: var(--b3-switch-checked-background, var(--b3-theme-primary, #3575f0)) !important;
+  border-color: transparent !important;
+}
+
+.b3-dialog__content input[data-setting-key][type="checkbox"]::after,
+input.b3-switch::after,
+input[data-setting-key][type="checkbox"]::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 7px !important;
+  transform: translate(-50%, -50%) !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background-color: var(--b3-switch-border, rgba(0, 0, 0, 0.4)) !important;
+  transition: left 0.12s ease, width 0.12s ease, height 0.12s ease, background-color 0.12s ease !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+}
+
+.b3-dialog__content input[data-setting-key][type="checkbox"]:checked::after,
+input.b3-switch:checked::after,
+input[data-setting-key][type="checkbox"]:checked::after {
+  left: 17px !important;
+  width: 12px !important;
+  height: 12px !important;
+  background-color: var(--b3-switch-checked, #ffffff) !important;
+}
+
+
