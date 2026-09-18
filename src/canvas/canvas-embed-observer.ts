@@ -1,17 +1,19 @@
 import type { Plugin } from "siyuan"
-import type { CanvasEmbedRefreshEventDetail } from "@/canvas/canvas-embed-events"
 import { getAllEditor } from "siyuan"
 import {
   getBlockAttrs,
   getFileText,
   sql,
 } from "@/api"
-import { CANVAS_EMBED_REFRESH_EVENT } from "@/canvas/canvas-embed-events"
 import {
   CANVAS_EMBED_BOUND_ATTR,
   CANVAS_EMBED_CLASS,
+  CANVAS_EMBED_REFRESH_EVENT,
+  type CanvasEmbedRefreshEventDetail,
   refreshCanvasEmbedBlock,
 } from "@/canvas/canvas-embed-insert"
+
+export { CANVAS_EMBED_REFRESH_EVENT, type CanvasEmbedRefreshEventDetail }
 import { generateCanvasEmbedDataUrl } from "@/canvas/canvas-embed-preview"
 import { parseCanvasDocument } from "@/canvas/format"
 import { openCanvasEditorTab } from "@/canvas/plugin-tabs"
@@ -68,7 +70,7 @@ function isElement(value: unknown): value is Element {
   return value instanceof Element
 }
 
-function normalizeCanvasPath(path: string): string {
+export function normalizeCanvasPath(path: string): string {
   if (!path) return ""
   return path.replace(/^\/\/data\//, "/data/")
 }

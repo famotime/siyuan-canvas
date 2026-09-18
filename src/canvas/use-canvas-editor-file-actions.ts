@@ -29,7 +29,7 @@ import {
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import { getCanvasFileName } from "@/canvas/use-canvas-editor-shared"
 import { createDebugLog } from "@/canvas/debug-log"
-import { CANVAS_EMBED_REFRESH_EVENT, type CanvasEmbedRefreshEventDetail } from "@/canvas/canvas-embed-events"
+import { CANVAS_EMBED_REFRESH_EVENT, type CanvasEmbedRefreshEventDetail } from "@/canvas/canvas-embed-insert"
 import {
   type CanvasBoardMetrics,
   toBoardX,

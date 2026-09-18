@@ -1,5 +1,4 @@
 import type { ResolvedCanvasFileTarget } from "@/canvas/file-target-resolution"
-import type { ResolvedCanvasFileNode } from "@/canvas/file-node-resolution"
 
 import { parseCanvasDocument } from "@/canvas/format"
 
@@ -32,10 +31,7 @@ export interface CanvasFileTargetPreview {
   }
 }
 
-type PreviewInput = (
-  ResolvedCanvasFileTarget
-  | ResolvedCanvasFileNode
-) & {
+type PreviewInput = ResolvedCanvasFileTarget & {
   excerptHtml?: string
   imageSrc?: string
   thumbnail?: {

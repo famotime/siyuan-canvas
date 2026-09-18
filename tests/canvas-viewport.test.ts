@@ -62,37 +62,19 @@ describe("canvas focusNodeById presentation scale logic", () => {
     }
 
     const actions = createCanvasEditorNodeEdgeActions({
-      activateCanvasSurface: vi.fn(),
-      board: ref({ left: 0, top: 0, width: 5000, height: 5000 }),
-      closeEdgePopover: vi.fn(),
-      closeSelectionPopover: vi.fn(),
+      geometry: {
+        board: ref({ left: 0, top: 0, width: 5000, height: 5000 }),
+        stageRef: ref(stage) as any,
+        viewport,
+      },
+      state: state as any,
       commitDocument: vi.fn(),
-      createEdgeDialog: { visible: false },
-      edgeLabelDraft: ref(""),
-      editingEdgeLabelId: ref(""),
-      edgeToolbarPopover: ref("closed"),
-      fileFieldRefresh: vi.fn(async () => {}),
+      t: vi.fn((key) => key) as any,
       getSettings: vi.fn(() => ({
         presentationAutoRatio: true,
         presentationMaskOpacity: 60,
       } as any)),
-      newEdgeFromSide: ref("right"),
-      newEdgeLabel: ref(""),
-      newEdgeSourceId: ref(""),
-      newEdgeSourceQuery: ref(""),
-      newEdgeTargetId: ref(""),
-      newEdgeTargetQuery: ref(""),
-      newEdgeToSide: ref("left"),
       presentationActive: ref(true),
-      selectedEdge: ref(undefined) as any,
-      selectedEdgeAnchors: ref(null) as any,
-      selectedNode: ref(null) as any,
-      selectionBounds: ref(null) as any,
-      selectionToolbarPopover: ref("closed") as any,
-      stageRef: ref(stage) as any,
-      state: state as any,
-      t: vi.fn((key) => key) as any,
-      viewport,
     })
 
     actions.focusNodeById("node-1")
@@ -124,37 +106,19 @@ describe("canvas focusNodeById presentation scale logic", () => {
     }
 
     const actions = createCanvasEditorNodeEdgeActions({
-      activateCanvasSurface: vi.fn(),
-      board: ref({ left: 0, top: 0, width: 5000, height: 5000 }),
-      closeEdgePopover: vi.fn(),
-      closeSelectionPopover: vi.fn(),
+      geometry: {
+        board: ref({ left: 0, top: 0, width: 5000, height: 5000 }),
+        stageRef: ref(stage) as any,
+        viewport,
+      },
+      state: state as any,
       commitDocument: vi.fn(),
-      createEdgeDialog: { visible: false },
-      edgeLabelDraft: ref(""),
-      editingEdgeLabelId: ref(""),
-      edgeToolbarPopover: ref("closed"),
-      fileFieldRefresh: vi.fn(async () => {}),
+      t: vi.fn((key) => key) as any,
       getSettings: vi.fn(() => ({
         presentationAutoRatio: false,
         presentationMaskOpacity: 60,
       } as any)),
-      newEdgeFromSide: ref("right"),
-      newEdgeLabel: ref(""),
-      newEdgeSourceId: ref(""),
-      newEdgeSourceQuery: ref(""),
-      newEdgeTargetId: ref(""),
-      newEdgeTargetQuery: ref(""),
-      newEdgeToSide: ref("left"),
       presentationActive: ref(true),
-      selectedEdge: ref(undefined) as any,
-      selectedEdgeAnchors: ref(null) as any,
-      selectedNode: ref(null) as any,
-      selectionBounds: ref(null) as any,
-      selectionToolbarPopover: ref("closed") as any,
-      stageRef: ref(stage) as any,
-      state: state as any,
-      t: vi.fn((key) => key) as any,
-      viewport,
     })
 
     actions.focusNodeById("node-1")

@@ -16,7 +16,7 @@ import type {
 import type { CanvasI18nTranslator } from '@/canvas/use-canvas-editor-shared'
 import type { CanvasPluginSettings } from '@/canvas/plugin-data'
 
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { showMessage } from 'siyuan'
 import {
   applyCanvasNodeLayout,
@@ -44,75 +44,153 @@ import { findSproutRelations, type SproutRelationItem } from '@/canvas/siyuan-ke
 const MIND_MAP_HORIZONTAL_GAP = 80
 const MIND_MAP_VERTICAL_GAP = 40
 
-interface CanvasEditorNodeEdgeActionsOptions {
-  activateCanvasSurface: () => void
+export interface CanvasEditorGeometryState {
   board: ComputedRef<CanvasBoardMetrics>
-  closeEdgePopover: () => void
-  closeSelectionPopover: () => void
-  commitDocument: (document: CanvasDocument) => void
-  createEdgeDialog: {
-    visible: boolean
-  }
-  edgeLabelDraft: Ref<string>
-  editingEdgeLabelId: Ref<string>
-  edgeToolbarPopover: Ref<'closed' | 'color' | 'direction'>
-  fileFieldRefresh: () => Promise<void>
-  getSettings?: () => CanvasPluginSettings
-  newEdgeFromSide: Ref<CanvasSide>
-  newEdgeLabel: Ref<string>
-  newEdgeSourceId: Ref<string>
-  newEdgeSourceQuery: Ref<string>
-  newEdgeTargetId: Ref<string>
-  newEdgeTargetQuery: Ref<string>
-  newEdgeToSide: Ref<CanvasSide>
-  presentationActive?: Ref<boolean>
-  selectedEdge: ComputedRef<CanvasEdge | undefined>
-  selectedEdgeAnchors: ComputedRef<{
-    from: { x: number, y: number }
-    to: { x: number, y: number }
-  } | null>
-  selectedNode: ComputedRef<CanvasNode | null>
-  selectionBounds: ComputedRef<CanvasBounds | null>
-  selectionToolbarPopover: Ref<'closed' | 'color' | 'layout'>
-  stageRef: Ref<HTMLElement | undefined>
-  state: CanvasEditorState
-  t: CanvasI18nTranslator
   viewport: {
     scale: number
     x: number
     y: number
   }
+  stageRef?: Ref<HTMLElement | undefined>
+}
+
+export interface CanvasEditorSelectionUIState {
+  closeEdgePopover?: () => void
+  closeSelectionPopover?: () => void
+  edgeLabelDraft?: Ref<string>
+  editingEdgeLabelId?: Ref<string>
+  edgeToolbarPopover?: Ref<'closed' | 'color' | 'direction'>
+  selectionToolbarPopover?: Ref<'closed' | 'color' | 'layout'>
+  selectedEdge?: ComputedRef<CanvasEdge | undefined>
+  selectedEdgeAnchors?: ComputedRef<{
+    from: { x: number, y: number }
+    to: { x: number, y: number }
+  } | null>
+  selectedNode?: ComputedRef<CanvasNode | null>
+  selectionBounds?: ComputedRef<CanvasBounds | null>
+}
+
+export interface CanvasEditorCreateEdgeFormState {
+  dialog?: {
+    visible: boolean
+  }
+  fromSide?: Ref<CanvasSide>
+  label?: Ref<string>
+  sourceId?: Ref<string>
+  sourceQuery?: Ref<string>
+  targetId?: Ref<string>
+  targetQuery?: Ref<string>
+  toSide?: Ref<CanvasSide>
+}
+
+export interface CanvasEditorNodeEdgeActionsOptions {
+  state: CanvasEditorState
+  commitDocument: (document: CanvasDocument) => void
+  t: CanvasI18nTranslator
+  geometry?: CanvasEditorGeometryState
+  selectionUI?: CanvasEditorSelectionUIState
+  createEdgeForm?: CanvasEditorCreateEdgeFormState
+  activateCanvasSurface?: () => void
+  fileFieldRefresh?: () => Promise<void>
+  getSettings?: () => CanvasPluginSettings
+  presentationActive?: Ref<boolean>
+
+  // 扁平向后兼容属性
+  board?: ComputedRef<CanvasBoardMetrics>
+  viewport?: {
+    scale: number
+    x: number
+    y: number
+  }
+  stageRef?: Ref<HTMLElement | undefined>
+  closeEdgePopover?: () => void
+  closeSelectionPopover?: () => void
+  createEdgeDialog?: {
+    visible: boolean
+  }
+  edgeLabelDraft?: Ref<string>
+  editingEdgeLabelId?: Ref<string>
+  edgeToolbarPopover?: Ref<'closed' | 'color' | 'direction'>
+  newEdgeFromSide?: Ref<CanvasSide>
+  newEdgeLabel?: Ref<string>
+  newEdgeSourceId?: Ref<string>
+  newEdgeSourceQuery?: Ref<string>
+  newEdgeTargetId?: Ref<string>
+  newEdgeTargetQuery?: Ref<string>
+  newEdgeToSide?: Ref<CanvasSide>
+  selectedEdge?: ComputedRef<CanvasEdge | undefined>
+  selectedEdgeAnchors?: ComputedRef<{
+    from: { x: number, y: number }
+    to: { x: number, y: number }
+  } | null>
+  selectedNode?: ComputedRef<CanvasNode | null>
+  selectionBounds?: ComputedRef<CanvasBounds | null>
+  selectionToolbarPopover?: Ref<'closed' | 'color' | 'layout'>
 }
 
 export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeActionsOptions) {
+  const geometry: CanvasEditorGeometryState = options.geometry ?? {
+    board: options.board as ComputedRef<CanvasBoardMetrics>,
+    viewport: options.viewport as { scale: number, x: number, y: number },
+    stageRef: options.stageRef,
+  }
+
+  const selectionUI: CanvasEditorSelectionUIState = options.selectionUI ?? {
+    closeEdgePopover: options.closeEdgePopover,
+    closeSelectionPopover: options.closeSelectionPopover,
+    edgeLabelDraft: options.edgeLabelDraft,
+    editingEdgeLabelId: options.editingEdgeLabelId,
+    edgeToolbarPopover: options.edgeToolbarPopover,
+    selectedEdge: options.selectedEdge,
+    selectedEdgeAnchors: options.selectedEdgeAnchors,
+    selectedNode: options.selectedNode,
+    selectionBounds: options.selectionBounds,
+    selectionToolbarPopover: options.selectionToolbarPopover,
+  }
+
+  const createEdgeForm: CanvasEditorCreateEdgeFormState = options.createEdgeForm ?? {
+    dialog: options.createEdgeDialog,
+    fromSide: options.newEdgeFromSide,
+    label: options.newEdgeLabel,
+    sourceId: options.newEdgeSourceId,
+    sourceQuery: options.newEdgeSourceQuery,
+    targetId: options.newEdgeTargetId,
+    targetQuery: options.newEdgeTargetQuery,
+    toSide: options.newEdgeToSide,
+  }
+
   const {
-    activateCanvasSurface,
-    board,
-    closeEdgePopover,
-    closeSelectionPopover,
-    commitDocument,
-    createEdgeDialog,
-    edgeLabelDraft,
-    editingEdgeLabelId,
-    edgeToolbarPopover,
-    fileFieldRefresh,
-    newEdgeFromSide,
-    newEdgeLabel,
-    newEdgeSourceId,
-    newEdgeSourceQuery,
-    newEdgeTargetId,
-    newEdgeTargetQuery,
-    newEdgeToSide,
-    selectedEdge,
-    selectedEdgeAnchors,
-    selectedNode,
-    selectionBounds,
-    selectionToolbarPopover,
-    stageRef,
     state,
+    commitDocument,
     t,
-    viewport,
+    activateCanvasSurface = () => {},
+    fileFieldRefresh = async () => {},
+    getSettings,
+    presentationActive,
   } = options
+
+  const board = geometry.board
+  const viewport = geometry.viewport
+  const stageRef = geometry.stageRef
+  const closeEdgePopover = selectionUI.closeEdgePopover ?? (() => {})
+  const closeSelectionPopover = selectionUI.closeSelectionPopover ?? (() => {})
+  const edgeLabelDraft = selectionUI.edgeLabelDraft ?? ref('')
+  const editingEdgeLabelId = selectionUI.editingEdgeLabelId ?? ref('')
+  const edgeToolbarPopover = selectionUI.edgeToolbarPopover ?? ref('closed' as const)
+  const selectionToolbarPopover = selectionUI.selectionToolbarPopover ?? ref('closed' as const)
+  const selectedEdge = selectionUI.selectedEdge ?? computed(() => undefined)
+  const selectedEdgeAnchors = selectionUI.selectedEdgeAnchors ?? computed(() => null)
+  const selectedNode = selectionUI.selectedNode ?? computed(() => null)
+  const selectionBounds = selectionUI.selectionBounds ?? computed(() => null)
+
+  const createEdgeDialog = createEdgeForm.dialog ?? { visible: false }
+  const newEdgeFromSide = createEdgeForm.fromSide ?? ref<CanvasSide>('right')
+  const newEdgeLabel = createEdgeForm.label ?? ref('')
+  const newEdgeSourceId = createEdgeForm.sourceId ?? ref('')
+  const newEdgeSourceQuery = createEdgeForm.sourceQuery ?? ref('')
+  const newEdgeTargetId = createEdgeForm.targetId ?? ref('')
+  const newEdgeTargetQuery = createEdgeForm.targetQuery ?? ref('')
+  const newEdgeToSide = createEdgeForm.toSide ?? ref<CanvasSide>('left')
 
   function selectNode(nodeId?: string, event?: MouseEvent) {
     state.selectNode(nodeId, {

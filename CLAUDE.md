@@ -63,7 +63,7 @@ Canvas 文件通过 `format.ts`（JSON Canvas 规范）解析为 `CanvasDocument
 
 ### 文件预览管线
 
-新路径：`file-target-resolution.ts` → `file-target-preview.ts` → `file-preview-fallbacks.ts`。`file-node-resolution.ts` 与 `file-node-preview.ts` 是遗留兼容适配器，新功能应走新管线。`siyuan-file-node-lookups.ts` 是纯查找逻辑，运行时 SQL 访问隔离在 `siyuan-kernel-file-node-lookups.ts`。
+统一目标解析路径：`file-target-resolution.ts` → `file-target-preview.ts` → `file-preview-fallbacks.ts`，已彻底清除遗留兼容层（`file-node-resolution.ts` 与 `file-node-preview.ts`）。`siyuan-file-node-lookups.ts` 是纯查找逻辑，运行时 SQL 访问隔离在 `siyuan-kernel-file-node-lookups.ts`。
 
 ### 构建系统
 

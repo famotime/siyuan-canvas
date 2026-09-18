@@ -29,12 +29,8 @@
   Stateful editor model for open/save/conflict handling and selection state.
 - `src/canvas/file-service.ts`
   Canvas document load/save service over a text gateway.
-- `src/canvas/siyuan-text-gateway.ts`
-  Minimal SiYuan file API bridge used by `CanvasFileService`.
-- `src/canvas/file-node-resolution.ts`
-  Legacy compatibility adapter that now delegates file-node parsing to `file-target-resolution.ts` and maps results back into the older `file/document/asset/canvas` shape used by compatibility tests.
-- `src/canvas/file-node-preview.ts`
-  Compatibility preview wrapper for the older file-node model. Current preview semantics stay aligned with `file-target-preview.ts`.
+- `src/canvas/query-node-runtime.ts`
+  Encapsulated runtime module for dynamic query nodes: query execution, refresh timer lifecycles, Markdown pre-rendering, image extraction, and drag-and-drop transfer state.
 - `src/canvas/file-target-resolution.ts`
   Normalizes file-node input from paths and block IDs into document, canvas, image, or fallback targets.
 - `src/canvas/file-target-preview.ts`
@@ -83,7 +79,11 @@
 ## UI Layer
 
 - `src/components/canvas/CanvasWorkspace.vue`
-  Main canvas workspace composition view. Renders toolbar, stage, floating selection toolbar, file picker, and inspector while delegating file-card and create-edge dialog markup to child components. Scoped styles extracted to `canvas-workspace.scss`.
+  Main canvas workspace composition view. Renders toolbar, stage, floating selection toolbar, and file picker, delegating file-card and create-edge dialog markup to child components. Scoped styles extracted to `canvas-workspace.scss`.
+- `src/components/canvas/CanvasDock.vue`
+  Dedicated dock host for workspace document tree navigation and selection inspector. Operates independently of editor tab lifecycles.
+- `src/components/canvas/CanvasWorkspaceTree.vue`
+  Recursive workspace document tree component rendering folder hierarchies and canvas files with drag-and-drop support.
 - `src/components/canvas/canvas-workspace.scss`
   Scoped styles for `CanvasWorkspace.vue` (~2178 lines). Extracted from SFC for reduced diff surface.
 - `src/components/canvas/CanvasFileCard.vue`

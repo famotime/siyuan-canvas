@@ -337,6 +337,7 @@ import type { Plugin } from "siyuan"
 import { showMessage as siyuanShowMessage } from "siyuan"
 import {
   computed,
+  onBeforeUnmount,
   onMounted,
   ref,
   watch,
@@ -365,7 +366,7 @@ const t = createCanvasI18n((props.plugin as any).i18n)
 const activeTab = ref<'documents' | 'selection'>('documents')
 const sortDropdownOpen = ref(false)
 
-// 活跃画布状态绑定
+// 活跃画布状态绑定（仅用于高亮当前编辑文件与属性审查器展示）
 const activeEditor = computed(() => (props.plugin as any)?.activeEditor?.value ?? null)
 const hasActiveEditor = computed(() => !!activeEditor.value)
 const activeEditorFilePath = computed(() => activeEditor.value?.state?.filePath ?? "")
@@ -374,28 +375,17 @@ const activeEditorFilePath = computed(() => activeEditor.value?.state?.filePath 
 const localRecentFiles = ref<any[]>([])
 
 const refreshLocalRecentFiles = () => {
-  localRecentFiles.value = (props.plugin as any).getRecentCanvasFiles()
+  localRecentFiles.value = (props.plugin as any).getRecentCanvasFiles?.() ?? []
 }
 
-// 展开折叠状态同步
-const localInspectorSectionState = ref({
+// 展开折叠状态独立管理
+const inspectorSectionState = ref({
   document: true,
   recent: true,
 })
 
-const inspectorSectionState = computed(() => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    return activeEditor.value.inspectorSectionState
-  }
-  return localInspectorSectionState.value
-})
-
 const toggleInspectorSection = (section: 'document' | 'recent') => {
-  if (hasActiveEditor.value) {
-    activeEditor.value.toggleInspectorSection(section)
-  } else {
-    localInspectorSectionState.value[section] = !localInspectorSectionState.value[section]
-  }
+  inspectorSectionState.value[section] = !inspectorSectionState.value[section]
 }
 
 // 监听活跃编辑器状态，当画布关闭时如果当前在属性页则强制切回文件树 Tab
@@ -405,115 +395,63 @@ watch(hasActiveEditor, (newVal) => {
   }
 })
 
-// === 1. Standalone Workspace Tree 实例化 ===
-const refreshRecentFiles = () => {
-  refreshLocalRecentFiles()
+// === 1. 工作区文档树统一宿主管理 ===
+const workspaceTree = (props.plugin as any)?.getOrCreateWorkspaceTree
+  ? (props.plugin as any).getOrCreateWorkspaceTree()
+  : ((props.plugin as any)?.workspaceTree ?? createCanvasEditorWorkspaceTree({
+      readDir: siyuanReadDir,
+      putFile: siyuanPutFile,
+      removeFile: siyuanRemoveFile,
+      showMessage: siyuanShowMessage,
+      getSettings: () => (props.plugin as any)?.getCanvasSettings?.() ?? {},
+      plugin: props.plugin as any,
+      onFilePathUpdate: (path: string) => {
+        if (activeEditor.value?.state) {
+          activeEditor.value.state.filePath = path
+        }
+      },
+      refreshRecentFiles: () => {
+        refreshLocalRecentFiles()
+      },
+      promptText: openTextInputDialog,
+      confirm: openConfirmDialog,
+      labels: {
+        copyTitle: t("selectionToolbarCopy") || "复制",
+        deleteCanvasTitle: t("selectionToolbarDelete") || "删除画布",
+        deleteFolderTitle: t("contextMenuDelete") || "删除文件夹",
+        dialogCancel: t("dialogCancel") || "取消",
+        dialogConfirm: t("dialogConfirm") || "确认",
+        folderNameTitle: t("inspectorNewFolder") || "新建文件夹",
+        renameFolderTitle: t("contextMenuRename") || "重命名文件夹",
+        renameTitle: t("contextMenuRename") || "重命名",
+        unableToSaveMessage: t("unableToSave") || "无法保存",
+        untitledCanvas: t("untitledCanvas") || "未命名画布.canvas",
+      },
+    }))
+
+// 确保存储至插件实例，使后续打开的编辑器能共享同一文档树实例
+if (props.plugin && !(props.plugin as any).workspaceTree) {
+  (props.plugin as any).workspaceTree = workspaceTree
 }
 
-const standaloneWorkspaceTree = createCanvasEditorWorkspaceTree({
-  readDir: siyuanReadDir,
-  putFile: siyuanPutFile,
-  removeFile: siyuanRemoveFile,
-  showMessage: siyuanShowMessage,
-  getSettings: () => (props.plugin as any)?.getCanvasSettings?.() ?? {},
-  plugin: props.plugin as any,
-  onFilePathUpdate: (path: string) => {
-    props.plugin?.openCanvasTab?.({ path })
-  },
-  refreshRecentFiles,
-  promptText: openTextInputDialog,
-  confirm: openConfirmDialog,
-  labels: {
-    copyTitle: t("selectionToolbarCopy") || "复制",
-    deleteCanvasTitle: t("selectionToolbarDelete") || "删除画布",
-    deleteFolderTitle: t("contextMenuDelete") || "删除文件夹",
-    dialogCancel: t("dialogCancel") || "取消",
-    dialogConfirm: t("dialogConfirm") || "确认",
-    folderNameTitle: t("inspectorNewFolder") || "新建文件夹",
-    renameFolderTitle: t("contextMenuRename") || "重命名文件夹",
-    renameTitle: t("contextMenuRename") || "重命名",
-    unableToSaveMessage: t("unableToSave") || "无法保存",
-    untitledCanvas: t("untitledCanvas") || "未命名画布.canvas",
-  }
-})
-
-// 自动在编辑器切换或关闭时刷新对应的文件树和最近文件数据
-watch(activeEditor, (newEditor) => {
-  if (newEditor) {
-    newEditor.refreshWorkspaceDocuments?.()
-  } else {
-    standaloneWorkspaceTree.refreshWorkspaceDocuments()
-    refreshLocalRecentFiles()
-  }
-}, { immediate: true })
-
-onMounted(() => {
-  if (activeEditor.value) {
-    activeEditor.value.refreshWorkspaceDocuments?.()
-  } else {
-    standaloneWorkspaceTree.refreshWorkspaceDocuments()
-    refreshLocalRecentFiles()
-  }
-})
-
-// === 2. 状态映射与统一计算 ===
-const workspaceDocuments = computed(() => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    return activeEditor.value.workspaceDocuments ?? []
-  }
-  return standaloneWorkspaceTree.workspaceDocuments.value
-})
-
-const workspaceExpandedFolders = computed(() => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    return activeEditor.value.expandedFolders ?? new Set<string>()
-  }
-  return standaloneWorkspaceTree.expandedFolders.value ?? new Set<string>()
-})
-
-const workspaceSortField = computed(() => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    return activeEditor.value.workspaceSortField ?? 'updated'
-  }
-  return standaloneWorkspaceTree.workspaceSortField.value
-})
-
-const workspaceSortDirection = computed(() => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    return activeEditor.value.workspaceSortDirection ?? 'desc'
-  }
-  return standaloneWorkspaceTree.workspaceSortDirection.value
-})
-
+// === 2. 状态映射 ===
+const workspaceDocuments = computed(() => workspaceTree.workspaceDocuments.value)
+const workspaceExpandedFolders = computed(() => workspaceTree.expandedFolders.value)
+const workspaceSortField = computed(() => workspaceTree.workspaceSortField.value)
+const workspaceSortDirection = computed(() => workspaceTree.workspaceSortDirection.value)
+const allFoldersExpanded = computed(() => workspaceTree.allFoldersExpanded.value)
+const recentFiles = computed(() => localRecentFiles.value)
 const defaultCanvasDirectory = computed(() => {
   return (props.plugin as any)?.getCanvasSettings?.()?.defaultCanvasDirectory ?? ""
-})
-
-const allFoldersExpanded = computed(() => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    return activeEditor.value.allFoldersExpanded ?? false
-  }
-  return standaloneWorkspaceTree.allFoldersExpanded.value
 })
 
 const dragSourcePath = ref<string | null>(null)
 const dragOverFolderPath = ref<string | null>(null)
 let dragExpandTimer: any = null
 
-const recentFiles = computed(() => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    return activeEditor.value.recentFiles ?? []
-  }
-  return localRecentFiles.value
-})
-
-// === 3. 操作代理包装 ===
+// === 3. 操作事件 ===
 const handleToggleFolder = (path: string) => {
-  if (hasActiveEditor.value) {
-    activeEditor.value.toggleFolderExpand(path)
-  } else {
-    standaloneWorkspaceTree.toggleFolderExpand(path)
-  }
+  workspaceTree.toggleFolderExpand(path)
 }
 
 const handleOpenFile = (path: string) => {
@@ -521,57 +459,33 @@ const handleOpenFile = (path: string) => {
 }
 
 const handleDeleteDocument = (path: string) => {
-  if (hasActiveEditor.value) {
-    activeEditor.value.deleteWorkspaceDocument(path)
-  } else {
-    standaloneWorkspaceTree.deleteWorkspaceDocument(path)
-  }
+  workspaceTree.deleteWorkspaceDocument(path)
 }
 
 const handleCreateCanvas = async (path?: unknown) => {
   const targetPath = typeof path === 'string' ? path : undefined
-  if (hasActiveEditor.value && activeEditor.value) {
-    await activeEditor.value.createWorkspaceCanvas?.(targetPath)
-  } else {
-    await standaloneWorkspaceTree.createWorkspaceCanvas(targetPath)
-  }
+  await workspaceTree.createWorkspaceCanvas(targetPath)
 }
 
 const handleCreateFolder = async () => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    await activeEditor.value.createWorkspaceFolder()
-  } else {
-    await standaloneWorkspaceTree.createWorkspaceFolder()
-  }
+  await workspaceTree.createWorkspaceFolder()
 }
 
 const handleToggleAllFolders = () => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    activeEditor.value.expandAllInspectorSections()
+  if (workspaceTree.allFoldersExpanded.value) {
+    workspaceTree.collapseAllFolders()
   } else {
-    if (standaloneWorkspaceTree.allFoldersExpanded.value) {
-      standaloneWorkspaceTree.collapseAllFolders()
-    } else {
-      standaloneWorkspaceTree.expandAllFolders()
-    }
+    workspaceTree.expandAllFolders()
   }
 }
 
 const handleSetWorkspaceSortField = (field: 'name' | 'updated' | 'created') => {
-  if (hasActiveEditor.value) {
-    activeEditor.value.setWorkspaceSortField(field)
-  } else {
-    standaloneWorkspaceTree.setWorkspaceSortField(field)
-  }
+  workspaceTree.setWorkspaceSortField(field)
   sortDropdownOpen.value = false
 }
 
 const handleSetWorkspaceSortDirection = (direction: 'asc' | 'desc') => {
-  if (hasActiveEditor.value) {
-    activeEditor.value.setWorkspaceSortDirection(direction)
-  } else {
-    standaloneWorkspaceTree.setWorkspaceSortDirection(direction)
-  }
+  workspaceTree.setWorkspaceSortDirection(direction)
   sortDropdownOpen.value = false
 }
 
@@ -580,38 +494,21 @@ const handleOpenRecentFile = (recent: any) => {
 }
 
 const handleRemoveRecentFileRecord = async (path: string) => {
-  if (hasActiveEditor.value) {
-    await activeEditor.value.removeRecentFileRecord(path)
-  } else {
-    await (props.plugin as any).removeRecentCanvasFile(path)
-    refreshLocalRecentFiles()
-  }
+  await (props.plugin as any).removeRecentCanvasFile?.(path)
+  refreshLocalRecentFiles()
 }
 
-// === 4. 右键菜单与代理 ===
-const currentTreeProvider = computed(() => {
-  if (hasActiveEditor.value && activeEditor.value) {
-    return {
-      ...activeEditor.value,
-      createWorkspaceCanvas: (path?: string) => activeEditor.value.createWorkspaceCanvas?.(path) ?? activeEditor.value.newCanvas(),
-    }
-  }
-  return {
-    ...standaloneWorkspaceTree,
-    createWorkspaceCanvas: (path?: string) => standaloneWorkspaceTree.createWorkspaceCanvas(path),
-  }
-})
-
-const contextMenuEditorProxy = {
-  copyWorkspaceDocument: (path: string) => currentTreeProvider.value.copyWorkspaceDocument(path),
-  createWorkspaceFolder: (path?: string) => currentTreeProvider.value.createWorkspaceFolder(path),
-  createWorkspaceCanvas: (path?: string) => currentTreeProvider.value.createWorkspaceCanvas(path),
-  deleteWorkspaceDocument: (path: string) => currentTreeProvider.value.deleteWorkspaceDocument(path),
-  deleteWorkspaceFolder: (path: string) => currentTreeProvider.value.deleteWorkspaceFolder(path),
-  openInExplorer: (path: string) => currentTreeProvider.value.openInExplorer(path),
-  renameWorkspaceDocument: (path: string) => currentTreeProvider.value.renameWorkspaceDocument(path),
-  renameWorkspaceFolder: (path: string) => currentTreeProvider.value.renameWorkspaceFolder(path),
-  newCanvas: (path?: string) => currentTreeProvider.value.createWorkspaceCanvas(path),
+// === 4. 右键菜单 ===
+const contextMenuTreeActions = {
+  copyWorkspaceDocument: (path: string) => workspaceTree.copyWorkspaceDocument(path),
+  createWorkspaceFolder: (path?: string) => workspaceTree.createWorkspaceFolder(path),
+  createWorkspaceCanvas: (path?: string) => workspaceTree.createWorkspaceCanvas(path),
+  deleteWorkspaceDocument: (path: string) => workspaceTree.deleteWorkspaceDocument(path),
+  deleteWorkspaceFolder: (path: string) => workspaceTree.deleteWorkspaceFolder(path),
+  openInExplorer: (path: string) => workspaceTree.openInExplorer(path),
+  renameWorkspaceDocument: (path: string) => workspaceTree.renameWorkspaceDocument(path),
+  renameWorkspaceFolder: (path: string) => workspaceTree.renameWorkspaceFolder(path),
+  newCanvas: (path?: string) => workspaceTree.createWorkspaceCanvas(path),
 }
 
 const {
@@ -636,13 +533,33 @@ const {
       console.error("Failed to copy path", e)
     }
   },
-  editor: contextMenuEditorProxy,
+  editor: contextMenuTreeActions,
   showCopyPathSuccess: () => {
     siyuanShowMessage(t("selectionToolbarCopySuccess") || "已复制到剪贴板")
+  },
+})
+
+function onContextMenuKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeContextMenu()
+}
+
+onMounted(() => {
+  workspaceTree.refreshWorkspaceDocuments()
+  refreshLocalRecentFiles()
+  document.addEventListener("click", closeContextMenu)
+  document.addEventListener("keydown", onContextMenuKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", closeContextMenu)
+  document.removeEventListener("keydown", onContextMenuKeydown)
+  if (dragExpandTimer) {
+    clearTimeout(dragExpandTimer)
+    dragExpandTimer = null
   }
 })
 
-// === 5. 拖拽与放置代理事件 ===
+// === 5. 拖拽与放置事件 ===
 const onFileDragStart = (event: DragEvent, filePath: string) => {
   if (!event.dataTransfer) return
   event.dataTransfer.effectAllowed = 'copyMove'
@@ -659,19 +576,12 @@ const onFolderDragOver = (event: DragEvent) => {
 const onFolderDragEnter = (event: DragEvent, folderPath: string) => {
   event.preventDefault()
   dragOverFolderPath.value = folderPath
-  
-  const currentTree = hasActiveEditor.value && activeEditor.value
-    ? activeEditor.value
-    : standaloneWorkspaceTree
 
-  const expandedFoldersSet = hasActiveEditor.value && activeEditor.value
-    ? activeEditor.value.expandedFolders
-    : standaloneWorkspaceTree.expandedFolders.value
-
+  const expandedFoldersSet = workspaceTree.expandedFolders.value
   if (expandedFoldersSet && !expandedFoldersSet.has(folderPath)) {
     if (dragExpandTimer) clearTimeout(dragExpandTimer)
     dragExpandTimer = setTimeout(() => {
-      currentTree.toggleFolderExpand(folderPath)
+      workspaceTree.toggleFolderExpand(folderPath)
       dragExpandTimer = null
     }, 600)
   }
@@ -700,11 +610,7 @@ const onFolderDrop = async (event: DragEvent, folderPath: string) => {
   if (!sourcePath) return
   dragSourcePath.value = null
 
-  const currentTree = hasActiveEditor.value && activeEditor.value
-    ? activeEditor.value
-    : standaloneWorkspaceTree
-
-  await currentTree.moveWorkspaceFile(sourcePath, folderPath)
+  await workspaceTree.moveWorkspaceFile(sourcePath, folderPath)
 }
 
 const onRootDrop = async (event: DragEvent) => {
@@ -713,15 +619,11 @@ const onRootDrop = async (event: DragEvent) => {
   if (!sourcePath) return
   dragSourcePath.value = null
 
-  const currentTree = hasActiveEditor.value && activeEditor.value
-    ? activeEditor.value
-    : standaloneWorkspaceTree
-
   const defaultDir = (props.plugin as any)?.getCanvasSettings?.()?.defaultCanvasDirectory ?? ""
-  await currentTree.moveWorkspaceFile(sourcePath, defaultDir)
+  await workspaceTree.moveWorkspaceFile(sourcePath, defaultDir)
 }
 
-const onDragEnd = (event: DragEvent) => {
+const onDragEnd = () => {
   dragSourcePath.value = null
   dragOverFolderPath.value = null
   if (dragExpandTimer) {
@@ -743,3 +645,61 @@ const getSideLabel = (side: any) => {
 </script>
 
 <style scoped lang="scss" src="./canvas-workspace.scss"></style>
+
+<style lang="scss">
+.workspace-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 160px;
+  padding: 4px 0;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 8px;
+  background: var(--b3-theme-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+}
+
+.workspace-context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 8px);
+  margin: 0 4px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+
+  &:hover {
+    background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+  }
+
+  &--danger {
+    color: var(--b3-card-error-color, #c04f2a);
+
+    &:hover {
+      background: color-mix(in srgb, var(--b3-card-error-color, #c04f2a) 12%, transparent);
+    }
+  }
+}
+
+.workspace-context-menu__icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 14px;
+  color: currentColor;
+}
+
+.workspace-context-menu__divider {
+  height: 1px;
+  margin: 4px;
+  background: var(--b3-border-color);
+}
+</style>

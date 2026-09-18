@@ -128,4 +128,19 @@ describe("resolveCanvasFileTarget", () => {
     expect(result.openPath).toBe("/data/storage/maps/roadmap.assets/pasted.png")
     expect(result.path).toBe("/data/storage/maps/roadmap.assets/pasted.png")
   })
+
+  it("falls back to a generic file target when no Siyuan target is found", async () => {
+    const result = await resolveCanvasFileTarget("notes/legacy.md", {
+      resolveBlockById: vi.fn(async () => null),
+      resolveCanvasByPath: vi.fn(async () => null),
+      resolveDocumentByBlockId: vi.fn(async () => null),
+      resolveDocumentByPath: vi.fn(async () => null),
+      resolveImageByBlockId: vi.fn(async () => null),
+      resolveImageByPath: vi.fn(async () => null),
+    })
+
+    expect(result.kind).toBe("file")
+    expect(result.title).toBe("legacy.md")
+    expect(result.path).toBe("notes/legacy.md")
+  })
 })

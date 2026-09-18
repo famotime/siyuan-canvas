@@ -26,8 +26,9 @@
 6. 数据库与 AV 视图：[04-database-av/](04-database-av/)
 7. 块模型与块属性规范：[05-block-model/块模型与属性规范.md](05-block-model/块模型与属性规范.md)
 8. 调试与发布流程：[06-guides/调试与发布流程.md](06-guides/调试与发布流程.md)
-9. 官方全量公开 API 索引：[07-official-index/官方API全量索引-按模块.md](07-official-index/官方API全量索引-按模块.md)
-10. router 725 路由变更与风险索引：[07-official-index/router路由变更与风险索引.md](07-official-index/router路由变更与风险索引.md)
+9. 设置页控件与布局 FAQ：[06-guides/插件设置页开关与控件布局FAQ.md](06-guides/插件设置页开关与控件布局FAQ.md)
+10. 官方全量公开 API 索引：[07-official-index/官方API全量索引-按模块.md](07-official-index/官方API全量索引-按模块.md)
+11. router 725 路由变更与风险索引：[07-official-index/router路由变更与风险索引.md](07-official-index/router路由变更与风险索引.md)
 
 ## 目录结构
 
@@ -37,7 +38,7 @@
 - `03-kernel-api/`：公开 API 导航、调用示例、非公开 API 风险说明，以及官方 `API_zh_CN.md` 和 `router.go`
 - `04-database-av/`：属性视图（AV/数据库）增删改查、富文本与公式、SQL 结构与表字段详解
 - `05-block-model/`：块模型、块类型映射表（含 NodeCustomBlock 与 NodeTabs）、块属性清单
-- `06-guides/`：调试与发布流程、集市上架规范、SDK 使用边界
+- `06-guides/`：调试与发布流程、集市上架规范、SDK 使用边界、设置页开关与控件布局 FAQ
 - `07-official-index/`：官方 API 全量索引与 router.go 725 路由风险评级
 
 ## 文档使用约定
@@ -55,5 +56,6 @@
 - 版本演进指南：[00-version/SiYuan-v3.8.3开发进展与API迁移指南.md](00-version/SiYuan-v3.8.3开发进展与API迁移指南.md)
 - 插件入门实践：[01-start/插件开发入门与工程实践.md](01-start/插件开发入门与工程实践.md)
 - 关键架构概念：[01-start/关键概念与数据架构速览.md](01-start/关键概念与数据架构速览.md)
+- 设置页布局 FAQ：[06-guides/插件设置页开关与控件布局FAQ.md](06-guides/插件设置页开关与控件布局FAQ.md)
 - 官方 API 全量索引：[07-official-index/官方API全量索引-按模块.md](07-official-index/官方API全量索引-按模块.md)
 - router 风险索引：[07-official-index/router路由变更与风险索引.md](07-official-index/router路由变更与风险索引.md)

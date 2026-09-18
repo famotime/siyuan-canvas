@@ -71,4 +71,18 @@ describe("createCanvasFileTargetPreview", () => {
     expect(preview.thumbnail?.nodes).toHaveLength(2)
     expect(preview.thumbnail?.edges).toHaveLength(1)
   })
+
+  it("creates a generic fallback preview card", () => {
+    const preview = createCanvasFileTargetPreview({
+      kind: "file",
+      path: "notes/legacy.md",
+      title: "legacy.md",
+    })
+
+    expect(preview.kind).toBe("file")
+    expect(preview.badge).toBe("MD")
+    expect(preview.headline).toBe("legacy.md")
+    expect(preview.detail).toBe("notes/legacy.md")
+    expect(preview.helper).toBe("Double click to open")
+  })
 })

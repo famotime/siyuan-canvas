@@ -48,7 +48,9 @@ import {
 } from "@/main"
 import { setCanvasEmbedDebugEnabled, startCanvasEmbedObserver, stopCanvasEmbedObserver } from "@/canvas/canvas-embed-observer"
 import { insertCanvasEmbed, insertCanvasLink } from "@/canvas/canvas-embed-insert"
-import { getFileText } from "@/api"
+import { getFileText, putFile as siyuanPutFile, readDir as siyuanReadDir, removeFile as siyuanRemoveFile } from "@/api"
+import { openConfirmDialog } from "@/canvas/confirm-dialog"
+import { createCanvasEditorWorkspaceTree, type CanvasEditorWorkspaceTree } from "@/canvas/use-canvas-editor-workspace-tree"
 import { runCanvasEmbedCommand } from "@/canvas/canvas-embed-command"
 
 import "@/index.scss"
@@ -66,9 +68,46 @@ export default class SiyuanCanvasPlugin extends Plugin {
   public readonly version = pluginInfo.version
   public activeEditor = ref<any>(null)
   public activeAiConfig = ref<any>(null)
+  public workspaceTree: CanvasEditorWorkspaceTree | null = null
   private canvasData = createDefaultCanvasPluginData()
   private lastActiveProtyle: IProtyle | null = null
   private _onApiSwitchReady: (() => void) | null = null
+
+  public getOrCreateWorkspaceTree(): CanvasEditorWorkspaceTree {
+    if (!this.workspaceTree) {
+      this.workspaceTree = createCanvasEditorWorkspaceTree({
+        readDir: siyuanReadDir,
+        putFile: siyuanPutFile,
+        removeFile: siyuanRemoveFile,
+        showMessage,
+        getSettings: () => this.getCanvasSettings(),
+        plugin: this,
+        onFilePathUpdate: (path: string) => {
+          if (this.activeEditor?.value?.state) {
+            this.activeEditor.value.state.filePath = path
+          }
+        },
+        refreshRecentFiles: () => {
+          // 触发近期文件同步
+        },
+        promptText: openTextInputDialog,
+        confirm: openConfirmDialog,
+        labels: {
+          copyTitle: this.t("selectionToolbarCopy") || "复制",
+          deleteCanvasTitle: this.t("selectionToolbarDelete") || "删除画布",
+          deleteFolderTitle: this.t("contextMenuDelete") || "删除文件夹",
+          dialogCancel: this.t("dialogCancel") || "取消",
+          dialogConfirm: this.t("dialogConfirm") || "确认",
+          folderNameTitle: this.t("inspectorNewFolder") || "新建文件夹",
+          renameFolderTitle: this.t("contextMenuRename") || "重命名文件夹",
+          renameTitle: this.t("contextMenuRename") || "重命名",
+          unableToSaveMessage: this.t("unableToSave") || "无法保存",
+          untitledCanvas: this.t("untitledCanvas") || "未命名画布.canvas",
+        },
+      })
+    }
+    return this.workspaceTree
+  }
 
   private readonly rememberActiveProtyle = (event: CustomEvent<{ protyle?: IProtyle }>) => {
     if (event.detail?.protyle) {

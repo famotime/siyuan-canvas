@@ -11,6 +11,11 @@ import { parseCanvasDocument } from "@/canvas/format"
 export const CANVAS_EMBED_CLASS = "canvas-embed-preview"
 export const CANVAS_EMBED_BOUND_ATTR = "data-canvas-embed-bound"
 export const CANVAS_PATH_ATTR = "custom-canvas-path"
+export const CANVAS_EMBED_REFRESH_EVENT = "siyuan-canvas-embed-refresh"
+
+export interface CanvasEmbedRefreshEventDetail {
+  path: string
+}
 
 function escapeMarkdownImageAlt(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/]/g, "\\]")
