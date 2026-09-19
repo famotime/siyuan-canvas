@@ -1,3 +1,8 @@
+import type { CanvasEditorState } from "@/canvas/editor-state"
+import type { ResolvedCanvasFileTarget } from "@/canvas/file-target-resolution"
+import type {
+  CanvasPluginSettings,
+} from "@/canvas/plugin-data"
 import type {
   CanvasDocument,
   CanvasEdge,
@@ -5,13 +10,7 @@ import type {
   CanvasNode,
   CanvasTextNode,
 } from "@/canvas/types"
-import type {
-  CanvasPluginSettings,
-} from "@/canvas/plugin-data"
-import type { ResolvedCanvasFileTarget } from "@/canvas/file-target-resolution"
-import type { CanvasPluginBridge } from "@/canvas/use-canvas-editor-shared"
 import type { CanvasEditorFileSource } from "@/canvas/use-canvas-editor-shared"
-import type { CanvasEditorState } from "@/canvas/editor-state"
 
 import {
   showMessage,
@@ -33,10 +32,16 @@ import {
   extractMarkdownHeadingSections,
 } from "@/canvas/markdown-preview"
 import {
+  findNonOverlappingPosition,
+} from "@/canvas/node-overlap"
+import {
+  escapeSqlString,
+} from "@/canvas/siyuan-file-node-lookups"
+import {
+  findSiyuanAssetByPath,
+  getSiyuanBlockMarkdown,
   getSiyuanDocumentMarkdown,
   getSiyuanHeadingBlockMarkdown,
-  getSiyuanBlockMarkdown,
-  findSiyuanAssetByPath,
 } from "@/canvas/siyuan-kernel-file-node-lookups"
 import {
   getCanvasFileName,
@@ -44,13 +49,6 @@ import {
 import {
   buildWorkspaceImagePath,
 } from "@/canvas/workspace-image-files"
-import {
-  doNodesOverlap,
-  findNonOverlappingPosition,
-} from "@/canvas/node-overlap"
-import {
-  escapeSqlString,
-} from "@/canvas/siyuan-file-node-lookups"
 
 // ---------------------------------------------------------------------------
 // Re-exports for backward compatibility
@@ -68,8 +66,12 @@ export function findNonOverlappingNodePosition(
   stepY: number,
 ): { x: number, y: number } {
   const result = findNonOverlappingPosition(
-    node.x, node.y, node.width, node.height,
-    existingNodes, stepY,
+    node.x,
+    node.y,
+    node.width,
+    node.height,
+    existingNodes,
+    stepY,
   )
   node.x = result.x
   node.y = result.y
@@ -137,7 +139,7 @@ export function extractDocumentTitle(node: CanvasTextNode, fallbackLabel: string
 export function stripKramdownBlockIds(markdown: string): string {
   return markdown
     .replace(/\{:[^}]*\}/g, '')
-    .replace(/\s*\n{3,}/g, '\n\n')
+    .replace(/\s*\n{3}/g, '\n\n')
     .trim()
 }
 
@@ -181,7 +183,15 @@ export interface SelectionExportDependencies {
 }
 
 export function createCanvasEditorSelectionExport(deps: SelectionExportDependencies) {
-  const { state, commitDocument, refreshFileNodeMetadata, getResolvedFileNode, getPluginSettings, fileSource, t } = deps
+  const {
+    state,
+    commitDocument,
+    refreshFileNodeMetadata,
+    getResolvedFileNode,
+    getPluginSettings,
+    fileSource,
+    t,
+  } = deps
 
   async function findHeadingBlockIds(documentId: string, expectedCount: number): Promise<string[]> {
     const blocks = await sql(
@@ -205,29 +215,43 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
       // 规整路径，统一使用正斜杠并去除末尾斜杠
       const normalized = settings.noteCreationDirectory.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/$/, '')
       const segments = normalized.split('/').filter(Boolean)
-      
+
       if (segments.length > 0) {
         const firstSegment = segments[0]
         // 尝试匹配未关闭的笔记本名称
         const matchedNotebook = activeNotebooks.find((n: { name: string }) => n.name === firstSegment)
         if (matchedNotebook) {
           // 如果首段匹配到了笔记本，则使用该笔记本，剩余段作为笔记本内部的父路径
-          const remainingPath = '/' + segments.slice(1).join('/')
-          return { notebook: matchedNotebook.id, parentPath: remainingPath }
+          const remainingPath = `/${segments.slice(1).join('/')}`
+          return {
+            notebook: matchedNotebook.id,
+            parentPath: remainingPath,
+          }
         }
       }
       // 未匹配到任何笔记本时，默认在活动笔记本下的整个路径中创建
-      return { notebook: defaultNotebook.id, parentPath: normalized || '/' }
+      return {
+        notebook: defaultNotebook.id,
+        parentPath: normalized || '/',
+      }
     }
 
     const conf = await getNotebookConf(defaultNotebook.id)
     const dailyNotePath = conf?.conf?.dailyNoteSavePath
-    if (!dailyNotePath) return { notebook: defaultNotebook.id, parentPath: '/' }
+    if (!dailyNotePath) {
+      return {
+        notebook: defaultNotebook.id,
+        parentPath: '/',
+      }
+    }
 
     const resolved = await renderSprig(dailyNotePath)
     const segments = resolved.replace(/\\/g, '/').replace(/\/+/g, '/').split('/').filter(Boolean)
     segments.pop()
-    return { notebook: defaultNotebook.id, parentPath: '/' + segments.join('/') }
+    return {
+      notebook: defaultNotebook.id,
+      parentPath: `/${segments.join('/')}`,
+    }
   }
 
   async function copyImageTargetToWorkspaceCanvasAssets(
@@ -347,7 +371,10 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
         stack.pop()
       }
 
-      const parent = stack[stack.length - 1] ?? { id: sourceNodeId, level: minLevel - 1 }
+      const parent = stack[stack.length - 1] ?? {
+        id: sourceNodeId,
+        level: minLevel - 1,
+      }
       const depth = Math.max(1, heading.level - minLevel + 1)
       const row = columnCounts.get(depth) ?? 0
       columnCounts.set(depth, row + 1)
@@ -393,7 +420,7 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
 
   async function convertSelectionToDocument(selectedNodeIds: string[]) {
     const allTextNodes = selectedNodeIds
-      .map(id => state.document.nodes.find(n => n.id === id))
+      .map((id) => state.document.nodes.find((n) => n.id === id))
       .filter((n): n is CanvasTextNode => n?.type === 'text')
 
     if (allTextNodes.length === 0) return
@@ -410,18 +437,22 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
         : topologicalSortSelectedNodes(selectedNodeIds, state.document.edges)
 
       const orderedNodes = orderedIds
-        .map(id => allTextNodes.find(n => n.id === id))
+        .map((id) => allTextNodes.find((n) => n.id === id))
         .filter((n): n is CanvasTextNode => Boolean(n))
 
       if (orderedNodes.length === 0) return
 
-      const firstNonEmpty = orderedNodes.find(n => n.text.trim())
+      const firstNonEmpty = orderedNodes.find((n) => n.text.trim())
       if (!firstNonEmpty) return
 
       const title = extractDocumentTitle(firstNonEmpty, t('nodeKindText'))
       const markdown = buildMergedMarkdown(orderedNodes)
       const docPath = dir.parentPath === '/' ? `/${title}` : `${dir.parentPath}/${title}`
       const documentId = await createDocWithMd(dir.notebook, docPath, markdown)
+
+      if (!documentId) {
+        throw new Error('createDocWithMd returned empty documentId')
+      }
 
       const replacementNodes: Array<{ id: string, node: CanvasFileNode }> = []
 
@@ -441,11 +472,18 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
           },
         })
       } else {
-        const nonEmptyCount = orderedNodes.filter(n => n.text.trim()).length
+        const nonEmptyCount = orderedNodes.filter((n) => n.text.trim()).length
         const headingCount = Math.max(0, nonEmptyCount - 1)
-        const headingBlockIds = headingCount > 0
-          ? await findHeadingBlockIds(documentId, headingCount)
-          : []
+        let headingBlockIds: string[] = []
+        if (headingCount > 0) {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            headingBlockIds = await findHeadingBlockIds(documentId, headingCount)
+            if (headingBlockIds.length >= headingCount) {
+              break
+            }
+            await new Promise((resolve) => setTimeout(resolve, 120))
+          }
+        }
         let headingIndex = 0
 
         for (let i = 0; i < orderedNodes.length; i++) {
@@ -465,12 +503,15 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
             height: source.height,
             color: source.color,
           }
-          replacementNodes.push({ id: source.id, node: fileNode })
+          replacementNodes.push({
+            id: source.id,
+            node: fileNode,
+          })
         }
       }
 
-      const replacementMap = new Map(replacementNodes.map(r => [r.id, r.node]))
-      const updatedNodes = state.document.nodes.map(node =>
+      const replacementMap = new Map(replacementNodes.map((r) => [r.id, r.node]))
+      const updatedNodes = state.document.nodes.map((node) =>
         replacementMap.get(node.id) ?? node,
       )
 
@@ -479,7 +520,7 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
         nodes: updatedNodes,
       })
 
-      await refreshFileNodeMetadata(replacementNodes.map(r => r.id))
+      await refreshFileNodeMetadata(replacementNodes.map((r) => r.id))
 
       showMessage(t('messageConvertToDocumentSuccess', { title }), 3000)
     } catch (err) {
@@ -490,7 +531,7 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
 
   async function convertSelectionToText(selectedNodeIds: string[]) {
     const fileNodes = selectedNodeIds
-      .map(id => state.document.nodes.find(n => n.id === id))
+      .map((id) => state.document.nodes.find((n) => n.id === id))
       .filter((n): n is CanvasFileNode => n?.type === 'file')
 
     if (fileNodes.length === 0) return
@@ -508,11 +549,14 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
           height: node.height,
           color: node.color,
         }
-        return { id: node.id, node: textNode as CanvasNode }
+        return {
+          id: node.id,
+          node: textNode as CanvasNode,
+        }
       }))
 
-      const replacementMap = new Map(replacementEntries.map(r => [r.id, r.node]))
-      const updatedNodes = state.document.nodes.map(node =>
+      const replacementMap = new Map(replacementEntries.map((r) => [r.id, r.node]))
+      const updatedNodes = state.document.nodes.map((node) =>
         replacementMap.get(node.id) ?? node,
       )
 

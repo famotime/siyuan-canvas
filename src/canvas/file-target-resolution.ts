@@ -53,8 +53,8 @@ export interface CanvasFileTargetLookups {
 }
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/i
-const EMBEDDED_BLOCK_ID_PATTERN = /\{\:\s*[^}]*\bid="(\d{14}-[a-z0-9]{7})"[^}]*\}/i
-const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/i
+const EMBEDDED_BLOCK_ID_PATTERN = /\{:[^}]*\bid="(\d{14}-[a-z0-9]{7})"[^}]*\}/i
+const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/
 const IMAGE_PATH_PATTERN = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i
 
 function getFallbackTitle(path: string): string {
@@ -133,6 +133,16 @@ export async function resolveCanvasFileTarget(
     const document = await lookups.resolveDocumentByBlockId(blockId)
     if (document) {
       return document
+    }
+
+    // 若通过各查找函数暂未在数据库中查到（如刚创建文档，思源 SQLite 索引还在异步处理中），
+    // 由于确定是思源块/文档 ID，绝不能作为外部本地文件处理，兜底作为文档返回
+    return {
+      hpath: blockId,
+      id: blockId,
+      kind: "document",
+      path: blockId,
+      title: blockId,
     }
   }
 

@@ -1,8 +1,14 @@
-import type { CanvasNode } from '@/canvas/types'
 import type { ResolvedCanvasFileTarget } from '@/canvas/file-target-resolution'
-import type { CanvasI18nTranslator, CanvasPluginBridge } from '@/canvas/use-canvas-editor-shared'
+import type { CanvasNode } from '@/canvas/types'
+import type {
+  CanvasI18nTranslator,
+  CanvasPluginBridge,
+} from '@/canvas/use-canvas-editor-shared'
 
-import { openTab, showMessage } from 'siyuan'
+import {
+  openTab,
+  showMessage,
+} from 'siyuan'
 import { openExternalFile } from '@/canvas/open-external-file'
 
 interface CanvasEditorNodeActivationOptions {
@@ -87,6 +93,25 @@ export function createCanvasEditorNodeActivationActions(options: CanvasEditorNod
       }
 
       if (resolved.kind === 'file') {
+        // 安全拦截：若 resolved.path 或 node.file 实际上是思源块/文档 ID，绝不能调用外部 openExternalFile 打开本地文件
+        const targetId = (/^\d{14}-[a-z0-9]{7}$/i.test(resolved.path.trim())
+          ? resolved.path.trim()
+          : /^\d{14}-[a-z0-9]{7}$/i.test(node.file.trim())
+            ? node.file.trim()
+            : '')
+        if (targetId) {
+          void openTab({
+            app: plugin.app,
+            doc: {
+              id: targetId,
+            },
+            keepCursor: false,
+            openNewTab: true,
+          })
+          showMessage(t('nodeActivated', { title: resolved.detail || resolved.title }), 2000, 'info')
+          return
+        }
+
         void openExternalFile(resolved.path, {
           currentCanvasFilePath: currentCanvasFilePath?.(),
         }).then((openResult) => {

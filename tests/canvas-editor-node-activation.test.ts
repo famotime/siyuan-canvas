@@ -91,4 +91,52 @@ describe('canvas editor node activation', () => {
 
     expect(openCanvasTab).toHaveBeenCalledWith({ path: 'data/plugins/siyuan-canvas/nested.canvas' })
   })
+
+  it('opens doc in siyuan via openTab when node.file is a block id even if resolved.kind is file', async () => {
+    const { openTab } = await import('siyuan')
+    vi.mocked(openTab).mockClear()
+
+    const mockOpenPath = vi.fn(async () => '')
+    ;(window as any).require = vi.fn((mod: string) => {
+      if (mod === 'electron') {
+        return { shell: { openPath: mockOpenPath } }
+      }
+      return null
+    })
+
+    const actions = createCanvasEditorNodeActivationActions({
+      ensureCanvasPath: (p: string) => p,
+      getResolvedFileNode: (node: any) => ({
+        detail: node.file,
+        kind: 'file',
+        path: node.file,
+        title: node.file,
+      }),
+      openDocumentByBlockId: vi.fn(async () => {}),
+      plugin: { app: { id: 'app-1' } } as any,
+      t: (k: string) => k,
+    })
+
+    const blockIdNode = {
+      height: 160,
+      id: 'file-doc-1',
+      type: 'file' as const,
+      width: 320,
+      x: 100,
+      y: 100,
+      file: '20260919113430-rg8m7ll',
+    }
+
+    actions.activateNode(blockIdNode)
+
+    await new Promise((r) => setTimeout(r, 10))
+
+    // 验证绝不调用本地 shell.openPath 打开外部文件
+    expect(mockOpenPath).not.toHaveBeenCalled()
+    // 验证在思源内部通过 openTab 打开该笔记文档
+    expect(openTab).toHaveBeenCalledWith(expect.objectContaining({
+      doc: { id: '20260919113430-rg8m7ll' },
+      openNewTab: true,
+    }))
+  })
 })

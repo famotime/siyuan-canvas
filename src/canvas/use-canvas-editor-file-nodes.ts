@@ -113,10 +113,20 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
 
   function createFallbackFileTarget(path: string): ResolvedCanvasFileTarget & { detail: string } {
     const trimmed = path.trim()
-    const segments = trimmed.replace(/\\/g, "/").split("/")
+    if (/^\d{14}-[a-z0-9]{7}$/i.test(trimmed)) {
+      return {
+        detail: trimmed,
+        hpath: trimmed,
+        id: trimmed,
+        kind: 'document',
+        path: trimmed,
+        title: trimmed,
+      }
+    }
+    const segments = trimmed.replace(/\\/g, '/').split('/')
     return {
       detail: trimmed,
-      kind: trimmed.endsWith(".canvas") ? "canvas" : "file",
+      kind: trimmed.endsWith('.canvas') ? 'canvas' : 'file',
       path: trimmed,
       title: segments[segments.length - 1] || trimmed,
     }
@@ -202,7 +212,19 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
   }
 
   async function resolveFileNodeMetadata(node: Extract<CanvasNode, { type: 'file' }>) {
-    const resolved = await resolveCanvasFileTarget(node.file, resolveLookups)
+    let resolved = await resolveCanvasFileTarget(node.file, resolveLookups)
+
+    // 若属于思源块 ID 但命中了尚未建立索引的兜底（title 等于 id），支持最多重试 3 次，平滑异步索引队列延迟
+    if (/^\d{14}-[a-z0-9]{7}$/i.test(node.file.trim()) && resolved.kind === 'document' && resolved.title === resolved.id) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 120))
+        const retried = await resolveCanvasFileTarget(node.file, resolveLookups)
+        if (retried.title !== retried.id) {
+          resolved = retried
+          break
+        }
+      }
+    }
 
     let enriched: ResolvedCanvasFileTarget & {
       detail: string

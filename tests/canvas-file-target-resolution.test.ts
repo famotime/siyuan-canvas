@@ -143,4 +143,20 @@ describe("resolveCanvasFileTarget", () => {
     expect(result.title).toBe("legacy.md")
     expect(result.path).toBe("notes/legacy.md")
   })
+
+  it("falls back to a document target for a block id when all lookups return null", async () => {
+    const result = await resolveCanvasFileTarget("20260919113430-rg8m7ll", {
+      resolveBlockById: vi.fn(async () => null),
+      resolveCanvasByPath: vi.fn(async () => null),
+      resolveDocumentByBlockId: vi.fn(async () => null),
+      resolveDocumentByPath: vi.fn(async () => null),
+      resolveImageByBlockId: vi.fn(async () => null),
+      resolveImageByPath: vi.fn(async () => null),
+    })
+
+    expect(result.kind).toBe("document")
+    expect(result.id).toBe("20260919113430-rg8m7ll")
+    expect(result.title).toBe("20260919113430-rg8m7ll")
+    expect(result.path).toBe("20260919113430-rg8m7ll")
+  })
 })
