@@ -614,9 +614,8 @@ export function useCanvasEditor(
   function getNodeStyle(node: CanvasNode) {
     return {
       height: `${node.height}px`,
-      left: `${toBoardX(board.value, node.x)}px`,
-      top: `${toBoardY(board.value, node.y)}px`,
       width: `${node.width}px`,
+      transform: `translate(${toBoardX(board.value, node.x)}px, ${toBoardY(board.value, node.y)}px)`,
     }
   }
 
