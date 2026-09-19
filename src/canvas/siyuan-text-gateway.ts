@@ -42,6 +42,15 @@ function getFsModule(): any {
   return null
 }
 
+function getWorkspaceDir(): string {
+  try {
+    const workspaceDir = (window as any).siyuan?.config?.system?.workspaceDir
+    return typeof workspaceDir === "string" && workspaceDir ? workspaceDir : ""
+  } catch {
+    return ""
+  }
+}
+
 export class SiyuanCanvasTextGateway implements CanvasTextGateway {
   async readText(path: string): Promise<string> {
     const trimmed = path.trim()
@@ -126,6 +135,47 @@ export class SiyuanCanvasTextGateway implements CanvasTextGateway {
     const payload = await response.json()
     if (!response.ok || payload.code !== 0) {
       throw new Error(payload.msg || `Failed to write ${trimmed}`)
+    }
+  }
+
+  /**
+   * 直接通过 Electron fs 写入磁盘，绕过 `/api/file/putFile`。
+   * 自动保存使用此方法可避免 putFile 触发思源宿主侧文件树刷新/重布局导致的画布闪烁。
+   * 写入成功返回 true；环境不支持（无 fs / 无法解析工作区路径）或写入失败时返回 false，
+   * 调用方应回退到 writeText（putFile）。
+   */
+  async writeTextDirect(path: string, text: string): Promise<boolean> {
+    const fs = getFsModule()
+    if (!fs) return false
+
+    const trimmed = path.trim()
+    const isAbsoluteLocal = /^[a-zA-Z]:[/\\]/.test(trimmed) || /^[/\\]+[a-zA-Z]:/.test(trimmed) || trimmed.startsWith('file://')
+
+    let targetPath = trimmed
+    if (isAbsoluteLocal) {
+      if (targetPath.startsWith('file:///')) {
+        targetPath = decodeURIComponent(targetPath.substring(8))
+      } else if (targetPath.startsWith('file://')) {
+        targetPath = decodeURIComponent(targetPath.substring(7))
+      }
+      targetPath = targetPath.replace(/^[/\\]+([a-zA-Z]:)/, '$1')
+    } else {
+      const workspaceDir = getWorkspaceDir()
+      if (!workspaceDir) return false
+      targetPath = `${workspaceDir.replace(/[\\/]+$/, '')}/${trimmed.replace(/^\/+/, '')}`
+    }
+
+    try {
+      if (typeof fs.promises?.writeFile === 'function') {
+        await fs.promises.writeFile(targetPath, text, 'utf-8')
+      } else if (typeof fs.writeFileSync === 'function') {
+        fs.writeFileSync(targetPath, text, 'utf-8')
+      } else {
+        return false
+      }
+      return true
+    } catch {
+      return false
     }
   }
 }

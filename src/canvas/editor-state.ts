@@ -21,6 +21,7 @@ interface CanvasEditorService {
     options?: {
       baseRaw?: string
       detectExternalChanges?: boolean
+      direct?: boolean
     },
   ) => Promise<string>
 }
@@ -190,6 +191,7 @@ export class CanvasEditorState {
     options: {
       detectExternalChanges?: boolean
       force?: boolean
+      direct?: boolean
     } = {},
   ): Promise<void> {
     if (!path) {
@@ -201,7 +203,8 @@ export class CanvasEditorState {
         baseRaw: !options.force && path === this.filePath && this.lastSavedRaw
           ? this.lastSavedRaw
           : undefined,
-        detectExternalChanges: options.detectExternalChanges && !options.force,
+        detectExternalChanges: options.detectExternalChanges && !options.force && !options.direct,
+        direct: options.direct && !options.force,
       })
       this.filePath = path
       this.isDirty = false

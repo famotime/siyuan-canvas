@@ -915,50 +915,38 @@ export function useCanvasEditor(
    * 保存包装：维护 isSaving 标志，让顶栏徽标可以呈现 saving 态。
    * 同时在打开新文件 / 新建画布时清空历史栈，避免跨文档 undo 出诡异结果。
    */
+  let saveInFlight = false
+
   async function save() {
-    if (isSaving.value) {
+    if (saveInFlight) {
       return
     }
+    saveInFlight = true
     isSaving.value = true
     try {
       await saveImpl()
     } finally {
       isSaving.value = false
+      saveInFlight = false
     }
   }
 
   /**
-   * 静默保存包装：复用 isSaving 守卫，不弹对话框直接写入当前文件路径。
+   * 静默保存包装：不弹对话框直接写入当前文件路径。
+   * 与手动保存不同，这里不翻转 isSaving（静默保存不应触发顶栏「保存中」状态切换），
+   * 仅用非响应式的 saveInFlight 守卫并发，避免任何响应式状态抖动引起画布重渲染闪烁。
    */
   async function silentSave() {
-    if (isSaving.value) {
+    if (saveInFlight) {
       return
     }
-    isSaving.value = true
+    saveInFlight = true
     try {
       await silentSaveImpl()
     } finally {
-      isSaving.value = false
+      saveInFlight = false
     }
   }
-
-  // 自动保存：文档变脏后 1 秒静默保存到当前路径
-  let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
-  watch(
-    () => state.isDirty,
-    (dirty) => {
-      if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer)
-        autoSaveTimer = null
-      }
-      if (dirty) {
-        autoSaveTimer = setTimeout(() => {
-          autoSaveTimer = null
-          void silentSave()
-        }, 1000)
-      }
-    },
-  )
 
   function clearHistory() {
     history.clear()
@@ -1171,6 +1159,7 @@ export function useCanvasEditor(
     handleNodePointerDown,
     handleWheelZoom,
     isConnectionTarget,
+    isDragging,
     startEdgeEndpointDrag,
     startConnectionDrag,
     startCornerResize,
@@ -1194,6 +1183,23 @@ export function useCanvasEditor(
     autoCreateTextCardOnDrag: computed(() => getReactivePluginSettings().autoCreateTextCardOnDrag),
     showNodeHeader: computed(() => getReactivePluginSettings().showNodeHeader),
   })
+
+  // 自动保存：文档变脏后 1 秒静默保存到当前路径；拖拽/缩放期间挂起，结束后再恢复调度
+  let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+  function scheduleAutoSave() {
+    if (autoSaveTimer) {
+      clearTimeout(autoSaveTimer)
+      autoSaveTimer = null
+    }
+    if (state.isDirty && !isDragging.value) {
+      autoSaveTimer = setTimeout(() => {
+        autoSaveTimer = null
+        void silentSave()
+      }, 1000)
+    }
+  }
+  watch(() => state.isDirty, scheduleAutoSave)
+  watch(isDragging, scheduleAutoSave)
 
   function nudgeSelectedNodes(dx: number, dy: number) {
     if (!state.selectedNodeIds.length) {

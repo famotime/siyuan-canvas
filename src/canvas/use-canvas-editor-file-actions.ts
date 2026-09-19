@@ -387,6 +387,23 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
     }
   }
 
+  // 静默保存仅写盘并同步状态，跳过内嵌预览刷新 / 最近文件 / 工作区树重读，
+  // 避免触发宿主侧文档 reload 与重布局导致的「跳转页面再刷新」闪烁
+  async function silentSaveLocal(path: string) {
+    const raw = stringifyCanvasDocument(state.document)
+    await writeLocalFileText(path, raw)
+    state.filePath = path
+    state.isDirty = false
+    state.lastSavedRaw = raw
+    state.conflict = null
+  }
+
+  async function silentSaveWorkspace(path: string) {
+    await state.save(path, {
+      direct: true,
+    })
+  }
+
   async function silentSave() {
     if (!state.filePath) {
       return
@@ -394,9 +411,9 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
 
     try {
       if (fileSource.value === "local") {
-        await saveLocal(state.filePath)
+        await silentSaveLocal(state.filePath)
       } else {
-        await saveWorkspace(state.filePath)
+        await silentSaveWorkspace(state.filePath)
       }
     } catch {
       // 自动保存失败静默处理，不干扰用户编辑

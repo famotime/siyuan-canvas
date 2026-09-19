@@ -2,7 +2,10 @@ import type {
   ComputedRef,
   Ref,
 } from "vue"
-import { watch } from "vue"
+import {
+  ref,
+  watch,
+} from "vue"
 import type { CanvasBoardMetrics } from "@/canvas/board"
 import type { CanvasEditorState } from "@/canvas/editor-state"
 import type {
@@ -119,6 +122,9 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     viewport,
     showNodeHeader,
   } = options
+
+  // 拖拽/缩放期间挂起自动保存，避免拖拽中途触发宿主侧文件写入与重布局导致闪烁
+  const isDragging = ref(false)
 
   function clearSelectionBox() {
     selectionBox.visible = false
@@ -592,6 +598,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     if (!state.selectedNodeIds.includes(node.id)) {
       state.selectNode(node.id)
     }
+    isDragging.value = true
     startPointerGesture(event, (dx, dy, moveEvent) => {
       const rawDelta = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
       const {
@@ -617,7 +624,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
       commitDocument(movedDocument, { coalesceKey: `drag-${node.id}` })
     }, {
-      onEnd: clearAlignmentGuides,
+      onEnd: () => {
+        isDragging.value = false
+        clearAlignmentGuides()
+      },
     })
   }
 
@@ -649,6 +659,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     )
     let hasCopied = false
 
+    isDragging.value = true
     startPointerGesture(event, (dx, dy, moveEvent) => {
       const rawDelta = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
       const {
@@ -688,7 +699,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         hasCopied = true
       }
     }, {
-      onEnd: clearAlignmentGuides,
+      onEnd: () => {
+        isDragging.value = false
+        clearAlignmentGuides()
+      },
     })
   }
 
@@ -959,6 +973,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     event.preventDefault?.()
+    isDragging.value = true
     startPointerGesture(event, (dx, dy) => {
       commitDocument(
         setCanvasNodeGeometry(
@@ -968,6 +983,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         ),
         { coalesceKey: `resize-${node.id}-${side}` },
       )
+    }, {
+      onEnd: () => {
+        isDragging.value = false
+      },
     })
   }
 
@@ -977,6 +996,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     event.preventDefault?.()
+    isDragging.value = true
     startPointerGesture(event, (dx, dy) => {
       commitDocument(
         setCanvasNodeGeometry(
@@ -986,6 +1006,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         ),
         { coalesceKey: `resize-corner-${node.id}` },
       )
+    }, {
+      onEnd: () => {
+        isDragging.value = false
+      },
     })
   }
 
@@ -999,6 +1023,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     handleNodePointerDown,
     handleWheelZoom,
     isConnectionTarget,
+    isDragging,
     startEdgeEndpointDrag,
     startConnectionDrag,
     startCornerResize,

@@ -923,5 +923,35 @@ describe('canvas editor gesture handlers', () => {
       expect(preventDefaultSpy).toHaveBeenCalled()
       expect(stopPropagationSpy).toHaveBeenCalled()
     })
+
+    it("marks isDragging true during card drag and resets it on pointerup", () => {
+      const node = { id: "node-1", type: "text", x: 100, y: 100, width: 200, height: 100 } as CanvasNode
+      const { handlers } = createGestureHarness([node])
+
+      const target = document.createElement("div")
+      target.className = "canvas-node__header"
+      const pointerDownEvent = new PointerEvent("pointerdown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        bubbles: true,
+      })
+      Object.defineProperty(pointerDownEvent, "target", { value: target })
+
+      handlers.handleNodePointerDown(node, pointerDownEvent)
+      expect(handlers.isDragging.value).toBe(true)
+
+      window.dispatchEvent(new PointerEvent("pointermove", {
+        clientX: 130,
+        clientY: 140,
+      }))
+      expect(handlers.isDragging.value).toBe(true)
+
+      window.dispatchEvent(new PointerEvent("pointerup", {
+        clientX: 130,
+        clientY: 140,
+      }))
+      expect(handlers.isDragging.value).toBe(false)
+    })
   })
 })

@@ -10,6 +10,7 @@ import {
 export interface CanvasTextGateway {
   readText: (path: string) => Promise<string>
   writeText: (path: string, text: string) => Promise<void>
+  writeTextDirect?: (path: string, text: string) => Promise<boolean>
 }
 
 export interface CanvasLoadResult {
@@ -21,6 +22,7 @@ export interface CanvasLoadResult {
 export interface CanvasSaveOptions {
   baseRaw?: string
   detectExternalChanges?: boolean
+  direct?: boolean
 }
 
 export class CanvasExternalChangeError extends Error {
@@ -48,6 +50,15 @@ export class CanvasFileService {
   }
 
   async save(path: string, document: CanvasDocument, options: CanvasSaveOptions = {}): Promise<string> {
+    // 直写模式：绕过 putFile 直接写磁盘，避免触发宿主侧刷新；失败时回退到常规 putFile
+    if (options.direct && typeof this.gateway.writeTextDirect === "function") {
+      const directRaw = stringifyCanvasDocument(document)
+      const wrote = await this.gateway.writeTextDirect(path, directRaw)
+      if (wrote) {
+        return directRaw
+      }
+    }
+
     if (options.detectExternalChanges && options.baseRaw !== undefined) {
       const currentRaw = await this.gateway.readText(path)
       if (currentRaw !== options.baseRaw) {
