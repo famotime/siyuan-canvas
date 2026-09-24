@@ -48,6 +48,11 @@ import {
   clampViewportScale,
   scaleViewportAtPoint,
 } from "@/canvas/viewport"
+import {
+  createCanvasWheelSourceClassifier,
+  normalizeCanvasWheelDelta,
+  WHEEL_ZOOM_SENSITIVITY,
+} from "@/canvas/wheel-gesture"
 
 export interface CanvasEditorSelectionBoxState {
   height: number
@@ -125,6 +130,9 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
   // 拖拽/缩放期间挂起自动保存，避免拖拽中途触发宿主侧文件写入与重布局导致闪烁
   const isDragging = ref(false)
+
+  // 触控板双指滑动与鼠标滚轮共用 wheel 事件，来源需按手势锁存，避免滑动中途被误判
+  const wheelSourceClassifier = createCanvasWheelSourceClassifier()
 
   function clearSelectionBox() {
     selectionBox.visible = false
@@ -257,7 +265,8 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     window.addEventListener("pointerup", handleUp)
   }
 
-  function handleWheelZoom(event: WheelEvent) {
+  // 以指针位置为锚点缩放，保持光标下的画布坐标不动
+  function applyAnchoredZoom(event: WheelEvent) {
     const stage = stageRef.value
     if (!stage) {
       return
@@ -268,12 +277,43 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     }
-    const nextScale = clampViewportScale(Number((viewport.scale * Math.exp(-event.deltaY * 0.0015)).toFixed(2)))
+    const { y: deltaY } = normalizeCanvasWheelDelta(event)
+    // 不对 scale 取整：取整会把每帧的缩放增量抹平（1.00 * exp(-1 * 0.0015) 仍会舍入回 1.00），
+    // 导致小幅度捏合完全推不动画布；缩放百分比由界面层自行取整显示
+    const nextScale = clampViewportScale(viewport.scale * Math.exp(-deltaY * WHEEL_ZOOM_SENSITIVITY))
     const nextViewport = scaleViewportAtPoint(viewport, point, nextScale)
 
     viewport.scale = nextViewport.scale
     viewport.x = nextViewport.x
     viewport.y = nextViewport.y
+  }
+
+  function handleStageWheel(event: WheelEvent) {
+    // 无位移的事件（部分设备在手指落下时会上报）既不消耗，也不参与来源判定
+    if (event.deltaX === 0 && event.deltaY === 0) {
+      return
+    }
+
+    // 拖拽/缩放卡片期间冻结视口：节点位移按当前 scale 换算，中途改变缩放会让卡片跳变
+    if (isDragging.value) {
+      return
+    }
+
+    // 每次事件都参与判定，捏合事件会刷新手势时效但不改变已锁存的来源
+    const source = wheelSourceClassifier.classify(event)
+
+    if (event.ctrlKey || event.metaKey || source === "mouse") {
+      applyAnchoredZoom(event)
+    } else {
+      // 平移取「内容跟随手指」的方向，与 startPan 的指针拖拽增量相反：
+      // deltaY > 0 表示向下滚动，画布内容相应上移，因此视口偏移量相减
+      const { x, y } = normalizeCanvasWheelDelta(event)
+      viewport.x -= x
+      viewport.y -= y
+    }
+
+    // 画布已消费该手势：阻止浏览器把横向滑动解释为前进/后退，以及 Ctrl+滚轮缩放整个宿主界面
+    event.preventDefault()
   }
 
   watch(() => stageRef.value, (stage) => {
@@ -1021,7 +1061,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     getConnectionDraftPath,
     getEdgeReconnectDraftPath,
     handleNodePointerDown,
-    handleWheelZoom,
+    handleStageWheel,
     isConnectionTarget,
     isDragging,
     startEdgeEndpointDrag,

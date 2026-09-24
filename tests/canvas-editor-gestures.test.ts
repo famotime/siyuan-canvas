@@ -12,7 +12,6 @@ import {
   reactive,
 } from 'vue'
 
-import { createEmptyCanvasDocument } from '@/canvas/document'
 import { createCanvasEditorGestureHandlers } from '@/canvas/use-canvas-editor-gestures'
 import type { CanvasNode } from '@/canvas/types'
 
@@ -91,9 +90,8 @@ function createGestureHarness(
 }
 
 describe('canvas editor gesture handlers', () => {
-  it('zooms around the cursor without cancelling the wheel event', () => {
-    const stage = document.createElement('div')
-    stage.getBoundingClientRect = vi.fn(() => ({
+  describe('wheel navigation', () => {
+    const stageRect = {
       bottom: 440,
       height: 400,
       left: 40,
@@ -103,68 +101,165 @@ describe('canvas editor gesture handlers', () => {
       x: 40,
       y: 40,
       toJSON: () => ({}),
-    }))
-
-    const viewport = {
-      scale: 1,
-      x: 10,
-      y: 20,
     }
-    const event = {
-      clientX: 190,
-      clientY: 160,
-      deltaY: 120,
-      preventDefault: vi.fn(),
-    } as unknown as WheelEvent
 
-    const handlers = createCanvasEditorGestureHandlers({
-      alignmentGuides: {
-        guides: [],
-        visible: false,
-      },
-      board: computed(() => ({
-        height: 2400,
-        left: 0,
-        top: 0,
-        width: 3200,
-      })),
-      commitDocument: vi.fn(),
-      connectionDraft: {
-        fromNodeId: '',
-        fromSide: 'left',
-        toNodeId: '',
-        toSide: 'left',
-        toX: 0,
-        toY: 0,
-        visible: false,
-      },
-      getAnchor: vi.fn(),
-      selectionBox: {
-        height: 0,
-        visible: false,
-        width: 0,
-        x: 0,
-        y: 0,
-      },
-      stageRef: ref(stage),
-      state: {
-        document: createEmptyCanvasDocument(),
-        selectEdge: vi.fn(),
-        selectNodes: vi.fn(),
-      } as any,
-      viewport,
-      readonly: computed(() => false),
-      selectedEdge: computed(() => null),
-      showDragAlignmentGuides: computed(() => true),
-      showNodeHeader: computed(() => true),
+    function createWheelHarness(nodes: CanvasNode[] = []) {
+      const harness = createGestureHarness(nodes)
+      harness.stage.getBoundingClientRect = vi.fn(() => stageRect)
+      // 光标落在 stage 内的 (150, 120)，视口初始偏移为 (10, 20)
+      harness.viewport.x = 10
+      harness.viewport.y = 20
+      return harness
+    }
+
+    function createWheelEvent(init: {
+      clientX?: number
+      clientY?: number
+      ctrlKey?: boolean
+      deltaMode?: number
+      deltaX?: number
+      deltaY?: number
+    } = {}) {
+      return {
+        clientX: 190,
+        clientY: 160,
+        ctrlKey: false,
+        deltaMode: 0,
+        deltaX: 0,
+        deltaY: 0,
+        preventDefault: vi.fn(),
+        ...init,
+      } as unknown as WheelEvent & { preventDefault: ReturnType<typeof vi.fn> }
+    }
+
+    it('pans the canvas on a trackpad two-finger swipe without changing the scale', () => {
+      const { handlers, viewport } = createWheelHarness()
+      const event = createWheelEvent({ deltaX: 12, deltaY: 4 })
+
+      handlers.handleStageWheel(event)
+
+      // 画布已消费该手势，需阻止浏览器把横向滑动解释为前进/后退
+      expect(event.preventDefault).toHaveBeenCalled()
+      expect(viewport.x).toBe(10 - 12)
+      expect(viewport.y).toBe(20 - 4)
+      expect(viewport.scale).toBe(1)
+
+      handlers.handleStageWheel(createWheelEvent({ deltaY: 30 }))
+      expect(viewport.x).toBe(10 - 12)
+      expect(viewport.y).toBe(20 - 4 - 30)
+      expect(viewport.scale).toBe(1)
     })
 
-    handlers.handleWheelZoom(event)
+    it('keeps zooming around the cursor on a mouse wheel', () => {
+      const { handlers, viewport } = createWheelHarness()
+      const event = createWheelEvent({ deltaY: 120 })
 
-    expect(event.preventDefault).not.toHaveBeenCalled()
-    expect(viewport.scale).toBe(0.84)
-    expect((150 - viewport.x) / viewport.scale).toBeCloseTo(140)
-    expect((120 - viewport.y) / viewport.scale).toBeCloseTo(100)
+      handlers.handleStageWheel(event)
+
+      expect(event.preventDefault).toHaveBeenCalled()
+      expect(viewport.scale).toBeCloseTo(0.8353, 4)
+      expect((150 - viewport.x) / viewport.scale).toBeCloseTo(140)
+      expect((120 - viewport.y) / viewport.scale).toBeCloseTo(100)
+    })
+
+    it('zooms around the cursor on a trackpad pinch', () => {
+      const { handlers, viewport } = createWheelHarness()
+
+      handlers.handleStageWheel(createWheelEvent({ ctrlKey: true, deltaY: 120 }))
+
+      expect(viewport.scale).toBeCloseTo(0.8353, 4)
+      expect((150 - viewport.x) / viewport.scale).toBeCloseTo(140)
+      expect((120 - viewport.y) / viewport.scale).toBeCloseTo(100)
+    })
+
+    it('lets the pinch branch win when the delta looks like a trackpad swipe', () => {
+      const { handlers, viewport } = createWheelHarness()
+
+      // 带横向分量本会判为触控板，但 ctrlKey 优先，应当缩放而不是平移
+      handlers.handleStageWheel(createWheelEvent({ ctrlKey: true, deltaX: 4, deltaY: -8 }))
+
+      expect(viewport.scale).toBeGreaterThan(1)
+      expect((150 - viewport.x) / viewport.scale).toBeCloseTo(140)
+      expect((120 - viewport.y) / viewport.scale).toBeCloseTo(100)
+    })
+
+    it('zooms on a line-mode mouse wheel instead of stalling at the current scale', () => {
+      const { handlers, viewport } = createWheelHarness()
+
+      // Firefox 鼠标滚轮上报 ±3 行，折算为 48 像素；不折算会几乎不动，保留取整则完全不动
+      handlers.handleStageWheel(createWheelEvent({ deltaMode: 1, deltaY: 3 }))
+
+      expect(viewport.scale).not.toBe(1)
+      expect(viewport.scale).toBeCloseTo(Math.exp(-48 * 0.0015), 4)
+    })
+
+    it('keeps panning when a fast flick emits a mouse-sized delta mid-gesture', () => {
+      const { handlers, viewport } = createWheelHarness()
+
+      // 首个事件是小增量，判定为触控板并锁存，后续的满刻度增量不应改判为缩放
+      handlers.handleStageWheel(createWheelEvent({ deltaY: 8 }))
+      handlers.handleStageWheel(createWheelEvent({ deltaY: 120 }))
+
+      expect(viewport.scale).toBe(1)
+      expect(viewport.y).toBe(20 - 8 - 120)
+    })
+
+    it('ignores wheel events without displacement', () => {
+      const { handlers, viewport } = createWheelHarness()
+      const event = createWheelEvent()
+
+      handlers.handleStageWheel(event)
+
+      expect(event.preventDefault).not.toHaveBeenCalled()
+      expect(viewport.x).toBe(10)
+      expect(viewport.y).toBe(20)
+      expect(viewport.scale).toBe(1)
+    })
+
+    it('freezes the viewport while a card is being dragged', () => {
+      const node = { height: 80, id: 'node-1', type: 'text', width: 100, x: 50, y: 60 } as CanvasNode
+      const { handlers, viewport } = createWheelHarness([node])
+      const pointerDownEvent = new PointerEvent('pointerdown', {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        bubbles: true,
+      })
+      Object.defineProperty(pointerDownEvent, 'target', { value: document.createElement('div') })
+
+      handlers.handleNodePointerDown(node, pointerDownEvent)
+      expect(handlers.isDragging.value).toBe(true)
+
+      // 拖拽期间改变缩放会让卡片位移换算跳变，因此滚轮不生效
+      handlers.handleStageWheel(createWheelEvent({ deltaY: 120 }))
+      expect(viewport.scale).toBe(1)
+      expect(viewport.y).toBe(20)
+
+      window.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: 100,
+        clientY: 100,
+      }))
+      expect(handlers.isDragging.value).toBe(false)
+    })
+
+    it('clamps the scale on the zoom path', () => {
+      const { handlers, viewport } = createWheelHarness()
+
+      for (let index = 0; index < 12; index += 1) {
+        handlers.handleStageWheel(createWheelEvent({ ctrlKey: true, deltaY: -120 }))
+      }
+
+      expect(viewport.scale).toBe(2.5)
+    })
+
+    it('applies trackpad pan deltas without clamping the offset', () => {
+      const { handlers, viewport } = createWheelHarness()
+
+      // 与 startPan 一致，平移不做边界收敛
+      handlers.handleStageWheel(createWheelEvent({ deltaX: 4000 }))
+
+      expect(viewport.x).toBe(10 - 4000)
+    })
   })
 
   it('pans the canvas in readonly mode when dragging a node', () => {

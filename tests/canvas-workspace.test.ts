@@ -166,7 +166,7 @@ function createEditorMock(node = createTextNode()) {
     getNodeTitle: vi.fn((candidate: any) => candidate.text || candidate.label || candidate.url || candidate.id || "Text"),
     getRenderedMarkdown: vi.fn((text: string) => `<p>${text}</p>`),
     handleNodePointerDown: vi.fn(),
-    handleWheelZoom: vi.fn(),
+    handleStageWheel: vi.fn(),
     isConnectionTarget: vi.fn(() => false),
     importCanvas: vi.fn(),
     inspectorExpanded: true,
@@ -1077,7 +1077,7 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find("[data-testid='bottom-toolbar']").exists()).toBe(true)
   })
 
-  it("does not zoom the canvas when wheeling inside a selected node", async () => {
+  it("does not navigate the canvas when wheeling inside a scrollable selected node", async () => {
     const node = createTextNode()
     currentEditor = createEditorMock(node)
     currentEditor.state.selectedNodeIds = [node.id]
@@ -1091,6 +1091,37 @@ describe("CanvasWorkspace", () => {
       },
     })
 
+    const body = wrapper.find(".canvas-node__body").element as HTMLElement
+    // jsdom 不做布局，滚动指标需要手动打桩：可滚动且未到边界
+    Object.defineProperty(body, "clientHeight", { configurable: true, value: 200 })
+    Object.defineProperty(body, "scrollHeight", { configurable: true, value: 400 })
+    Object.defineProperty(body, "scrollTop", { configurable: true, value: 100 })
+
+    body.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 120,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleStageWheel).not.toHaveBeenCalled()
+  })
+
+  it("navigates the canvas when wheeling over a selected node that cannot scroll", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    // 选中卡片不能无条件吞掉滚轮，否则光标停在卡片上就滑不动画布
     wrapper.find(".canvas-node__body").element.dispatchEvent(new WheelEvent("wheel", {
       bubbles: true,
       cancelable: true,
@@ -1098,10 +1129,41 @@ describe("CanvasWorkspace", () => {
     }))
     await nextTick()
 
-    expect(currentEditor.handleWheelZoom).not.toHaveBeenCalled()
+    expect(currentEditor.handleStageWheel).toHaveBeenCalledTimes(1)
   })
 
-  it("keeps canvas zoom enabled when wheeling over an unselected node", async () => {
+  it("navigates the canvas horizontally when the node body can only scroll vertically", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const body = wrapper.find(".canvas-node__body").element as HTMLElement
+    // 纵向可滚动、横向不可滚动；纯横向滑动应当交给画布而不是被整段吞掉
+    Object.defineProperty(body, "clientHeight", { configurable: true, value: 200 })
+    Object.defineProperty(body, "scrollHeight", { configurable: true, value: 400 })
+    Object.defineProperty(body, "scrollTop", { configurable: true, value: 100 })
+    Object.defineProperty(body, "clientWidth", { configurable: true, value: 200 })
+    Object.defineProperty(body, "scrollWidth", { configurable: true, value: 200 })
+
+    body.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaX: 40,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleStageWheel).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps canvas navigation enabled when wheeling over an unselected node", async () => {
     const node = createTextNode()
     currentEditor = createEditorMock(node)
 
@@ -1121,7 +1183,7 @@ describe("CanvasWorkspace", () => {
     }))
     await nextTick()
 
-    expect(currentEditor.handleWheelZoom).toHaveBeenCalledTimes(1)
+    expect(currentEditor.handleStageWheel).toHaveBeenCalledTimes(1)
   })
 
   it("opens the create-edge dialog from the bottom toolbar", async () => {
@@ -1425,7 +1487,7 @@ describe("CanvasWorkspace", () => {
     }))
     await nextTick()
 
-    expect(currentEditor.handleWheelZoom).not.toHaveBeenCalled()
+    expect(currentEditor.handleStageWheel).not.toHaveBeenCalled()
   })
 
   it("hides the canvas minimap by default", () => {
@@ -1541,6 +1603,32 @@ describe("CanvasWorkspace", () => {
     })
 
     expect(wrapper.find("[data-testid='canvas-minimap']").exists()).toBe(true)
+  })
+
+  it("bubbles wheel events over the minimap to the stage handler", async () => {
+    currentEditor = createEditorMock()
+    currentEditor.getPluginSettings = vi.fn(() => ({
+      showCanvasThumbnails: true,
+    }))
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock({ showCanvasThumbnails: true }),
+        setTitle: vi.fn(),
+      },
+    })
+
+    // 小地图渲染在 stage 内部且不拦截滚轮，在其上滑动等同于在画布上滑动
+    wrapper.find("[data-testid='canvas-minimap']").element.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 120,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleStageWheel).toHaveBeenCalledTimes(1)
   })
 
   it("updates canvas minimap visibility after settings change", async () => {

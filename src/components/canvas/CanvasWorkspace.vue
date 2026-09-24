@@ -327,7 +327,7 @@
         @pointerdown="handleStagePointerDown"
         @dblclick="handleStageDoubleClick"
         @paste="handleStagePaste"
-        @wheel.passive="editor.handleWheelZoom"
+        @wheel="editor.handleStageWheel"
         @contextmenu.prevent
         @dragover="editor.handleStageDragOver"
         @dragenter.prevent
@@ -528,7 +528,7 @@
             @mousedown.stop
             @click.stop="handleNodeClick(node, $event)"
             @dblclick.stop="handleNodeDoubleClick(node)"
-            @wheel.passive="handleNodeWheel(node, $event)"
+            @wheel.passive="handleNodeWheel($event)"
             @mouseenter="handleNodeMouseEnter(node.id)"
             @mouseleave="handleNodeMouseLeave(node.id)"
             @dragstart.stop.prevent="handleNodeDragStart"
@@ -687,7 +687,7 @@
                 </div>
 
                 <!-- 正常展示状态 -->
-                <div v-else class="canvas-node__query-view" @wheel.stop>
+                <div v-else class="canvas-node__query-view">
                   <header class="canvas-node__query-header">
                     <div class="query-header__left">
                       <CanvasIcon
@@ -2773,21 +2773,34 @@ function onLinkIframeError(nodeId: string) {
   }
 }
 
-function handleNodeWheel(node: CanvasNode, event: WheelEvent) {
+function handleNodeWheel(event: WheelEvent) {
   const target = event.target as HTMLElement | null
   if (!target) return
-  const isSelected = editor.state.selectedNodeIds.includes(node.id)
-  if (isSelected) {
-    event.stopPropagation()
-    return
-  }
-  const scrollable = target.closest('.canvas-node__body, .markdown-preview pre, .file-card__document-preview') as HTMLElement | null
+  // 卡片内可自行滚动的区域：滚到边界后事件继续上浮，交给画布平移或缩放
+  const scrollable = target.closest(
+    ".canvas-node__body, .markdown-preview pre, .file-card__document-preview, .canvas-node__query-content",
+  ) as HTMLElement | null
   if (!scrollable) return
-  const { scrollHeight, clientHeight, scrollTop } = scrollable
-  if (scrollHeight <= clientHeight) return
-  const atTop = scrollTop <= 0 && event.deltaY < 0
-  const atBottom = scrollTop + clientHeight >= scrollHeight - 1 && event.deltaY > 0
-  if (!atTop && !atBottom) {
+  const {
+    clientHeight,
+    clientWidth,
+    scrollHeight,
+    scrollLeft,
+    scrollTop,
+    scrollWidth,
+  } = scrollable
+  // 按主轴判断边界，避免纯横向滑动被整段吞掉
+  const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+  const viewportSize = horizontal ? clientWidth : clientHeight
+  const contentSize = horizontal ? scrollWidth : scrollHeight
+  const offset = horizontal ? scrollLeft : scrollTop
+  const delta = horizontal ? event.deltaX : event.deltaY
+
+  if (contentSize <= viewportSize) return
+
+  const atStart = offset <= 0 && delta < 0
+  const atEnd = offset + viewportSize >= contentSize - 1 && delta > 0
+  if (!atStart && !atEnd) {
     event.stopPropagation()
   }
 }
