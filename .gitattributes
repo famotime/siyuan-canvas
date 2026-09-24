@@ -1,0 +1,25 @@
+# 统一行尾为 LF。
+#
+# 为什么必须有这个文件：
+#   tests/ 下的多个样式契约测试直接用 readFileSync 读取 src/**.scss，
+#   并用含 "\n" 的字面量做 toContain 断言（例如
+#   tests/canvas-workspace.test.ts:1883 断言 ".inspector {\n  overflow: hidden;"）。
+#   在没有 .gitattributes 且 Windows 上 core.autocrlf=true 时，检出会把 LF
+#   转成 CRLF，这些断言在**任何** Windows 机器上都会失败 —— 与源码对错无关，
+#   纯粹是行尾问题（上游 main 分支的测试长期红着，根源就在这里）。
+#
+# 因此这里显式声明：源码、测试、配置一律 LF。
+* text=auto eol=lf
+
+# 二进制文件不做任何行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.zip binary
+*.tar binary
+*.gz binary
