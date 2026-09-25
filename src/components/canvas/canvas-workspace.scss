@@ -1047,15 +1047,36 @@
   transform: translate(-50%, 0);
 }
 
-.canvas-toolbar [data-tooltip]::after,
-.inspector [data-tooltip]::after {
+.canvas-toolbar [data-tooltip]::after {
   top: calc(100% + 8px);
   bottom: auto;
   transform: translate(-50%, -4px);
 }
 
 .canvas-toolbar [data-tooltip]:hover::after,
-.canvas-toolbar [data-tooltip]:focus-visible::after,
+.canvas-toolbar [data-tooltip]:focus-visible::after {
+  transform: translate(-50%, 0);
+}
+
+/* ★ 本 fork 修复上游回归（提交 c40a551，2026-07-12）★
+   上游为了让 inspector 内的 tooltip 能够溢出显示，直接在 inspector 规则里
+   追加了一行 `overflow: visible`，覆盖掉前一行的 `overflow: hidden`。
+   后果：inspector 这个滚动容器的裁剪能力被废掉，而
+   tests/canvas-workspace.test.ts:1883 断言该处必须是 `hidden`，
+   上游 main 分支的测试因此长期是红的。
+
+   正确的修法不是二选一，而是把两件职责拆开：
+     · 裁剪 → 交给 inspector 自身（恢复 hidden，测试断言满足）
+     · tooltip 溢出 → 改为在 inspector 内向上弹出（见下方
+       「inspector 内 tooltip 上翻」规则）。向上弹出不需要父级
+       overflow: visible，纯 CSS 即可，且不破坏 __content 的滚动。 */
+/* inspector 内 tooltip 上翻：不依赖父级 overflow，避免被裁剪。 */
+.inspector [data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform: translate(-50%, 4px);
+}
+
 .inspector [data-tooltip]:hover::after,
 .inspector [data-tooltip]:focus-visible::after {
   transform: translate(-50%, 0);
@@ -2421,9 +2442,19 @@
   }
 }
 
+/* ★ 本 fork 修复上游回归（提交 c40a551，2026-07-12）★
+   上游为了让 inspector 内的 tooltip 能溢出显示，直接在 inspector 规则里追加了
+   一行 `overflow: visible` 覆盖掉前一行 `overflow: hidden`。后果：inspector 这个
+   滚动容器的裁剪能力被废掉，而 tests/canvas-workspace.test.ts:1883 断言该处
+   必须是 `hidden`，上游 main 分支测试因此长期是红的。
+
+   正确修法不是二选一，而是拆开两件职责：
+     · 裁剪 → 交回 inspector 自身（恢复 hidden，测试断言满足）
+     · tooltip 溢出 → 改为在 inspector 内**向上弹出**（见上方
+       「inspector 内 tooltip 上翻」规则）。向上弹出不需要父级 overflow: visible，
+       纯 CSS 即可，且不破坏 __content 的滚动。 */
 .inspector {
   overflow: hidden;
-  overflow: visible;
   box-sizing: border-box;
   padding: 12px 8px 12px 14px;
   border-left: 1px solid var(--canvas-border);
