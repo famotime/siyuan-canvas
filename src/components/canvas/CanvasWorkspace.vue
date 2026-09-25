@@ -2126,6 +2126,8 @@ async function handleAiSearch() {
         requestTimeoutSeconds: activeConfig.requestTimeoutSeconds ?? 30,
         temperature: activeConfig.temperature ?? 0.7,
         maxTokens: activeConfig.maxTokens ?? 4096,
+        headers: activeConfig.headers,
+        protocol: activeConfig.protocol,
       }
     } else {
       const settings = editor.settings

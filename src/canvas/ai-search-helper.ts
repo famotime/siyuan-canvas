@@ -179,6 +179,8 @@ export async function requestAiSearch(options: {
     requestTimeoutSeconds: number
     temperature: number
     maxTokens: number
+    headers?: Record<string, string>
+    protocol?: string
   }
   richness?: "simple" | "medium" | "detailed"
   cardCount: number
@@ -256,6 +258,13 @@ ${userSpecificInstruction}
   }
   if (apiKey) {
     headers["Authorization"] = `Bearer ${apiKey}`
+  }
+  if (apiConfig.headers && typeof apiConfig.headers === "object") {
+    for (const [key, value] of Object.entries(apiConfig.headers)) {
+      if (key && value !== undefined && value !== null) {
+        headers[key] = String(value)
+      }
+    }
   }
 
   const requestBody = {
