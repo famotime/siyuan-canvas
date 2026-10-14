@@ -430,7 +430,10 @@
             >
               <path
                 class="stage__edge"
-                :class="{ 'stage__edge--selected': editor.state.selectedEdgeId === edge.id }"
+                :class="{
+                  'stage__edge--selected': editor.state.selectedEdgeId === edge.id,
+                  'stage__edge--related': editor.isRelatedEdge?.(edge.id) ?? false,
+                }"
                 :d="editor.getEdgePath(edge)"
                 fill="none"
                 :marker-start="resolveEdgeStartMarker(edge.startArrow ?? false)"
@@ -474,6 +477,7 @@
               <text
                 v-if="edge.label"
                 class="stage__edge-label"
+                :class="{ 'stage__edge-label--related': editor.isRelatedEdge?.(edge.id) ?? false }"
                 :x="editor.getEdgeLabelPosition(edge).x"
                 :y="editor.getEdgeLabelPosition(edge).y"
                 :style="getEdgeLabelStyle(edge)"
@@ -515,6 +519,7 @@
                 'canvas-node--search-current': hasCanvasCurrentSearchMatch(node.id),
                 'canvas-node--search-match': hasCanvasSearchMatch(node.id),
                 'canvas-node--selected': editor.state.selectedNodeIds.includes(node.id),
+                'canvas-node--neighbor-highlight': editor.isRelatedNode?.(node.id) ?? false,
                 'canvas-node--no-header': !showNodeHeader,
                 'canvas-node--presentation-current': editor.presentation.currentNodeId === node.id,
                 'canvas-node--presentation-history': editor.presentation.pathHistory.includes(node.id),
@@ -869,7 +874,8 @@
                 :class="{
                   'stage__edge--hovered': hoveredEdgeId === edge.id,
                   'stage__edge--selected': editor.state.selectedEdgeId === edge.id,
-                  'stage__edge--visible': hoveredEdgeId === edge.id || editor.state.selectedEdgeId === edge.id,
+                  'stage__edge--related': editor.isRelatedEdge?.(edge.id) ?? false,
+                  'stage__edge--visible': hoveredEdgeId === edge.id || editor.state.selectedEdgeId === edge.id || Boolean(editor.isRelatedEdge?.(edge.id)),
                   'stage__edge--presentation-path': editor.presentation.isActive && presentationPathNodeIds.includes(edge.fromNode) && presentationPathNodeIds.includes(edge.toNode) && presentationPathNodeIds.indexOf(edge.fromNode) < presentationPathNodeIds.indexOf(edge.toNode),
                   'stage__edge--presentation-next': editor.presentation.isActive && editor.presentation.currentNodeId === edge.fromNode && editor.presentation.availableNextNodes.includes(edge.toNode)
                 }"

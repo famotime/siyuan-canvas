@@ -168,6 +168,8 @@ function createEditorMock(node = createTextNode()) {
     handleNodePointerDown: vi.fn(),
     handleStageWheel: vi.fn(),
     isConnectionTarget: vi.fn(() => false),
+    isRelatedEdge: vi.fn(() => false),
+    isRelatedNode: vi.fn(() => false),
     importCanvas: vi.fn(),
     inspectorExpanded: true,
     inspectorSectionState: {

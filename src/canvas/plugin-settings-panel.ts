@@ -179,6 +179,22 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     },
   })
   setting.addItem({
+    title: t("settingsEnableRelationHighlightOnSelectTitle"),
+    description: t("settingsEnableRelationHighlightOnSelectDescription"),
+    createActionElement: () => {
+      const input = document.createElement("input")
+      input.dataset.settingKey = "enableRelationHighlightOnSelect"
+      input.className = "b3-switch fn__flex-center"
+      input.type = "checkbox"
+      input.checked = draft.enableRelationHighlightOnSelect
+      input.addEventListener("change", () => {
+        draft.enableRelationHighlightOnSelect = input.checked
+        void saveDraft()
+      })
+      return input
+    },
+  })
+  setting.addItem({
     title: t("settingsEnableDebugLogTitle"),
     description: t("settingsEnableDebugLogDescription"),
     createActionElement: () => {
@@ -723,6 +739,7 @@ function categorizeSettings(t: CanvasI18nTranslator, isControlled: boolean) {
         "showNodeHeader",
         "showDragAlignmentGuides",
         "autoCreateTextCardOnDrag",
+        "enableRelationHighlightOnSelect",
       ],
       open: true,
     },
@@ -799,6 +816,7 @@ function categorizeSettings(t: CanvasI18nTranslator, isControlled: boolean) {
     { key: "showNodeHeader", title: "settingsShowNodeHeaderTitle", desc: "settingsShowNodeHeaderDescription" },
     { key: "showDragAlignmentGuides", title: "settingsShowDragAlignmentGuidesTitle", desc: "settingsShowDragAlignmentGuidesDescription" },
     { key: "autoCreateTextCardOnDrag", title: "settingsAutoCreateTextCardOnDragTitle", desc: "settingsAutoCreateTextCardOnDragDescription" },
+    { key: "enableRelationHighlightOnSelect", title: "settingsEnableRelationHighlightOnSelectTitle", desc: "settingsEnableRelationHighlightOnSelectDescription" },
     { key: "enableDebugLog", title: "settingsEnableDebugLogTitle", desc: "settingsEnableDebugLogDescription" },
     { key: "noteCreationDirectory", title: "settingsNoteCreationDirectoryTitle", desc: "settingsNoteCreationDirectoryDescription" },
     { key: "presentationStyle", title: "settingsPresentationStyleTitle", desc: "settingsPresentationStyleDescription" },

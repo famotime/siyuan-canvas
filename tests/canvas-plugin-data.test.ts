@@ -20,6 +20,7 @@ describe("canvas plugin data", () => {
     expect(data.settings.showCanvasThumbnails).toBe(false)
     expect(data.settings.showNodeHeader).toBe(true)
     expect(data.settings.showDragAlignmentGuides).toBe(false)
+    expect(data.settings.enableRelationHighlightOnSelect).toBe(false)
     expect(data.settings.presentationAutoRatio).toBe(true)
     expect(data.settings.presentationMaskOpacity).toBe(60)
     expect(data.settings.autoCreateTextCardOnDrag).toBe(false)

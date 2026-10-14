@@ -218,6 +218,8 @@
   "settingsShowDragAlignmentGuidesDescription": "When enabled, show edge/center alignment guides and snap cards while dragging. Off by default.",
   "settingsAutoCreateTextCardOnDragTitle": "Auto-create text card on drag connection",
   "settingsAutoCreateTextCardOnDragDescription": "When dragging to create a new connection from a card handle and releasing in empty area, automatically create and connect a text card. Off by default.",
+  "settingsEnableRelationHighlightOnSelectTitle": "Highlight node relations on selection",
+  "settingsEnableRelationHighlightOnSelectDescription": "When a single node is selected, highlight its directly connected edges and adjacent nodes. Off by default.",
   "settingsEnableDebugLogTitle": "Enable debug logging",
   "settingsEnableDebugLogDescription": "When enabled, output Canvas save flow debug information in the browser console.",
   "settingsNoteCreationDirectoryTitle": "Note creation directory",

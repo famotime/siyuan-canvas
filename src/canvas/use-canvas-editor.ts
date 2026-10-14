@@ -997,6 +997,55 @@ export function useCanvasEditor(
     return history.canRedo
   })
   const readonly = computed(() => Boolean(state.conflict || plugin.isMobile || presentation.isActive))
+
+  const activeRelatedRelations = computed(() => {
+    if (!getReactivePluginSettings().enableRelationHighlightOnSelect) {
+      return {
+        edgeIds: new Set<string>(),
+        nodeIds: new Set<string>(),
+      }
+    }
+
+    if (presentation.isActive) {
+      return {
+        edgeIds: new Set<string>(),
+        nodeIds: new Set<string>(),
+      }
+    }
+
+    if (state.selectedNodeIds.length !== 1) {
+      return {
+        edgeIds: new Set<string>(),
+        nodeIds: new Set<string>(),
+      }
+    }
+
+    const selectedId = state.selectedNodeIds[0]!
+    const edgeIds = new Set<string>()
+    const nodeIds = new Set<string>()
+
+    for (const edge of state.document.edges) {
+      if (edge.fromNode === selectedId) {
+        edgeIds.add(edge.id)
+        if (edge.toNode && edge.toNode !== selectedId) {
+          nodeIds.add(edge.toNode)
+        }
+      } else if (edge.toNode === selectedId) {
+        edgeIds.add(edge.id)
+        if (edge.fromNode && edge.fromNode !== selectedId) {
+          nodeIds.add(edge.fromNode)
+        }
+      }
+    }
+
+    return { edgeIds, nodeIds }
+  })
+
+  const relatedEdgeIds = computed(() => activeRelatedRelations.value.edgeIds)
+  const relatedNodeIds = computed(() => activeRelatedRelations.value.nodeIds)
+  const isRelatedEdge = (edgeId: string): boolean => relatedEdgeIds.value.has(edgeId)
+  const isRelatedNode = (nodeId: string): boolean => relatedNodeIds.value.has(nodeId)
+
   const {
     addNode,
     addNodeAtPosition,
@@ -1589,6 +1638,10 @@ export function useCanvasEditor(
       updateSelectedEdgeDirection,
       selectedEdgeDirectionMode,
       presentation,
+      relatedEdgeIds,
+      relatedNodeIds,
+      isRelatedEdge,
+      isRelatedNode,
       settings: computed(() => getReactivePluginSettings()),
       defaultCanvasDirectory: computed(() => getPluginSettings().defaultCanvasDirectory),
       sproutLoading,

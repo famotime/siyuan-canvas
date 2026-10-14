@@ -1135,6 +1135,17 @@
   stroke: var(--canvas-accent);
 }
 
+.stage__edge--related {
+  stroke: var(--canvas-accent) !important;
+  color: var(--canvas-accent) !important;
+  stroke-width: 3.5;
+}
+
+.stage__edge--related.stage__edge--overlay {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 8px var(--canvas-accent-soft));
+}
+
 .stage__edge--overlay {
   opacity: 0;
   stroke-width: 4;
@@ -1177,6 +1188,11 @@
   stroke: var(--b3-theme-background, #fff);
   stroke-width: 3px;
   stroke-linejoin: round;
+}
+
+.stage__edge-label--related {
+  fill: var(--canvas-accent) !important;
+  font-weight: 600;
 }
 
 .stage__alignment-guides {
@@ -1307,6 +1323,12 @@
 .canvas-node--selected {
   z-index: 3;
   box-shadow: 0 0 0 2px var(--canvas-selection-border), var(--canvas-shadow-strong);
+}
+
+.canvas-node--neighbor-highlight {
+  z-index: 2;
+  box-shadow: 0 0 0 2px var(--canvas-accent-soft), 0 0 12px var(--canvas-accent-soft);
+  transition: box-shadow 0.2s ease;
 }
 
 .canvas-node--search-match {

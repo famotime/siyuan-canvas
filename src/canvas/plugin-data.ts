@@ -20,6 +20,7 @@ export interface CanvasPluginSettings {
   presentationAutoRatio: boolean
   presentationMaskOpacity: number
   autoCreateTextCardOnDrag: boolean
+  enableRelationHighlightOnSelect: boolean
   enableAiSearch: boolean
   aiSearchCardCount: number
   aiSearchContentRichness: "simple" | "medium" | "detailed"
@@ -79,6 +80,7 @@ export function createDefaultCanvasPluginSettings(): CanvasPluginSettings {
     presentationAutoRatio: true,
     presentationMaskOpacity: 60,
     autoCreateTextCardOnDrag: false,
+    enableRelationHighlightOnSelect: false,
     enableAiSearch: false,
     aiSearchCardCount: 3,
     aiSearchContentRichness: "medium",
@@ -207,6 +209,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     autoCreateTextCardOnDrag: typeof candidate.settings?.autoCreateTextCardOnDrag === "boolean"
       ? candidate.settings.autoCreateTextCardOnDrag
       : defaults.settings.autoCreateTextCardOnDrag,
+    enableRelationHighlightOnSelect: typeof candidate.settings?.enableRelationHighlightOnSelect === "boolean"
+      ? candidate.settings.enableRelationHighlightOnSelect
+      : defaults.settings.enableRelationHighlightOnSelect,
     enableAiSearch: typeof candidate.settings?.enableAiSearch === "boolean"
       ? candidate.settings.enableAiSearch
       : defaults.settings.enableAiSearch,
