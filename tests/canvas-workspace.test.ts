@@ -1109,6 +1109,94 @@ describe("CanvasWorkspace", () => {
     expect(currentEditor.handleStageWheel).not.toHaveBeenCalled()
   })
 
+  it("does not navigate or zoom the canvas when wheeling at the top boundary of a scrollable node", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const body = wrapper.find(".canvas-node__body").element as HTMLElement
+    Object.defineProperty(body, "clientHeight", { configurable: true, value: 200 })
+    Object.defineProperty(body, "scrollHeight", { configurable: true, value: 400 })
+    Object.defineProperty(body, "scrollTop", { configurable: true, value: 0 })
+
+    body.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: -120,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleStageWheel).not.toHaveBeenCalled()
+  })
+
+  it("does not navigate or zoom the canvas when wheeling at the bottom boundary of a scrollable node", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const body = wrapper.find(".canvas-node__body").element as HTMLElement
+    Object.defineProperty(body, "clientHeight", { configurable: true, value: 200 })
+    Object.defineProperty(body, "scrollHeight", { configurable: true, value: 400 })
+    Object.defineProperty(body, "scrollTop", { configurable: true, value: 200 })
+
+    body.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 120,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleStageWheel).not.toHaveBeenCalled()
+  })
+
+  it("allows canvas zoom when holding ctrl even inside a scrollable node", async () => {
+    const node = createTextNode()
+    currentEditor = createEditorMock(node)
+    currentEditor.state.selectedNodeIds = [node.id]
+
+    const wrapper = mount(CanvasWorkspace, {
+      attachTo: document.body,
+      props: {
+        bootstrap: {},
+        plugin: createPluginMock(),
+        setTitle: vi.fn(),
+      },
+    })
+
+    const body = wrapper.find(".canvas-node__body").element as HTMLElement
+    Object.defineProperty(body, "clientHeight", { configurable: true, value: 200 })
+    Object.defineProperty(body, "scrollHeight", { configurable: true, value: 400 })
+    Object.defineProperty(body, "scrollTop", { configurable: true, value: 100 })
+
+    body.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      deltaY: 120,
+    }))
+    await nextTick()
+
+    expect(currentEditor.handleStageWheel).toHaveBeenCalledTimes(1)
+  })
+
   it("navigates the canvas when wheeling over a selected node that cannot scroll", async () => {
     const node = createTextNode()
     currentEditor = createEditorMock(node)

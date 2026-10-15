@@ -1423,6 +1423,7 @@
   flex: 1;
   padding: 12px 14px 16px;
   overflow: auto;
+  overscroll-behavior: contain;
   border-bottom-left-radius: 9px;
   border-bottom-right-radius: 9px;
 }
@@ -1693,6 +1694,7 @@
 .canvas-node__query-content {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
   background: var(--b3-theme-background);
 
@@ -2219,6 +2221,7 @@
   margin-top: 2px;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .file-card__helper {

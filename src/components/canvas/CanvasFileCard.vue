@@ -191,6 +191,7 @@ watch(() => props.documentPreviewHtml, () => {
   margin-top: 2px;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .file-card__helper {

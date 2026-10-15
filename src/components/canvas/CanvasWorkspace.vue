@@ -2781,36 +2781,41 @@ function onLinkIframeError(nodeId: string) {
   }
 }
 
+function findScrollableAncestor(
+  target: HTMLElement | null,
+  horizontal: boolean,
+): HTMLElement | null {
+  let current: HTMLElement | null = target
+  while (current && !current.classList?.contains("canvas-node")) {
+    if (
+      current.matches?.(
+        ".canvas-node__body, .canvas-node__editor, .markdown-preview pre, .file-card__document-preview, .canvas-node__query-content, textarea",
+      )
+    ) {
+      const viewportSize = horizontal ? current.clientWidth : current.clientHeight
+      const contentSize = horizontal ? current.scrollWidth : current.scrollHeight
+      if (contentSize > viewportSize) {
+        return current
+      }
+    }
+    current = current.parentElement
+  }
+  return null
+}
+
 function handleNodeWheel(event: WheelEvent) {
+  // 修饰键按住时属于画布缩放意图（如 Ctrl+滚轮），不拦截
+  if (event.ctrlKey || event.metaKey) return
   const target = event.target as HTMLElement | null
   if (!target) return
-  // 卡片内可自行滚动的区域：滚到边界后事件继续上浮，交给画布平移或缩放
-  const scrollable = target.closest(
-    ".canvas-node__body, .markdown-preview pre, .file-card__document-preview, .canvas-node__query-content",
-  ) as HTMLElement | null
-  if (!scrollable) return
-  const {
-    clientHeight,
-    clientWidth,
-    scrollHeight,
-    scrollLeft,
-    scrollTop,
-    scrollWidth,
-  } = scrollable
-  // 按主轴判断边界，避免纯横向滑动被整段吞掉
+
+  // 按主轴判断是否存在可滚动的卡片内容区域
   const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-  const viewportSize = horizontal ? clientWidth : clientHeight
-  const contentSize = horizontal ? scrollWidth : scrollHeight
-  const offset = horizontal ? scrollLeft : scrollTop
-  const delta = horizontal ? event.deltaX : event.deltaY
+  const scrollable = findScrollableAncestor(target, horizontal)
+  if (!scrollable) return
 
-  if (contentSize <= viewportSize) return
-
-  const atStart = offset <= 0 && delta < 0
-  const atEnd = offset + viewportSize >= contentSize - 1 && delta > 0
-  if (!atStart && !atEnd) {
-    event.stopPropagation()
-  }
+  // 卡片内容可滚动时，滚轮事件（包括滚动到顶部或底部边界后）全部阻止冒泡，避免触发整体界面缩放
+  event.stopPropagation()
 }
 
 function handleEdgeClick(edgeId: string) {
