@@ -1,7 +1,6 @@
 .idea
 # .vscode
 .DS_Store
-pnpm-lock.yaml
 node_modules
 dev
 dist
@@ -12,3 +11,6 @@ tmp
 .superpowers/
 .worktrees/
 developer_docs/
+
+*.zip
+package.zip
