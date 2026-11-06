@@ -346,7 +346,8 @@ export default class SiyuanCanvasPlugin extends Plugin {
       }
       ;(window as any).siyuanApiSwitch.register(
         "siyuan-canvas",
-        this.t("canvasHelper") || "Canvas",
+        // 显示名用内核按语言解析后的插件名（zh_CN 为「无界」），而非顶栏按钮文案 canvasHelper
+        this.displayName || this.name,
         (config: any) => {
           this.activeAiConfig.value = config
           if (this.canvasData.settings.enableDebugLog) {
