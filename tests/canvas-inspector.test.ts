@@ -13,6 +13,9 @@ function t(key: string) {
 function createEditorMock() {
   return reactive({
     applySelectedNodeChanges: vi.fn(),
+    edgeSources: [],
+    edgeTargets: [],
+    getNodeTitle: vi.fn((node: any) => node.text || node.id),
     inspectorSectionState: {
       createEdge: true,
       edge: true,
@@ -31,6 +34,7 @@ function createEditorMock() {
     selectedNodeCount: 2,
     state: {
       document: {
+        edges: [],
         nodes: [
           { height: 120, id: 'n1', text: 'Alpha', type: 'text', width: 240, x: 100, y: 200 },
           { height: 120, id: 'n2', text: 'Gamma', type: 'text', width: 240, x: 300, y: 400 },
@@ -93,6 +97,37 @@ describe('CanvasInspector', () => {
     expect(editor.applySelectedNodeChanges).not.toHaveBeenCalledWith(
       expect.objectContaining({ y: expect.anything() }),
     )
+
+    wrapper.unmount()
+  })
+
+  it('resets draftEditedFields and syncs multiNodeDraft when selectedNodeIds changes with the same primary node', async () => {
+    const editor = createEditorMock()
+    const wrapper = mount(CanvasInspector, {
+      props: {
+        editor,
+        getSideLabel: (side: string) => side,
+        t,
+      },
+    })
+
+    await wrapper.find('[data-testid="inspector-node-x"]').setValue('320')
+
+    // Simulate deselecting second node while primary selectedNode stays n1 (same object ref)
+    editor.state.selectedNodeIds = ['n1']
+    editor.selectedNodeCount = 1
+    await wrapper.vm.$nextTick()
+
+    // Now re-enter multi-selection [n1, n2] — stale draftEditedFields from earlier edit must be cleared
+    editor.state.selectedNodeIds = ['n1', 'n2']
+    editor.selectedNodeCount = 2
+    await wrapper.vm.$nextTick()
+
+    const xInput = wrapper.find('[data-testid="inspector-node-x"]').element as HTMLInputElement
+    expect(xInput.value).toBe('')
+
+    await wrapper.find('[data-testid="inspector-node-apply"]').trigger('click')
+    expect(editor.applySelectedNodeChanges).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })

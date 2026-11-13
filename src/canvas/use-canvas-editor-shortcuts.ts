@@ -1,7 +1,9 @@
 interface CanvasEditorKeyboardHandlerOptions {
   canDelete: () => boolean
   cancelEdgeLabelEditing: () => void
+  closeCreateEdgeDialog?: () => void
   closeEdgePopover: () => void
+  closeFilePickerDialog?: () => void
   closeFloatLayer?: () => void
   closeSelectionPopover: () => void
   deleteSelection: () => void
@@ -11,6 +13,9 @@ interface CanvasEditorKeyboardHandlerOptions {
   getEdgeToolbarPopover: () => 'closed' | 'color' | 'direction'
   getEditingEdgeLabelId: () => string
   getSelectionToolbarPopover: () => 'closed' | 'color' | 'layout' | 'sprout'
+  hasBlockingOverlay?: () => boolean
+  hasCreateEdgeDialog?: () => boolean
+  hasFilePickerDialog?: () => boolean
   hasFloatLayer?: () => boolean
   hasSelectedNodes?: () => boolean
   nudgeSelectedNodes?: (dx: number, dy: number) => void
@@ -41,7 +46,9 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
   const {
     canDelete,
     cancelEdgeLabelEditing,
+    closeCreateEdgeDialog,
     closeEdgePopover,
+    closeFilePickerDialog,
     closeFloatLayer,
     closeSelectionPopover,
     deleteSelection,
@@ -51,6 +58,9 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     getEdgeToolbarPopover,
     getEditingEdgeLabelId,
     getSelectionToolbarPopover,
+    hasBlockingOverlay,
+    hasCreateEdgeDialog,
+    hasFilePickerDialog,
     hasFloatLayer,
     hasSelectedNodes,
     nudgeSelectedNodes,
@@ -72,6 +82,50 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
 
   function handleKeydown(event: KeyboardEvent) {
     if (isCanvasEditorEditingTarget(event.target)) {
+      return
+    }
+
+    if (event.key === 'Escape') {
+      if (hasCreateEdgeDialog?.()) {
+        closeCreateEdgeDialog?.()
+        return
+      }
+
+      if (hasFilePickerDialog?.()) {
+        closeFilePickerDialog?.()
+        return
+      }
+
+      if (hasFloatLayer?.()) {
+        closeFloatLayer?.()
+        return
+      }
+
+      if (getEditingEdgeLabelId()) {
+        cancelEdgeLabelEditing()
+        return
+      }
+
+      if (getEdgeToolbarPopover() !== 'closed') {
+        closeEdgePopover()
+        return
+      }
+
+      if (getSelectionToolbarPopover() !== 'closed') {
+        closeSelectionPopover()
+        return
+      }
+
+      if (hasBlockingOverlay?.()) {
+        return
+      }
+
+      selectNode()
+      selectEdge()
+      return
+    }
+
+    if (hasBlockingOverlay?.()) {
       return
     }
 
@@ -117,32 +171,6 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     if (event.key === ' ' && !isAccelerator && !event.shiftKey && !event.altKey) {
       event.preventDefault()
       showFloatLayerForSelection?.()
-      return
-    }
-
-    if (event.key === 'Escape') {
-      if (hasFloatLayer?.()) {
-        closeFloatLayer?.()
-        return
-      }
-
-      if (getEditingEdgeLabelId()) {
-        cancelEdgeLabelEditing()
-        return
-      }
-
-      if (getEdgeToolbarPopover() !== 'closed') {
-        closeEdgePopover()
-        return
-      }
-
-      if (getSelectionToolbarPopover() !== 'closed') {
-        closeSelectionPopover()
-        return
-      }
-
-      selectNode()
-      selectEdge()
       return
     }
 

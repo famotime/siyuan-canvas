@@ -123,6 +123,8 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
     workspaceDocuments,
   } = options
 
+  let filePickerRequestSeq = 0
+
   function resetFilePickerGroups() {
     filePickerDialog.groups = {
       blocks: [],
@@ -137,12 +139,14 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
   }
 
   function closeFilePickerDialog() {
+    filePickerRequestSeq++
     filePickerDialog.visible = false
     filePickerDialog.query = ''
     resetFilePickerGroups()
   }
 
   async function updateFilePickerQuery(value: string) {
+    const requestSeq = ++filePickerRequestSeq
     filePickerDialog.query = value
     const query = value.trim()
 
@@ -154,14 +158,25 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
     const exactBlock = SIYUAN_BLOCK_ID_PATTERN.test(query)
       ? await resolveBlockById(query)
       : null
+    if (requestSeq !== filePickerRequestSeq) {
+      return
+    }
+
     const exactDocument = SIYUAN_BLOCK_ID_PATTERN.test(query) && !exactBlock
       ? await resolveDocumentByBlockId(query)
       : null
+    if (requestSeq !== filePickerRequestSeq) {
+      return
+    }
+
     const imageByBlockId = SIYUAN_BLOCK_ID_PATTERN.test(query)
       ? await resolveImageAssetByBlockId(query)
       : null
+    if (requestSeq !== filePickerRequestSeq) {
+      return
+    }
 
-    filePickerDialog.groups = await searchCanvasFilePickerTargets(query, {
+    const nextGroups = await searchCanvasFilePickerTargets(query, {
       searchBlocks: async (keyword) => {
         const blocks = SIYUAN_BLOCK_ID_PATTERN.test(keyword)
           ? (exactBlock ? [exactBlock] : [])
@@ -237,6 +252,11 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
           }))
       },
     })
+
+    if (requestSeq !== filePickerRequestSeq) {
+      return
+    }
+    filePickerDialog.groups = nextGroups
   }
 
   async function selectFilePickerResult(option: CanvasFilePickerOption) {

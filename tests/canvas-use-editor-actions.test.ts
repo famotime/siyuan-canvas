@@ -45,6 +45,7 @@ const showMessage = vi.fn()
 const confirm = vi.fn()
 const eventBusHandlers = new Map<string, Array<(event: any) => void>>()
 const fileNodeLookupMock = {
+  findSproutRelations: vi.fn(async () => ({ children: [], inlinks: [], outlinks: [] })),
   findSiyuanAssetByPath: vi.fn(async () => null),
   findSiyuanBlockById: vi.fn(async () => null),
   findSiyuanBlocksByQuery: vi.fn(async () => []),
@@ -478,6 +479,8 @@ beforeEach(() => {
   showMessage.mockReset()
   openTab.mockReset()
   fetchMock.mockClear()
+  fileNodeLookupMock.findSproutRelations.mockReset()
+  fileNodeLookupMock.findSproutRelations.mockResolvedValue({ children: [], inlinks: [], outlinks: [] })
   fileNodeLookupMock.findSiyuanAssetByPath.mockReset()
   fileNodeLookupMock.findSiyuanAssetByPath.mockResolvedValue(null)
   fileNodeLookupMock.findSiyuanBlockById.mockReset()
@@ -2363,6 +2366,78 @@ Only an intro.`,
       }
       wrapper.unmount()
     }
+  })
+
+  it("drops stale updateFilePickerQuery responses when a newer query or close happens", async () => {
+    const docResolvers: Array<(docs: any[]) => void> = []
+    fileNodeLookupMock.findSiyuanDocumentsByQuery.mockImplementation(
+      () => new Promise((resolve) => {
+        docResolvers.push(resolve)
+      }),
+    )
+
+    const { editor, wrapper } = await mountEditor()
+    editor.openFilePickerDialog()
+
+    const firstSearch = editor.updateFilePickerQuery("first")
+    const secondSearch = editor.updateFilePickerQuery("second")
+
+    docResolvers[1]?.([{ hpath: "/New", id: "doc-new", path: "/data/new.sy", title: "New Doc" }])
+    await secondSearch
+
+    docResolvers[0]?.([{ hpath: "/Old", id: "doc-old", path: "/data/old.sy", title: "Old Doc" }])
+    await firstSearch
+
+    expect(editor.filePickerDialog.groups.documents.map((item: any) => item.title)).toEqual(["New Doc"])
+
+    // Close invalidates in-flight results
+    const thirdSearch = editor.updateFilePickerQuery("third")
+    editor.closeFilePickerDialog()
+    docResolvers[2]?.([{ hpath: "/Ghost", id: "doc-ghost", path: "/data/ghost.sy", title: "Ghost Doc" }])
+    await thirdSearch
+
+    expect(editor.filePickerDialog.groups.documents).toEqual([])
+    wrapper.unmount()
+  })
+
+  it("ignores stale loadSproutRelations responses when switching nodes or loading again", async () => {
+    const resolvers: Array<(res: { children: any[], inlinks: any[], outlinks: any[] }) => void> = []
+    fileNodeLookupMock.findSproutRelations.mockImplementation(
+      () => new Promise((resolve) => {
+        resolvers.push(resolve)
+      }),
+    )
+
+    const { editor, wrapper } = await mountEditor()
+    editor.addNode("file")
+    const firstNode = editor.state.document.nodes[0] as any
+    editor.updateNodeField(firstNode.id, "file", "doc-a")
+    editor.addNode("file")
+    const secondNode = editor.state.document.nodes[1] as any
+    editor.updateNodeField(secondNode.id, "file", "doc-b")
+
+    editor.selectNode(firstNode.id)
+    const firstLoad = editor.loadSproutRelations("doc-a")
+
+    editor.selectNode(secondNode.id)
+    const secondLoad = editor.loadSproutRelations("doc-b")
+
+    resolvers[1]?.({
+      children: [{ id: "child-b", title: "Child B" }],
+      inlinks: [],
+      outlinks: [],
+    })
+    await secondLoad
+
+    resolvers[0]?.({
+      children: [{ id: "child-a", title: "Stale A" }],
+      inlinks: [],
+      outlinks: [],
+    })
+    await firstLoad
+
+    expect(editor.sproutRelations.children.map((item: any) => item.id)).toEqual(["child-b"])
+    wrapper.unmount()
   })
 })
 

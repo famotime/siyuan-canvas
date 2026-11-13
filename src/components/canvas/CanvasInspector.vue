@@ -715,13 +715,16 @@ function getFileNodePath(node: any): string {
 }
 
 watch(
-  () => props.editor.selectedNode,
-  (node) => {
+  [
+    () => props.editor.state?.selectedNodeIds?.join('|') ?? '',
+    () => props.editor.selectedNode,
+  ],
+  ([, node]) => {
+    draftEditedFields.clear()
     if (!node) {
       return
     }
 
-    draftEditedFields.clear()
     multiNodeDraft.x = node.x
     multiNodeDraft.y = node.y
     multiNodeDraft.width = node.width
@@ -819,6 +822,9 @@ function applyDraft(): void {
   const fields: Record<string, unknown> = {}
   for (const key of draftEditedFields) {
     fields[key] = (multiNodeDraft as Record<string, unknown>)[key]
+  }
+  if (Object.keys(fields).length === 0) {
+    return
   }
   props.editor.applySelectedNodeChanges(fields)
 }

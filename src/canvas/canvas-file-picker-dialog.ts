@@ -36,11 +36,14 @@ function escapeAttr(value: string): string {
   return escapeHtml(value)
 }
 
-async function collectCanvasFiles(dirPath: string): Promise<CanvasFileEntry[]> {
+async function collectCanvasFiles(dirPath: string, isRoot = true): Promise<CanvasFileEntry[]> {
   let entries: Array<{ isDir: boolean, name: string }>
   try {
     entries = (await readDir(dirPath)) ?? []
-  } catch {
+  } catch (error) {
+    if (isRoot) {
+      throw error
+    }
     return []
   }
 
@@ -48,7 +51,7 @@ async function collectCanvasFiles(dirPath: string): Promise<CanvasFileEntry[]> {
   for (const entry of entries) {
     const fullPath = `${dirPath}/${entry.name}`
     if (entry.isDir) {
-      files.push(...await collectCanvasFiles(fullPath))
+      files.push(...await collectCanvasFiles(fullPath, false))
     } else if (entry.name.endsWith(".canvas")) {
       files.push({ name: entry.name, path: fullPath })
     }
@@ -67,6 +70,7 @@ function buildListItem(entry: CanvasFileEntry, index: number, isActive: boolean)
 export function openCanvasFilePickerDialog(options: CanvasFilePickerDialogOptions): Promise<CanvasFilePickerResult | null> {
   return new Promise((resolve) => {
     let settled = false
+    let loadState: "loading" | "ready" | "error" = "loading"
     let allFiles: CanvasFileEntry[] = []
     let filteredFiles: CanvasFileEntry[] = []
     let activeIndex = 0
@@ -132,18 +136,34 @@ export function openCanvasFilePickerDialog(options: CanvasFilePickerDialogOption
 
     function renderList() {
       if (!listEl) return
+      listEl.dataset.loadState = loadState
+
+      if (loadState === "loading") {
+        listEl.innerHTML = `<div class="canvas-file-picker__loading">…</div>`
+        return
+      }
+
+      if (loadState === "error") {
+        listEl.innerHTML = `<div class="canvas-file-picker__empty canvas-file-picker__error">${escapeHtml(options.noResultsLabel)}</div>`
+        return
+      }
 
       if (filteredFiles.length === 0) {
         listEl.innerHTML = `<div class="canvas-file-picker__empty">${escapeHtml(options.noResultsLabel)}</div>`
         return
       }
 
+      const clampedIndex = Math.max(0, Math.min(filteredFiles.length - 1, activeIndex))
+      activeIndex = clampedIndex
       listEl.innerHTML = filteredFiles
-        .map((entry, i) => buildListItem(entry, i, i === activeIndex))
+        .map((entry, i) => buildListItem(entry, i, i === clampedIndex))
         .join("")
     }
 
     function filterFiles() {
+      if (loadState !== "ready") {
+        return
+      }
       const query = (input?.value ?? "").trim().toLowerCase()
       filteredFiles = allFiles.filter((entry) => {
         if (!query) return true
@@ -191,11 +211,19 @@ export function openCanvasFilePickerDialog(options: CanvasFilePickerDialogOption
         close(null)
       } else if (event.key === "ArrowDown") {
         event.preventDefault()
+        if (filteredFiles.length === 0) {
+          activeIndex = 0
+          return
+        }
         activeIndex = Math.min(filteredFiles.length - 1, activeIndex + 1)
         renderList()
         scrollActiveIntoView()
       } else if (event.key === "ArrowUp") {
         event.preventDefault()
+        if (filteredFiles.length === 0) {
+          activeIndex = 0
+          return
+        }
         activeIndex = Math.max(0, activeIndex - 1)
         renderList()
         scrollActiveIntoView()
@@ -220,22 +248,30 @@ export function openCanvasFilePickerDialog(options: CanvasFilePickerDialogOption
       if (!target) return
 
       const index = Number(target.dataset.canvasFilePickerIndex)
-      if (!Number.isNaN(index) && index !== activeIndex) {
+      if (!Number.isNaN(index) && index >= 0 && index < filteredFiles.length && index !== activeIndex) {
         activeIndex = index
         renderList()
       }
     })
 
     // Load files and initialize
+    renderList()
     queueMicrotask(() => {
       input?.focus()
     })
 
-    collectCanvasFiles(options.defaultDirectory).then((files) => {
+    collectCanvasFiles(options.defaultDirectory, true).then((files) => {
       if (settled) return
 
+      loadState = "ready"
       allFiles = files
-      filteredFiles = files
+      filterFiles()
+    }).catch(() => {
+      if (settled) return
+
+      loadState = "error"
+      allFiles = []
+      filteredFiles = []
       activeIndex = 0
       renderList()
     })

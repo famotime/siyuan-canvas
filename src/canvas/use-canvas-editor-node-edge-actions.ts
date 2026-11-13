@@ -969,21 +969,35 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     children: [],
   })
 
+  let sproutRequestSeq = 0
+
   async function loadSproutRelations(docId: string) {
     if (!docId) return
+    const requestSeq = ++sproutRequestSeq
     sproutLoading.value = true
     try {
       const res = await findSproutRelations(docId)
+      if (requestSeq !== sproutRequestSeq) {
+        return
+      }
+      if (selectedNode.value && (selectedNode.value.type !== 'file' || selectedNode.value.file !== docId)) {
+        return
+      }
       sproutRelations.value = {
         inlinks: res.inlinks.map((item, idx) => ({ ...item, checked: idx < 10 })),
         outlinks: res.outlinks.map((item, idx) => ({ ...item, checked: idx < 10 })),
         children: res.children.map((item, idx) => ({ ...item, checked: idx < 10 })),
       }
     } catch (e) {
+      if (requestSeq !== sproutRequestSeq) {
+        return
+      }
       console.error(e)
       showMessage(t('sproutNoLinks') || '读取关联文档失败', 2000, 'error')
     } finally {
-      sproutLoading.value = false
+      if (requestSeq === sproutRequestSeq) {
+        sproutLoading.value = false
+      }
     }
   }
 

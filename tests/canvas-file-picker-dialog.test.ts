@@ -405,4 +405,25 @@ describe("openCanvasFilePickerDialog", () => {
     getCancelButton().click()
     await promise
   })
+
+  it("tracks error loadState cleanly and keeps valid index when ArrowDown is pressed on empty results", async () => {
+    fetchSyncPost.mockRejectedValueOnce(new Error("boom"))
+
+    const promise = openCanvasFilePickerDialog(defaultOptions)
+    await vi.waitFor(() => {
+      const list = document.querySelector("[data-canvas-file-picker-list]") as HTMLElement | null
+      expect(list?.dataset.loadState).toBe("error")
+    })
+
+    const input = getInput()
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }))
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }))
+
+    // Confirming while list is empty with whitespace input should not confirm undefined index or crash
+    input.value = "   "
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+
+    getCancelButton().click()
+    expect(await promise).toBeNull()
+  })
 })

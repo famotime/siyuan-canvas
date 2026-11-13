@@ -1323,10 +1323,17 @@ export function useCanvasEditor(
     commitDocument(nextDocument, { coalesceKey: "nudge-nodes" })
   }
 
+  const externalModalOverlayOpen = ref(false)
+  function setModalOverlayOpen(open: boolean) {
+    externalModalOverlayOpen.value = open
+  }
+
   const { handleKeydown } = createCanvasEditorKeyboardHandler({
     canDelete: () => canDelete.value,
     cancelEdgeLabelEditing,
+    closeCreateEdgeDialog,
     closeEdgePopover,
+    closeFilePickerDialog,
     closeFloatLayer,
     closeSelectionPopover,
     createMindMapChildNode,
@@ -1336,6 +1343,9 @@ export function useCanvasEditor(
     getEdgeToolbarPopover: () => edgeToolbarPopover.value,
     getEditingEdgeLabelId: () => editingEdgeLabelId.value,
     getSelectionToolbarPopover: () => selectionToolbarPopover.value,
+    hasBlockingOverlay: () => externalModalOverlayOpen.value || createEdgeDialog.visible || filePickerDialog.visible,
+    hasCreateEdgeDialog: () => createEdgeDialog.visible,
+    hasFilePickerDialog: () => filePickerDialog.visible,
     hasFloatLayer: () => floatLayerActive.value,
     hasSelectedNodes: () => state.selectedNodeIds.length > 0,
     nudgeSelectedNodes,
@@ -1686,6 +1696,7 @@ export function useCanvasEditor(
       selectedEdgeHandlePositions,
       setSelectionToolbarSize,
       setEdgeToolbarSize,
+      setModalOverlayOpen,
       startEdgeEndpointDrag,
       startEdgeLabelEditing,
       submitEdgeLabelEditing,

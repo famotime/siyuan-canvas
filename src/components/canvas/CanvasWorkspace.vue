@@ -2609,16 +2609,65 @@ async function confirmPngExport() {
 }
 
 onBeforeUnmount(() => {
+  editor.setModalOverlayOpen?.(false)
   window.removeEventListener("keydown", handleGlobalKeydown, true)
 })
 
-// Ctrl/Cmd + K 打开命令面板。capture 阶段拦截，避免被画布的全局 keydown 当成普通快捷键
+// Ctrl/Cmd + K 打开命令面板；Escape 按弹出层优先级自顶向下关闭，阻止底层画布快捷键误触
 const commandPaletteOpen = ref(false)
+watch(
+  () => commandPaletteOpen.value || pngExportDialogVisible.value,
+  (isOpen) => {
+    editor.setModalOverlayOpen?.(isOpen)
+  },
+)
+
 function handleGlobalKeydown(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "k") {
     event.preventDefault()
     event.stopPropagation()
     commandPaletteOpen.value = true
+    return
+  }
+
+  if (event.key !== "Escape") {
+    return
+  }
+
+  if (commandPaletteOpen.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    commandPaletteOpen.value = false
+    return
+  }
+
+  if (pngExportDialogVisible.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!pngExportLoading.value) {
+      closePngExportDialog()
+    }
+    return
+  }
+
+  if (editor.createEdgeDialog.visible) {
+    event.preventDefault()
+    event.stopPropagation()
+    editor.closeCreateEdgeDialog()
+    return
+  }
+
+  if (editor.filePickerDialog.visible) {
+    event.preventDefault()
+    event.stopPropagation()
+    editor.closeFilePickerDialog()
+    return
+  }
+
+  if (colorThemePopoverOpen.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    colorThemePopoverOpen.value = false
   }
 }
 

@@ -406,4 +406,62 @@ describe('canvas editor keyboard handler', () => {
     expect(selectNode).not.toHaveBeenCalled()
     expect(selectEdge).not.toHaveBeenCalled()
   })
+
+  it('closes createEdgeDialog and filePickerDialog before floatLayer or selection on Escape', () => {
+    const closeCreateEdgeDialog = vi.fn()
+    const closeFilePickerDialog = vi.fn()
+    const closeFloatLayer = vi.fn()
+    const selectNode = vi.fn()
+
+    let createEdgeOpen = true
+    let filePickerOpen = true
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      closeCreateEdgeDialog,
+      closeFilePickerDialog,
+      closeFloatLayer,
+      hasCreateEdgeDialog: () => createEdgeOpen,
+      hasFilePickerDialog: () => filePickerOpen,
+      hasFloatLayer: () => true,
+      selectNode,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('Escape'))
+    expect(closeCreateEdgeDialog).toHaveBeenCalledTimes(1)
+    expect(closeFilePickerDialog).not.toHaveBeenCalled()
+    expect(closeFloatLayer).not.toHaveBeenCalled()
+
+    createEdgeOpen = false
+    handler.handleKeydown(createKeyboardEvent('Escape'))
+    expect(closeFilePickerDialog).toHaveBeenCalledTimes(1)
+    expect(closeFloatLayer).not.toHaveBeenCalled()
+    expect(selectNode).not.toHaveBeenCalled()
+  })
+
+  it('blocks canvas delete, nudge, and zoom shortcuts when a modal blocking overlay is active', () => {
+    const deleteSelection = vi.fn()
+    const nudgeSelectedNodes = vi.fn()
+    const zoomToFit = vi.fn()
+    const selectNode = vi.fn()
+    const handler = createCanvasEditorKeyboardHandler({
+      ...createBaseHandlerOptions(),
+      canDelete: () => true,
+      deleteSelection,
+      hasBlockingOverlay: () => true,
+      hasSelectedNodes: () => true,
+      nudgeSelectedNodes,
+      selectNode,
+      zoomToFit,
+    })
+
+    handler.handleKeydown(createKeyboardEvent('Delete'))
+    handler.handleKeydown(createKeyboardEvent('ArrowUp'))
+    handler.handleKeydown(createKeyboardEvent('f'))
+    handler.handleKeydown(createKeyboardEvent('Escape'))
+
+    expect(deleteSelection).not.toHaveBeenCalled()
+    expect(nudgeSelectedNodes).not.toHaveBeenCalled()
+    expect(zoomToFit).not.toHaveBeenCalled()
+    expect(selectNode).not.toHaveBeenCalled()
+  })
 })
