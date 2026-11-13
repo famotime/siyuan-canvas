@@ -269,4 +269,76 @@ describe("createQueryNodeRuntime", () => {
 
     runtime.cleanup()
   })
+
+  it("ignores stale SQL responses after newer requests or node removal and saves fields atomically when updateNodeFields is provided", async () => {
+    const queryNode: CanvasQueryNode = {
+      id: "query-race",
+      type: "query",
+      sql: "SELECT first",
+      refreshInterval: 0,
+      maxResults: 10,
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 400,
+    }
+    const nodes = ref<CanvasNode[]>([queryNode])
+    const resolvers: Array<(rows: unknown[]) => void> = []
+    const executeSql = vi.fn(
+      () => new Promise<unknown[]>((resolve) => {
+        resolvers.push(resolve)
+      }),
+    )
+    const updateNodeField = vi.fn()
+    const updateNodeFields = vi.fn((_id: string, fields: Record<string, unknown>) => {
+      Object.assign(queryNode, fields)
+    })
+    const editingNodeId = ref("")
+
+    const runtime = createQueryNodeRuntime({
+      getNodes: () => nodes.value,
+      updateNodeField,
+      updateNodeFields,
+      editingNodeId,
+      renderMarkdown: md => md,
+      executeSql,
+    })
+
+    // Trigger a newer SQL fetch while first fetch is still in flight
+    runtime.startQueryEditing(queryNode)
+    runtime.editingQuerySql.value = "SELECT second"
+    runtime.editingQueryInterval.value = 5
+    runtime.editingQueryMaxResults.value = 15
+    runtime.saveQueryEditing(queryNode)
+
+    expect(updateNodeFields).toHaveBeenCalledTimes(1)
+    expect(updateNodeFields).toHaveBeenCalledWith("query-race", {
+      maxResults: 15,
+      refreshInterval: 5,
+      sql: "SELECT second",
+    })
+    expect(updateNodeField).not.toHaveBeenCalled()
+
+    // Resolve newer request first, then stale request
+    resolvers[1]([{ content: "fresh row" }])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(runtime.queryResultsMap.value["query-race"]?.map(r => r.content)).toEqual(["fresh row"])
+
+    resolvers[0]([{ content: "stale row" }])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(runtime.queryResultsMap.value["query-race"]?.map(r => r.content)).toEqual(["fresh row"])
+
+    // In-flight request after node removal should not repopulate maps
+    const pendingFetch = runtime.fetchQueryResult(queryNode)
+    nodes.value = []
+    await Promise.resolve()
+    resolvers[2]([{ content: "orphan row" }])
+    await pendingFetch
+    expect(runtime.queryResultsMap.value["query-race"]).toBeUndefined()
+    expect(runtime.queryLoadingMap.value["query-race"]).toBeUndefined()
+
+    runtime.cleanup()
+  })
 })

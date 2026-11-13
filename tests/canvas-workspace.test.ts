@@ -2667,5 +2667,48 @@ describe("CanvasWorkspace", () => {
     expect(wrapper.find('[data-testid="edge-overlay-edge-bc"]').classes()).toContain("stage__edge--presentation-path")
   })
 
+  it("does not mark editor dirty before inline markdown commit and protects query SQL from stage blur overwrite", async () => {
+    const textNode = createTextNode({ id: "text-1", text: "initial" })
+    const queryNode = {
+      id: "query-1",
+      type: "query",
+      sql: "SELECT * FROM blocks LIMIT 5",
+      refreshInterval: 0,
+      maxResults: 5,
+      x: 400,
+      y: 100,
+      width: 300,
+      height: 220,
+    } as any
+    currentEditor = createEditorMock(textNode)
+    currentEditor.displayNodes = [textNode, queryNode]
+    currentEditor.state.document.nodes = [textNode, queryNode]
+    currentEditor.state.isDirty = false
+
+    const wrapper = mount(CanvasWorkspace, {
+      props: {
+        bootstrap: {},
+        plugin: {},
+        setTitle: vi.fn(),
+      },
+    })
+
+    const nodes = wrapper.findAll(".canvas-node")
+    await nodes[0].trigger("dblclick")
+    const textarea = wrapper.find(".canvas-node__editor")
+    await textarea.setValue("typing without blur")
+    expect(currentEditor.state.isDirty).toBe(false)
+    await textarea.trigger("blur")
+    expect(currentEditor.updateTextNodeContent).toHaveBeenCalledWith(textNode.id, "typing without blur")
+
+    await nodes[1].trigger("dblclick")
+    const sqlInput = wrapper.find(".query-editor__textarea")
+    expect(sqlInput.exists()).toBe(true)
+    expect((sqlInput.element as HTMLTextAreaElement).value).toBe("SELECT * FROM blocks LIMIT 5")
+
+    await wrapper.find("section.stage").trigger("pointerdown")
+    expect(currentEditor.updateNodeField).not.toHaveBeenCalledWith("query-1", "sql", "")
+  })
+
 })
 

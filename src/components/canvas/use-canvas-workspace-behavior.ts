@@ -22,6 +22,7 @@ interface CanvasWorkspaceEditor {
   }
   edgeToolbarPopover: "closed" | "color" | "direction"
   importCanvas: (file: File) => Promise<void>
+  readonly?: boolean
   selectNode: (nodeId: string) => void
   selectedNode: CanvasNode | null
   selectedNodeCount: number
@@ -44,7 +45,14 @@ interface CanvasWorkspaceEditor {
   toggleGroupCollapse: (nodeId: string) => void
 }
 
-export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
+interface CanvasWorkspaceBehaviorOptions {
+  onStartQueryEditing?: (node: CanvasNode) => void
+}
+
+export function useCanvasWorkspaceBehavior(
+  editor: CanvasWorkspaceEditor,
+  options: CanvasWorkspaceBehaviorOptions = {},
+) {
   const editingMarkdown = ref("")
   const editingNodeId = ref("")
   const editingOriginalText = ref("")
@@ -187,6 +195,16 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
       return
     }
 
+    if (editor.readonly) {
+      return
+    }
+
+    if (node.type === "query") {
+      editor.selectNode(node.id)
+      options.onStartQueryEditing?.(node)
+      return
+    }
+
     editor.selectNode(node.id)
     editingNodeId.value = node.id
     const initialText: string = node.type === "group"
@@ -195,9 +213,7 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
         ? (node.text || "")
         : node.type === "link"
           ? (node.url || "")
-          : node.type === "query"
-            ? (node.sql || "")
-            : ""
+          : ""
     editingMarkdown.value = initialText
     editingOriginalText.value = initialText
     void nextTick(() => {
@@ -215,36 +231,31 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
       return
     }
 
-    const trimmed = editingMarkdown.value.trim()
     const node = editor.state.document.nodes.find((candidate) => candidate.id === editingNodeId.value)
+    // query 节点通过独立 SQL 表单显式保存/取消，避免画布点击失焦时误将 SQL 覆写为文本草稿
     if (node?.type === "query") {
-      editor.updateNodeField?.(editingNodeId.value, "sql", editingMarkdown.value.trim())
-    } else if (node?.type === "text" && isWebUrl(trimmed)) {
-      editor.convertTextToLink(editingNodeId.value, trimmed)
-    } else if (node?.type === "link") {
-      if (isWebUrl(trimmed)) {
-        editor.updateTextNodeContent(editingNodeId.value, trimmed)
+      return
+    }
+
+    if (editingMarkdown.value !== editingOriginalText.value) {
+      const trimmed = editingMarkdown.value.trim()
+      if (node?.type === "text" && isWebUrl(trimmed)) {
+        editor.convertTextToLink(editingNodeId.value, trimmed)
+      } else if (node?.type === "link") {
+        if (isWebUrl(trimmed)) {
+          editor.updateTextNodeContent(editingNodeId.value, trimmed)
+        } else {
+          editor.convertLinkToText(editingNodeId.value, editingMarkdown.value)
+        }
       } else {
-        editor.convertLinkToText(editingNodeId.value, editingMarkdown.value)
+        editor.updateTextNodeContent(editingNodeId.value, editingMarkdown.value)
       }
-    } else {
-      editor.updateTextNodeContent(editingNodeId.value, editingMarkdown.value)
     }
 
     editingNodeId.value = ""
     editingMarkdown.value = ""
     editingOriginalText.value = ""
   }
-
-  watch(editingMarkdown, (next) => {
-    if (!editingNodeId.value) {
-      return
-    }
-
-    if (next !== editingOriginalText.value) {
-      editor.state.isDirty = true
-    }
-  })
 
   watch(
     () => editor.state.pendingEditNodeId,

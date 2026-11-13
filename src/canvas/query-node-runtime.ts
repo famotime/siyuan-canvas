@@ -8,6 +8,7 @@ import type { CanvasNode, CanvasQueryNode } from "@/canvas/types"
 export interface QueryNodeRuntimeOptions {
   getNodes: () => CanvasNode[]
   updateNodeField: (nodeId: string, field: string, value: unknown) => void
+  updateNodeFields?: (nodeId: string, fields: Record<string, unknown>) => void
   editingNodeId: Ref<string>
   renderMarkdown: (markdown: string) => string
   processRenderedHtml?: (html: string) => string
@@ -27,6 +28,7 @@ export function createQueryNodeRuntime(options: QueryNodeRuntimeOptions) {
   const {
     getNodes,
     updateNodeField,
+    updateNodeFields,
     editingNodeId,
     renderMarkdown,
     processRenderedHtml,
@@ -39,13 +41,23 @@ export function createQueryNodeRuntime(options: QueryNodeRuntimeOptions) {
   const queryErrorsMap = ref<Record<string, string>>({})
   const queryLoadingMap = ref<Record<string, boolean>>({})
   const queryTimersMap = new Map<string, { timer: ReturnType<typeof setInterval> | null, interval: number }>()
+  const requestSeqMap = new Map<string, number>()
+  let disposed = false
 
   const editingQuerySql = ref("")
   const editingQueryInterval = ref(0)
   const editingQueryMaxResults = ref(50)
 
+  function isActiveQueryNode(nodeId: string): boolean {
+    return getNodes().some(candidate => candidate.id === nodeId && candidate.type === "query")
+  }
+
   async function fetchQueryResult(node: CanvasQueryNode): Promise<void> {
-    if (!node.id || !node.sql) return
+    if (disposed || !node.id || !node.sql) return
+    const requestSeq = (requestSeqMap.get(node.id) ?? 0) + 1
+    requestSeqMap.set(node.id, requestSeq)
+    const isStale = () => disposed || requestSeqMap.get(node.id) !== requestSeq || !isActiveQueryNode(node.id)
+
     queryLoadingMap.value[node.id] = true
     queryErrorsMap.value[node.id] = ""
     try {
@@ -53,6 +65,7 @@ export function createQueryNodeRuntime(options: QueryNodeRuntimeOptions) {
         throw new Error("SQL executor is not configured")
       }
       const rawResults = await executeSql(node.sql)
+      if (isStale()) return
       if (!Array.isArray(rawResults)) {
         throw new Error("SQL returned invalid results (expected array)")
       }
@@ -70,13 +83,17 @@ export function createQueryNodeRuntime(options: QueryNodeRuntimeOptions) {
           renderedHtml: html,
         }
       })
+      if (isStale()) return
       queryResultsMap.value[node.id] = processed
     } catch (err: unknown) {
+      if (isStale()) return
       const errorMsg = err instanceof Error ? err.message : String(err)
       queryErrorsMap.value[node.id] = errorMsg
       queryResultsMap.value[node.id] = []
     } finally {
-      queryLoadingMap.value[node.id] = false
+      if (!disposed && requestSeqMap.get(node.id) === requestSeq && isActiveQueryNode(node.id)) {
+        queryLoadingMap.value[node.id] = false
+      }
     }
   }
 
@@ -98,9 +115,21 @@ export function createQueryNodeRuntime(options: QueryNodeRuntimeOptions) {
       return
     }
 
-    updateNodeField(node.id, "sql", editingQuerySql.value.trim())
-    updateNodeField(node.id, "refreshInterval", Math.max(0, editingQueryInterval.value || 0))
-    updateNodeField(node.id, "maxResults", Math.max(1, editingQueryMaxResults.value || 50))
+    const nextSql = editingQuerySql.value.trim()
+    const nextRefreshInterval = Math.max(0, editingQueryInterval.value || 0)
+    const nextMaxResults = Math.max(1, editingQueryMaxResults.value || 50)
+
+    if (updateNodeFields) {
+      updateNodeFields(node.id, {
+        maxResults: nextMaxResults,
+        refreshInterval: nextRefreshInterval,
+        sql: nextSql,
+      })
+    } else {
+      updateNodeField(node.id, "sql", nextSql)
+      updateNodeField(node.id, "refreshInterval", nextRefreshInterval)
+      updateNodeField(node.id, "maxResults", nextMaxResults)
+    }
 
     editingNodeId.value = ""
 
@@ -133,6 +162,7 @@ export function createQueryNodeRuntime(options: QueryNodeRuntimeOptions) {
           const info = queryTimersMap.get(timerId)
           if (info?.timer) clearInterval(info.timer)
           queryTimersMap.delete(timerId)
+          requestSeqMap.delete(timerId)
           delete queryResultsMap.value[timerId]
           delete queryErrorsMap.value[timerId]
           delete queryLoadingMap.value[timerId]
@@ -154,15 +184,16 @@ export function createQueryNodeRuntime(options: QueryNodeRuntimeOptions) {
             queryTimersMap.delete(node.id)
           }
           if (currentInterval > 0) {
+            const nodeId = node.id
             const timer = setInterval(() => {
-              const exists = getNodes().some(n => n.id === node.id)
-              if (exists) {
-                if (editingNodeId.value !== node.id) {
-                  void fetchQueryResult(node)
+              const latestNode = getNodes().find(n => n.id === nodeId && n.type === "query") as CanvasQueryNode | undefined
+              if (latestNode) {
+                if (editingNodeId.value !== nodeId) {
+                  void fetchQueryResult(latestNode)
                 }
               } else {
                 clearInterval(timer)
-                queryTimersMap.delete(node.id)
+                queryTimersMap.delete(nodeId)
               }
             }, currentInterval * 1000)
             queryTimersMap.set(node.id, { timer, interval: currentInterval })
@@ -188,12 +219,14 @@ export function createQueryNodeRuntime(options: QueryNodeRuntimeOptions) {
   })
 
   function cleanup(): void {
+    disposed = true
     stopNodesWatcher()
     stopEditingWatcher()
     for (const info of queryTimersMap.values()) {
       if (info.timer) clearInterval(info.timer)
     }
     queryTimersMap.clear()
+    requestSeqMap.clear()
   }
 
   return {

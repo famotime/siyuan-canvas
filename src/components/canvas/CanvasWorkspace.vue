@@ -1929,7 +1929,11 @@ const {
   setEdgeToolbarRef,
   setEditingTextareaRef,
   setSelectionToolbarRef,
-} = useCanvasWorkspaceBehavior(editor)
+} = useCanvasWorkspaceBehavior(editor, {
+  onStartQueryEditing: (node) => {
+    startQueryEditing(node as Parameters<typeof startQueryEditing>[0])
+  },
+})
 const edgeLabelInputRef = ref<HTMLInputElement>()
 const toolbarCollapsed = ref(false)
 const fileCardImageOverrides = ref<Record<string, string>>({})
@@ -2052,6 +2056,7 @@ const {
 } = createQueryNodeRuntime({
   getNodes: () => editor.state.document.nodes,
   updateNodeField: editor.updateNodeField,
+  updateNodeFields: editor.updateNodeFields,
   editingNodeId,
   renderMarkdown: editor.getRenderedMarkdown,
   processRenderedHtml: (html) => {

@@ -1224,4 +1224,51 @@ describe("useCanvasEditor selection toolbar integration", () => {
 
     wrapper.unmount()
   })
+
+  it("coalesces edge label typing into a single undo entry and skips no-op submit commits", async () => {
+    let editor!: ReturnType<typeof useCanvasEditor>
+
+    const plugin = { app: {} }
+    const bootstrap = {
+      raw: JSON.stringify({
+        nodes: [
+          { id: "n1", type: "text", text: "one", x: 100, y: 100, width: 180, height: 100 },
+          { id: "n2", type: "text", text: "two", x: 420, y: 220, width: 180, height: 100 },
+        ],
+        edges: [
+          { id: "e1", fromNode: "n1", fromSide: "right", toNode: "n2", toSide: "left", label: "old" },
+        ],
+      }),
+    }
+
+    const Harness = defineComponent({
+      setup() {
+        editor = useCanvasEditor(plugin as any, bootstrap, vi.fn())
+        return () => h("div")
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    editor.selectEdge("e1")
+    editor.startEdgeLabelEditing()
+    editor.submitEdgeLabelEditing()
+    expect(editor.canUndo).toBe(false)
+
+    editor.startEdgeLabelEditing()
+    editor.updateEditingEdgeLabel("a")
+    editor.updateEditingEdgeLabel("ab")
+    editor.updateEditingEdgeLabel("abc")
+    editor.submitEdgeLabelEditing()
+
+    expect(editor.state.document.edges[0].label).toBe("abc")
+    expect(editor.canUndo).toBe(true)
+
+    editor.undo()
+    expect(editor.state.document.edges[0].label).toBe("old")
+    expect(editor.canUndo).toBe(false)
+
+    wrapper.unmount()
+  })
 })

@@ -84,7 +84,7 @@ export interface CanvasEditorCreateEdgeFormState {
 
 export interface CanvasEditorNodeEdgeActionsOptions {
   state: CanvasEditorState
-  commitDocument: (document: CanvasDocument, options?: { coalesceKey?: string }) => void
+  commitDocument: (document: CanvasDocument, options?: { coalesceKey?: string, coalesceMs?: number }) => void
   t: CanvasI18nTranslator
   geometry?: CanvasEditorGeometryState
   selectionUI?: CanvasEditorSelectionUIState
@@ -569,13 +569,17 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     closeEdgePopover()
   }
 
+  let edgeLabelEditSessionCounter = 0
+  let activeEdgeLabelCoalesceKey = ''
+
   function startEdgeLabelEditing() {
-    if (!selectedEdge.value) {
+    if (!selectedEdge.value || presentationActive?.value) {
       return
     }
 
     editingEdgeLabelId.value = selectedEdge.value.id
     edgeLabelDraft.value = selectedEdge.value.label || ''
+    activeEdgeLabelCoalesceKey = `edge-label:${selectedEdge.value.id}:${++edgeLabelEditSessionCounter}`
     closeEdgePopover()
   }
 
@@ -585,7 +589,13 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     }
 
     edgeLabelDraft.value = value
-    commitDocument(setCanvasEdgeLabel(state.document, editingEdgeLabelId.value, value))
+    if (!activeEdgeLabelCoalesceKey) {
+      activeEdgeLabelCoalesceKey = `edge-label:${editingEdgeLabelId.value}:${++edgeLabelEditSessionCounter}`
+    }
+    commitDocument(setCanvasEdgeLabel(state.document, editingEdgeLabelId.value, value), {
+      coalesceKey: activeEdgeLabelCoalesceKey,
+      coalesceMs: Number.POSITIVE_INFINITY,
+    })
   }
 
   function submitEdgeLabelEditing() {
@@ -593,14 +603,24 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
       return
     }
 
-    commitDocument(setCanvasEdgeLabel(state.document, editingEdgeLabelId.value, edgeLabelDraft.value))
+    const currentEdge = state.document.edges.find((edge) => edge.id === editingEdgeLabelId.value)
+    if ((currentEdge?.label ?? '') !== edgeLabelDraft.value) {
+      commitDocument(
+        setCanvasEdgeLabel(state.document, editingEdgeLabelId.value, edgeLabelDraft.value),
+        activeEdgeLabelCoalesceKey
+          ? { coalesceKey: activeEdgeLabelCoalesceKey, coalesceMs: Number.POSITIVE_INFINITY }
+          : undefined,
+      )
+    }
     editingEdgeLabelId.value = ''
     edgeLabelDraft.value = ''
+    activeEdgeLabelCoalesceKey = ''
   }
 
   function cancelEdgeLabelEditing() {
     editingEdgeLabelId.value = ''
     edgeLabelDraft.value = ''
+    activeEdgeLabelCoalesceKey = ''
   }
 
   function updateNode(node: CanvasNode) {
@@ -705,6 +725,18 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
       ...node,
       [field]: value,
     } as any)
+  }
+
+  function updateNodeFields(nodeId: string, fields: Record<string, unknown>) {
+    const node = state.document.nodes.find((n) => n.id === nodeId)
+    if (!node) {
+      return
+    }
+
+    updateNode({
+      ...node,
+      ...fields,
+    } as CanvasNode)
   }
 
   function updateNumericNodeField(field: 'height' | 'width' | 'x' | 'y', value: string) {
@@ -1206,6 +1238,7 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
     updateEdgeSide,
     updateEditingEdgeLabel,
     updateNodeField,
+    updateNodeFields,
     updateNumericNodeField,
     updateSelectedNodeZIndex,
     moveSelectedNodeZIndex,
