@@ -22,66 +22,96 @@ export function unescapeHtmlEntities(str: string): string {
     .replace(/\r\n?/g, '\n')
 }
 
-/**
- * 动态获取或初始化全局 Mermaid 渲染引擎
- */
-async function getOrInitMermaid(): Promise<any> {
+const inflightScriptLoads = new Map<string, Promise<unknown>>()
+
+interface ExternalScriptLoadOptions<T> {
+  scriptId: string
+  relativePath: string
+  getGlobal: () => T | null
+  onLoaded?: (lib: T) => void
+}
+
+function loadExternalScriptOnce<T>(options: ExternalScriptLoadOptions<T>): Promise<T | null> {
   if (typeof window === 'undefined') {
-    return null
+    return Promise.resolve(null)
+  }
+
+  const existingLib = options.getGlobal()
+  if (existingLib) {
+    return Promise.resolve(existingLib)
+  }
+
+  if (typeof document === 'undefined' || !document.head) {
+    return Promise.resolve(null)
+  }
+
+  const existingPromise = inflightScriptLoads.get(options.scriptId) as Promise<T | null> | undefined
+  if (existingPromise) {
+    return existingPromise
   }
 
   const win = window as any
-
-  if (win.mermaid && typeof win.mermaid.render === 'function') {
-    return win.mermaid
+  const staleScript = document.getElementById(options.scriptId)
+  if (staleScript) {
+    staleScript.remove()
   }
 
-  if (typeof document !== 'undefined' && document.head) {
-    return new Promise((resolve) => {
-      const scriptId = 'siyuan-canvas-mermaid-js'
-      let script = document.getElementById(scriptId) as HTMLScriptElement | null
-      if (!script) {
-        script = document.createElement('script')
-        script.id = scriptId
+  const loadPromise = new Promise<T | null>((resolve) => {
+    const script = document.createElement('script')
+    script.id = options.scriptId
+    script.async = true
+    const baseUrl = win.location?.origin || ''
+    const scriptUrl = `${baseUrl}${options.relativePath}`
+    script.src = scriptUrl
 
-        const baseUrl = win.location?.origin || ''
-        const scriptUrl = `${baseUrl}/stage/protyle/js/mermaid/mermaid.min.js`
+    const finalize = (result: T | null) => {
+      inflightScriptLoads.delete(options.scriptId)
+      resolve(result)
+    }
 
-        script.src = scriptUrl
-        script.onload = () => {
-          if (win.mermaid) {
-            try {
-              win.mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' })
-            } catch (e) {
-              console.warn('[siyuan-canvas] win.mermaid.initialize warning:', e)
-            }
-            resolve(win.mermaid)
-          } else {
-            resolve(null)
-          }
-        }
-        script.onerror = (err) => {
-          console.warn(`[siyuan-canvas] Failed to load mermaid script: ${scriptUrl}`, err)
-          resolve(null)
-        }
-        document.head.appendChild(script)
+    script.onload = () => {
+      const lib = options.getGlobal()
+      if (lib) {
+        options.onLoaded?.(lib)
+        finalize(lib)
       } else {
-        let attempts = 0
-        const timer = setInterval(() => {
-          attempts++
-          if (win.mermaid && typeof win.mermaid.render === 'function') {
-            clearInterval(timer)
-            resolve(win.mermaid)
-          } else if (attempts > 20) {
-            clearInterval(timer)
-            resolve(null)
-          }
-        }, 100)
+        script.remove()
+        finalize(null)
       }
-    })
-  }
+    }
 
-  return null
+    script.onerror = (err) => {
+      console.warn(`[siyuan-canvas] Failed to load script: ${scriptUrl}`, err)
+      script.remove()
+      finalize(null)
+    }
+
+    document.head.appendChild(script)
+  })
+
+  inflightScriptLoads.set(options.scriptId, loadPromise)
+  return loadPromise
+}
+
+/**
+ * 动态获取或初始化全局 Mermaid 渲染引擎
+ */
+function getOrInitMermaid(): Promise<any> {
+  return loadExternalScriptOnce({
+    scriptId: 'siyuan-canvas-mermaid-js',
+    relativePath: '/stage/protyle/js/mermaid/mermaid.min.js',
+    getGlobal: () => {
+      const win = window as any
+      return win.mermaid && typeof win.mermaid.render === 'function' ? win.mermaid : null
+    },
+    onLoaded: (mermaidLib) => {
+      try {
+        mermaidLib.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' })
+      } catch (e) {
+        console.warn('[siyuan-canvas] win.mermaid.initialize warning:', e)
+      }
+    },
+  })
 }
 
 /**
@@ -172,58 +202,15 @@ export function looseJsonParse(text: string): any {
 /**
  * 动态获取或初始化全局 ECharts 渲染引擎
  */
-async function getOrInitEcharts(): Promise<any> {
-  if (typeof window === 'undefined') {
-    return null
-  }
-
-  const win = window as any
-
-  if (win.echarts && typeof win.echarts.init === 'function') {
-    return win.echarts
-  }
-
-  if (typeof document !== 'undefined' && document.head) {
-    return new Promise((resolve) => {
-      const scriptId = 'siyuan-canvas-echarts-js'
-      let script = document.getElementById(scriptId) as HTMLScriptElement | null
-      if (!script) {
-        script = document.createElement('script')
-        script.id = scriptId
-
-        const baseUrl = win.location?.origin || ''
-        const scriptUrl = `${baseUrl}/stage/protyle/js/echarts/echarts.min.js`
-
-        script.src = scriptUrl
-        script.onload = () => {
-          if (win.echarts) {
-            resolve(win.echarts)
-          } else {
-            resolve(null)
-          }
-        }
-        script.onerror = (err) => {
-          console.warn(`[siyuan-canvas] Failed to load echarts script: ${scriptUrl}`, err)
-          resolve(null)
-        }
-        document.head.appendChild(script)
-      } else {
-        let attempts = 0
-        const timer = setInterval(() => {
-          attempts++
-          if (win.echarts && typeof win.echarts.init === 'function') {
-            clearInterval(timer)
-            resolve(win.echarts)
-          } else if (attempts > 20) {
-            clearInterval(timer)
-            resolve(null)
-          }
-        }, 100)
-      }
-    })
-  }
-
-  return null
+function getOrInitEcharts(): Promise<any> {
+  return loadExternalScriptOnce({
+    scriptId: 'siyuan-canvas-echarts-js',
+    relativePath: '/stage/protyle/js/echarts/echarts.min.js',
+    getGlobal: () => {
+      const win = window as any
+      return win.echarts && typeof win.echarts.init === 'function' ? win.echarts : null
+    },
+  })
 }
 
 /**

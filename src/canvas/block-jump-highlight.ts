@@ -3,14 +3,16 @@ import type { CanvasPluginBridge } from '@/canvas/use-canvas-editor-shared'
 const BLOCK_HIGHLIGHT_CLASS = 'canvas-block-current'
 const BLOCK_HIGHLIGHT_STYLE_ID = 'siyuan-canvas-block-jump-highlight-style'
 const BLOCK_HIGHLIGHT_DURATION = 1200
+const activeStyleConsumers = new Set<symbol>()
 
 export function createCanvasBlockJumpHighlighter(plugin: CanvasPluginBridge) {
+  const consumerToken = Symbol('block-jump-highlight')
   let pendingBlockId: string | null = null
   let activeElement: HTMLElement | null = null
   let activeTimer: number | null = null
-  let styleElement: HTMLStyleElement | null = null
 
   function ensureStyleSheet() {
+    activeStyleConsumers.add(consumerToken)
     if (document.getElementById(BLOCK_HIGHLIGHT_STYLE_ID)) {
       return
     }
@@ -25,7 +27,6 @@ export function createCanvasBlockJumpHighlighter(plugin: CanvasPluginBridge) {
 }
 `
     document.head.appendChild(style)
-    styleElement = style
   }
 
   function clearActiveElement() {
@@ -100,8 +101,10 @@ export function createCanvasBlockJumpHighlighter(plugin: CanvasPluginBridge) {
       plugin.eventBus?.off?.('loaded-protyle-dynamic', handleLoadedProtyleDynamic)
       pendingBlockId = null
       clearActiveElement()
-      styleElement?.remove()
-      styleElement = null
+      activeStyleConsumers.delete(consumerToken)
+      if (activeStyleConsumers.size === 0) {
+        document.getElementById(BLOCK_HIGHLIGHT_STYLE_ID)?.remove()
+      }
     },
   }
 }

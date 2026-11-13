@@ -185,8 +185,9 @@ export async function requestAiSearch(options: {
   richness?: "simple" | "medium" | "detailed"
   cardCount: number
   customPrompt?: string
+  signal?: AbortSignal
 }): Promise<AiSearchResponse> {
-  const { collected, relations, targetNode, apiConfig, richness = "medium", cardCount, customPrompt } = options
+  const { collected, relations, targetNode, apiConfig, richness = "medium", cardCount, customPrompt, signal } = options
   const { baseUrl, apiKey, model, requestTimeoutSeconds, temperature, maxTokens } = apiConfig
 
   if (!baseUrl || !model) {
@@ -279,6 +280,12 @@ ${userSpecificInstruction}
   }
 
   const controller = new AbortController()
+  const onExternalAbort = () => controller.abort()
+  if (signal?.aborted) {
+    controller.abort()
+  } else {
+    signal?.addEventListener("abort", onExternalAbort, { once: true })
+  }
   const timeoutId = setTimeout(() => controller.abort(), (requestTimeoutSeconds ?? 30) * 1000)
 
   try {
@@ -288,8 +295,6 @@ ${userSpecificInstruction}
       body: JSON.stringify(requestBody),
       signal: controller.signal,
     })
-
-    clearTimeout(timeoutId)
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -385,10 +390,15 @@ ${userSpecificInstruction}
       throw new Error("大模型响应格式解析 JSON 失败：" + String(parseErr))
     }
   } catch (err: any) {
-    clearTimeout(timeoutId)
-    if (err.name === "AbortError") {
+    if (err?.name === "AbortError") {
+      if (signal?.aborted) {
+        throw err
+      }
       throw new Error("API 请求超时")
     }
     throw err
+  } finally {
+    clearTimeout(timeoutId)
+    signal?.removeEventListener("abort", onExternalAbort)
   }
 }

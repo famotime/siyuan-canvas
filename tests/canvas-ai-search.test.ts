@@ -317,6 +317,32 @@ describe('requestAiSearch JSON parser tolerance', () => {
 
     fetchSpy.mockRestore()
   })
+
+  it('forwards external AbortSignal so caller unmount/switch cancels in-flight fetch with AbortError', async () => {
+    const abortController = new AbortController()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, options: any) => {
+      return new Promise((_resolve, reject) => {
+        options.signal?.addEventListener('abort', () => {
+          const error = new Error('The operation was aborted.')
+          error.name = 'AbortError'
+          reject(error)
+        }, { once: true })
+      })
+    })
+
+    const requestPromise = requestAiSearch({
+      collected: [],
+      relations: [],
+      targetNode: { id: 't1', type: 'text', title: 'Target', content: 'Content', depth: 0 },
+      apiConfig: { provider: 'test', baseUrl: 'http://test.ai', apiKey: 'key', model: 'gpt-4', requestTimeoutSeconds: 30, temperature: 0.7, maxTokens: 100 },
+      cardCount: 1,
+      signal: abortController.signal,
+    })
+
+    abortController.abort()
+    await expect(requestPromise).rejects.toMatchObject({ name: 'AbortError' })
+    fetchSpy.mockRestore()
+  })
 })
 
 

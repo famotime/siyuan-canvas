@@ -111,6 +111,10 @@ export async function removeDoc(notebook: NotebookId, path: string) {
   return request(url, data);
 }
 
+export async function removeDocByID(id: DocumentId) {
+  return request("/api/filetree/removeDocByID", { id });
+}
+
 export async function moveDocs(
   fromPaths: string[],
   toNotebook: NotebookId,

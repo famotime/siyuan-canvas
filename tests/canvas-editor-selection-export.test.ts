@@ -1,170 +1,151 @@
+/* @vitest-environment jsdom */
+
 import {
+  beforeEach,
   describe,
   expect,
   it,
   vi,
 } from "vitest"
 
-// Mock the API module
-const mockLsNotebooks = vi.fn()
-const mockGetNotebookConf = vi.fn()
-const mockRenderSprig = vi.fn()
-
-vi.mock("@/api", () => ({
-  lsNotebooks: () => mockLsNotebooks(),
-  getNotebookConf: (notebookId: string) => mockGetNotebookConf(notebookId),
-  renderSprig: (sprig: string) => mockRenderSprig(sprig),
+const apiMocks = vi.hoisted(() => ({
   createDocWithMd: vi.fn(),
+  getNotebookConf: vi.fn(),
+  lsNotebooks: vi.fn(),
   putFile: vi.fn(),
+  removeDocByID: vi.fn(),
+  renderSprig: vi.fn(),
   sql: vi.fn(),
 }))
 
+const lookupMocks = vi.hoisted(() => ({
+  findSiyuanAssetByPath: vi.fn(async () => null),
+  getSiyuanBlockMarkdown: vi.fn(async () => "fetched content"),
+  getSiyuanDocumentMarkdown: vi.fn(async () => "doc content"),
+  getSiyuanHeadingBlockMarkdown: vi.fn(async () => "heading content"),
+}))
+
+vi.mock("siyuan", () => ({
+  showMessage: vi.fn(),
+}))
+
+vi.mock("@/api", () => apiMocks)
+vi.mock("@/canvas/siyuan-kernel-file-node-lookups", () => lookupMocks)
+
+import { createDefaultCanvasPluginSettings } from "@/canvas/plugin-data"
 import { createCanvasEditorSelectionExport } from "@/canvas/use-canvas-editor-selection-export"
-import type { CanvasPluginSettings } from "@/canvas/plugin-data"
 
-describe("resolveNoteCreationDirectory", () => {
-  it("returns null if there are no active notebooks", async () => {
-    mockLsNotebooks.mockResolvedValue({
-      notebooks: [
-        { id: "nb-1", name: "Closed Notebook", closed: true },
-      ],
+function createExportDeps(state: any, commitDocument = vi.fn()) {
+  return {
+    commitDocument,
+    fileSource: { value: "workspace" as const },
+    getPluginSettings: () => createDefaultCanvasPluginSettings(),
+    getResolvedFileNode: (node: any) => ({
+      id: node.file,
+      kind: "document" as const,
+      openPath: node.file,
+      path: node.file,
+      title: "Doc",
+    }),
+    refreshFileNodeMetadata: vi.fn(async () => {}),
+    state,
+    t: (key: string) => key,
+  }
+}
+
+describe("use-canvas-editor-selection-export safety guards", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    apiMocks.lsNotebooks.mockResolvedValue({
+      notebooks: [{ closed: false, id: "nb-1", name: "Main" }],
     })
-
-    const settings: CanvasPluginSettings = {
-      noteCreationDirectory: "/MyNotebook/Daily",
-    } as any
-
-    const { resolveNoteCreationDirectory } = createCanvasEditorSelectionExport({
-      state: {} as any,
-      commitDocument: vi.fn(),
-      refreshFileNodeMetadata: vi.fn(),
-      getResolvedFileNode: vi.fn(),
-      getPluginSettings: () => settings,
-      fileSource: { value: "workspace" },
-      t: (key: string) => key,
-    })
-
-    const result = await resolveNoteCreationDirectory()
-    expect(result).toBeNull()
+    apiMocks.getNotebookConf.mockResolvedValue({ conf: { dailyNoteSavePath: "/Daily" } })
+    apiMocks.renderSprig.mockResolvedValue("/Daily/Note")
+    apiMocks.removeDocByID.mockResolvedValue(null)
   })
 
-  it("extracts notebook id and remaining path if first path segment matches an active notebook name", async () => {
-    mockLsNotebooks.mockResolvedValue({
-      notebooks: [
-        { id: "nb-1", name: "剪藏笔记本", closed: false },
-        { id: "nb-2", name: "学习笔记", closed: false },
-      ],
-    })
+  it("rolls back created SiYuan document if canvas file switches before convertSelectionToDocument commits", async () => {
+    let resolveCreateDoc!: (id: string) => void
+    apiMocks.createDocWithMd.mockImplementation(
+      () => new Promise<string>((resolve) => {
+        resolveCreateDoc = resolve
+      }),
+    )
 
-    const settings: CanvasPluginSettings = {
-      noteCreationDirectory: "/剪藏笔记本/daily note/Top100大文件清单",
-    } as any
-
-    const { resolveNoteCreationDirectory } = createCanvasEditorSelectionExport({
-      state: {} as any,
-      commitDocument: vi.fn(),
-      refreshFileNodeMetadata: vi.fn(),
-      getResolvedFileNode: vi.fn(),
-      getPluginSettings: () => settings,
-      fileSource: { value: "workspace" },
-      t: (key: string) => key,
-    })
-
-    const result = await resolveNoteCreationDirectory()
-    expect(result).toEqual({
-      notebook: "nb-1",
-      parentPath: "/daily note/Top100大文件清单",
-    })
-  })
-
-  it("falls back to default notebook and full path if first path segment does not match any active notebook", async () => {
-    mockLsNotebooks.mockResolvedValue({
-      notebooks: [
-        { id: "nb-1", name: "剪藏笔记本", closed: false },
-        { id: "nb-2", name: "学习笔记", closed: false },
-      ],
-    })
-
-    const settings: CanvasPluginSettings = {
-      noteCreationDirectory: "/daily note/Top100大文件清单",
-    } as any
-
-    const { resolveNoteCreationDirectory } = createCanvasEditorSelectionExport({
-      state: {} as any,
-      commitDocument: vi.fn(),
-      refreshFileNodeMetadata: vi.fn(),
-      getResolvedFileNode: vi.fn(),
-      getPluginSettings: () => settings,
-      fileSource: { value: "workspace" },
-      t: (key: string) => key,
-    })
-
-    const result = await resolveNoteCreationDirectory()
-    expect(result).toEqual({
-      notebook: "nb-1",
-      parentPath: "/daily note/Top100大文件清单",
-    })
-  })
-
-  it("returns '/' as parentPath if noteCreationDirectory only specifies the notebook name", async () => {
-    mockLsNotebooks.mockResolvedValue({
-      notebooks: [
-        { id: "nb-1", name: "剪藏笔记本", closed: false },
-      ],
-    })
-
-    const settings: CanvasPluginSettings = {
-      noteCreationDirectory: "/剪藏笔记本",
-    } as any
-
-    const { resolveNoteCreationDirectory } = createCanvasEditorSelectionExport({
-      state: {} as any,
-      commitDocument: vi.fn(),
-      refreshFileNodeMetadata: vi.fn(),
-      getResolvedFileNode: vi.fn(),
-      getPluginSettings: () => settings,
-      fileSource: { value: "workspace" },
-      t: (key: string) => key,
-    })
-
-    const result = await resolveNoteCreationDirectory()
-    expect(result).toEqual({
-      notebook: "nb-1",
-      parentPath: "/",
-    })
-  })
-
-  it("falls back to daily note directory config of default notebook if noteCreationDirectory is empty", async () => {
-    mockLsNotebooks.mockResolvedValue({
-      notebooks: [
-        { id: "nb-1", name: "剪藏笔记本", closed: false },
-      ],
-    })
-    mockGetNotebookConf.mockResolvedValue({
-      conf: {
-        dailyNoteSavePath: "/daily note/{{date}}",
+    const state = {
+      document: {
+        edges: [],
+        nodes: [
+          { height: 100, id: "n1", text: "# Note Title\nBody", type: "text", width: 200, x: 0, y: 0 },
+        ],
       },
-    })
-    mockRenderSprig.mockImplementation(async (path) => path) // Simulate simple rendering returning same value
-
-    const settings: CanvasPluginSettings = {
-      noteCreationDirectory: "",
+      filePath: "/data/canvas-a.canvas",
     } as any
+    const commitDocument = vi.fn()
+    const actions = createCanvasEditorSelectionExport(createExportDeps(state, commitDocument))
 
-    const { resolveNoteCreationDirectory } = createCanvasEditorSelectionExport({
-      state: {} as any,
-      commitDocument: vi.fn(),
-      refreshFileNodeMetadata: vi.fn(),
-      getResolvedFileNode: vi.fn(),
-      getPluginSettings: () => settings,
-      fileSource: { value: "workspace" },
-      t: (key: string) => key,
-    })
+    const promise = actions.convertSelectionToDocument(["n1"])
+    await vi.waitFor(() => expect(apiMocks.createDocWithMd).toHaveBeenCalledTimes(1))
 
-    const result = await resolveNoteCreationDirectory()
-    expect(result).toEqual({
-      notebook: "nb-1",
-      parentPath: "/daily note",
-    })
+    // Simulate switching canvas before createDocWithMd resolves
+    state.filePath = "/data/canvas-b.canvas"
+    resolveCreateDoc("doc-orphan-123")
+    await promise
+
+    expect(commitDocument).not.toHaveBeenCalled()
+    expect(apiMocks.removeDocByID).toHaveBeenCalledWith("doc-orphan-123")
+  })
+
+  it("rolls back created SiYuan document when heading resolution fails after createDocWithMd", async () => {
+    apiMocks.createDocWithMd.mockResolvedValueOnce("doc-rollback-456")
+    apiMocks.sql.mockRejectedValueOnce(new Error("sql failed"))
+
+    const state = {
+      document: {
+        edges: [],
+        nodes: [
+          { height: 100, id: "n1", text: "# Title\nOne", type: "text", width: 200, x: 0, y: 0 },
+          { height: 100, id: "n2", text: "Two", type: "text", width: 200, x: 0, y: 150 },
+        ],
+      },
+      filePath: "/data/canvas-a.canvas",
+    } as any
+    const commitDocument = vi.fn()
+    const actions = createCanvasEditorSelectionExport(createExportDeps(state, commitDocument))
+
+    await actions.convertSelectionToDocument(["n1", "n2"])
+
+    expect(commitDocument).not.toHaveBeenCalled()
+    expect(apiMocks.removeDocByID).toHaveBeenCalledWith("doc-rollback-456")
+  })
+
+  it("drops stale convertSelectionToText commit when canvas switches mid-flight", async () => {
+    let resolveMarkdown!: (md: string) => void
+    lookupMocks.getSiyuanDocumentMarkdown.mockImplementation(
+      () => new Promise<string>((resolve) => {
+        resolveMarkdown = resolve
+      }),
+    )
+
+    const state = {
+      document: {
+        edges: [],
+        nodes: [
+          { file: "doc-1", height: 100, id: "f1", type: "file", width: 200, x: 0, y: 0 },
+        ],
+      },
+      filePath: "/data/canvas-a.canvas",
+    } as any
+    const commitDocument = vi.fn()
+    const actions = createCanvasEditorSelectionExport(createExportDeps(state, commitDocument))
+
+    const promise = actions.convertSelectionToText(["f1"])
+    await vi.waitFor(() => expect(lookupMocks.getSiyuanDocumentMarkdown).toHaveBeenCalledTimes(1))
+
+    state.filePath = "/data/canvas-b.canvas"
+    resolveMarkdown("stale doc markdown")
+    await promise
+
+    expect(commitDocument).not.toHaveBeenCalled()
   })
 })

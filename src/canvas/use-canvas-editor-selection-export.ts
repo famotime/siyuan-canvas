@@ -20,6 +20,7 @@ import {
   getNotebookConf,
   lsNotebooks,
   putFile,
+  removeDocByID,
   renderSprig,
   sql,
 } from "@/api"
@@ -418,6 +419,17 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
     }
   }
 
+  async function rollbackCreatedDocument(documentId: string) {
+    if (!documentId || typeof removeDocByID !== 'function') {
+      return
+    }
+    try {
+      await removeDocByID(documentId)
+    } catch (rollbackError) {
+      console.warn('[siyuan-canvas] rollbackCreatedDocument failed:', rollbackError)
+    }
+  }
+
   async function convertSelectionToDocument(selectedNodeIds: string[]) {
     const allTextNodes = selectedNodeIds
       .map((id) => state.document.nodes.find((n) => n.id === id))
@@ -425,12 +437,18 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
 
     if (allTextNodes.length === 0) return
 
+    const initialFilePath = state.filePath
     const dir = await resolveNoteCreationDirectory()
     if (!dir) {
       showMessage(t('messageNoNotebookAvailable'), 4000, 'info')
       return
     }
 
+    if (state.filePath !== initialFilePath) {
+      return
+    }
+
+    let createdDocumentId = ''
     try {
       const orderedIds = selectedNodeIds.length === 1
         ? selectedNodeIds
@@ -453,6 +471,7 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
       if (!documentId) {
         throw new Error('createDocWithMd returned empty documentId')
       }
+      createdDocumentId = documentId
 
       const replacementNodes: Array<{ id: string, node: CanvasFileNode }> = []
 
@@ -477,6 +496,10 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
         let headingBlockIds: string[] = []
         if (headingCount > 0) {
           for (let attempt = 0; attempt < 3; attempt++) {
+            if (state.filePath !== initialFilePath) {
+              await rollbackCreatedDocument(createdDocumentId)
+              return
+            }
             headingBlockIds = await findHeadingBlockIds(documentId, headingCount)
             if (headingBlockIds.length >= headingCount) {
               break
@@ -510,7 +533,19 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
         }
       }
 
-      const replacementMap = new Map(replacementNodes.map((r) => [r.id, r.node]))
+      if (state.filePath !== initialFilePath) {
+        await rollbackCreatedDocument(createdDocumentId)
+        return
+      }
+
+      const existingIds = new Set(state.document.nodes.map((node) => node.id))
+      const liveReplacementNodes = replacementNodes.filter((r) => existingIds.has(r.id))
+      if (liveReplacementNodes.length === 0) {
+        await rollbackCreatedDocument(createdDocumentId)
+        return
+      }
+
+      const replacementMap = new Map(liveReplacementNodes.map((r) => [r.id, r.node]))
       const updatedNodes = state.document.nodes.map((node) =>
         replacementMap.get(node.id) ?? node,
       )
@@ -520,10 +555,13 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
         nodes: updatedNodes,
       })
 
-      await refreshFileNodeMetadata(replacementNodes.map((r) => r.id))
+      await refreshFileNodeMetadata(liveReplacementNodes.map((r) => r.id))
 
       showMessage(t('messageConvertToDocumentSuccess', { title }), 3000)
     } catch (err) {
+      if (createdDocumentId) {
+        await rollbackCreatedDocument(createdDocumentId)
+      }
       console.error('[siyuan-canvas] convertSelectionToDocument failed:', err)
       showMessage(t('messageConvertToDocumentFailed'), 4000, 'error')
     }
@@ -536,6 +574,7 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
 
     if (fileNodes.length === 0) return
 
+    const initialFilePath = state.filePath
     try {
       const replacementEntries = await Promise.all(fileNodes.map(async (node) => {
         const content = await fetchFileNodeContent(node)
@@ -555,7 +594,18 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
         }
       }))
 
-      const replacementMap = new Map(replacementEntries.map((r) => [r.id, r.node]))
+      if (state.filePath !== initialFilePath) {
+        return
+      }
+
+      const existingIds = new Set(state.document.nodes.map((node) => node.id))
+      const replacementMap = new Map(
+        replacementEntries.filter((r) => existingIds.has(r.id)).map((r) => [r.id, r.node]),
+      )
+      if (replacementMap.size === 0) {
+        return
+      }
+
       const updatedNodes = state.document.nodes.map((node) =>
         replacementMap.get(node.id) ?? node,
       )

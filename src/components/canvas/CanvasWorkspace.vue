@@ -2099,6 +2099,16 @@ const isAiSearchButtonVisible = computed(() => {
   return node.type === "text"
 })
 
+let aiSearchRunId = 0
+let aiSearchAbortController: AbortController | null = null
+
+function cancelActiveAiSearch() {
+  aiSearchRunId++
+  aiSearchAbortController?.abort()
+  aiSearchAbortController = null
+  isAiSearching.value = false
+}
+
 async function handleAiSearch() {
   if (isAiSearching.value) return
 
@@ -2108,6 +2118,7 @@ async function handleAiSearch() {
   const targetNode = editor.state.document.nodes.find(n => n.id === selectedId)
   if (!targetNode || targetNode.type !== "text") return
 
+  const sourceFilePath = editor.filePath
   const promptInput = await openAiSearchPromptDialog({
     title: t("aiSearchDialogTitle") || "AI 探索",
     hint: t("aiSearchDialogHint") || "请输入探索方向或具体要求（可选），直接确认将按默认规则发散：",
@@ -2121,6 +2132,13 @@ async function handleAiSearch() {
     return
   }
 
+  if (editor.filePath !== sourceFilePath || !editor.state.document.nodes.some(n => n.id === selectedId)) {
+    return
+  }
+
+  const runId = ++aiSearchRunId
+  const abortController = new AbortController()
+  aiSearchAbortController = abortController
   isAiSearching.value = true
   const loadingMsgId = showMessage(t("aiSearchLoading") || "正在为您进行 AI 探索，请稍候...", 0)
 
@@ -2193,7 +2211,17 @@ async function handleAiSearch() {
       richness,
       cardCount,
       customPrompt: promptInput,
+      signal: abortController.signal,
     })
+
+    if (runId !== aiSearchRunId || abortController.signal.aborted || editor.filePath !== sourceFilePath) {
+      return
+    }
+
+    const latestTargetNode = editor.state.document.nodes.find(n => n.id === selectedId)
+    if (!latestTargetNode) {
+      return
+    }
 
     // 4. 解析结果并进行排布生成
     const generatedCards = response.cards
@@ -2213,8 +2241,8 @@ async function handleAiSearch() {
 
     const N = generatedCards.length
     // 计算相对垂直居中的初始 Y
-    const startY = targetNode.y + (targetNode.height / 2) - ((N * newCardHeight + (N - 1) * gapY) / 2)
-    const targetX = targetNode.x + targetNode.width + gapX
+    const startY = latestTargetNode.y + (latestTargetNode.height / 2) - ((N * newCardHeight + (N - 1) * gapY) / 2)
+    const targetX = latestTargetNode.x + latestTargetNode.width + gapX
 
     const currentNodes = [...editor.state.document.nodes]
 
@@ -2242,7 +2270,7 @@ async function handleAiSearch() {
       currentNodes.push(childNode) // 立即加入，用于下一个子节点的避障
 
       // 创建连线从当前选中节点右侧到新节点左侧
-      const edge = createCanvasEdge(targetNode.id, childNode.id) as any
+      const edge = createCanvasEdge(latestTargetNode.id, childNode.id) as any
       edge.fromSide = 'right'
       edge.toSide = 'left'
       newEdges.push(edge)
@@ -2264,10 +2292,16 @@ async function handleAiSearch() {
     const completeText = "AI 探索已完成"
     showMessage(completeText, 3000, "info")
   } catch (err: any) {
+    if (abortController.signal.aborted || err?.name === "AbortError") {
+      return
+    }
     console.error("[AI Search] Exploration failed:", err)
     const errText = t("aiSearchErrorRequest", { error: err.message || String(err) }) || `AI 探索发生错误: ${err.message || String(err)}`
     showMessage(errText, 5000, "error")
   } finally {
+    if (aiSearchAbortController === abortController) {
+      aiSearchAbortController = null
+    }
     // 隐藏等待 Toast 
     if (loadingMsgId) {
       try {
@@ -2276,7 +2310,9 @@ async function handleAiSearch() {
         // 防止由于版本或者环境不同报错
       }
     }
-    isAiSearching.value = false
+    if (runId === aiSearchRunId) {
+      isAiSearching.value = false
+    }
   }
 }
 
@@ -2442,8 +2478,49 @@ const sproutPopoverStyle = computed(() => {
   return style
 })
 const settingsRevision = ref(0)
+const MAX_IMAGE_BLOB_CACHE_ENTRIES = 128
 const fileCardImageBlobUrlLoads = new Set<string>()
 const textMarkdownImageBlobUrlLoads = new Set<string>()
+let workspaceUnmounted = false
+
+function setBoundedBlobUrlCache(
+  cacheRef: { value: Record<string, string> },
+  source: string,
+  blobUrl: string,
+) {
+  if (workspaceUnmounted) {
+    URL.revokeObjectURL(blobUrl)
+    return
+  }
+
+  const next = { ...cacheRef.value }
+  if (next[source] && next[source] !== blobUrl) {
+    URL.revokeObjectURL(next[source])
+  }
+  delete next[source]
+  next[source] = blobUrl
+
+  const keys = Object.keys(next)
+  while (keys.length > MAX_IMAGE_BLOB_CACHE_ENTRIES) {
+    const oldestKey = keys.shift()
+    if (oldestKey) {
+      URL.revokeObjectURL(next[oldestKey])
+      delete next[oldestKey]
+    }
+  }
+  cacheRef.value = next
+}
+
+function revokeAllBlobUrls() {
+  for (const blobUrl of Object.values(fileCardImageBlobUrls.value)) {
+    URL.revokeObjectURL(blobUrl)
+  }
+  for (const blobUrl of Object.values(textMarkdownImageBlobUrls.value)) {
+    URL.revokeObjectURL(blobUrl)
+  }
+  fileCardImageBlobUrls.value = {}
+  textMarkdownImageBlobUrls.value = {}
+}
 
 function isWorkspaceStorageImageSource(source: string): boolean {
   return /^\/data\/storage\/.+\.(?:avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(source.trim())
@@ -2454,6 +2531,7 @@ async function loadTextMarkdownImageBlobUrl(source: string) {
     return
   }
 
+  const requestFilePath = editor.filePath
   textMarkdownImageBlobUrlLoads.add(source)
   try {
     const response = await fetch("/api/file/getFile", {
@@ -2463,15 +2541,16 @@ async function loadTextMarkdownImageBlobUrl(source: string) {
       },
       method: "POST",
     })
-    if (!response.ok) {
+    if (!response.ok || workspaceUnmounted || editor.filePath !== requestFilePath) {
       return
     }
 
     const blobUrl = URL.createObjectURL(await response.blob())
-    textMarkdownImageBlobUrls.value = {
-      ...textMarkdownImageBlobUrls.value,
-      [source]: blobUrl,
+    if (workspaceUnmounted || editor.filePath !== requestFilePath) {
+      URL.revokeObjectURL(blobUrl)
+      return
     }
+    setBoundedBlobUrlCache(textMarkdownImageBlobUrls, source, blobUrl)
   } catch (error) {
     console.warn("[siyuan-canvas] unable to load text markdown image:", source, error)
   } finally {
@@ -2484,6 +2563,7 @@ async function loadFileCardImageBlobUrl(source: string) {
     return
   }
 
+  const requestFilePath = editor.filePath
   fileCardImageBlobUrlLoads.add(source)
   try {
     const response = await fetch("/api/file/getFile", {
@@ -2493,15 +2573,16 @@ async function loadFileCardImageBlobUrl(source: string) {
       },
       method: "POST",
     })
-    if (!response.ok) {
+    if (!response.ok || workspaceUnmounted || editor.filePath !== requestFilePath) {
       return
     }
 
     const blobUrl = URL.createObjectURL(await response.blob())
-    fileCardImageBlobUrls.value = {
-      ...fileCardImageBlobUrls.value,
-      [source]: blobUrl,
+    if (workspaceUnmounted || editor.filePath !== requestFilePath) {
+      URL.revokeObjectURL(blobUrl)
+      return
     }
+    setBoundedBlobUrlCache(fileCardImageBlobUrls, source, blobUrl)
   } catch (error) {
     console.warn("[siyuan-canvas] unable to load file card image:", source, error)
   } finally {
@@ -2576,13 +2657,20 @@ onMounted(() => {
   document.addEventListener("pointerdown", closeColorThemePopover)
 })
 
+watch(
+  () => editor.filePath,
+  (nextPath, prevPath) => {
+    if (nextPath !== prevPath) {
+      cancelActiveAiSearch()
+      revokeAllBlobUrls()
+    }
+  },
+)
+
 onBeforeUnmount(() => {
-  for (const blobUrl of Object.values(fileCardImageBlobUrls.value)) {
-    URL.revokeObjectURL(blobUrl)
-  }
-  for (const blobUrl of Object.values(textMarkdownImageBlobUrls.value)) {
-    URL.revokeObjectURL(blobUrl)
-  }
+  workspaceUnmounted = true
+  cancelActiveAiSearch()
+  revokeAllBlobUrls()
   window.removeEventListener("siyuan-canvas-settings-changed", handleCanvasSettingsChanged)
   document.removeEventListener("pointerdown", closeColorThemePopover)
   cleanupQueryRuntime()

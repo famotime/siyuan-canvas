@@ -2710,5 +2710,46 @@ describe("CanvasWorkspace", () => {
     expect(currentEditor.updateNodeField).not.toHaveBeenCalledWith("query-1", "sql", "")
   })
 
+  it("revokes cached image object URLs when switching canvas filePath", async () => {
+    const imagePath = "/data/storage/petal/siyuan-canvas/assets/demo.png"
+    const node = createTextNode({ text: `![demo](${imagePath})` })
+    currentEditor = createEditorMock(node)
+    currentEditor.filePath = "/data/canvas-one.canvas"
+    currentEditor.getRenderedMarkdown = vi.fn(() => `<p><img src="${imagePath}" alt="demo"></p>`)
+    const fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+      blob: async () => new Blob(["png"], { type: "image/png" }),
+      ok: true,
+    } as Response)
+    const createObjectUrlSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:switch-image")
+    const revokeObjectUrlSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
+
+    try {
+      const wrapper = mount(CanvasWorkspace, {
+        props: {
+          bootstrap: {},
+          plugin: {},
+          setTitle: vi.fn(),
+        },
+      })
+
+      await Promise.resolve()
+      await Promise.resolve()
+      await nextTick()
+      await nextTick()
+
+      expect(createObjectUrlSpy).toHaveBeenCalled()
+
+      currentEditor.filePath = "/data/canvas-two.canvas"
+      await nextTick()
+
+      expect(revokeObjectUrlSpy).toHaveBeenCalledWith("blob:switch-image")
+      wrapper.unmount()
+    } finally {
+      fetchSpy.mockRestore()
+      createObjectUrlSpy.mockRestore()
+      revokeObjectUrlSpy.mockRestore()
+    }
+  })
+
 })
 

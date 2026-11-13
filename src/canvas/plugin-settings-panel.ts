@@ -5,6 +5,8 @@ import type { CanvasI18nTranslator } from "@/canvas/use-canvas-editor-shared"
 
 import { CANVAS_COLOR_THEMES } from "@/canvas/canvas-color-themes"
 
+let activeSettingsAiConfigCleanup: (() => void) | null = null
+
 interface CanvasPluginSettingsPanelOptions {
   createSetting: (options: { width: string }) => Setting
   getSettings: () => CanvasPluginSettings
@@ -696,7 +698,33 @@ export function openCanvasPluginSettingsPanel(options: CanvasPluginSettingsPanel
     }
   }
 
+  activeSettingsAiConfigCleanup?.()
+
+  let domDetachObserver: MutationObserver | null = null
+  let observedAttached = Boolean(document.querySelector('[data-setting-key="aiBaseUrl"]'))
+  const cleanupAiConfigListener = () => {
+    window.removeEventListener("siyuan-canvas:ai-config-changed", onAiConfigChanged)
+    domDetachObserver?.disconnect()
+    domDetachObserver = null
+    if (activeSettingsAiConfigCleanup === cleanupAiConfigListener) {
+      activeSettingsAiConfigCleanup = null
+    }
+  }
+
   window.addEventListener("siyuan-canvas:ai-config-changed", onAiConfigChanged)
+  activeSettingsAiConfigCleanup = cleanupAiConfigListener
+
+  if (typeof MutationObserver !== "undefined" && typeof document !== "undefined" && document.body) {
+    domDetachObserver = new MutationObserver(() => {
+      const el = document.querySelector('[data-setting-key="aiBaseUrl"]')
+      if (el) {
+        observedAttached = true
+      } else if (observedAttached) {
+        cleanupAiConfigListener()
+      }
+    })
+    domDetachObserver.observe(document.body, { childList: true, subtree: true })
+  }
 
   return setting
 }
