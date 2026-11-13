@@ -7,6 +7,8 @@ const props = defineProps<{
 }>()
 
 const presentation = computed(() => props.editor.presentation)
+const canGoPrev = computed(() => presentation.value.canGoPrev ?? presentation.value.pathHistory.length > 0)
+const canGoNext = computed(() => presentation.value.canGoNext ?? presentation.value.availableNextNodes.length > 0)
 const recordLongPressTriggered = ref(false)
 let recordLongPressTimer: number | null = null
 
@@ -26,6 +28,7 @@ function handleRecordPointerDown() {
   recordLongPressTriggered.value = false
   clearRecordLongPressTimer()
   recordLongPressTimer = window.setTimeout(() => {
+    recordLongPressTimer = null
     recordLongPressTriggered.value = true
     presentation.value.clearRecordedPath()
   }, 700)
@@ -33,29 +36,33 @@ function handleRecordPointerDown() {
 
 function handleRecordPointerUp() {
   clearRecordLongPressTimer()
-  if (recordLongPressTriggered.value) return
+  const triggered = recordLongPressTriggered.value
+  recordLongPressTriggered.value = false
+  if (triggered) return
   presentation.value.toggleRecording()
 }
 
 function handleRecordPointerCancel() {
   clearRecordLongPressTimer()
+  recordLongPressTriggered.value = false
 }
 
 onBeforeUnmount(() => {
   clearRecordLongPressTimer()
+  recordLongPressTriggered.value = false
 })
 </script>
 
 <template>
   <div class="canvas-presentation-controller" v-if="presentation.isActive">
     <div class="canvas-presentation-controller__panel">
-      <button class="b3-menu__item" @click="handlePrev" :disabled="presentation.pathHistory.length === 0">
+      <button class="b3-menu__item" data-testid="presentation-prev" @click="handlePrev" :disabled="!canGoPrev">
         <CanvasIcon name="chevron-left" />
       </button>
-      <button class="b3-menu__item" @click="handleTogglePlay">
+      <button class="b3-menu__item" data-testid="presentation-play" @click="handleTogglePlay">
         <CanvasIcon :name="presentation.isPlaying ? 'pause' : 'play'" />
       </button>
-      <button class="b3-menu__item" @click="handleNext" :disabled="presentation.availableNextNodes.length === 0">
+      <button class="b3-menu__item" data-testid="presentation-next" @click="handleNext" :disabled="!canGoNext">
         <CanvasIcon name="chevron-right" />
       </button>
       <button

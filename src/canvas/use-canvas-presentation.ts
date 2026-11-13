@@ -50,6 +50,7 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   const playbackMode = ref<CanvasPresentationPlaybackMode>("graph")
   const recordedPlaybackPath = ref<string[]>([])
   const recordedPlaybackIndex = ref(0)
+  let shouldReplayRecordedOnPlay = false
   let autoplayTimer: number | null = null
 
   const validSavedRecordedPath = computed(() => {
@@ -58,6 +59,26 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   })
 
   const hasRecordedPath = computed(() => validSavedRecordedPath.value.length > 0)
+
+  function findNextResolvableRecordedIndex(fromIndex: number): number {
+    const doc = getDocument()
+    for (let idx = fromIndex + 1; idx < recordedPlaybackPath.value.length; idx++) {
+      if (resolveTargetNodeId(doc, recordedPlaybackPath.value[idx])) {
+        return idx
+      }
+    }
+    return -1
+  }
+
+  function findPrevResolvableRecordedIndex(fromIndex: number): number {
+    const doc = getDocument()
+    for (let idx = fromIndex - 1; idx >= 0; idx--) {
+      if (resolveTargetNodeId(doc, recordedPlaybackPath.value[idx])) {
+        return idx
+      }
+    }
+    return -1
+  }
 
   const availableNextNodes = computed(() => {
     if (!currentNodeId.value) return []
@@ -182,12 +203,14 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   }
 
   const goToNode = (nodeId: string) => {
+    shouldReplayRecordedOnPlay = false
     playbackMode.value = "graph"
     moveToNode(nodeId)
     scheduleNext()
   }
 
   const startGraphPlayback = (nodeId: string) => {
+    shouldReplayRecordedOnPlay = false
     playbackMode.value = "graph"
     recordedPlaybackPath.value = []
     recordedPlaybackIndex.value = 0
@@ -255,6 +278,7 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     isActive.value = false
     isPlaying.value = false
     isRecording.value = false
+    shouldReplayRecordedOnPlay = false
     playbackMode.value = "graph"
     currentNodeId.value = null
     pathHistory.value = []
@@ -302,15 +326,9 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
 
   const prev = () => {
     if (playbackMode.value === "recorded" && recordedPlaybackIndex.value > 0) {
-      let prevIndex = recordedPlaybackIndex.value - 1
-      let resolvedId: string | null = null
-      while (prevIndex >= 0) {
-        resolvedId = resolveTargetNodeId(getDocument(), recordedPlaybackPath.value[prevIndex])
-        if (resolvedId) {
-          break
-        }
-        prevIndex--
-      }
+      const prevIndex = findPrevResolvableRecordedIndex(recordedPlaybackIndex.value)
+      const doc = getDocument()
+      const resolvedId = prevIndex >= 0 ? resolveTargetNodeId(doc, recordedPlaybackPath.value[prevIndex]) : null
 
       if (prevIndex >= 0 && resolvedId) {
         recordedPlaybackIndex.value = prevIndex
@@ -318,7 +336,10 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
           visitedNodes.value.delete(currentNodeId.value)
         }
         currentNodeId.value = resolvedId
-        pathHistory.value = recordedPlaybackPath.value.slice(0, prevIndex)
+        pathHistory.value = recordedPlaybackPath.value
+          .slice(0, prevIndex)
+          .map(id => resolveTargetNodeId(doc, id))
+          .filter((id): id is string => id !== null)
         clearSelection()
         selectNode(resolvedId)
         focusNode(resolvedId)
@@ -346,36 +367,53 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   }
 
   const togglePlay = () => {
-    isPlaying.value = !isPlaying.value
-    if (isPlaying.value) {
-      if (isRecording.value && availableNextNodes.value.length > 1) {
-        moveToNode(availableNextNodes.value[0])
-        scheduleNext()
-        return
-      }
-
-      if (playbackMode.value === "graph" && !isRecording.value && validSavedRecordedPath.value.length > 0) {
-        startRecordedPlayback(validSavedRecordedPath.value)
-        return
-      }
-
-      if (playbackMode.value === "recorded") {
-        if (recordedPlaybackIndex.value >= recordedPlaybackPath.value.length - 1) {
-          startRecordedPlayback(recordedPlaybackPath.value)
-        } else {
-          scheduleNext()
-        }
-        return
-      }
-
-      // If we resumed play and have branches, we need to pick one or we schedule next
-      if (availableNextNodes.value.length === 0) {
-        isPlaying.value = false // Can't play
-      } else {
-        scheduleNext()
-      }
-    } else {
+    if (!isActive.value) {
+      isPlaying.value = false
       clearTimer()
+      return
+    }
+
+    if (isPlaying.value) {
+      isPlaying.value = false
+      clearTimer()
+      return
+    }
+
+    if (isRecording.value && availableNextNodes.value.length > 1) {
+      isPlaying.value = true
+      moveToNode(availableNextNodes.value[0])
+      scheduleNext()
+      return
+    }
+
+    if (playbackMode.value === "graph" && !isRecording.value && shouldReplayRecordedOnPlay && validSavedRecordedPath.value.length > 0) {
+      shouldReplayRecordedOnPlay = false
+      startRecordedPlayback(validSavedRecordedPath.value)
+      return
+    }
+
+    if (playbackMode.value === "recorded") {
+      if (recordedPlaybackPath.value.length === 0) {
+        isPlaying.value = false
+        clearTimer()
+        return
+      }
+      if (recordedPlaybackIndex.value >= recordedPlaybackPath.value.length - 1 || findNextResolvableRecordedIndex(recordedPlaybackIndex.value) === -1) {
+        startRecordedPlayback(recordedPlaybackPath.value)
+      } else {
+        isPlaying.value = true
+        scheduleNext()
+      }
+      return
+    }
+
+    // If we resumed play and have no target nodes, refuse to enter playing state
+    if (availableNextNodes.value.length === 0) {
+      isPlaying.value = false
+      clearTimer()
+    } else {
+      isPlaying.value = true
+      scheduleNext()
     }
   }
 
@@ -410,10 +448,25 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     }
   }
 
+  const canGoNext = computed(() => {
+    if (playbackMode.value === "recorded") {
+      return findNextResolvableRecordedIndex(recordedPlaybackIndex.value) !== -1
+    }
+    return availableNextNodes.value.length > 0
+  })
+
+  const canGoPrev = computed(() => {
+    if (playbackMode.value === "recorded") {
+      return findPrevResolvableRecordedIndex(recordedPlaybackIndex.value) !== -1
+    }
+    return pathHistory.value.length > 0
+  })
+
   const finishRecording = () => {
     isRecording.value = false
     isPlaying.value = false
     clearTimer()
+    shouldReplayRecordedOnPlay = recordedDraftPath.value.length > 0
     saveRecordedPath?.(recordedDraftPath.value)
   }
 
@@ -426,8 +479,16 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   }
 
   const clearRecordedPath = () => {
+    shouldReplayRecordedOnPlay = false
     saveRecordedPath?.([])
     recordedDraftPath.value = []
+    if (playbackMode.value === "recorded") {
+      playbackMode.value = "graph"
+      recordedPlaybackPath.value = []
+      recordedPlaybackIndex.value = 0
+      isPlaying.value = false
+      clearTimer()
+    }
   }
 
   const selectBranch = (nodeId: string) => {
@@ -449,9 +510,12 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     isActive,
     isPlaying,
     isRecording,
+    playbackMode,
     currentNodeId,
     pathHistory,
     availableNextNodes,
+    canGoNext,
+    canGoPrev,
     recordedDraftPath,
     hasRecordedPath,
     start,
@@ -460,6 +524,7 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
     prev,
     goTo: (nodeId: string) => {
       clearTimer()
+      shouldReplayRecordedOnPlay = false
       playbackMode.value = "graph"
 
       const resolvedId = resolveTargetNodeId(getDocument(), nodeId)

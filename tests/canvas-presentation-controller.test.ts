@@ -60,4 +60,43 @@ describe('CanvasPresentationController', () => {
       vi.useRealTimers()
     }
   })
+
+  it('enables next button via canGoNext in recorded mode even when availableNextNodes is empty', async () => {
+    const editor = createEditor({
+      availableNextNodes: [],
+      canGoNext: true,
+      canGoPrev: true,
+    })
+    const wrapper = mount(CanvasPresentationController, {
+      props: { editor },
+    })
+
+    const prevButton = wrapper.find('[data-testid="presentation-prev"]')
+    const nextButton = wrapper.find('[data-testid="presentation-next"]')
+    expect((prevButton.element as HTMLButtonElement).disabled).toBe(false)
+    expect((nextButton.element as HTMLButtonElement).disabled).toBe(false)
+
+    await nextButton.trigger('click')
+    expect(editor.presentation.next).toHaveBeenCalledOnce()
+  })
+
+  it('cancels long press timer on pointercancel without clearing or toggling recording', async () => {
+    vi.useFakeTimers()
+    try {
+      const editor = createEditor({ hasRecordedPath: true })
+      const wrapper = mount(CanvasPresentationController, {
+        props: { editor },
+      })
+
+      const recordButton = wrapper.find('[data-testid="presentation-record"]')
+      await recordButton.trigger('pointerdown')
+      await recordButton.trigger('pointercancel')
+      vi.advanceTimersByTime(1000)
+
+      expect(editor.presentation.clearRecordedPath).not.toHaveBeenCalled()
+      expect(editor.presentation.toggleRecording).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

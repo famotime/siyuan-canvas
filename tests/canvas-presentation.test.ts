@@ -556,6 +556,104 @@ describe('useCanvasPresentation', () => {
       presentation.prev() // 往回退，跳过空组，应退回到 a
       expect(presentation.currentNodeId).toBe('a')
     })
+
+    it('exposes accurate canGoNext/canGoPrev and omits unresolved group ids from pathHistory in recorded mode', () => {
+      const document: CanvasDocument = {
+        edges: [],
+        nodes: [
+          createNode('a', 0, 0),
+          createGroupNode('emptyGroup', 50, 0, 10, 10),
+          createNode('b', 100, 0),
+          createNode('c', 200, 0),
+        ],
+        presentation: {
+          recordedPath: ['a', 'emptyGroup', 'b', 'c'],
+        },
+      }
+      const { presentation } = createPresentation(document)
+
+      presentation.start('a')
+      expect(presentation.playbackMode).toBe('recorded')
+      expect(presentation.canGoPrev).toBe(false)
+      expect(presentation.canGoNext).toBe(true)
+
+      presentation.next() // 跳过 emptyGroup 到达 'b'
+      expect(presentation.currentNodeId).toBe('b')
+      expect(presentation.canGoPrev).toBe(true)
+      expect(presentation.canGoNext).toBe(true)
+
+      presentation.next() // 到达 'c'
+      expect(presentation.currentNodeId).toBe('c')
+      expect(presentation.canGoNext).toBe(false)
+
+      presentation.prev() // 退回 'b'，pathHistory 中不应保留无效节点 emptyGroup
+      expect(presentation.currentNodeId).toBe('b')
+      expect(presentation.pathHistory).toEqual(['a'])
+    })
+
+    it('does not hijack manual graph navigation back to recorded playback when togglePlay is clicked', () => {
+      vi.useFakeTimers()
+      try {
+        const document: CanvasDocument = {
+          edges: [
+            { fromNode: 'x', fromSide: 'right', id: 'xy', toNode: 'y', toSide: 'left' },
+          ],
+          nodes: [createNode('a'), createNode('b'), createNode('x', 300, 0), createNode('y', 500, 0)],
+          presentation: {
+            recordedPath: ['a', 'b'],
+          },
+        }
+        const { presentation } = createPresentation(document)
+
+        presentation.start('a')
+        presentation.goTo('x')
+        expect(presentation.playbackMode).toBe('graph')
+        presentation.togglePlay() // 暂停
+        presentation.togglePlay() // 在 x 节点继续图谱播放，而非跳回 a
+        vi.advanceTimersByTime(1000)
+        expect(presentation.currentNodeId).toBe('y')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stops autoplay and exits recorded mode when clearRecordedPath is called mid-playback', () => {
+      vi.useFakeTimers()
+      try {
+        const document: CanvasDocument = {
+          edges: [],
+          nodes: [createNode('a'), createNode('b')],
+          presentation: {
+            recordedPath: ['a', 'b'],
+          },
+        }
+        const { presentation } = createPresentation(document)
+
+        presentation.start('a')
+        expect(presentation.playbackMode).toBe('recorded')
+        expect(presentation.isPlaying).toBe(true)
+
+        presentation.clearRecordedPath()
+        expect(presentation.playbackMode).toBe('graph')
+        expect(presentation.isPlaying).toBe(false)
+
+        vi.advanceTimersByTime(2000)
+        expect(presentation.currentNodeId).toBe('a')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('refuses to set isPlaying when presentation is inactive', () => {
+      const document: CanvasDocument = {
+        edges: [{ fromNode: 'a', fromSide: 'right', id: 'ab', toNode: 'b', toSide: 'left' }],
+        nodes: [createNode('a'), createNode('b')],
+      }
+      const { presentation } = createPresentation(document)
+
+      presentation.togglePlay()
+      expect(presentation.isPlaying).toBe(false)
+    })
   })
 })
 
