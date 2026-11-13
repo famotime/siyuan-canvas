@@ -31,7 +31,8 @@ export interface CanvasFileTargetPreview {
   }
 }
 
-type PreviewInput = ResolvedCanvasFileTarget & {
+type PreviewInput = (ResolvedCanvasFileTarget | { kind: 'asset', [key: string]: any }) & {
+  description?: string
   excerptHtml?: string
   imageSrc?: string
   thumbnail?: {
@@ -41,16 +42,17 @@ type PreviewInput = ResolvedCanvasFileTarget & {
 }
 
 function toImageSource(target: PreviewInput): string | undefined {
-  if ("openPath" in target && typeof target.openPath === "string") {
-    return target.openPath
+  const anyTarget = target as any
+  if (typeof anyTarget.openPath === "string") {
+    return anyTarget.openPath
   }
 
-  if ("asset" in target && target.asset?.openPath) {
-    return target.asset.openPath
+  if (anyTarget.asset?.openPath) {
+    return anyTarget.asset.openPath
   }
 
-  if ("imageSrc" in target && typeof target.imageSrc === "string") {
-    return target.imageSrc
+  if (typeof anyTarget.imageSrc === "string") {
+    return anyTarget.imageSrc
   }
 
   return undefined
@@ -77,12 +79,13 @@ function getFileBadge(target: PreviewInput): string {
 }
 
 export function createCanvasFileTargetPreview(target: PreviewInput): CanvasFileTargetPreview {
+  const anyTarget = target as any
   switch (target.kind) {
     case 'block':
       return {
         badge: 'Block',
         clampMode: 'viewport',
-        detail: 'hpath' in target ? target.hpath || target.path : target.path,
+        detail: anyTarget.hpath || anyTarget.path || '',
         headline: target.title,
         helper: 'Opens block in SiYuan',
         imageSrc: toImageSource(target),
@@ -93,7 +96,7 @@ export function createCanvasFileTargetPreview(target: PreviewInput): CanvasFileT
       return {
         badge: 'Document',
         clampMode: 'viewport',
-        detail: 'hpath' in target ? target.hpath || target.path : target.path,
+        detail: anyTarget.hpath || anyTarget.path || '',
         headline: target.title,
         helper: 'Opens in SiYuan',
         kind: 'document',
@@ -120,7 +123,7 @@ export function createCanvasFileTargetPreview(target: PreviewInput): CanvasFileT
     case 'asset':
       return {
         badge: 'Image Asset',
-        detail: 'description' in target ? target.description : target.path,
+        detail: typeof anyTarget.description === 'string' ? anyTarget.description : anyTarget.path || '',
         headline: target.title,
         helper: 'Opens in asset viewer',
         imageSrc: toImageSource(target),
@@ -129,7 +132,7 @@ export function createCanvasFileTargetPreview(target: PreviewInput): CanvasFileT
     default:
       return {
         badge: getFileBadge(target),
-        detail: 'description' in target ? target.description : target.path,
+        detail: typeof anyTarget.description === 'string' ? anyTarget.description : anyTarget.path || '',
         headline: target.title,
         helper: 'Double click to open',
         kind: 'file',

@@ -1,7 +1,9 @@
 import { computed, reactive, ref, watch } from "vue"
-import type { CanvasDocument, CanvasEdge, CanvasNode } from "@/canvas/types"
+import type { CanvasDocument, CanvasEdge } from "@/canvas/types"
 import type { CanvasPluginSettings } from "@/canvas/plugin-data"
 import { findCanvasNodesInGroup } from "@/canvas/document-group"
+
+export type CanvasPresentationPlaybackMode = "graph" | "recorded"
 
 
 export interface CanvasPresentationOptions {
@@ -209,7 +211,6 @@ export function useCanvasPresentation(options: CanvasPresentationOptions) {
   }
 
   const startRecordedPlayback = (path: string[]) => {
-    let startNodeId = path[0]
     let resolvedId: string | null = null
     let startIndex = 0
     for (let i = 0; i < path.length; i++) {

@@ -211,12 +211,14 @@ const WorkspaceTreeNodeView = defineComponent({
       type: String,
     },
     focusedPath: {
-      required: true,
-      type: String as PropType<string | null>,
+      required: false,
+      default: null,
+      type: [String, Object] as PropType<string | null>,
     },
     defaultTabPath: {
-      required: true,
-      type: String as PropType<string | null>,
+      required: false,
+      default: null,
+      type: [String, Object] as PropType<string | null>,
     },
   },
   emits: [

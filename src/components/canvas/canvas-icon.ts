@@ -18,7 +18,7 @@ export function hardenStrokeOnlySvgFill(svg: string) {
     return ''
   }
 
-  let hardened = svg.replace(/<svg([^>]*)>/, (match, attrs) => {
+  let hardened = svg.replace(/<svg([^>]*)>/, (_match, attrs) => {
     if (!/\bstyle=/.test(attrs)) {
       return `<svg${attrs} style="fill:none!important">`
     }

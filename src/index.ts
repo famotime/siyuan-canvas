@@ -1,4 +1,3 @@
-import type { Custom } from "siyuan"
 import type { IProtyle } from "siyuan"
 import type {
   CanvasPluginUiState,
@@ -93,7 +92,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
         promptText: openTextInputDialog,
         confirm: openConfirmDialog,
         labels: {
-          copyTitle: this.t("selectionToolbarCopy") || "复制",
+          copyTitle: this.t("contextMenuCopy") || "复制",
           deleteCanvasTitle: this.t("selectionToolbarDelete") || "删除画布",
           deleteFolderTitle: this.t("contextMenuDelete") || "删除文件夹",
           dialogCancel: this.t("dialogCancel") || "取消",
@@ -101,7 +100,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
           folderNameTitle: this.t("inspectorNewFolder") || "新建文件夹",
           renameFolderTitle: this.t("contextMenuRename") || "重命名文件夹",
           renameTitle: this.t("contextMenuRename") || "重命名",
-          unableToSaveMessage: this.t("unableToSave") || "无法保存",
+          unableToSaveMessage: this.t("messageUnableSaveCanvas") || "无法保存",
           untitledCanvas: this.t("untitledCanvas") || "未命名画布.canvas",
         },
       })
@@ -138,12 +137,13 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addDock({
       config: {
         position: "RightTop",
-        size: { width: "320px", height: "0" },
+        size: { width: 320, height: 0 },
         icon: CANVAS_TAB_ICON_ID,
         title: this.t("canvasHelper"),
         show: false,
       },
       type: "siyuan-canvas-dock",
+      data: {},
       init(this: any) {
         mountCanvasDockApp(this.element, pluginInstance)
       },
@@ -163,6 +163,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addCommand({
       langKey: "openCanvas",
       langText: this.t("openCanvas"),
+      hotkey: "",
       callback: () => {
         void this.openCanvasTab()
       },
@@ -171,6 +172,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addCommand({
       langKey: "openCanvasPath",
       langText: this.t("openCanvasPath"),
+      hotkey: "",
       callback: async () => {
         const path = await openTextInputDialog({
           cancelLabel: this.t("dialogCancel"),
@@ -189,6 +191,7 @@ export default class SiyuanCanvasPlugin extends Plugin {
     this.addCommand({
       langKey: "openCanvasSettings",
       langText: this.t("openCanvasSettings"),
+      hotkey: "",
       callback: () => {
         this.openCanvasSettings()
       },

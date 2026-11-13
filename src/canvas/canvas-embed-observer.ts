@@ -94,13 +94,6 @@ async function getCanvasPathFromBlockAttrs(blockId: string): Promise<string> {
   }
 }
 
-function findClickedImageBlockId(target: EventTarget | null): string {
-  const element = target && "closest" in target ? target as Element : null
-  const image = element?.closest("img")
-  if (!image) return ""
-  return image.closest<HTMLElement>("[data-node-id]")?.getAttribute("data-node-id") || ""
-}
-
 function getEventElements(event: Event): Element[] {
   const path = typeof event.composedPath === "function" ? event.composedPath() : []
   const elements = path.filter(isElement)
@@ -148,24 +141,6 @@ function summarizeElements(elements: Element[]): string[] {
 function findCanvasEmbedPathInDocument(doc: Document): string {
   const embed = doc.querySelector<HTMLElement>(`.${CANVAS_EMBED_CLASS}[data-canvas-path]`)
   return normalizeCanvasPath(embed?.dataset.canvasPath || "")
-}
-
-async function openCanvasFromBlockId(event: Event, blockId: string, plugin: Plugin, pluginName: string) {
-  if (!blockId) {
-    debugCanvasEmbed("open canvas embed: missing block id")
-    return
-  }
-
-  const canvasPath = await getCanvasPathFromBlockAttrs(blockId)
-  if (!canvasPath) return
-
-  debugCanvasEmbed("open canvas embed", {
-    blockId,
-    path: canvasPath,
-  })
-  event.preventDefault()
-  event.stopPropagation()
-  void openCanvasEditorTab(plugin, pluginName, { path: canvasPath }, "Untitled.canvas")
 }
 
 async function openCanvasFromBlockIdOrPath(
@@ -416,7 +391,7 @@ function reloadOpenEditors(rootIds: Set<string>) {
     const rootId = editor?.protyle?.block?.rootID || editor?.protyle?.block?.id || ""
     if (!rootIds.has(rootId)) continue
 
-    editor.reload?.()
+    editor.reload?.(false)
   }
 }
 

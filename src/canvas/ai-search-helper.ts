@@ -246,7 +246,7 @@ ${nodeDetails}
 内容:
 ${targetNode.content}
 ${userSpecificInstruction}
-请根据以上上下文和当前选中的卡片，进行 AI 探索。生成 ${cardCount} 个直接相连且有深度的关联卡片内容。
+请根据以上上下文和当前选中的卡片，进行 AI 探索。生成 ${cardCount} 个直接相连且有深度的关联卡片内容（内容详略度：${richness === "simple" ? "简明扼要" : richness === "detailed" ? "详尽深入" : "适中完整"}）。
 每张卡片必须严格遵循：
 - 以 "### 标题" 的三级标题作为第一行；
 - 提供少于 150 字的概要说明，聚焦一个明确的主题概念；

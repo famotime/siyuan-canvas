@@ -30,6 +30,7 @@ interface CanvasEditorFileNodeOptions {
     excerptHtml?: string
     imageSrc?: string
     thumbnail?: CanvasFileTargetPreview["thumbnail"]
+    originalFile?: string
   }>>
   state: CanvasEditorState
   t: CanvasI18nTranslator
@@ -219,7 +220,7 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
       for (let attempt = 0; attempt < 3; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 120))
         const retried = await resolveCanvasFileTarget(node.file, resolveLookups)
-        if (retried.title !== retried.id) {
+        if (retried.kind === 'document' && retried.title !== retried.id) {
           resolved = retried
           break
         }
@@ -239,11 +240,17 @@ export function createCanvasEditorFileNodeHelpers(options: CanvasEditorFileNodeO
     }
 
     if (resolved.kind === 'block') {
-      enriched = await withBlockPreview(resolved)
+      enriched = {
+        ...(await withBlockPreview(resolved)),
+        originalFile: node.file,
+      }
     }
 
     if (resolved.kind === 'document') {
-      enriched = await withDocumentPreview(resolved)
+      enriched = {
+        ...(await withDocumentPreview(resolved)),
+        originalFile: node.file,
+      }
     }
 
     if (resolved.kind === 'canvas') {

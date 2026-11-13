@@ -1807,6 +1807,7 @@ import type {
 
 import {
   computed,
+  isRef,
   nextTick,
   onActivated,
   onDeactivated,
@@ -1904,7 +1905,15 @@ onMounted(bindEditorToPlugin)
 onActivated(bindEditorToPlugin)
 onBeforeUnmount(unbindEditorFromPlugin)
 onDeactivated(unbindEditorFromPlugin)
-const fileInputRef = editor.fileInputRef
+const fileInputRef = isRef(editor.fileInputRef)
+  ? editor.fileInputRef
+  : ref<HTMLInputElement>()
+
+watch(fileInputRef, (el) => {
+  if (isRef(editor.fileInputRef) && editor.fileInputRef !== fileInputRef) {
+    editor.fileInputRef.value = el
+  }
+})
 const stageRef = editor.stageRef ?? ref<HTMLElement>()
 const SELECTION_TOOLBAR_TOOLTIPS = createSelectionToolbarTooltips(t)
 const {

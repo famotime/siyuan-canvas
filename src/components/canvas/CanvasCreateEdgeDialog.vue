@@ -183,6 +183,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { CanvasIcon } from '@/components/canvas/canvas-icon'
 
 type EdgeNodePickerKind = 'source' | 'target'
 

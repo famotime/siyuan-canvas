@@ -2,19 +2,11 @@ import { createEmptyCanvasDocument } from "@/canvas/document"
 import type { CanvasPluginBridge } from "@/canvas/use-canvas-editor-shared"
 import type { CanvasPluginSettings } from "@/canvas/plugin-data"
 
-import {
-  fetchSyncPost,
-  showMessage as siyuanShowMessage,
-} from "siyuan"
+import { fetchSyncPost } from "siyuan"
 import {
   computed,
   ref,
 } from "vue"
-import {
-  putFile as siyuanPutFile,
-  readDir as siyuanReadDir,
-  removeFile as siyuanRemoveFile,
-} from "@/api"
 import { openConfirmDialog } from "@/canvas/confirm-dialog"
 import { openTextInputDialog } from "@/canvas/text-input-dialog"
 import {

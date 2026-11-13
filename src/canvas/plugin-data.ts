@@ -140,9 +140,9 @@ export function normalizeCanvasPluginData(value: unknown): CanvasPluginData {
     return defaults
   }
 
-  const candidate = value as Partial<CanvasPluginData> & {
+  const candidate = value as {
     settings?: Partial<CanvasPluginSettings>
-    recentFiles?: Partial<CanvasRecentFile>[]
+    recentFiles?: unknown[]
     ui?: {
       inspectorSections?: Partial<Record<keyof CanvasInspectorSectionsState, unknown>>
     }

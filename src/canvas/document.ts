@@ -28,6 +28,11 @@ export function createCanvasId(prefix: string): string {
   return `${prefix}${random}`
 }
 
+export function createCanvasNode(type: "text"): Extract<CanvasNode, { type: "text" }>
+export function createCanvasNode(type: "file"): Extract<CanvasNode, { type: "file" }>
+export function createCanvasNode(type: "group"): Extract<CanvasNode, { type: "group" }>
+export function createCanvasNode(type: "link"): Extract<CanvasNode, { type: "link" }>
+export function createCanvasNode(type: CanvasNodeType): CanvasNode
 export function createCanvasNode(type: CanvasNodeType): CanvasNode {
   const shared = {
     id: createCanvasId("node-"),

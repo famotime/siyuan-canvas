@@ -4,12 +4,6 @@ const BLOCK_HIGHLIGHT_CLASS = 'canvas-block-current'
 const BLOCK_HIGHLIGHT_STYLE_ID = 'siyuan-canvas-block-jump-highlight-style'
 const BLOCK_HIGHLIGHT_DURATION = 1200
 
-interface LoadedProtyleEvent {
-  protyle?: {
-    element?: HTMLElement
-  }
-}
-
 export function createCanvasBlockJumpHighlighter(plugin: CanvasPluginBridge) {
   let pendingBlockId: string | null = null
   let activeElement: HTMLElement | null = null
@@ -68,14 +62,15 @@ export function createCanvasBlockJumpHighlighter(plugin: CanvasPluginBridge) {
     scheduleClear()
   }
 
-  function tryApplyHighlight(event: LoadedProtyleEvent) {
-    if (!pendingBlockId || !event.protyle?.element) {
+  function tryApplyHighlight(event: any) {
+    const protyleElement: HTMLElement | undefined = event?.detail?.protyle?.element ?? event?.protyle?.element
+    if (!pendingBlockId || !protyleElement) {
       return
     }
 
     const selector = `[data-node-id="${pendingBlockId}"][data-type]`
-    const blockElement = event.protyle.element.querySelector<HTMLElement>(selector)
-      ?? event.protyle.element.querySelector<HTMLElement>(`[data-node-id="${pendingBlockId}"]`)
+    const blockElement = protyleElement.querySelector<HTMLElement>(selector)
+      ?? protyleElement.querySelector<HTMLElement>(`[data-node-id="${pendingBlockId}"]`)
 
     if (!blockElement) {
       return
@@ -85,11 +80,11 @@ export function createCanvasBlockJumpHighlighter(plugin: CanvasPluginBridge) {
     pendingBlockId = null
   }
 
-  const handleLoadedProtyleStatic = (event: LoadedProtyleEvent) => {
+  const handleLoadedProtyleStatic = (event: any) => {
     tryApplyHighlight(event)
   }
 
-  const handleLoadedProtyleDynamic = (event: LoadedProtyleEvent) => {
+  const handleLoadedProtyleDynamic = (event: any) => {
     tryApplyHighlight(event)
   }
 

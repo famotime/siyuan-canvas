@@ -3,12 +3,12 @@ import type {
   CanvasBounds,
   CanvasDocument,
   CanvasEdge,
-  CanvasFileNode,
+  CanvasGroupNode,
   CanvasNodeLayoutAction,
   CanvasNode,
   CanvasSide,
-  CanvasTextNode,
 } from "@/canvas/types"
+import type { CanvasFilePickerOption } from "@/canvas/file-picker-dialog"
 import type { CanvasTabBootstrap } from "@/main"
 import type {
   CanvasPluginUiState,
@@ -53,9 +53,7 @@ import {
 import { clampViewportScale, scaleViewportAtPoint } from "@/canvas/viewport"
 import {
   getCanvasSelectionBounds,
-  setCanvasEdgeEndpoint,
   setCanvasNodeGeometry,
-  upsertCanvasEdge,
   collapseCanvasGroup,
   expandCanvasGroup,
 } from "@/canvas/document"
@@ -151,6 +149,7 @@ export function useCanvasEditor(
     excerptHtml?: string
     imageSrc?: string
     thumbnail?: CanvasFileTargetPreview["thumbnail"]
+    originalFile?: string
   }>>({})
   const isBootstrapLocal = bootstrap.path ? (/^[a-zA-Z]:[/\\]/.test(bootstrap.path) || /^[/\\]+[a-zA-Z]:/.test(bootstrap.path) || bootstrap.path.startsWith("file://")) : false
   const fileSource = ref<CanvasEditorFileSource>(bootstrap.path ? (isBootstrapLocal ? "local" : "workspace") : "unsaved")
@@ -336,9 +335,6 @@ export function useCanvasEditor(
   const selectionBounds = computed<CanvasBounds | null>(() =>
     getCanvasSelectionBounds(state.document, state.selectedNodeIds),
   )
-  const edgeSourceNode = computed(
-    () => state.document.nodes.find((node) => node.id === newEdgeSourceId.value) || null,
-  )
   const edgeTargets = computed(() =>
     filterEdgeNodeOptions(
       state.document.nodes.filter((node) => node.id !== newEdgeSourceId.value),
@@ -515,11 +511,11 @@ export function useCanvasEditor(
     return workspaceTree.removeRecentFileRecord(path)
   }
 
-  async function openDocumentAtBlock(blockId: string, documentId?: string) {
+  async function openDocumentAtBlock(blockId: string, _documentId?: string) {
     blockJumpHighlighter.requestBlockHighlight(blockId)
     if (blockId) {
       await openTab({
-        app: plugin.app,
+        app: plugin.app as any,
         doc: {
           action: BLOCK_NAVIGATION_ACTIONS,
           id: blockId,
@@ -1199,7 +1195,6 @@ export function useCanvasEditor(
     t,
   })
   const {
-    clearConnectionDraft,
     clearEdgeReconnectDraft,
     clearSelectionBox,
     finishConnectionDrag,

@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasGroupNode, CanvasEdge, CanvasNode } from "@/canvas/types"
+import type { CanvasDocument, CanvasGroupNode, CanvasEdge } from "@/canvas/types"
 import { createCanvasNode, getCanvasSelectionBounds } from "@/canvas/document"
 
 export function createCanvasGroupForNodes(

@@ -18,6 +18,8 @@
     "release:minor": "node ./release.js --mode=minor",
     "release:major": "node ./release.js --mode=major",
     "build": "vite build && node ./scripts/sync-plugins.mjs && node ./scripts/verify-package.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:watch": "vitest",
     "release:changelog": "node ./release.js --mode=changelog",

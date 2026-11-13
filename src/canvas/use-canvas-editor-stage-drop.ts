@@ -78,7 +78,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
     // 2. 如果是思源原生元素的拖拽，走原本的思源块添加流程
     if (rawIds) {
       if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
-        showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'warning')
+        showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'info')
         return
       }
 
@@ -140,7 +140,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
 
     if (workspaceFilePath) {
       if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
-        showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'warning')
+        showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'info')
         return
       }
 
@@ -184,7 +184,7 @@ export function createCanvasEditorStageDropActions(options: CanvasEditorStageDro
     const files = event.dataTransfer?.files ? Array.from(event.dataTransfer.files) : []
     if (files.length > 0) {
       if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
-        showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'warning')
+        showMessage(t('messageUnableDropWithoutWorkspaceCanvas'), 4000, 'info')
         return
       }
 

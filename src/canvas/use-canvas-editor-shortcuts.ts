@@ -10,13 +10,13 @@ interface CanvasEditorKeyboardHandlerOptions {
   createMindMapSiblingNode?: () => void
   getEdgeToolbarPopover: () => 'closed' | 'color' | 'direction'
   getEditingEdgeLabelId: () => string
-  getSelectionToolbarPopover: () => 'closed' | 'color' | 'layout'
+  getSelectionToolbarPopover: () => 'closed' | 'color' | 'layout' | 'sprout'
   hasFloatLayer?: () => boolean
   hasSelectedNodes?: () => boolean
   nudgeSelectedNodes?: (dx: number, dy: number) => void
   openFilePickerDialog?: () => void
   redo?: () => void
-  save: () => void | Promise<void>
+  save?: () => void | Promise<void>
   silentSave: () => void | Promise<void>
   selectAllNodes: () => void
   selectEdge: () => void
@@ -56,7 +56,6 @@ export function createCanvasEditorKeyboardHandler(options: CanvasEditorKeyboardH
     nudgeSelectedNodes,
     openFilePickerDialog,
     redo,
-    save,
     silentSave,
     selectAllNodes,
     selectEdge,

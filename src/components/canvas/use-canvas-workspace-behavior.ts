@@ -29,7 +29,7 @@ interface CanvasWorkspaceEditor {
   selectionToolbar: {
     visible: boolean
   }
-  selectionToolbarPopover: "closed" | "color" | "layout"
+  selectionToolbarPopover: "closed" | "color" | "layout" | "sprout"
   setSelectionToolbarSize: (size: { height: number, width: number }) => void
   state: {
     document: {
@@ -37,7 +37,9 @@ interface CanvasWorkspaceEditor {
     }
     isDirty: boolean
     selectedNodeIds: string[]
+    pendingEditNodeId?: string
   }
+  updateNodeField?: (nodeId: string, field: string, value: unknown) => void
   updateTextNodeContent: (nodeId: string, text: string) => void
   toggleGroupCollapse: (nodeId: string) => void
 }
@@ -216,7 +218,7 @@ export function useCanvasWorkspaceBehavior(editor: CanvasWorkspaceEditor) {
     const trimmed = editingMarkdown.value.trim()
     const node = editor.state.document.nodes.find((candidate) => candidate.id === editingNodeId.value)
     if (node?.type === "query") {
-      editor.updateNodeField(editingNodeId.value, "sql", editingMarkdown.value.trim())
+      editor.updateNodeField?.(editingNodeId.value, "sql", editingMarkdown.value.trim())
     } else if (node?.type === "text" && isWebUrl(trimmed)) {
       editor.convertTextToLink(editingNodeId.value, trimmed)
     } else if (node?.type === "link") {

@@ -1,13 +1,11 @@
 import type {
   CanvasDocument,
   CanvasEdge,
-  CanvasGeometryPatch,
   CanvasGroupNode,
   CanvasNode,
 } from "@/canvas/types"
 
 import { findCanvasNodesInGroup } from "@/canvas/document-group"
-import { doNodesOverlap } from "@/canvas/node-overlap"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -223,17 +221,6 @@ function extractConnectedSubgraph(document: CanvasDocument, selectedNodeId: stri
   }
 
   return { nodes, edges }
-}
-
-function buildAdjacencyList(edges: CanvasEdge[]): Map<string, string[]> {
-  const adj = new Map<string, string[]>()
-  for (const edge of edges) {
-    if (!adj.has(edge.fromNode)) adj.set(edge.fromNode, [])
-    if (!adj.has(edge.toNode)) adj.set(edge.toNode, [])
-    adj.get(edge.fromNode)!.push(edge.toNode)
-    adj.get(edge.toNode)!.push(edge.fromNode)
-  }
-  return adj
 }
 
 // ─── Direction Inference ──────────────────────────────────────────────────────
@@ -463,7 +450,7 @@ function computePositions(
 function applyPositions(
   document: CanvasDocument,
   positions: Map<string, { x: number, y: number }>,
-  groupPadding: number,
+  _groupPadding?: number,
 ): CanvasDocument {
   if (positions.size === 0) {
     return document

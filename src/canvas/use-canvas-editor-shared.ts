@@ -8,8 +8,9 @@ import type {
 import type { CanvasI18nKey } from "@/i18n/canvas"
 import type { CanvasTabBootstrap } from "@/main"
 
-export interface CanvasPluginBridge extends Plugin {
-  app: unknown
+export interface CanvasPluginBridge extends Omit<Plugin, "app" | "i18n"> {
+  app?: any
+  isMobile?: boolean
   getCanvasSettings?: () => CanvasPluginSettings
   getCanvasUiState?: () => CanvasPluginUiState
   getRecentCanvasFiles?: () => CanvasRecentFile[]
@@ -19,7 +20,9 @@ export interface CanvasPluginBridge extends Plugin {
   openCanvasSettings?: () => void
   openCanvasTab?: (bootstrap?: CanvasTabBootstrap) => Promise<void>
   updateCanvasSettings?: (settings: Partial<CanvasPluginSettings>) => Promise<void>
-  updateCanvasUiState?: (ui: Partial<CanvasPluginUiState>) => Promise<void>
+  updateCanvasUiState?: (ui: {
+    inspectorSections?: Partial<CanvasPluginUiState["inspectorSections"]>
+  }) => Promise<void>
 }
 
 export type CanvasEditorFileSource = CanvasRecentFileSource | "unsaved"

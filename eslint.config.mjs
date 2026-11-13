@@ -1,5 +1,4 @@
 import antfu from '@antfu/eslint-config'
-import perfectionist from 'eslint-plugin-perfectionist'
 
 export default antfu(
   {
@@ -17,6 +16,7 @@ export default antfu(
     ignores: [
       'dist',
       'node_modules',
+      'docs/**',
     ],
   },
   {

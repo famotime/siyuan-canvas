@@ -35,7 +35,6 @@ import {
   upsertCanvasNode,
 } from '@/canvas/document'
 import { getCachedMarkdownPreview } from '@/canvas/markdown-preview-cache'
-import { isWebUrl } from '@/canvas/url-detection'
 import { centerViewportOnBounds } from '@/canvas/selection-toolbar'
 import { clampViewportScale, scaleViewportAtPoint } from '@/canvas/viewport'
 import { findNonOverlappingPosition } from '@/canvas/node-overlap'
@@ -60,7 +59,7 @@ export interface CanvasEditorSelectionUIState {
   edgeLabelDraft?: Ref<string>
   editingEdgeLabelId?: Ref<string>
   edgeToolbarPopover?: Ref<'closed' | 'color' | 'direction'>
-  selectionToolbarPopover?: Ref<'closed' | 'color' | 'layout'>
+  selectionToolbarPopover?: Ref<'closed' | 'color' | 'layout' | 'sprout'>
   selectedEdge?: ComputedRef<CanvasEdge | undefined>
   selectedEdgeAnchors?: ComputedRef<{
     from: { x: number, y: number }
@@ -85,13 +84,13 @@ export interface CanvasEditorCreateEdgeFormState {
 
 export interface CanvasEditorNodeEdgeActionsOptions {
   state: CanvasEditorState
-  commitDocument: (document: CanvasDocument) => void
+  commitDocument: (document: CanvasDocument, options?: { coalesceKey?: string }) => void
   t: CanvasI18nTranslator
   geometry?: CanvasEditorGeometryState
   selectionUI?: CanvasEditorSelectionUIState
   createEdgeForm?: CanvasEditorCreateEdgeFormState
   activateCanvasSurface?: () => void
-  fileFieldRefresh?: () => Promise<void>
+  fileFieldRefresh?: (nodeIds?: string[]) => Promise<void>
   getSettings?: () => CanvasPluginSettings
   presentationActive?: Ref<boolean>
 
@@ -125,7 +124,7 @@ export interface CanvasEditorNodeEdgeActionsOptions {
   } | null>
   selectedNode?: ComputedRef<CanvasNode | null>
   selectionBounds?: ComputedRef<CanvasBounds | null>
-  selectionToolbarPopover?: Ref<'closed' | 'color' | 'layout'>
+  selectionToolbarPopover?: Ref<'closed' | 'color' | 'layout' | 'sprout'>
 }
 
 export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeActionsOptions) {
@@ -370,8 +369,8 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
       height: node.height,
     }
 
-    const isPresentation = options.presentationActive?.value
-    const autoRatio = options.getSettings?.().presentationAutoRatio ?? true
+    const isPresentation = presentationActive?.value
+    const autoRatio = getSettings?.().presentationAutoRatio ?? true
     const targetScale = (isPresentation && autoRatio) ? 1.0 : viewport.scale
 
     const nextViewport = centerViewportOnBounds(
@@ -890,7 +889,7 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
 
   function openCreateEdgeDialog() {
     if (state.selectedNodeIds.length !== 1 || !selectedNode.value) {
-      showMessage(t('messageSelectSingleSourceNodeFirst'), 2500, 'warning')
+      showMessage(t('messageSelectSingleSourceNodeFirst'), 2500, 'info')
       return
     }
 
@@ -1148,7 +1147,7 @@ export function createCanvasEditorNodeEdgeActions(options: CanvasEditorNodeEdgeA
 
     // 刷新新节点元数据
     if (addedNodeIds.length > 0) {
-      await options.fileFieldRefresh(addedNodeIds)
+      await fileFieldRefresh(addedNodeIds)
     }
 
     // 关闭气泡

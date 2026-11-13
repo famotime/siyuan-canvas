@@ -34,12 +34,14 @@ interface IResGetTemplates {
   path: string;
 }
 
-interface IResReadDir {
+interface IResReadDirItem {
   isDir: boolean;
   isSymlink: boolean;
   name: string;
   updated: number;
 }
+
+type IResReadDir = IResReadDirItem[];
 
 interface IResExportMdContent {
   hPath: string;

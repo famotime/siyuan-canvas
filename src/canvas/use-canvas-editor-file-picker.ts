@@ -57,7 +57,7 @@ interface CanvasEditorFilePickerActionsOptions {
     title: string
   }>>
   resolveImageAssetByBlockId: (blockId: string) => Promise<{
-    blockId: string
+    blockId?: string
     name: string
     path: string
     title?: string
@@ -268,7 +268,7 @@ export function createCanvasEditorFilePickerActions(options: CanvasEditorFilePic
 
   async function handleClipboardImagePaste(file: File) {
     if (fileSource.value !== 'workspace' || !state.filePath.endsWith('.canvas')) {
-      showMessage(t('messageUnablePasteImageWithoutWorkspaceCanvas'), 4000, 'warning')
+      showMessage(t('messageUnablePasteImageWithoutWorkspaceCanvas'), 4000, 'info')
       return
     }
 

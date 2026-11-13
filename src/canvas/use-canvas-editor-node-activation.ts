@@ -56,7 +56,7 @@ export function createCanvasEditorNodeActivationActions(options: CanvasEditorNod
 
       if (resolved.kind === 'document') {
         void openTab({
-          app: plugin.app,
+          app: plugin.app as any,
           doc: {
             id: resolved.id,
           },
@@ -81,7 +81,7 @@ export function createCanvasEditorNodeActivationActions(options: CanvasEditorNod
         }
 
         void openTab({
-          app: plugin.app,
+          app: plugin.app as any,
           asset: {
             path: resolved.openPath,
           },
@@ -101,7 +101,7 @@ export function createCanvasEditorNodeActivationActions(options: CanvasEditorNod
             : '')
         if (targetId) {
           void openTab({
-            app: plugin.app,
+            app: plugin.app as any,
             doc: {
               id: targetId,
             },

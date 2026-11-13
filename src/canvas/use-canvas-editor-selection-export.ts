@@ -427,7 +427,7 @@ export function createCanvasEditorSelectionExport(deps: SelectionExportDependenc
 
     const dir = await resolveNoteCreationDirectory()
     if (!dir) {
-      showMessage(t('messageNoNotebookAvailable'), 4000, 'warning')
+      showMessage(t('messageNoNotebookAvailable'), 4000, 'info')
       return
     }
 

@@ -49,7 +49,7 @@ export class CanvasEditorState {
   public selectedNodeIds: string[] = []
   public pendingEditNodeId = ""
 
-  constructor(private readonly service: CanvasEditorService) {}
+  constructor(public readonly service: CanvasEditorService) {}
 
   async open(path: string): Promise<void> {
     const result = await this.service.load(path)

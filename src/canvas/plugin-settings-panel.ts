@@ -886,7 +886,6 @@ function categorizeSettings(t: CanvasI18nTranslator, isControlled: boolean) {
         // 强制同步 reflow 以读取真实尺寸
         void tooltip.offsetHeight
 
-        const tooltipH = tooltip.offsetHeight || 36
         const tooltipW = tooltip.offsetWidth || 240
 
         const rect = itemWrapper.getBoundingClientRect()
