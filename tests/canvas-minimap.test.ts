@@ -146,4 +146,44 @@ describe("CanvasMinimap", () => {
     const newWidth = getFirstNodeWidth()
     expect(newWidth).toBeLessThan(initialWidth)
   })
+
+  it("ignores mismatched pointerId moves and resets dragging on blur or unmount", async () => {
+    const editor = makeEditor()
+    const wrapper = mount(CanvasMinimap, { props: { editor } })
+    const minimapEl = wrapper.find("[data-testid='canvas-minimap']").element as HTMLElement
+    Object.defineProperty(minimapEl, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, width: 180, height: 120, right: 180, bottom: 120, x: 0, y: 0, toJSON: () => "" }),
+      configurable: true,
+    })
+
+    minimapEl.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true,
+      clientX: 90,
+      clientY: 60,
+      button: 0,
+      pointerId: 1,
+    }))
+    const xAfterDown = editor.viewport.x
+
+    // 不同 pointerId 不应驱动小地图视口移动
+    minimapEl.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 10,
+      clientY: 10,
+      pointerId: 2,
+    }))
+    expect(editor.viewport.x).toBe(xAfterDown)
+
+    // window blur 应中止拖拽状态，随后的 pointermove 不再改变视口
+    window.dispatchEvent(new Event("blur"))
+    minimapEl.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 20,
+      clientY: 20,
+      pointerId: 1,
+    }))
+    expect(editor.viewport.x).toBe(xAfterDown)
+
+    wrapper.unmount()
+  })
 })

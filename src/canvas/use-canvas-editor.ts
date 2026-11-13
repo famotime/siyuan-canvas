@@ -680,7 +680,10 @@ export function useCanvasEditor(
     viewport.y = stage.clientHeight / 2 - centerY * scale
   }
 
-  function commitDocument(nextDocument: CanvasDocument, options: { coalesceKey?: string } = {}) {
+  function commitDocument(
+    nextDocument: CanvasDocument,
+    options: { coalesceKey?: string, coalesceMs?: number } = {},
+  ) {
     // 采用惰性快照：仅在需要产生新的历史记录步时才执行 cloneCanvasDocument 全量深拷贝
     const didRecord = history.recordLazy(
       () => ({
@@ -689,7 +692,10 @@ export function useCanvasEditor(
         selectedNodeId: state.selectedNodeId,
         selectedEdgeId: state.selectedEdgeId,
       }),
-      { coalesceKey: options.coalesceKey },
+      {
+        coalesceKey: options.coalesceKey,
+        coalesceMs: options.coalesceMs,
+      },
     )
     if (didRecord) {
       historyVersion.value++

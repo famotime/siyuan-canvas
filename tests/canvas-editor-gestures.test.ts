@@ -1047,6 +1047,145 @@ describe('canvas editor gesture handlers', () => {
         clientY: 140,
       }))
       expect(handlers.isDragging.value).toBe(false)
+      expect(handlers.gestureMode.value).toBe("idle")
+    })
+
+    it("cleans up isDragging, guides, and gestureMode on pointercancel and window blur", () => {
+      const moving = { id: "moving", type: "text", x: 106, y: 220, width: 100, height: 80 } as CanvasNode
+      const target = { id: "target", type: "text", x: 100, y: 20, width: 100, height: 80 } as CanvasNode
+      const { alignmentGuides, handlers } = createGestureHarness([moving, target])
+
+      const down = new PointerEvent("pointerdown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        pointerId: 7,
+        bubbles: true,
+      })
+      Object.defineProperty(down, "target", { value: document.createElement("div") })
+
+      handlers.handleNodePointerDown(moving, down)
+      expect(handlers.isDragging.value).toBe(true)
+      expect(handlers.gestureMode.value).toBe("drag-node")
+
+      window.dispatchEvent(new PointerEvent("pointermove", { clientX: 97, clientY: 100, pointerId: 7 }))
+      expect(alignmentGuides.visible).toBe(true)
+
+      window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 7 }))
+      expect(handlers.isDragging.value).toBe(false)
+      expect(handlers.gestureMode.value).toBe("idle")
+      expect(alignmentGuides.visible).toBe(false)
+
+      // 再次拖拽后触发 window blur 也应自动中止
+      handlers.handleNodePointerDown(moving, down)
+      expect(handlers.isDragging.value).toBe(true)
+      window.dispatchEvent(new Event("blur"))
+      expect(handlers.isDragging.value).toBe(false)
+      expect(handlers.gestureMode.value).toBe("idle")
+    })
+
+    it("ignores mismatched pointerId events during an active gesture", () => {
+      const node = { id: "node-1", type: "text", x: 100, y: 100, width: 200, height: 100 } as CanvasNode
+      const { commitDocument, handlers } = createGestureHarness([node])
+
+      const down = new PointerEvent("pointerdown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        pointerId: 10,
+        bubbles: true,
+      })
+      Object.defineProperty(down, "target", { value: document.createElement("div") })
+      handlers.handleNodePointerDown(node, down)
+
+      // 其他指针 ID 的 move/up 不应干扰当前手势
+      window.dispatchEvent(new PointerEvent("pointermove", { clientX: 220, clientY: 220, pointerId: 11 }))
+      window.dispatchEvent(new PointerEvent("pointerup", { clientX: 220, clientY: 220, pointerId: 11 }))
+      expect(handlers.isDragging.value).toBe(true)
+      expect(commitDocument).not.toHaveBeenCalled()
+
+      // 匹配指针 ID 的释放才结束手势
+      window.dispatchEvent(new PointerEvent("pointerup", { clientX: 100, clientY: 100, pointerId: 10 }))
+      expect(handlers.isDragging.value).toBe(false)
+    })
+
+    it("skips committing tiny <= 2px jitter when clicking a node", () => {
+      const node = { id: "node-1", type: "text", x: 100, y: 100, width: 200, height: 100 } as CanvasNode
+      const { commitDocument, handlers } = createGestureHarness([node])
+
+      const down = new PointerEvent("pointerdown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        pointerId: 3,
+        bubbles: true,
+      })
+      Object.defineProperty(down, "target", { value: document.createElement("div") })
+      handlers.handleNodePointerDown(node, down)
+
+      window.dispatchEvent(new PointerEvent("pointermove", { clientX: 101, clientY: 101, pointerId: 3 }))
+      window.dispatchEvent(new PointerEvent("pointerup", { clientX: 101, clientY: 101, pointerId: 3 }))
+
+      expect(commitDocument).not.toHaveBeenCalled()
+    })
+
+    it("marks isDragging during connection drag and uses infinite coalesceMs per drag session", () => {
+      const node = { id: "node-1", type: "text", x: 100, y: 100, width: 200, height: 100 } as CanvasNode
+      const { commitDocument, handlers } = createGestureHarness([node])
+
+      handlers.startConnectionDrag(node, "right", new PointerEvent("pointerdown", { button: 0, clientX: 300, clientY: 150, pointerId: 5 }))
+      expect(handlers.isDragging.value).toBe(true)
+      expect(handlers.gestureMode.value).toBe("connect")
+
+      window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 5 }))
+      expect(handlers.isDragging.value).toBe(false)
+      expect(handlers.gestureMode.value).toBe("idle")
+
+      const down = new PointerEvent("pointerdown", { button: 0, clientX: 100, clientY: 100, pointerId: 6, bubbles: true })
+      Object.defineProperty(down, "target", { value: document.createElement("div") })
+      handlers.handleNodePointerDown(node, down)
+      window.dispatchEvent(new PointerEvent("pointermove", { clientX: 140, clientY: 140, pointerId: 6 }))
+      window.dispatchEvent(new PointerEvent("pointerup", { clientX: 140, clientY: 140, pointerId: 6 }))
+
+      expect(commitDocument).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          coalesceKey: expect.stringMatching(/^drag-node-1-/),
+          coalesceMs: Number.POSITIVE_INFINITY,
+        }),
+      )
+    })
+
+    it("removes touch listeners from previous stage element when stageRef changes", () => {
+      const oldStage = document.createElement("div")
+      const newStage = document.createElement("div")
+      const removeSpy = vi.spyOn(oldStage, "removeEventListener")
+      const stageRef = ref<HTMLElement | undefined>(oldStage)
+
+      createCanvasEditorGestureHandlers({
+        alignmentGuides: { guides: [], visible: false },
+        board: computed(() => ({ height: 2400, left: 0, top: 0, width: 3200 })),
+        commitDocument: vi.fn(),
+        connectionDraft: {} as any,
+        edgeReconnectDraft: {} as any,
+        getAnchor: vi.fn(),
+        readonly: computed(() => false),
+        selectionBox: {} as any,
+        selectedEdge: computed(() => null),
+        showDragAlignmentGuides: computed(() => true),
+        autoCreateTextCardOnDrag: computed(() => false),
+        stageRef,
+        state: { document: { nodes: [], edges: [] }, selectNode: vi.fn(), selectedNodeIds: [] } as any,
+        viewport: { scale: 1, x: 0, y: 0 },
+        showNodeHeader: computed(() => true),
+      })
+
+      stageRef.value = newStage
+      return Promise.resolve().then(() => {
+        expect(removeSpy).toHaveBeenCalledWith("touchstart", expect.any(Function))
+        expect(removeSpy).toHaveBeenCalledWith("touchmove", expect.any(Function))
+        expect(removeSpy).toHaveBeenCalledWith("touchend", expect.any(Function))
+      })
     })
   })
 })

@@ -95,8 +95,41 @@ watch(
   { immediate: true },
 )
 
+let dragging = false
+let activePointerId: number | null = null
+let activeDragTarget: HTMLElement | null = null
+
+function isMatchingPointer(pointerId: number | null, event: PointerEvent): boolean {
+  if (pointerId === null) return false
+  if (event.pointerId === pointerId) return true
+  return !event.isTrusted && event.pointerId === 0
+}
+
+function cleanupMinimapDrag() {
+  dragging = false
+  const target = activeDragTarget
+  if (target) {
+    if (activePointerId !== null) {
+      try {
+        if (target.hasPointerCapture?.(activePointerId)) {
+          target.releasePointerCapture?.(activePointerId)
+        }
+      } catch {
+        // 忽略释放指针捕获时的边界异常
+      }
+    }
+    target.removeEventListener("pointermove", onPointerMove)
+    target.removeEventListener("pointerup", onPointerUp)
+    target.removeEventListener("pointercancel", onPointerUp)
+  }
+  window.removeEventListener("blur", cleanupMinimapDrag)
+  activePointerId = null
+  activeDragTarget = null
+}
+
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
+  cleanupMinimapDrag()
 })
 
 /**
@@ -190,11 +223,11 @@ function recenterViewportTo(mx: number, my: number) {
   props.editor.viewport.y = halfH - boardY * props.editor.viewport.scale
 }
 
-let dragging = false
-let activePointerId: number | null = null
-
 function localPoint(event: PointerEvent, target: HTMLElement) {
   const rect = target.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) {
+    return null
+  }
   return {
     x: ((event.clientX - rect.left) / rect.width) * MINIMAP_WIDTH,
     y: ((event.clientY - rect.top) / rect.height) * MINIMAP_HEIGHT,
@@ -203,34 +236,40 @@ function localPoint(event: PointerEvent, target: HTMLElement) {
 
 function onPointerDown(event: PointerEvent) {
   if (event.button !== 0) return
+  if (dragging) {
+    cleanupMinimapDrag()
+  }
   const target = event.currentTarget as HTMLElement
   dragging = true
   activePointerId = event.pointerId
-  target.setPointerCapture?.(event.pointerId)
+  activeDragTarget = target
+  try {
+    target.setPointerCapture?.(event.pointerId)
+  } catch {
+    // 忽略测试环境或非活动指针异常
+  }
   const pt = localPoint(event, target)
-  recenterViewportTo(pt.x, pt.y)
+  if (pt) {
+    recenterViewportTo(pt.x, pt.y)
+  }
   target.addEventListener("pointermove", onPointerMove)
   target.addEventListener("pointerup", onPointerUp)
   target.addEventListener("pointercancel", onPointerUp)
+  window.addEventListener("blur", cleanupMinimapDrag)
 }
 
 function onPointerMove(event: PointerEvent) {
-  if (!dragging) return
+  if (!dragging || !isMatchingPointer(activePointerId, event)) return
   const target = event.currentTarget as HTMLElement
   const pt = localPoint(event, target)
-  recenterViewportTo(pt.x, pt.y)
+  if (pt) {
+    recenterViewportTo(pt.x, pt.y)
+  }
 }
 
 function onPointerUp(event: PointerEvent) {
-  dragging = false
-  const target = event.currentTarget as HTMLElement
-  if (activePointerId !== null) {
-    target.releasePointerCapture?.(activePointerId)
-    activePointerId = null
-  }
-  target.removeEventListener("pointermove", onPointerMove)
-  target.removeEventListener("pointerup", onPointerUp)
-  target.removeEventListener("pointercancel", onPointerUp)
+  if (!dragging || !isMatchingPointer(activePointerId, event)) return
+  cleanupMinimapDrag()
 }
 </script>
 

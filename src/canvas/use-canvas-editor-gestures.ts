@@ -3,6 +3,8 @@ import type {
   Ref,
 } from "vue"
 import {
+  getCurrentScope,
+  onScopeDispose,
   ref,
   watch,
 } from "vue"
@@ -87,10 +89,26 @@ export interface CanvasEditorEdgeReconnectDraftState {
   visible: boolean
 }
 
+export type CanvasGestureMode =
+  | "idle"
+  | "pan"
+  | "marquee"
+  | "drag-node"
+  | "copy-drag"
+  | "connect"
+  | "reconnect-edge"
+  | "resize"
+  | "corner-resize"
+
+const DRAG_ACTIVATION_THRESHOLD_PX = 2
+
 interface CanvasEditorGestureOptions {
   alignmentGuides: CanvasEditorAlignmentGuideState
   board: ComputedRef<CanvasBoardMetrics>
-  commitDocument: (document: CanvasDocument, options?: { coalesceKey?: string }) => void
+  commitDocument: (
+    document: CanvasDocument,
+    options?: { coalesceKey?: string, coalesceMs?: number },
+  ) => void
   connectionDraft: CanvasEditorConnectionDraftState
   edgeReconnectDraft: CanvasEditorEdgeReconnectDraftState
   getAnchor: (node: CanvasNode, side: CanvasSide) => { x: number, y: number }
@@ -128,11 +146,28 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     showNodeHeader,
   } = options
 
+  // 显式追踪当前交互模态，所有拖拽/连线/调尺寸均通过统一会话管理生命周期
+  const gestureMode = ref<CanvasGestureMode>("idle")
   // 拖拽/缩放期间挂起自动保存，避免拖拽中途触发宿主侧文件写入与重布局导致闪烁
   const isDragging = ref(false)
+  let gestureSessionSeq = 0
+  let cancelActiveGestureSession: (() => void) | null = null
 
   // 触控板双指滑动与鼠标滚轮共用 wheel 事件，来源需按手势锁存，避免滑动中途被误判
   const wheelSourceClassifier = createCanvasWheelSourceClassifier()
+
+  function nextGestureCoalesceKey(prefix: string): string {
+    gestureSessionSeq += 1
+    return `${prefix}-${gestureSessionSeq}`
+  }
+
+  function isMatchingPointer(startPointerId: number, activeEvent: PointerEvent): boolean {
+    if (activeEvent.pointerId === startPointerId) {
+      return true
+    }
+    // 兼容测试环境中未显式传入 pointerId 的合成事件（jsdom 默认为 0 且 isTrusted 为 false）
+    return !activeEvent.isTrusted && activeEvent.pointerId === 0
+  }
 
   function clearSelectionBox() {
     selectionBox.visible = false
@@ -175,17 +210,24 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     event: PointerEvent,
     onMove: (dx: number, dy: number, moveEvent: PointerEvent) => void,
     handlers: {
+      mode?: CanvasGestureMode
+      onCancel?: () => void
       onEnd?: (dx: number, dy: number, upEvent: PointerEvent) => void
     } = {},
   ) {
+    // 若上一轮手势尚未正常收尾（例如外部拦截或重复按下），先强制终止以防状态/监听残留
+    cancelActiveGestureSession?.()
+
+    const pointerId = event.pointerId
     const startX = event.clientX
     const startY = event.clientY
+    gestureMode.value = handlers.mode ?? "idle"
 
     // 指针捕获：防止拖拽过程中指针移出窗口或悬停在 iframe/其他元素上时丢失事件
     const targetElement = event.target instanceof Element ? event.target : null
     if (targetElement && typeof targetElement.setPointerCapture === "function") {
       try {
-        targetElement.setPointerCapture(event.pointerId)
+        targetElement.setPointerCapture(pointerId)
       } catch {
         // 部分测试环境或非活动指针可能报错，安全忽略
       }
@@ -196,15 +238,39 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     let latestDy = 0
     let latestMoveEvent: PointerEvent | null = null
     let hasMoved = false
+    let finished = false
 
     const isTestEnv = typeof process !== "undefined" && (process.env?.VITEST === "true" || process.env?.NODE_ENV === "test")
 
+    const cleanupSession = () => {
+      window.removeEventListener("pointermove", handleMove)
+      window.removeEventListener("pointerup", handleUp)
+      window.removeEventListener("pointercancel", handleCancel)
+      window.removeEventListener("blur", handleBlur)
+      if (cancelActiveGestureSession === cancelGesture) {
+        cancelActiveGestureSession = null
+      }
+
+      if (targetElement && typeof targetElement.releasePointerCapture === "function") {
+        try {
+          if (targetElement.hasPointerCapture(pointerId)) {
+            targetElement.releasePointerCapture(pointerId)
+          }
+        } catch {
+          // 安全忽略
+        }
+      }
+    }
+
     const handleMove = (moveEvent: PointerEvent) => {
+      if (finished || !isMatchingPointer(pointerId, moveEvent)) {
+        return
+      }
       latestDx = moveEvent.clientX - startX
       latestDy = moveEvent.clientY - startY
       latestMoveEvent = moveEvent
 
-      if (Math.hypot(latestDx, latestDy) > 2) {
+      if (Math.hypot(latestDx, latestDy) > DRAG_ACTIVATION_THRESHOLD_PX) {
         hasMoved = true
       }
 
@@ -212,7 +278,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         if (rafId === null) {
           rafId = requestAnimationFrame(() => {
             rafId = null
-            if (latestMoveEvent) {
+            if (!finished && latestMoveEvent) {
               onMove(latestDx, latestDy, latestMoveEvent)
             }
           })
@@ -223,6 +289,11 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     const handleUp = (upEvent: PointerEvent) => {
+      if (finished || !isMatchingPointer(pointerId, upEvent)) {
+        return
+      }
+      finished = true
+
       if (rafId !== null && typeof cancelAnimationFrame === "function") {
         cancelAnimationFrame(rafId)
         rafId = null
@@ -232,18 +303,9 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         }
       }
 
-      window.removeEventListener("pointermove", handleMove)
-      window.removeEventListener("pointerup", handleUp)
-
-      if (targetElement && typeof targetElement.releasePointerCapture === "function") {
-        try {
-          if (targetElement.hasPointerCapture(event.pointerId)) {
-            targetElement.releasePointerCapture(event.pointerId)
-          }
-        } catch {
-          // 安全忽略
-        }
-      }
+      cleanupSession()
+      gestureMode.value = "idle"
+      wheelSourceClassifier.reset()
 
       // 若拖动过程中发生了实质位移，在捕获阶段拦截随后浏览器合成触发的 click 事件，避免误触卡片内部链接或选择逻辑
       if (hasMoved) {
@@ -261,8 +323,47 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       handlers.onEnd?.(upEvent.clientX - startX, upEvent.clientY - startY, upEvent)
     }
 
+    const cancelGesture = () => {
+      if (finished) {
+        return
+      }
+      finished = true
+
+      if (rafId !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(rafId)
+        rafId = null
+      }
+
+      cleanupSession()
+      isDragging.value = false
+      gestureMode.value = "idle"
+      wheelSourceClassifier.reset()
+      handlers.onCancel?.()
+    }
+
+    const handleCancel = (cancelEvent: PointerEvent) => {
+      if (!isMatchingPointer(pointerId, cancelEvent)) {
+        return
+      }
+      cancelGesture()
+    }
+
+    const handleBlur = () => {
+      cancelGesture()
+    }
+
+    cancelActiveGestureSession = cancelGesture
     window.addEventListener("pointermove", handleMove)
     window.addEventListener("pointerup", handleUp)
+    window.addEventListener("pointercancel", handleCancel)
+    window.addEventListener("blur", handleBlur)
+  }
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      cancelActiveGestureSession?.()
+      wheelSourceClassifier.reset()
+    })
   }
 
   // 以指针位置为锚点缩放，保持光标下的画布坐标不动
@@ -316,21 +417,21 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     event.preventDefault()
   }
 
-  watch(() => stageRef.value, (stage) => {
+  watch(() => stageRef.value, (stage, _oldStage, onCleanup) => {
     if (!stage) return
 
     let initialPinchDistance = 0
     let initialScale = 1
     let initialWorldCenter = { x: 0, y: 0 }
 
-    stage.addEventListener("touchstart", (e) => {
+    const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         e.preventDefault()
         const t1 = e.touches[0]
         const t2 = e.touches[1]
         initialPinchDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
         initialScale = viewport.scale
-        
+
         const rect = stage.getBoundingClientRect()
         const initialPinchCenter = {
           x: (t1.clientX + t2.clientX) / 2 - rect.left,
@@ -341,36 +442,49 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
           y: (initialPinchCenter.y - viewport.y) / viewport.scale,
         }
       }
-    }, { passive: false })
+    }
 
-    stage.addEventListener("touchmove", (e) => {
+    const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         e.preventDefault()
         const t1 = e.touches[0]
         const t2 = e.touches[1]
         const distance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
-        
+
         if (initialPinchDistance > 0) {
           const scaleRatio = distance / initialPinchDistance
-          const nextScale = clampViewportScale(Number((initialScale * scaleRatio).toFixed(2)))
-          
+          const nextScale = clampViewportScale(initialScale * scaleRatio)
+
           const rect = stage.getBoundingClientRect()
           const currentPinchCenter = {
             x: (t1.clientX + t2.clientX) / 2 - rect.left,
             y: (t1.clientY + t2.clientY) / 2 - rect.top,
           }
-          
+
           viewport.scale = nextScale
           viewport.x = currentPinchCenter.x - initialWorldCenter.x * nextScale
           viewport.y = currentPinchCenter.y - initialWorldCenter.y * nextScale
         }
       }
-    }, { passive: false })
+    }
 
-    stage.addEventListener("touchend", (e) => {
+    const handleTouchEnd = (e: TouchEvent) => {
       if (e.touches.length < 2) {
         initialPinchDistance = 0
       }
+    }
+
+    stage.addEventListener("touchstart", handleTouchStart, { passive: false })
+    stage.addEventListener("touchmove", handleTouchMove, { passive: false })
+    stage.addEventListener("touchend", handleTouchEnd)
+    stage.addEventListener("touchcancel", handleTouchEnd)
+
+    onCleanup(() => {
+      stage.removeEventListener("touchstart", handleTouchStart)
+      stage.removeEventListener("touchmove", handleTouchMove)
+      stage.removeEventListener("touchend", handleTouchEnd)
+      stage.removeEventListener("touchcancel", handleTouchEnd)
+      initialPinchDistance = 0
     })
   }, { immediate: true })
 
@@ -531,10 +645,16 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       event.preventDefault()
       const initialX = viewport.x
       const initialY = viewport.y
-      startPointerGesture(event, (dx, dy) => {
-        viewport.x = initialX + dx
-        viewport.y = initialY + dy
-      })
+      startPointerGesture(
+        event,
+        (dx, dy) => {
+          viewport.x = initialX + dx
+          viewport.y = initialY + dy
+        },
+        {
+          mode: "pan",
+        },
+      )
       return
     }
 
@@ -565,6 +685,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         })
       },
       {
+        mode: "marquee",
+        onCancel: () => {
+          clearSelectionBox()
+        },
         onEnd: (_dx, _dy, upEvent) => {
           finalizeSelectionBox(
             startPoint,
@@ -638,8 +762,13 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     if (!state.selectedNodeIds.includes(node.id)) {
       state.selectNode(node.id)
     }
+    const sessionCoalesceKey = nextGestureCoalesceKey(`drag-${node.id}`)
+    let hasCommittedDrag = false
     isDragging.value = true
     startPointerGesture(event, (dx, dy, moveEvent) => {
+      if (!hasCommittedDrag && Math.hypot(dx, dy) <= DRAG_ACTIVATION_THRESHOLD_PX) {
+        return
+      }
       const rawDelta = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
       const {
         deltaX,
@@ -650,6 +779,10 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         movingNodeIds: selectedNodeIds,
         nodes: initialNodes,
       })
+      if (!hasCommittedDrag && deltaX === 0 && deltaY === 0) {
+        return
+      }
+      hasCommittedDrag = true
       const movedDocument = state.document.nodes.reduce((document, candidate) => {
         const initial = initialPositions.get(candidate.id)
         if (!initial) {
@@ -662,8 +795,16 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         })
       }, state.document)
 
-      commitDocument(movedDocument, { coalesceKey: `drag-${node.id}` })
+      commitDocument(movedDocument, {
+        coalesceKey: sessionCoalesceKey,
+        coalesceMs: Number.POSITIVE_INFINITY,
+      })
     }, {
+      mode: "drag-node",
+      onCancel: () => {
+        isDragging.value = false
+        clearAlignmentGuides()
+      },
       onEnd: () => {
         isDragging.value = false
         clearAlignmentGuides()
@@ -698,9 +839,13 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
       !copiedNodeIds.includes(candidate.id) && !selectedNodeIds.includes(candidate.id),
     )
     let hasCopied = false
+    const sessionCoalesceKey = nextGestureCoalesceKey(`copy-drag-${node.id}`)
 
     isDragging.value = true
     startPointerGesture(event, (dx, dy, moveEvent) => {
+      if (!hasCopied && Math.hypot(dx, dy) <= DRAG_ACTIVATION_THRESHOLD_PX) {
+        return
+      }
       const rawDelta = resolveDragDelta(dx, dy, { lockAxis: moveEvent.shiftKey })
       const {
         deltaX,
@@ -733,12 +878,20 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         ],
       }
 
-      commitDocument(movedDocument, { coalesceKey: `copy-drag-${node.id}` })
+      commitDocument(movedDocument, {
+        coalesceKey: sessionCoalesceKey,
+        coalesceMs: Number.POSITIVE_INFINITY,
+      })
       if (!hasCopied) {
         state.selectNodes(copiedNodeIds)
         hasCopied = true
       }
     }, {
+      mode: "copy-drag",
+      onCancel: () => {
+        isDragging.value = false
+        clearAlignmentGuides()
+      },
       onEnd: () => {
         isDragging.value = false
         clearAlignmentGuides()
@@ -919,13 +1072,20 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     connectionDraft.toY = anchor.y
     connectionDraft.visible = true
 
+    isDragging.value = true
     startPointerGesture(
       event,
       (_dx, _dy, moveEvent) => {
         updateConnectionTarget(moveEvent)
       },
       {
+        mode: "connect",
+        onCancel: () => {
+          isDragging.value = false
+          clearConnectionDraft()
+        },
         onEnd: (_dx, _dy, upEvent) => {
+          isDragging.value = false
           updateConnectionTarget(upEvent)
           finishConnectionDrag()
         },
@@ -992,6 +1152,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
 
     event.preventDefault?.()
     clearEdgeReconnectDraft()
+    isDragging.value = true
 
     startPointerGesture(
       event,
@@ -999,7 +1160,13 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
         updateEdgeReconnectTarget(edge, endpoint, moveEvent)
       },
       {
+        mode: "reconnect-edge",
+        onCancel: () => {
+          isDragging.value = false
+          clearEdgeReconnectDraft()
+        },
         onEnd: (_dx, _dy, upEvent) => {
+          isDragging.value = false
           updateEdgeReconnectTarget(edge, endpoint, upEvent)
           finishEdgeEndpointDrag(edge, endpoint)
         },
@@ -1013,17 +1180,30 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     event.preventDefault?.()
+    const sessionCoalesceKey = nextGestureCoalesceKey(`resize-${node.id}-${side}`)
+    let hasCommittedResize = false
     isDragging.value = true
     startPointerGesture(event, (dx, dy) => {
+      if (!hasCommittedResize && Math.hypot(dx, dy) <= DRAG_ACTIVATION_THRESHOLD_PX) {
+        return
+      }
+      hasCommittedResize = true
       commitDocument(
         setCanvasNodeGeometry(
           state.document,
           node.id,
           resizeCanvasNodeFromSide(node, side, dx / viewport.scale, dy / viewport.scale),
         ),
-        { coalesceKey: `resize-${node.id}-${side}` },
+        {
+          coalesceKey: sessionCoalesceKey,
+          coalesceMs: Number.POSITIVE_INFINITY,
+        },
       )
     }, {
+      mode: "resize",
+      onCancel: () => {
+        isDragging.value = false
+      },
       onEnd: () => {
         isDragging.value = false
       },
@@ -1036,17 +1216,30 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     }
 
     event.preventDefault?.()
+    const sessionCoalesceKey = nextGestureCoalesceKey(`resize-corner-${node.id}`)
+    let hasCommittedResize = false
     isDragging.value = true
     startPointerGesture(event, (dx, dy) => {
+      if (!hasCommittedResize && Math.hypot(dx, dy) <= DRAG_ACTIVATION_THRESHOLD_PX) {
+        return
+      }
+      hasCommittedResize = true
       commitDocument(
         setCanvasNodeGeometry(
           state.document,
           node.id,
           resizeCanvasNodeFromCorner(node, dx / viewport.scale, dy / viewport.scale),
         ),
-        { coalesceKey: `resize-corner-${node.id}` },
+        {
+          coalesceKey: sessionCoalesceKey,
+          coalesceMs: Number.POSITIVE_INFINITY,
+        },
       )
     }, {
+      mode: "corner-resize",
+      onCancel: () => {
+        isDragging.value = false
+      },
       onEnd: () => {
         isDragging.value = false
       },
@@ -1058,6 +1251,7 @@ export function createCanvasEditorGestureHandlers(options: CanvasEditorGestureOp
     clearEdgeReconnectDraft,
     clearSelectionBox,
     finishConnectionDrag,
+    gestureMode,
     getConnectionDraftPath,
     getEdgeReconnectDraftPath,
     handleNodePointerDown,
