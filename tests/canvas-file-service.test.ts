@@ -131,4 +131,27 @@ describe("canvas file service", () => {
 
     expect(gateway.writeText).not.toHaveBeenCalled()
   })
+
+  it("still detects external changes before direct writes when detectExternalChanges is enabled", async () => {
+    const writeTextDirect = vi.fn(async () => true)
+    const gateway = {
+      readText: vi.fn(async () => JSON.stringify({ nodes: [{ id: "n1", type: "text", text: "external edit", x: 0, y: 0, width: 320, height: 180 }], edges: [] })),
+      writeText: vi.fn(async () => undefined),
+      writeTextDirect,
+    }
+
+    const service = new CanvasFileService(gateway)
+
+    await expect(service.save("/data/storage/canvas/example.canvas", {
+      nodes: [],
+      edges: [],
+    }, {
+      baseRaw: "{\"nodes\":[],\"edges\":[]}",
+      detectExternalChanges: true,
+      direct: true,
+    })).rejects.toBeInstanceOf(CanvasExternalChangeError)
+
+    expect(writeTextDirect).not.toHaveBeenCalled()
+    expect(gateway.writeText).not.toHaveBeenCalled()
+  })
 })

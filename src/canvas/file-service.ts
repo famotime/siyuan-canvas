@@ -50,19 +50,19 @@ export class CanvasFileService {
   }
 
   async save(path: string, document: CanvasDocument, options: CanvasSaveOptions = {}): Promise<string> {
+    if (options.detectExternalChanges && options.baseRaw !== undefined) {
+      const currentRaw = await this.gateway.readText(path)
+      if (currentRaw !== options.baseRaw) {
+        throw new CanvasExternalChangeError(path, currentRaw, parseCanvasDocument(currentRaw))
+      }
+    }
+
     // 直写模式：绕过 putFile 直接写磁盘，避免触发宿主侧刷新；失败时回退到常规 putFile
     if (options.direct && typeof this.gateway.writeTextDirect === "function") {
       const directRaw = stringifyCanvasDocument(document)
       const wrote = await this.gateway.writeTextDirect(path, directRaw)
       if (wrote) {
         return directRaw
-      }
-    }
-
-    if (options.detectExternalChanges && options.baseRaw !== undefined) {
-      const currentRaw = await this.gateway.readText(path)
-      if (currentRaw !== options.baseRaw) {
-        throw new CanvasExternalChangeError(path, currentRaw, parseCanvasDocument(currentRaw))
       }
     }
 

@@ -82,8 +82,25 @@ export default class SiyuanCanvasPlugin extends Plugin {
         getSettings: () => this.getCanvasSettings(),
         plugin: this,
         onFilePathUpdate: (path: string) => {
-          if (this.activeEditor?.value?.state) {
-            this.activeEditor.value.state.filePath = path
+          const active = this.activeEditor?.value
+          if (!active?.state) {
+            return
+          }
+          if (typeof active.replaceFilePath === "function") {
+            active.replaceFilePath(path)
+          } else {
+            active.state.filePath = path
+          }
+        },
+        onFileRenamed: (oldPath: string, newPath: string) => {
+          const active = this.activeEditor?.value
+          if (!active?.state || active.state.filePath !== oldPath) {
+            return
+          }
+          if (typeof active.replaceFilePath === "function") {
+            active.replaceFilePath(newPath)
+          } else {
+            active.state.filePath = newPath
           }
         },
         refreshRecentFiles: () => {

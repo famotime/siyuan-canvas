@@ -400,12 +400,13 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
 
   async function silentSaveWorkspace(path: string) {
     await state.save(path, {
+      detectExternalChanges: getPluginSettings().detectExternalChanges,
       direct: true,
     })
   }
 
   async function silentSave() {
-    if (!state.filePath) {
+    if (!state.filePath || state.conflict) {
       return
     }
 
@@ -416,7 +417,10 @@ export function createCanvasEditorFileActions(options: CanvasEditorFileActionOpt
         await silentSaveWorkspace(state.filePath)
       }
     } catch {
-      // 自动保存失败静默处理，不干扰用户编辑
+      if (state.conflict) {
+        showMessage(t("messageCanvasFileChangedOnDisk"), 5000, "error")
+      }
+      // 其余自动保存失败静默处理，不干扰用户编辑
     }
   }
 

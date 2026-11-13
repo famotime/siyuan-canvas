@@ -50,6 +50,7 @@ export interface WorkspaceTreeDependencies {
   getSettings: () => CanvasPluginSettings
   plugin: Pick<CanvasPluginBridge, "removeRecentCanvasFile" | "updateCanvasUiState">
   onFilePathUpdate?: (path: string) => void
+  onFileRenamed?: (oldPath: string, newPath: string) => void
   refreshRecentFiles: () => void
   labels?: Partial<WorkspaceTreeLabels>
   promptText?: (options: {
@@ -367,7 +368,11 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
       return false
     }
 
-    deps.onFilePathUpdate?.(targetFilePath)
+    if (deps.onFileRenamed) {
+      deps.onFileRenamed(sourcePath, targetFilePath)
+    } else {
+      deps.onFilePathUpdate?.(targetFilePath)
+    }
     await deps.plugin.removeRecentCanvasFile?.(sourcePath)
     deps.refreshRecentFiles()
     await refreshWorkspaceDocuments()
@@ -419,7 +424,11 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
       return
     }
 
-    deps.onFilePathUpdate?.(newPath)
+    if (deps.onFileRenamed) {
+      deps.onFileRenamed(oldPath, newPath)
+    } else {
+      deps.onFilePathUpdate?.(newPath)
+    }
     await deps.plugin.removeRecentCanvasFile?.(oldPath)
     deps.refreshRecentFiles()
     await refreshWorkspaceDocuments()
@@ -442,6 +451,17 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
     if (!sanitized || sanitized === currentName) return
 
     const newFolderPath = `${parentDir}/${sanitized}`
+    const writtenNewPaths: string[] = []
+
+    const rollbackWrittenFiles = async () => {
+      for (const writtenPath of writtenNewPaths) {
+        try {
+          await deps.removeFile(writtenPath)
+        } catch {
+          // 尽力回滚已写入的副本，避免源目录与目标目录状态撕裂
+        }
+      }
+    }
 
     try {
       const files = collectWorkspaceCanvasFiles(await readDirectoryTree(folderPath))
@@ -455,12 +475,14 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
           body: JSON.stringify({ path: filePath }),
         })
         if (!response.ok) {
+          await rollbackWrittenFiles()
           deps.showMessage(labels.unableToRenameFolderMessage, 4000, "error")
           return
         }
         const content = await response.text()
         const blob = new Blob([content], { type: "application/json" })
         await deps.putFile(newFilePath, false, blob)
+        writtenNewPaths.push(newFilePath)
       }
 
       await deps.removeFile(folderPath)
@@ -469,7 +491,11 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
       for (const filePath of files) {
         const relativePath = filePath.substring(folderPath.length + 1)
         const newFilePath = `${newFolderPath}/${relativePath}`
-        deps.onFilePathUpdate?.(newFilePath)
+        if (deps.onFileRenamed) {
+          deps.onFileRenamed(filePath, newFilePath)
+        } else {
+          deps.onFilePathUpdate?.(newFilePath)
+        }
         await deps.plugin.removeRecentCanvasFile?.(filePath)
       }
 
@@ -477,6 +503,7 @@ export function createCanvasEditorWorkspaceTree(deps: WorkspaceTreeDependencies)
       await refreshWorkspaceDocuments()
       deps.showMessage(labels.messageFolderRenamed(sanitized))
     } catch {
+      await rollbackWrittenFiles()
       deps.showMessage(labels.unableToRenameFolderMessage, 4000, "error")
     }
   }

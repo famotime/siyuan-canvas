@@ -592,4 +592,74 @@ describe("workspace tree", () => {
       expect(putFileMock).toHaveBeenCalledWith("/data/storage/canvas/subfolder/Untitled.canvas", false, expect.any(Blob))
     })
   })
+
+  describe("renameWorkspaceFolder rollback and rename notifications", () => {
+    it("rolls back partially written files if reading a later file fails during folder rename", async () => {
+      readDirMock.mockImplementation(async (dir: string) => {
+        if (dir === "/root/old-folder") {
+          return [
+            { name: "a.canvas", isDir: false },
+            { name: "b.canvas", isDir: false },
+          ]
+        }
+        return []
+      })
+      putFileMock.mockResolvedValue({})
+      removeFileMock.mockResolvedValue({})
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+        const body = JSON.parse(String(init?.body || "{}"))
+        if (body.path === "/root/old-folder/a.canvas") {
+          return new Response("{}", { status: 200 })
+        }
+        return new Response("error", { status: 500 })
+      })
+
+      const tree = createTree({
+        promptText: async () => "new-folder",
+      })
+
+      await tree.renameWorkspaceFolder("/root/old-folder")
+
+      expect(putFileMock).toHaveBeenCalledTimes(1)
+      expect(putFileMock).toHaveBeenCalledWith("/root/new-folder/a.canvas", false, expect.any(Blob))
+      expect(removeFileMock).toHaveBeenCalledWith("/root/new-folder/a.canvas")
+      expect(removeFileMock).not.toHaveBeenCalledWith("/root/old-folder")
+      expect(showMessageMock).toHaveBeenCalledWith(expect.any(String), 4000, "error")
+    })
+
+    it("notifies onFileRenamed per file without blindly overwriting unrelated active paths", async () => {
+      readDirMock.mockImplementation(async (dir: string) => {
+        if (dir === "/root/old-folder") {
+          return [
+            { name: "a.canvas", isDir: false },
+            { name: "b.canvas", isDir: false },
+          ]
+        }
+        return []
+      })
+      putFileMock.mockResolvedValue({})
+      removeFileMock.mockResolvedValue({})
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("{}", { status: 200 }))
+      const onFileRenamedMock = vi.fn()
+
+      const tree = createCanvasEditorWorkspaceTree({
+        readDir: readDirMock as MockReadDir,
+        putFile: putFileMock,
+        removeFile: removeFileMock,
+        showMessage: showMessageMock,
+        getSettings: getSettingsMock,
+        plugin: { removeRecentCanvasFile: removeRecentCanvasFileMock, updateCanvasUiState: vi.fn() },
+        onFileRenamed: onFileRenamedMock,
+        onFilePathUpdate: onFilePathUpdateMock,
+        refreshRecentFiles: refreshRecentFilesMock,
+        promptText: async () => "new-folder",
+      })
+
+      await tree.renameWorkspaceFolder("/root/old-folder")
+
+      expect(onFileRenamedMock).toHaveBeenCalledWith("/root/old-folder/a.canvas", "/root/new-folder/a.canvas")
+      expect(onFileRenamedMock).toHaveBeenCalledWith("/root/old-folder/b.canvas", "/root/new-folder/b.canvas")
+      expect(onFilePathUpdateMock).not.toHaveBeenCalled()
+    })
+  })
 })

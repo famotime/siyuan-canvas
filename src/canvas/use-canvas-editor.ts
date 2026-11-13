@@ -166,6 +166,15 @@ export function useCanvasEditor(
   const searchListeners = new Set<() => void>()
   let unregisterCanvasSearchHost: (() => void) | null = null
 
+  let preserveHistoryForPath: string | null = null
+  function replaceActiveFilePath(nextPath: string) {
+    if (state.filePath === nextPath) {
+      return
+    }
+    preserveHistoryForPath = nextPath
+    state.filePath = nextPath
+  }
+
   const workspaceTree = (plugin as any)?.getOrCreateWorkspaceTree
     ? (plugin as any).getOrCreateWorkspaceTree()
     : ((plugin as any)?.workspaceTree ?? createCanvasEditorWorkspaceTree({
@@ -176,7 +185,12 @@ export function useCanvasEditor(
         getSettings: getPluginSettings,
         plugin,
         refreshRecentFiles,
-        onFilePathUpdate: (path) => { state.filePath = path },
+        onFilePathUpdate: (path) => { replaceActiveFilePath(path) },
+        onFileRenamed: (oldPath, newPath) => {
+          if (state.filePath === oldPath) {
+            replaceActiveFilePath(newPath)
+          }
+        },
         labels: {
           copyTitle: t("contextMenuCopy"),
           deleteCanvasDescription: path => t("workspaceDeleteCanvasDescription", { path }),
@@ -741,15 +755,21 @@ export function useCanvasEditor(
   }
 
   function applyHistorySnapshot(snapshot: ReturnType<typeof cloneCanvasDocument> extends infer _T ? import("@/canvas/canvas-history").CanvasHistorySnapshot : never) {
+    editingEdgeLabelId.value = ""
+    state.pendingEditNodeId = ""
     state.document = snapshot.document
     state.selectedNodeIds = [...snapshot.selectedNodeIds]
     state.selectedNodeId = snapshot.selectedNodeId
     state.selectedEdgeId = snapshot.selectedEdgeId
     state.isDirty = true
     state.issues = validateCanvasDocument(snapshot.document)
+    notifyCanvasSearchChanged()
   }
 
   function undo() {
+    if (readonly.value) {
+      return
+    }
     const current = {
       document: cloneCanvasDocument(state.document),
       selectedNodeIds: [...state.selectedNodeIds],
@@ -765,6 +785,9 @@ export function useCanvasEditor(
   }
 
   function redo() {
+    if (readonly.value) {
+      return
+    }
     const current = {
       document: cloneCanvasDocument(state.document),
       selectedNodeIds: [...state.selectedNodeIds],
@@ -914,40 +937,63 @@ export function useCanvasEditor(
   })
 
   /**
-   * 保存包装：维护 isSaving 标志，让顶栏徽标可以呈现 saving 态。
-   * 同时在打开新文件 / 新建画布时清空历史栈，避免跨文档 undo 出诡异结果。
+   * 保存包装：维护 isSaving 标志与串行排空队列，防止静默自动保存进行中时手动 Ctrl+S 被吞掉。
    */
   let saveInFlight = false
+  let pendingSaveKind: "manual" | "silent" | null = null
+  let activeSavePromise: Promise<void> | null = null
+
+  function enqueueSave(kind: "manual" | "silent"): Promise<void> {
+    if (kind === "manual" || pendingSaveKind === null) {
+      pendingSaveKind = kind
+    }
+
+    if (activeSavePromise) {
+      return activeSavePromise
+    }
+
+    activeSavePromise = (async () => {
+      saveInFlight = true
+      try {
+        while (pendingSaveKind !== null) {
+          const nextKind = pendingSaveKind
+          pendingSaveKind = null
+          if (nextKind === "manual") {
+            isSaving.value = true
+            try {
+              await saveImpl()
+            } finally {
+              isSaving.value = false
+            }
+          } else {
+            await silentSaveImpl()
+          }
+        }
+      } finally {
+        isSaving.value = false
+        saveInFlight = false
+        pendingSaveKind = null
+        activeSavePromise = null
+      }
+    })()
+
+    return activeSavePromise
+  }
 
   async function save() {
-    if (saveInFlight) {
-      return
-    }
-    saveInFlight = true
-    isSaving.value = true
-    try {
-      await saveImpl()
-    } finally {
-      isSaving.value = false
-      saveInFlight = false
-    }
+    await enqueueSave("manual")
   }
 
   /**
    * 静默保存包装：不弹对话框直接写入当前文件路径。
    * 与手动保存不同，这里不翻转 isSaving（静默保存不应触发顶栏「保存中」状态切换），
-   * 仅用非响应式的 saveInFlight 守卫并发，避免任何响应式状态抖动引起画布重渲染闪烁。
+   * 仅通过串行保存队列排队执行，避免竞态写入。
    */
   async function silentSave() {
-    if (saveInFlight) {
-      return
+    if (saveInFlight && pendingSaveKind === "manual") {
+      return activeSavePromise ?? undefined
     }
-    saveInFlight = true
-    try {
-      await silentSaveImpl()
-    } finally {
-      saveInFlight = false
-    }
+    await enqueueSave("silent")
   }
 
   function clearHistory() {
@@ -981,10 +1027,15 @@ export function useCanvasEditor(
     },
   })
 
-  // 跟踪 filePath 变化（newCanvas / open* 都会改 filePath），切换文档时清空历史
+  // 跟踪 filePath 变化（newCanvas / open* 都会改 filePath），切换文档时清空历史；就地重命名/移动则保留历史
   watch(
     () => state.filePath,
-    () => {
+    (nextPath) => {
+      if (preserveHistoryForPath !== null && preserveHistoryForPath === nextPath) {
+        preserveHistoryForPath = null
+        return
+      }
+      preserveHistoryForPath = null
       clearHistory()
     },
   )
@@ -1234,14 +1285,14 @@ export function useCanvasEditor(
     showNodeHeader: computed(() => getReactivePluginSettings().showNodeHeader),
   })
 
-  // 自动保存：文档变脏后 1 秒静默保存到当前路径；拖拽/缩放期间挂起，结束后再恢复调度
+  // 自动保存：文档变脏后 1 秒静默保存到当前路径；拖拽/缩放或存在未决冲突期间挂起，结束后再恢复调度
   let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
   function scheduleAutoSave() {
     if (autoSaveTimer) {
       clearTimeout(autoSaveTimer)
       autoSaveTimer = null
     }
-    if (state.isDirty && !isDragging.value) {
+    if (state.isDirty && !isDragging.value && !state.conflict) {
       autoSaveTimer = setTimeout(() => {
         autoSaveTimer = null
         void silentSave()
@@ -1250,6 +1301,7 @@ export function useCanvasEditor(
   }
   watch(() => state.isDirty, scheduleAutoSave)
   watch(isDragging, scheduleAutoSave)
+  watch(() => state.conflict, scheduleAutoSave)
 
   function nudgeSelectedNodes(dx: number, dy: number) {
     if (!state.selectedNodeIds.length) {
@@ -1414,6 +1466,10 @@ export function useCanvasEditor(
   })
 
   onBeforeUnmount(() => {
+    if (autoSaveTimer) {
+      clearTimeout(autoSaveTimer)
+      autoSaveTimer = null
+    }
     closeFloatLayer()
     unregisterCanvasSearchHost?.()
     unregisterCanvasSearchHost = null
@@ -1602,6 +1658,7 @@ export function useCanvasEditor(
       openSettings,
       openWorkspacePath,
       overwriteConflictVersion,
+      replaceFilePath: replaceActiveFilePath,
       recentFiles,
       searchDecorations,
       refreshSelectedSiyuanNode,

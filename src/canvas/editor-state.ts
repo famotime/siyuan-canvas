@@ -203,7 +203,7 @@ export class CanvasEditorState {
         baseRaw: !options.force && path === this.filePath && this.lastSavedRaw
           ? this.lastSavedRaw
           : undefined,
-        detectExternalChanges: options.detectExternalChanges && !options.force && !options.direct,
+        detectExternalChanges: options.detectExternalChanges && !options.force,
         direct: options.direct && !options.force,
       })
       this.filePath = path

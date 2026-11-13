@@ -2257,5 +2257,112 @@ Only an intro.`,
 
     wrapper.unmount()
   })
+
+  it("preserves undo history on replaceFilePath rename and clears on document switch", async () => {
+    const path = "/data/storage/maps/roadmap.canvas"
+    workspaceFiles.set(path, createCanvasRaw("workspace canvas"))
+    const { editor, wrapper } = await mountEditor({ path })
+    await flushEditor()
+
+    editor.addNode("text")
+    await flushEditor()
+    expect(editor.state.document.nodes.length).toBeGreaterThan(1)
+    expect(editor.canUndo).toBe(true)
+
+    // 就地重命名应当保留撤销栈
+    editor.replaceFilePath("/data/storage/maps/roadmap-renamed.canvas")
+    await flushEditor()
+    expect(editor.state.filePath).toBe("/data/storage/maps/roadmap-renamed.canvas")
+    expect(editor.canUndo).toBe(true)
+
+    // 切换到另一份文档应当清空撤销栈
+    editor.state.filePath = "/data/storage/maps/another.canvas"
+    await flushEditor()
+    expect(editor.canUndo).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it("blocks undo and redo when editor is in readonly conflict or presentation mode", async () => {
+    const path = "/data/storage/maps/readonly-undo.canvas"
+    workspaceFiles.set(path, createCanvasRaw("workspace canvas"))
+    const { editor, wrapper } = await mountEditor({ path })
+    await flushEditor()
+
+    editor.addNode("text")
+    await flushEditor()
+    const countBefore = editor.state.document.nodes.length
+    expect(editor.canUndo).toBe(true)
+
+    editor.state.conflict = {
+      document: { edges: [], nodes: [] },
+      issues: [],
+      path,
+      raw: "{}",
+    }
+    await flushEditor()
+    expect(editor.readonly).toBe(true)
+
+    editor.undo()
+    await flushEditor()
+    expect(editor.state.document.nodes.length).toBe(countBefore)
+
+    wrapper.unmount()
+  })
+
+  it("queues manual save behind an in-flight silent save instead of dropping it", async () => {
+    const path = "/data/storage/petal/siyuan-canvas/save-queue.canvas"
+    workspaceFiles.set(path, createCanvasRaw("workspace canvas"))
+    const { editor, wrapper } = await mountEditor({ path })
+    await editor.openWorkspacePath(path)
+    await flushEditor()
+
+    let releaseFirstWrite: (() => void) | null = null
+    let markFirstPutStarted: (() => void) | null = null
+    const firstPutStarted = new Promise<void>((resolve) => {
+      markFirstPutStarted = resolve
+    })
+    let writeCount = 0
+    const prevFetchImpl = fetchMock.getMockImplementation()
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url
+      if (url === "/api/file/putFile") {
+        writeCount += 1
+        if (writeCount === 1) {
+          markFirstPutStarted?.()
+          await new Promise<void>((resolve) => {
+            releaseFirstWrite = resolve
+          })
+        }
+        return prevFetchImpl ? prevFetchImpl(input, init) : new Response(JSON.stringify({ code: 0 }), { status: 200 })
+      }
+      return prevFetchImpl ? prevFetchImpl(input, init) : new Response(JSON.stringify({ code: 0 }), { status: 200 })
+    })
+
+    try {
+      editor.addNode("text")
+      await flushEditor()
+
+      // 触发第 1 次静默保存并等待其进入 putFile 阶段
+      const firstSilentSave = editor.silentSave()
+      await firstPutStarted
+
+      // 静默保存尚未返回期间再次修改并触发手动保存（排队等待上一轮结束后执行）
+      editor.addNode("text")
+      queueDialogResponse("save-queue")
+      const queuedManualSave = editor.save()
+
+      releaseFirstWrite?.()
+      await Promise.all([firstSilentSave, queuedManualSave])
+
+      expect(writeCount).toBeGreaterThanOrEqual(2)
+      expect(editor.state.isDirty).toBe(false)
+    } finally {
+      if (prevFetchImpl) {
+        fetchMock.mockImplementation(prevFetchImpl)
+      }
+      wrapper.unmount()
+    }
+  })
 })
 
